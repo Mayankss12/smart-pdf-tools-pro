@@ -8,14 +8,14 @@ export default function CompressPDFPage() {
         <h1 className="text-4xl font-black">Compress PDF</h1>
 
         <p className="mt-3 text-slate-600">
-          Upload workflow placeholder. Full PDF compression processing can be
-          connected in the next version.
+          Upload your PDF and reduce file size. Full compression processing will
+          be connected in the next version.
         </p>
 
         <div className="mt-8 rounded-3xl border-2 border-dashed border-slate-300 bg-white p-10 text-center">
           <div className="font-bold">Upload PDF</div>
           <p className="mt-2 text-sm text-slate-500">
-            Drag and drop area for PDF compression.
+            Drag and drop your PDF here or add file picker in the next step.
           </p>
         </div>
       </main>
