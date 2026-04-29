@@ -14,6 +14,8 @@ import {
   ZoomIn,
   ZoomOut,
   RotateCcw,
+  Minus,
+  Plus,
 } from "lucide-react";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
@@ -639,6 +641,47 @@ export default function EditorPage() {
                   <RotateCcw size={16} />
                   Clear
                 </button>
+                                {selectedLayer?.type === "text" && (
+                  <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2">
+                    <span className="text-xs font-black text-slate-500">
+                      Font
+                    </span>
+
+                    <button
+                      onClick={() =>
+                        updateLayer(selectedLayer.id, {
+                          fontSize: Math.max(
+                            8,
+                            (selectedLayer.fontSize || 16) - 1
+                          ),
+                        })
+                      }
+                      className="rounded-lg border border-slate-200 bg-slate-50 p-1.5 text-slate-700 hover:bg-slate-100"
+                      title="Decrease font size"
+                    >
+                      <Minus size={13} />
+                    </button>
+
+                    <span className="min-w-8 text-center text-sm font-black text-slate-900">
+                      {selectedLayer.fontSize || 16}
+                    </span>
+
+                    <button
+                      onClick={() =>
+                        updateLayer(selectedLayer.id, {
+                          fontSize: Math.min(
+                            72,
+                            (selectedLayer.fontSize || 16) + 1
+                          ),
+                        })
+                      }
+                      className="rounded-lg border border-slate-200 bg-slate-50 p-1.5 text-slate-700 hover:bg-slate-100"
+                      title="Increase font size"
+                    >
+                      <Plus size={13} />
+                    </button>
+                  </div>
+                )}
 
                 <div className="ml-auto flex items-center gap-2">
                   <button
@@ -779,17 +822,16 @@ export default function EditorPage() {
                       }
 
                       return (
-                        <div
+                      <div
                           key={layer.id}
-                          onMouseDown={(event) => startMove(event, layer)}
                           onClick={(event) => {
                             event.stopPropagation();
                             setSelectedLayerId(layer.id);
                           }}
-                          className={`absolute cursor-move rounded-lg border-2 bg-white text-slate-950 transition ${
+                          className={`absolute rounded-md border bg-white text-slate-950 transition ${
                             isSelected
-                              ? "border-indigo-700 ring-4 ring-indigo-200"
-                              : "border-indigo-400"
+                              ? "border-indigo-500 ring-2 ring-indigo-100"
+                              : "border-indigo-300"
                           }`}
                           style={{
                             left: layer.x,
@@ -816,7 +858,14 @@ export default function EditorPage() {
                               lineHeight: 1.15,
                             }}
                           />
-
+                          {isSelected && (
+                            <div
+                              onMouseDown={(event) => startMove(event, layer)}
+                              className="absolute left-0 top-0 h-2 w-full cursor-move rounded-t-md bg-indigo-500/20"
+                              title="Drag text box"
+                            />
+                          )}
+                        
                           {renderResizeHandles(layer)}
                         </div>
                       );
