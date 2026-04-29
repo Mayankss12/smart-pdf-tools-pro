@@ -306,16 +306,29 @@ export default function EditorPage() {
   async function handleFile(file?: File) {
     if (!file) return;
 
-    if (file.type !== "application/pdf") {
-      setStatus("Please upload a valid PDF file.");
-      return;
-    }
-
     setBusy(true);
     setStatus("Loading PDF preview...");
 
     try {
       const arrayBuffer = await file.arrayBuffer();
+      const fileNameLower = file.name.toLowerCase();
+      const hasPdfExtension = fileNameLower.endsWith(".pdf");
+      const hasPdfMime =
+        file.type === "application/pdf" || file.type === "application/x-pdf";
+      const headerBytes = new Uint8Array(arrayBuffer.slice(0, 5));
+      const hasPdfSignature =
+        headerBytes.length === 5 &&
+        headerBytes[0] === 0x25 &&
+        headerBytes[1] === 0x50 &&
+        headerBytes[2] === 0x44 &&
+        headerBytes[3] === 0x46 &&
+        headerBytes[4] === 0x2d;
+
+      if (!hasPdfMime && !hasPdfExtension && !hasPdfSignature) {
+        setStatus("Please upload a valid PDF file.");
+        return;
+      }
+
       fileBytesRef.current = arrayBuffer.slice(0);
 
       const loadedPdf = await pdfjsLib.getDocument({
@@ -359,6 +372,7 @@ export default function EditorPage() {
       height: 38,
       text: "Edit text",
       fontSize: 16,
+      fontStyle: "normal",
     };
 
     setLayers((prev) => [...prev, newLayer]);
@@ -380,6 +394,7 @@ export default function EditorPage() {
       y: 180,
       width: 250,
       height: 30,
+      opacity: 0.42,
     };
 
     setLayers((prev) => [...prev, newLayer]);
@@ -405,6 +420,27 @@ export default function EditorPage() {
 
     deleteLayer(selectedLayerId);
   }
+  function duplicateSelectedLayer() {
+    if (!selectedLayerId) {
+      setStatus("Select a layer first.");
+      return;
+    }
+
+    const layer = layers.find((item) => item.id === selectedLayerId);
+    if (!layer) return;
+
+    const duplicateLayer: PdfLayer = {
+      ...layer,
+      id: crypto.randomUUID(),
+      x: clamp(layer.x + 20, 0, canvasSize.width - layer.width),
+      y: clamp(layer.y + 20, 0, canvasSize.height - layer.height),
+    };
+
+    setLayers((prev) => [...prev, duplicateLayer]);
+    setSelectedLayerId(duplicateLayer.id);
+    setStatus("Layer duplicated.");
+  }
+
   function resetEditor() {
     setLayers([]);
     setSelectedLayerId(null);
@@ -476,6 +512,10 @@ export default function EditorPage() {
     try {
       const pdfDoc = await PDFDocument.load(fileBytesRef.current.slice(0));
       const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const helveticaBoldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+      const helveticaObliqueFont = await pdfDoc.embedFont(
+        StandardFonts.HelveticaOblique
+      );
       const pages = pdfDoc.getPages();
 
       for (const layer of layers) {
@@ -490,29 +530,41 @@ export default function EditorPage() {
 
         if (layer.type === "highlight") {
           page.drawRectangle({
-          x: pdfX,
-          y: pdfY,
-          width: layer.width / renderScale,
-          height: layer.height / renderScale,
-          color: rgb(1, 0.86, 0.16),
-          opacity: layer.opacity || 0.42,
-        });
-      }
-
-       if (layer.type === "text") {
-          const textToDraw = layer.text || "";
-          const fontSize = (layer.fontSize || 16) / renderScale;
-
-          page.drawText(textToDraw, {
             x: pdfX,
-            y: pdfY + 5,
-            size: fontSize,
-            font: helveticaFont,
+            y: pdfY,
+            width: layer.width / renderScale,
+            height: layer.height / renderScale,
+            color: rgb(1, 0.86, 0.16),
+            opacity: layer.opacity ?? 0.42,
+          });
+        }
+
+        if (layer.type === "text") {
+          const fontSize = layer.fontSize || 16;
+          const scaledFontSize = fontSize / renderScale;
+          const scaledLineHeight = (fontSize * 1.15) / renderScale;
+          const scaledWidth = layer.width / renderScale;
+          const scaledHeight = layer.height / renderScale;
+          const paddingX = 2 / renderScale;
+          const paddingY = 1 / renderScale;
+
+          const textFont = layer.isBold
+            ? helveticaBoldFont
+            : layer.isItalic
+              ? helveticaObliqueFont
+              : helveticaFont;
+
+          page.drawText(layer.text || "", {
+            x: pdfX + paddingX,
+            y: pdfY + scaledHeight - paddingY - scaledFontSize,
+            size: scaledFontSize,
+            lineHeight: scaledLineHeight,
+            maxWidth: Math.max(scaledWidth - paddingX * 2, 1),
+            font: textFont,
             color: rgb(0.05, 0.07, 0.16),
           });
         }
       }
-
       const pdfBytes = await pdfDoc.save();
       const blob = new Blob([pdfBytes], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
@@ -794,17 +846,35 @@ export default function EditorPage() {
                 </button>
 
                 <button
+                  onClick={resetEditor}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-black text-slate-700 transition hover:bg-slate-100"
+                >
+                  <RotateCcw size={16} />
+                  Clear
+                </button>
+
+                <button
                   onClick={exportPdf}
                   className="inline-flex items-center gap-2 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-2.5 text-sm font-black text-emerald-700 transition hover:bg-emerald-100"
                 >
                   <Download size={16} />
                   Export PDF
                 </button>
-                                {selectedLayer?.type === "text" && (
+
+                {selectedLayer?.type === "text" && (
                   <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2">
-                    <span className="text-xs font-black text-slate-500">
-                      Font
-                    </span>
+                    <button
+                      onClick={() => updateLayer(selectedLayer.id, { fontStyle: "bold" })}
+                      className={`rounded-lg border px-2 py-1 text-xs font-black ${selectedLayer.fontStyle === "bold" ? "border-indigo-300 bg-indigo-50 text-indigo-700" : "border-slate-200 bg-slate-50 text-slate-700"}`}
+                    >
+                      Bold
+                    </button>
+                    <button
+                      onClick={() => updateLayer(selectedLayer.id, { fontStyle: "italic" })}
+                      className={`rounded-lg border px-2 py-1 text-xs font-black ${selectedLayer.fontStyle === "italic" ? "border-indigo-300 bg-indigo-50 text-indigo-700" : "border-slate-200 bg-slate-50 text-slate-700"}`}
+                    >
+                      Italic
+                    </button>
 
                     <button
                       onClick={() =>
@@ -838,6 +908,40 @@ export default function EditorPage() {
                       title="Increase font size"
                     >
                       <Plus size={13} />
+                    </button>
+
+                    <button
+                      onClick={duplicateSelectedLayer}
+                      className="ml-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-black text-slate-700 hover:bg-slate-100"
+                    >
+                      Duplicate
+                    </button>
+                  </div>
+                )}
+
+                {selectedLayer?.type === "highlight" && (
+                  <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2">
+                    <span className="text-xs font-black text-slate-500">Opacity</span>
+                    <select
+                      value={selectedLayer.opacity ?? 0.42}
+                      onChange={(event) =>
+                        updateLayer(selectedLayer.id, {
+                          opacity: Number(event.target.value),
+                        })
+                      }
+                      className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-bold text-slate-700"
+                    >
+                      <option value={0.2}>20%</option>
+                      <option value={0.35}>35%</option>
+                      <option value={0.5}>50%</option>
+                      <option value={0.65}>65%</option>
+                      <option value={0.8}>80%</option>
+                    </select>
+                    <button
+                      onClick={duplicateSelectedLayer}
+                      className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-black text-slate-700 hover:bg-slate-100"
+                    >
+                      Duplicate
                     </button>
                   </div>
                 )}
