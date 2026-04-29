@@ -10,6 +10,10 @@ import {
   Loader2,
   Minus,
   Plus,
+  FileText,
+  MousePointer2,
+  Sparkles,
+  Layers,
 } from "lucide-react";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
@@ -46,8 +50,8 @@ export default function EditorPage() {
   const [status, setStatus] = useState("Upload a PDF to start editing.");
   const [numPages, setNumPages] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
-  const [canvasSize, setCanvasSize] = useState({ width: 760, height: 980 });
-  const [renderScale, setRenderScale] = useState(1.55);
+  const [canvasSize, setCanvasSize] = useState({ width: 680, height: 880 });
+  const [renderScale, setRenderScale] = useState(1.35);
   const [layers, setLayers] = useState<PdfLayer[]>([]);
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -61,7 +65,8 @@ export default function EditorPage() {
 
     const page = await pdfDocRef.current.getPage(pageNumber);
 
-    const scale = 1.55;
+    // Smaller preview than before, but still sharp
+    const scale = 1.35;
     const viewport = page.getViewport({ scale });
 
     const canvas = canvasRef.current;
@@ -148,7 +153,7 @@ export default function EditorPage() {
     }
 
     setBusy(true);
-    setStatus("Loading PDF...");
+    setStatus("Loading PDF preview...");
 
     try {
       const arrayBuffer = await file.arrayBuffer();
@@ -168,7 +173,7 @@ export default function EditorPage() {
 
       await renderPage(1);
 
-      setStatus("PDF loaded. Add text/highlight, drag it, edit it, then export.");
+      setStatus("PDF loaded. Add text/highlight, drag it, then export.");
     } catch (error) {
       console.error(error);
       setStatus("Unable to load PDF. Please try another file.");
@@ -187,17 +192,17 @@ export default function EditorPage() {
       id: crypto.randomUUID(),
       page: currentPage,
       type: "text",
-      x: 90,
-      y: 130,
-      width: 260,
-      height: 46,
-      text: "Edit this text",
-      fontSize: 18,
+      x: 80,
+      y: 120,
+      width: 220,
+      height: 38,
+      text: "Edit text",
+      fontSize: 16,
     };
 
     setLayers((prev) => [...prev, newLayer]);
     setSelectedLayerId(newLayer.id);
-    setStatus("Text layer added. Drag it or edit from right panel.");
+    setStatus("Text layer added. Drag it or edit from the right panel.");
   }
 
   function addHighlightLayer() {
@@ -210,15 +215,15 @@ export default function EditorPage() {
       id: crypto.randomUUID(),
       page: currentPage,
       type: "highlight",
-      x: 90,
-      y: 200,
-      width: 280,
-      height: 34,
+      x: 80,
+      y: 180,
+      width: 250,
+      height: 30,
     };
 
     setLayers((prev) => [...prev, newLayer]);
     setSelectedLayerId(newLayer.id);
-    setStatus("Highlight layer added. Drag or resize from right panel.");
+    setStatus("Highlight layer added. Drag it or resize from the right panel.");
   }
 
   function deleteSelectedLayer() {
@@ -285,18 +290,18 @@ export default function EditorPage() {
             y: pdfY,
             width: layer.width / renderScale,
             height: layer.height / renderScale,
-            color: rgb(1, 0.92, 0.25),
-            opacity: 0.45,
+            color: rgb(1, 0.9, 0.18),
+            opacity: 0.42,
           });
         }
 
         if (layer.type === "text") {
           page.drawText(layer.text || "", {
             x: pdfX,
-            y: pdfY + 10,
-            size: layer.fontSize || 18,
+            y: pdfY + 4,
+            size: (layer.fontSize || 16) / renderScale,
             font: helveticaFont,
-            color: rgb(0.04, 0.08, 0.16),
+            color: rgb(0.03, 0.07, 0.15),
           });
         }
       }
@@ -330,327 +335,392 @@ export default function EditorPage() {
     <>
       <Header />
 
-      <main className="mx-auto max-w-7xl px-6 py-8">
-        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-          <div>
-            <h1 className="text-3xl font-black">Advanced PDF Editor</h1>
-            <p className="mt-2 text-slate-600">{status}</p>
+      <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+        <section className="mx-auto max-w-7xl px-5 py-7">
+          <div className="rounded-[2rem] border border-slate-200 bg-white/80 p-5 shadow-sm backdrop-blur">
+            <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
+              <div>
+                <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
+                  <Sparkles size={14} />
+                  Smart PDF Workspace
+                </div>
+
+                <h1 className="text-3xl font-black tracking-tight text-slate-950 md:text-4xl">
+                  Advanced PDF Editor
+                </h1>
+
+                <p className="mt-2 max-w-2xl text-sm font-medium text-slate-600 md:text-base">
+                  {status}
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700"
+                >
+                  <Upload size={18} />
+                  Upload PDF
+                </button>
+
+                <button
+                  onClick={exportPdf}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-900 shadow-sm transition hover:bg-slate-50"
+                >
+                  <Download size={18} />
+                  Export
+                </button>
+              </div>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="application/pdf"
+                className="hidden"
+                onChange={(event) => handleFile(event.target.files?.[0])}
+              />
+            </div>
+
+            <div
+              className="mt-6 rounded-3xl border-2 border-dashed border-blue-200 bg-gradient-to-r from-blue-50 via-white to-indigo-50 p-6 text-center"
+              onDrop={(event) => {
+                event.preventDefault();
+                handleFile(event.dataTransfer.files?.[0]);
+              }}
+              onDragOver={(event) => event.preventDefault()}
+            >
+              <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-md shadow-blue-200">
+                <FileText size={22} />
+              </div>
+
+              <div className="font-black text-slate-950">
+                {fileName || "Drop your PDF here"}
+              </div>
+
+              <div className="mt-1 text-sm font-medium text-slate-500">
+                Add draggable text and highlights, then download the edited PDF.
+              </div>
+            </div>
           </div>
 
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="btn-primary gap-2"
-          >
-            <Upload size={18} />
-            Upload PDF
-          </button>
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="application/pdf"
-            className="hidden"
-            onChange={(event) => handleFile(event.target.files?.[0])}
-          />
-        </div>
-
-        <div
-          className="mt-6 rounded-3xl border-2 border-dashed border-slate-300 bg-white p-8 text-center"
-          onDrop={(event) => {
-            event.preventDefault();
-            handleFile(event.dataTransfer.files?.[0]);
-          }}
-          onDragOver={(event) => event.preventDefault()}
-        >
-          <div className="font-bold">{fileName || "Drop PDF here"}</div>
-          <div className="mt-1 text-sm text-slate-500">
-            Upload PDF, add draggable text/highlight, then export edited file.
-          </div>
-        </div>
-
-        <div className="mt-6 overflow-hidden rounded-3xl border bg-white shadow-sm">
-          <div className="flex flex-wrap gap-2 border-b p-3">
-            <button
-              onClick={addTextLayer}
-              className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold hover:bg-slate-50"
-            >
-              <Type size={16} />
-              Text
-            </button>
-
-            <button
-              onClick={addHighlightLayer}
-              className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold hover:bg-slate-50"
-            >
-              <Highlighter size={16} />
-              Highlight
-            </button>
-
-            <button
-              onClick={deleteSelectedLayer}
-              className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold hover:bg-slate-50"
-            >
-              <Trash2 size={16} />
-              Delete Selected
-            </button>
-
-            <button
-              onClick={exportPdf}
-              className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold hover:bg-slate-50"
-            >
-              <Download size={16} />
-              Export PDF
-            </button>
-          </div>
-
-          <div className="grid min-h-[700px] md:grid-cols-[170px_1fr_300px]">
-            <aside className="border-r bg-slate-50 p-4">
-              <div className="mb-3 font-bold">Pages</div>
-
-              {numPages === 0 ? (
-                <p className="text-sm text-slate-500">No PDF uploaded.</p>
-              ) : (
-                Array.from({ length: numPages }).map((_, index) => {
-                  const pageNumber = index + 1;
-
-                  return (
-                    <button
-                      key={pageNumber}
-                      onClick={() => {
-                        setCurrentPage(pageNumber);
-                        setSelectedLayerId(null);
-                      }}
-                      className={`mb-3 w-full rounded-xl border p-3 text-left text-sm ${
-                        currentPage === pageNumber
-                          ? "border-brand-600 bg-brand-50 font-bold text-brand-700"
-                          : "bg-white"
-                      }`}
-                    >
-                      Page {pageNumber}
-                    </button>
-                  );
-                })
-              )}
-            </aside>
-
-            <section className="flex items-start justify-center overflow-auto bg-slate-200 p-6">
-              <div
-                className="relative rounded-xl bg-white shadow-lg"
-                style={{
-                  width: canvasSize.width,
-                  minHeight: canvasSize.height,
-                }}
-                onClick={() => setSelectedLayerId(null)}
+          <div className="mt-6 overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-xl shadow-slate-200/60">
+            <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white/90 p-3 backdrop-blur">
+              <button
+                onClick={addTextLayer}
+                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-bold text-slate-900 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
               >
-                {busy && (
-                  <div className="absolute inset-0 z-30 flex items-center justify-center rounded-xl bg-white/70">
-                    <div className="flex items-center gap-2 rounded-xl bg-white px-4 py-3 font-semibold shadow">
-                      <Loader2 className="animate-spin" size={18} />
-                      Processing
-                    </div>
-                  </div>
-                )}
+                <Type size={16} />
+                Text
+              </button>
 
-                {!fileName && (
-                  <div className="flex min-h-[560px] items-center justify-center p-10 text-center text-slate-500">
-                    Upload a PDF to preview it here.
-                  </div>
-                )}
+              <button
+                onClick={addHighlightLayer}
+                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-bold text-slate-900 transition hover:border-yellow-200 hover:bg-yellow-50 hover:text-yellow-700"
+              >
+                <Highlighter size={16} />
+                Highlight
+              </button>
 
-                <canvas ref={canvasRef} className={fileName ? "block" : "hidden"} />
+              <button
+                onClick={deleteSelectedLayer}
+                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-bold text-slate-900 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700"
+              >
+                <Trash2 size={16} />
+                Delete Selected
+              </button>
 
-                {currentPageLayers.map((layer) => {
-                  const isSelected = selectedLayerId === layer.id;
+              <div className="ml-auto hidden items-center gap-2 rounded-2xl bg-slate-100 px-4 py-2 text-xs font-bold text-slate-600 md:flex">
+                <MousePointer2 size={15} />
+                Drag layers directly on PDF
+              </div>
+            </div>
 
-                  if (layer.type === "highlight") {
+            <div className="grid min-h-[660px] lg:grid-cols-[155px_1fr_285px]">
+              <aside className="border-r border-slate-200 bg-slate-50/80 p-4">
+                <div className="mb-3 flex items-center gap-2 text-sm font-black text-slate-950">
+                  <FileText size={16} />
+                  Pages
+                </div>
+
+                {numPages === 0 ? (
+                  <p className="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-sm text-slate-500">
+                    No PDF uploaded.
+                  </p>
+                ) : (
+                  Array.from({ length: numPages }).map((_, index) => {
+                    const pageNumber = index + 1;
+
                     return (
                       <button
+                        key={pageNumber}
+                        onClick={() => {
+                          setCurrentPage(pageNumber);
+                          setSelectedLayerId(null);
+                        }}
+                        className={`mb-2 w-full rounded-2xl border p-3 text-left text-sm transition ${
+                          currentPage === pageNumber
+                            ? "border-blue-600 bg-blue-50 font-black text-blue-700 shadow-sm"
+                            : "border-slate-200 bg-white font-semibold text-slate-700 hover:border-blue-200 hover:bg-blue-50"
+                        }`}
+                      >
+                        Page {pageNumber}
+                      </button>
+                    );
+                  })
+                )}
+              </aside>
+
+              <section className="flex items-start justify-center overflow-auto bg-[radial-gradient(circle_at_top,_#e0ecff,_#f1f5f9_45%,_#e2e8f0)] p-6">
+                <div
+                  className="relative rounded-xl bg-white shadow-2xl shadow-slate-500/20 ring-1 ring-slate-200"
+                  style={{
+                    width: canvasSize.width,
+                    minHeight: canvasSize.height,
+                  }}
+                  onClick={() => setSelectedLayerId(null)}
+                >
+                  {busy && (
+                    <div className="absolute inset-0 z-30 flex items-center justify-center rounded-xl bg-white/75 backdrop-blur-sm">
+                      <div className="flex items-center gap-2 rounded-2xl bg-white px-5 py-4 font-bold shadow-xl">
+                        <Loader2 className="animate-spin text-blue-600" size={20} />
+                        Processing
+                      </div>
+                    </div>
+                  )}
+
+                  {!fileName && (
+                    <div className="flex min-h-[540px] items-center justify-center p-10 text-center">
+                      <div>
+                        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-3xl bg-blue-50 text-blue-600">
+                          <Upload size={26} />
+                        </div>
+                        <div className="font-black text-slate-900">
+                          Upload a PDF to preview it here
+                        </div>
+                        <p className="mt-2 text-sm text-slate-500">
+                          Your PDF pages will appear in this workspace.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  <canvas ref={canvasRef} className={fileName ? "block" : "hidden"} />
+
+                  {currentPageLayers.map((layer) => {
+                    const isSelected = selectedLayerId === layer.id;
+
+                    if (layer.type === "highlight") {
+                      return (
+                        <button
+                          key={layer.id}
+                          onMouseDown={(event) => startDrag(event, layer)}
+                          className={`absolute cursor-move rounded-md border-2 transition ${
+                            isSelected
+                              ? "border-blue-700 ring-4 ring-blue-200"
+                              : "border-yellow-500"
+                          } bg-yellow-300/50`}
+                          style={{
+                            left: layer.x,
+                            top: layer.y,
+                            width: layer.width,
+                            height: layer.height,
+                          }}
+                          title="Drag highlight layer"
+                        />
+                      );
+                    }
+
+                    return (
+                      <input
                         key={layer.id}
+                        value={layer.text || ""}
                         onMouseDown={(event) => startDrag(event, layer)}
-                        className={`absolute cursor-move border-2 ${
-                          isSelected ? "border-brand-700" : "border-yellow-500"
-                        } bg-yellow-300/50`}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setSelectedLayerId(layer.id);
+                        }}
+                        onChange={(event) =>
+                          updateLayer(layer.id, { text: event.target.value })
+                        }
+                        className={`absolute cursor-move rounded-lg border-2 bg-white px-2 py-1 font-semibold text-slate-950 outline-none transition ${
+                          isSelected
+                            ? "border-blue-700 ring-4 ring-blue-200"
+                            : "border-blue-400"
+                        }`}
                         style={{
                           left: layer.x,
                           top: layer.y,
                           width: layer.width,
                           height: layer.height,
+                          fontSize: layer.fontSize || 16,
                         }}
-                        title="Drag highlight layer"
                       />
                     );
-                  }
+                  })}
+                </div>
+              </section>
 
-                  return (
-                    <input
-                      key={layer.id}
-                      value={layer.text || ""}
-                      onMouseDown={(event) => startDrag(event, layer)}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setSelectedLayerId(layer.id);
-                      }}
-                      onChange={(event) =>
-                        updateLayer(layer.id, { text: event.target.value })
-                      }
-                      className={`absolute cursor-move rounded-md border-2 bg-white/90 px-2 py-1 font-semibold outline-none ${
-                        isSelected ? "border-brand-700" : "border-brand-400"
-                      }`}
-                      style={{
-                        left: layer.x,
-                        top: layer.y,
-                        width: layer.width,
-                        height: layer.height,
-                        fontSize: layer.fontSize || 18,
-                      }}
-                    />
-                  );
-                })}
-              </div>
-            </section>
+              <aside className="border-l border-slate-200 bg-white p-4">
+                <div className="mb-3 flex items-center gap-2 text-sm font-black text-slate-950">
+                  <Layers size={16} />
+                  Layers
+                </div>
 
-            <aside className="border-l p-4">
-              <div className="font-bold">Layers</div>
+                <div className="space-y-2">
+                  {layers.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                      No layers yet. Add text or highlight.
+                    </div>
+                  ) : (
+                    layers.map((layer) => (
+                      <button
+                        key={layer.id}
+                        onClick={() => {
+                          setCurrentPage(layer.page);
+                          setSelectedLayerId(layer.id);
+                        }}
+                        className={`w-full rounded-2xl border p-3 text-left text-sm capitalize transition ${
+                          selectedLayerId === layer.id
+                            ? "border-blue-600 bg-blue-50 font-black text-blue-700"
+                            : "border-slate-200 bg-white font-semibold text-slate-700 hover:border-blue-200 hover:bg-blue-50"
+                        }`}
+                      >
+                        {layer.type} layer
+                        <div className="mt-1 text-xs text-slate-500">
+                          Page {layer.page}
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
 
-              <div className="mt-3 space-y-2">
-                {layers.length === 0 ? (
-                  <p className="text-sm text-slate-500">No layers yet.</p>
-                ) : (
-                  layers.map((layer) => (
-                    <button
-                      key={layer.id}
-                      onClick={() => {
-                        setCurrentPage(layer.page);
-                        setSelectedLayerId(layer.id);
-                      }}
-                      className={`w-full rounded-xl border p-3 text-left text-sm capitalize ${
-                        selectedLayerId === layer.id
-                          ? "border-brand-600 bg-brand-50 font-bold text-brand-700"
-                          : "bg-white"
-                      }`}
-                    >
-                      {layer.type} layer
-                      <div className="text-xs text-slate-500">
-                        Page {layer.page}
-                      </div>
-                    </button>
-                  ))
-                )}
-              </div>
+                {selectedLayer && (
+                  <div className="mt-5 rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="font-black text-slate-950">
+                      Selected Layer Settings
+                    </div>
 
-              {selectedLayer && (
-                <div className="mt-5 rounded-2xl border bg-slate-50 p-4">
-                  <div className="font-bold">Selected Layer Settings</div>
-
-                  <div className="mt-4 space-y-4">
-                    {selectedLayer.type === "text" && (
-                      <>
-                        <label className="block text-sm font-semibold">
-                          Text
-                          <textarea
-                            value={selectedLayer.text || ""}
-                            onChange={(event) =>
-                              updateLayer(selectedLayer.id, {
-                                text: event.target.value,
-                              })
-                            }
-                            className="mt-2 min-h-24 w-full rounded-xl border bg-white p-3 text-sm outline-none"
-                          />
-                        </label>
-
-                        <div>
-                          <div className="text-sm font-semibold">Font size</div>
-                          <div className="mt-2 flex items-center gap-2">
-                            <button
-                              onClick={() =>
+                    <div className="mt-4 space-y-4">
+                      {selectedLayer.type === "text" && (
+                        <>
+                          <label className="block text-sm font-bold text-slate-800">
+                            Text
+                            <textarea
+                              value={selectedLayer.text || ""}
+                              onChange={(event) =>
                                 updateLayer(selectedLayer.id, {
-                                  fontSize: Math.max(
-                                    8,
-                                    (selectedLayer.fontSize || 18) - 1
-                                  ),
+                                  text: event.target.value,
                                 })
                               }
-                              className="rounded-lg border bg-white p-2"
-                            >
-                              <Minus size={14} />
-                            </button>
+                              className="mt-2 min-h-24 w-full rounded-2xl border border-slate-200 bg-white p-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                            />
+                          </label>
 
-                            <div className="w-12 text-center font-bold">
-                              {selectedLayer.fontSize || 18}
+                          <div>
+                            <div className="text-sm font-bold text-slate-800">
+                              Font size
                             </div>
 
-                            <button
-                              onClick={() =>
+                            <div className="mt-2 flex items-center gap-2">
+                              <button
+                                onClick={() =>
+                                  updateLayer(selectedLayer.id, {
+                                    fontSize: Math.max(
+                                      8,
+                                      (selectedLayer.fontSize || 16) - 1
+                                    ),
+                                  })
+                                }
+                                className="rounded-xl border border-slate-200 bg-white p-2 transition hover:bg-slate-50"
+                              >
+                                <Minus size={14} />
+                              </button>
+
+                              <div className="w-12 rounded-xl bg-white py-2 text-center font-black">
+                                {selectedLayer.fontSize || 16}
+                              </div>
+
+                              <button
+                                onClick={() =>
+                                  updateLayer(selectedLayer.id, {
+                                    fontSize: Math.min(
+                                      72,
+                                      (selectedLayer.fontSize || 16) + 1
+                                    ),
+                                  })
+                                }
+                                className="rounded-xl border border-slate-200 bg-white p-2 transition hover:bg-slate-50"
+                              >
+                                <Plus size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        </>
+                      )}
+
+                      {selectedLayer.type === "highlight" && (
+                        <>
+                          <div>
+                            <div className="text-sm font-bold text-slate-800">
+                              Width
+                            </div>
+
+                            <input
+                              type="range"
+                              min="40"
+                              max="550"
+                              value={selectedLayer.width}
+                              onChange={(event) =>
                                 updateLayer(selectedLayer.id, {
-                                  fontSize: Math.min(
-                                    80,
-                                    (selectedLayer.fontSize || 18) + 1
-                                  ),
+                                  width: Number(event.target.value),
                                 })
                               }
-                              className="rounded-lg border bg-white p-2"
-                            >
-                              <Plus size={14} />
-                            </button>
-                          </div>
-                        </div>
-                      </>
-                    )}
+                              className="mt-2 w-full"
+                            />
 
-                    {selectedLayer.type === "highlight" && (
-                      <>
-                        <div>
-                          <div className="text-sm font-semibold">Width</div>
-                          <input
-                            type="range"
-                            min="40"
-                            max="600"
-                            value={selectedLayer.width}
-                            onChange={(event) =>
-                              updateLayer(selectedLayer.id, {
-                                width: Number(event.target.value),
-                              })
-                            }
-                            className="mt-2 w-full"
-                          />
-                          <div className="text-xs text-slate-500">
-                            {selectedLayer.width}px
+                            <div className="text-xs font-semibold text-slate-500">
+                              {selectedLayer.width}px
+                            </div>
                           </div>
-                        </div>
 
-                        <div>
-                          <div className="text-sm font-semibold">Height</div>
-                          <input
-                            type="range"
-                            min="15"
-                            max="180"
-                            value={selectedLayer.height}
-                            onChange={(event) =>
-                              updateLayer(selectedLayer.id, {
-                                height: Number(event.target.value),
-                              })
-                            }
-                            className="mt-2 w-full"
-                          />
-                          <div className="text-xs text-slate-500">
-                            {selectedLayer.height}px
+                          <div>
+                            <div className="text-sm font-bold text-slate-800">
+                              Height
+                            </div>
+
+                            <input
+                              type="range"
+                              min="14"
+                              max="150"
+                              value={selectedLayer.height}
+                              onChange={(event) =>
+                                updateLayer(selectedLayer.id, {
+                                  height: Number(event.target.value),
+                                })
+                              }
+                              className="mt-2 w-full"
+                            />
+
+                            <div className="text-xs font-semibold text-slate-500">
+                              {selectedLayer.height}px
+                            </div>
                           </div>
-                        </div>
-                      </>
-                    )}
+                        </>
+                      )}
 
-                    <button
-                      onClick={deleteSelectedLayer}
-                      className="w-full rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 hover:bg-red-100"
-                    >
-                      Delete this layer
-                    </button>
+                      <button
+                        onClick={deleteSelectedLayer}
+                        className="w-full rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-black text-red-700 transition hover:bg-red-100"
+                      >
+                        Delete this layer
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )}
-            </aside>
+                )}
+              </aside>
+            </div>
           </div>
-        </div>
+        </section>
       </main>
     </>
   );
