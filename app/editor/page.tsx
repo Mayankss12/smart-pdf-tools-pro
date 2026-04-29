@@ -441,6 +441,27 @@ export default function EditorPage() {
     setStatus("Layer duplicated.");
   }
 
+  function duplicateSelectedLayer() {
+    if (!selectedLayerId) {
+      setStatus("Select a layer first.");
+      return;
+    }
+
+    const layer = layers.find((item) => item.id === selectedLayerId);
+    if (!layer) return;
+
+    const duplicateLayer: PdfLayer = {
+      ...layer,
+      id: crypto.randomUUID(),
+      x: clamp(layer.x + 20, 0, canvasSize.width - layer.width),
+      y: clamp(layer.y + 20, 0, canvasSize.height - layer.height),
+    };
+
+    setLayers((prev) => [...prev, duplicateLayer]);
+    setSelectedLayerId(duplicateLayer.id);
+    setStatus("Layer duplicated.");
+  }
+
   function resetEditor() {
     setLayers([]);
     setSelectedLayerId(null);
@@ -1007,8 +1028,8 @@ export default function EditorPage() {
                       <MousePointer2 size={14} />
                       Quick tip
                     </div>
-                    Click a layer to select it. Drag from center to move. Drag
-                    dots to resize.
+                    Click a layer to select it. Use the top strip to move text
+                    boxes. Drag dots to resize.
                   </div>
                 </aside>
 
