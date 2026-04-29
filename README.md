@@ -24,3 +24,4 @@ npm run dev
 ## Deploy
 
 Upload this project to GitHub, then import it into Vercel.
+Fresh deployment trigger after compress fix.
