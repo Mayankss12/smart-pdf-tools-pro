@@ -550,31 +550,17 @@ export default function EditorPage() {
                     PDFMantra Smart Workspace
                   </div>
 
-                  <h1 className="text-3xl font-black tracking-tight md:text-4xl">
+                  <h1 className="text-3xl font-black tracking-[-0.03em] md:text-5xl">
                     PDF Editor
                   </h1>
 
-                  <p className="mt-2 max-w-2xl text-sm font-medium text-indigo-50 md:text-base">
+                  <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-indigo-50 md:text-base">
                     {status}
                   </p>
                 </div>
 
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-amber-400 px-5 py-3 text-sm font-black text-slate-950 shadow-lg shadow-amber-900/20 transition hover:bg-amber-300"
-                  >
-                    <Upload size={18} />
-                    Upload PDF
-                  </button>
-
-                  <button
-                    onClick={exportPdf}
-                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-black text-indigo-700 shadow-lg shadow-indigo-900/20 transition hover:bg-indigo-50"
-                  >
-                    <Download size={18} />
-                    Export PDF
-                  </button>
+                <div className="hidden rounded-2xl bg-white/15 px-4 py-3 text-sm font-bold text-white ring-1 ring-white/20 lg:block">
+                  Fast, private, browser-based PDF editing
                 </div>
 
                 <input
@@ -602,10 +588,17 @@ export default function EditorPage() {
               <div className="font-black text-slate-950">
                 {fileName || "Drop your PDF here"}
               </div>
-
-              <div className="mt-1 text-sm font-semibold text-slate-500">
+  <div className="mt-1 text-sm font-semibold text-slate-500">
                 Add text or highlight, then resize directly from corners/sides.
               </div>
+
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="mt-4 inline-flex items-center justify-center gap-2 rounded-2xl bg-amber-400 px-5 py-3 text-sm font-black text-slate-950 shadow-lg shadow-amber-100 transition hover:bg-amber-300"
+              >
+                <Upload size={18} />
+                Upload PDF
+              </button>
             </div>
 
             <div className="mx-5 mb-5 overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white shadow-sm">
@@ -635,11 +628,11 @@ export default function EditorPage() {
                 </button>
 
                 <button
-                  onClick={resetEditor}
-                  className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-black text-slate-700 transition hover:bg-slate-100"
+                  onClick={exportPdf}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-2.5 text-sm font-black text-emerald-700 transition hover:bg-emerald-100"
                 >
-                  <RotateCcw size={16} />
-                  Clear
+                  <Download size={16} />
+                  Export PDF
                 </button>
                                 {selectedLayer?.type === "text" && (
                   <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2">
