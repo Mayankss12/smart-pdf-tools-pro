@@ -16,6 +16,10 @@ import {
   RotateCcw,
   Minus,
   Plus,
+  Bold,
+  Italic,
+  Palette,
+  Copy,
 } from "lucide-react";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
@@ -31,7 +35,8 @@ type PdfLayer = {
   height: number;
   text?: string;
   fontSize?: number;
-  fontStyle?: "normal" | "bold" | "italic";
+  isBold?: boolean;
+  isItalic?: boolean;
   opacity?: number;
 };
 
@@ -397,17 +402,24 @@ export default function EditorPage() {
     setStatus("Highlight box added. Drag it or resize from any side/corner.");
   }
 
+  function deleteLayer(layerId: string) {
+    setLayers((prev) => prev.filter((layer) => layer.id !== layerId));
+
+    if (selectedLayerId === layerId) {
+      setSelectedLayerId(null);
+    }
+
+    setStatus("Layer deleted.");
+  }
+
   function deleteSelectedLayer() {
     if (!selectedLayerId) {
       setStatus("Select a layer first.");
       return;
     }
 
-    setLayers((prev) => prev.filter((layer) => layer.id !== selectedLayerId));
-    setSelectedLayerId(null);
-    setStatus("Selected layer deleted.");
+    deleteLayer(selectedLayerId);
   }
-
   function duplicateSelectedLayer() {
     if (!selectedLayerId) {
       setStatus("Select a layer first.");
@@ -536,12 +548,12 @@ export default function EditorPage() {
           const paddingX = 2 / renderScale;
           const paddingY = 1 / renderScale;
 
-          const textFont =
-            layer.fontStyle === "bold"
-              ? helveticaBoldFont
-              : layer.fontStyle === "italic"
+          const textFont = layer.isBold
+            ? helveticaBoldFont
+            : layer.isItalic
               ? helveticaObliqueFont
               : helveticaFont;
+
           page.drawText(layer.text || "", {
             x: pdfX + paddingX,
             y: pdfY + scaledHeight - paddingY - scaledFontSize,
@@ -553,7 +565,6 @@ export default function EditorPage() {
           });
         }
       }
-
       const pdfBytes = await pdfDoc.save();
       const blob = new Blob([pdfBytes], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
@@ -579,6 +590,155 @@ export default function EditorPage() {
   const currentPageLayers = layers.filter((layer) => layer.page === currentPage);
   const selectedLayer = layers.find((layer) => layer.id === selectedLayerId);
 
+    function renderFloatingLayerToolbar(layer: PdfLayer) {
+    if (selectedLayerId !== layer.id) return null;
+
+    const toolbarLeft = layer.x + layer.width / 2;
+    const toolbarTop = Math.max(layer.y - 54, 8);
+
+    return (
+      <div
+        className="absolute z-40 flex -translate-x-1/2 items-center gap-1 rounded-2xl border border-indigo-200 bg-white/95 px-2 py-2 shadow-xl backdrop-blur"
+        style={{
+          left: toolbarLeft,
+          top: toolbarTop,
+        }}
+        onMouseDown={(event) => event.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
+      >
+        {layer.type === "text" && (
+          <>
+            <button
+              type="button"
+              onClick={() =>
+                updateLayer(layer.id, {
+                  isBold: !layer.isBold,
+                })
+              }
+              className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border transition ${
+                layer.isBold
+                  ? "border-indigo-200 bg-indigo-50 text-indigo-700"
+                  : "border-slate-200 text-slate-700 hover:bg-slate-50"
+              }`}
+              title="Bold"
+            >
+              <Bold size={16} />
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                updateLayer(layer.id, {
+                  isItalic: !layer.isItalic,
+                })
+              }
+              className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border transition ${
+                layer.isItalic
+                  ? "border-indigo-200 bg-indigo-50 text-indigo-700"
+                  : "border-slate-200 text-slate-700 hover:bg-slate-50"
+              }`}
+              title="Italic"
+            >
+              <Italic size={16} />
+            </button>
+
+            <div className="mx-1 h-7 w-px bg-slate-200" />
+
+            <button
+              type="button"
+              onClick={() =>
+                updateLayer(layer.id, {
+                  fontSize: Math.max(8, (layer.fontSize || 16) - 1),
+                })
+              }
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-700 transition hover:bg-slate-50"
+              title="Decrease font size"
+            >
+              <Minus size={15} />
+            </button>
+
+            <div className="min-w-10 text-center text-sm font-black text-slate-800">
+              {layer.fontSize || 16}
+            </div>
+
+            <button
+              type="button"
+              onClick={() =>
+                updateLayer(layer.id, {
+                  fontSize: Math.min(72, (layer.fontSize || 16) + 1),
+                })
+              }
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-700 transition hover:bg-slate-50"
+              title="Increase font size"
+            >
+              <Plus size={15} />
+            </button>
+          </>
+        )}
+
+        {layer.type === "highlight" && (
+          <>
+            <button
+              type="button"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 text-amber-700"
+              title="Highlight"
+            >
+              <Highlighter size={16} />
+            </button>
+
+            <select
+              value={layer.opacity || 0.42}
+              onChange={(event) =>
+                updateLayer(layer.id, {
+                  opacity: Number(event.target.value),
+                })
+              }
+              className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-bold text-slate-700 outline-none"
+              title="Opacity"
+            >
+              <option value={0.2}>20%</option>
+              <option value={0.3}>30%</option>
+              <option value={0.42}>42%</option>
+              <option value={0.5}>50%</option>
+              <option value={0.65}>65%</option>
+            </select>
+          </>
+        )}
+
+        <div className="mx-1 h-7 w-px bg-slate-200" />
+
+        <button
+          type="button"
+          onClick={() => {
+            const duplicated: PdfLayer = {
+              ...layer,
+              id: crypto.randomUUID(),
+              x: layer.x + 18,
+              y: layer.y + 18,
+            };
+
+            setLayers((prev) => [...prev, duplicated]);
+            setSelectedLayerId(duplicated.id);
+            setStatus("Layer duplicated.");
+          }}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-700 transition hover:bg-slate-50"
+          title="Duplicate"
+        >
+          <Copy size={16} />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => deleteLayer(layer.id)}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-red-200 text-red-600 transition hover:bg-red-50"
+          title="Delete"
+        >
+          <Trash2 size={16} />
+        </button>
+      </div>
+    );
+  }
+
   function renderResizeHandles(layer: PdfLayer) {
     if (selectedLayerId !== layer.id) return null;
 
@@ -586,8 +746,7 @@ export default function EditorPage() {
       <button
         key={handle.id}
         onMouseDown={(event) => startResize(event, layer, handle.id)}
-        data-resize-handle="true"
-        className={`absolute z-20 h-4 w-4 rounded-full border-2 border-white bg-indigo-600 shadow-md ${handle.className}`}
+        className={`absolute z-20 h-3.5 w-3.5 rounded-full border-2 border-white bg-indigo-500 shadow-sm transition hover:scale-110 ${handle.className}`}
         style={{ cursor: handle.cursor }}
         title={`Resize ${handle.id}`}
       />
@@ -907,21 +1066,22 @@ export default function EditorPage() {
                               event.stopPropagation();
                               setSelectedLayerId(layer.id);
                             }}
-                            className={`absolute cursor-move rounded-md border-2 transition ${
+                            className={`absolute cursor-move rounded-md border transition ${
                               isSelected
-                                ? "border-indigo-700 ring-4 ring-indigo-200"
-                                : "border-amber-500"
-                            } bg-amber-300/45`}
-                            style={{
-                              left: layer.x,
-                              top: layer.y,
-                              width: layer.width,
-                              height: layer.height,
-                              opacity: layer.opacity ?? 0.42,
-                            }}
+                                  ? "border-amber-500 ring-2 ring-amber-100"
+                                  : "border-transparent hover:border-amber-300"
+                              }`}
+                              style={{
+                                left: layer.x,
+                                top: layer.y,
+                                width: layer.width,
+                                height: layer.height,
+                                backgroundColor: `rgba(251, 191, 36, ${layer.opacity || 0.42})`,
+                              }}
                             title="Drag highlight layer"
                           >
-                            {renderResizeHandles(layer)}
+                          {renderFloatingLayerToolbar(layer)}
+                          {renderResizeHandles(layer)}
                           </div>
                         );
                       }
@@ -933,10 +1093,10 @@ export default function EditorPage() {
                             event.stopPropagation();
                             setSelectedLayerId(layer.id);
                           }}
-                          className={`absolute rounded-md border bg-white text-slate-950 transition ${
+                          className={`absolute rounded-lg border bg-white/95 text-slate-950 shadow-sm transition ${
                             isSelected
-                              ? "border-indigo-500"
-                              : "border-indigo-300"
+                              ? "border-indigo-400 ring-2 ring-indigo-100"
+                              : "border-transparent hover:border-indigo-200"
                           }`}
                           style={{
                             left: layer.x,
@@ -959,22 +1119,22 @@ export default function EditorPage() {
                             }
                             className="h-full w-full resize-none rounded-md bg-transparent px-2 py-1 font-semibold outline-none"
                             style={{
-                              fontSize: layer.fontSize || 16,
-                              lineHeight: 1.15,
-                              fontWeight:
-                                layer.fontStyle === "bold" ? 700 : 600,
-                              fontStyle:
-                                layer.fontStyle === "italic" ? "italic" : "normal",
-                            }}
+                             fontSize: layer.fontSize || 16,
+                             lineHeight: 1.2,
+                             fontWeight: layer.isBold ? 800 : 600,
+                             fontStyle: layer.isItalic ? "italic" : "normal",
+                             letterSpacing: "-0.01em",
+                           }}
                           />
                           {isSelected && (
                             <div
                               onMouseDown={(event) => startMove(event, layer)}
-                              data-no-drag="true"
-                              className="absolute left-0 top-0 h-2 w-full cursor-move rounded-t-md bg-indigo-500/20"
+                              className="absolute left-2 right-2 top-1 h-1.5 cursor-move rounded-full bg-indigo-500/25 transition hover:bg-indigo-500/40"
                               title="Drag text box"
                             />
                           )}
+                        
+                          {renderFloatingLayerToolbar(layer)}
                           {renderResizeHandles(layer)}
                         </div>
                       );
