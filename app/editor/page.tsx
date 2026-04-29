@@ -1101,7 +1101,6 @@ export default function EditorPage() {
                               }}
                             title="Drag highlight layer"
                           >
-                          {renderFloatingLayerToolbar(layer)}
                           {renderResizeHandles(layer)}
                           </div>
                         );
@@ -1155,7 +1154,6 @@ export default function EditorPage() {
                             />
                           )}
                         
-                          {renderFloatingLayerToolbar(layer)}
                           {renderResizeHandles(layer)}
                         </div>
                       );
