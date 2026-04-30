@@ -5,39 +5,26 @@ import {
   CheckCircle2,
   Download,
   FileText,
+  Grip,
   Hash,
   Loader2,
+  RotateCcw,
   Upload,
   X,
 } from "lucide-react";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
-import { useEffect, useRef, useState } from "react";
+import { MouseEvent, useEffect, useRef, useState } from "react";
 
 type PdfPagePreview = {
   pageNumber: number;
   previewUrl: string;
 };
 
-type PageNumberPosition =
-  | "bottom-center"
-  | "bottom-right"
-  | "bottom-left"
-  | "top-center"
-  | "top-right"
-  | "top-left";
-
-const POSITION_OPTIONS: Array<{
-  value: PageNumberPosition;
-  label: string;
-}> = [
-  { value: "bottom-center", label: "Bottom Center" },
-  { value: "bottom-right", label: "Bottom Right" },
-  { value: "bottom-left", label: "Bottom Left" },
-  { value: "top-center", label: "Top Center" },
-  { value: "top-right", label: "Top Right" },
-  { value: "top-left", label: "Top Left" },
-];
+type NumberPosition = {
+  xPercent: number;
+  yPercent: number;
+};
 
 function isPdfFile(file: File) {
   return (
@@ -102,35 +89,6 @@ async function renderPdfPageToPng(
   return canvas.toDataURL("image/png");
 }
 
-function getPageNumberPosition({
-  position,
-  pageWidth,
-  pageHeight,
-  textWidth,
-  fontSize,
-  margin,
-}: {
-  position: PageNumberPosition;
-  pageWidth: number;
-  pageHeight: number;
-  textWidth: number;
-  fontSize: number;
-  margin: number;
-}) {
-  const isTop = position.startsWith("top");
-  const y = isTop ? pageHeight - margin - fontSize : margin;
-
-  if (position.endsWith("left")) {
-    return { x: margin, y };
-  }
-
-  if (position.endsWith("right")) {
-    return { x: pageWidth - margin - textWidth, y };
-  }
-
-  return { x: pageWidth / 2 - textWidth / 2, y };
-}
-
 async function addPageNumbersToPdf({
   file,
   position,
@@ -140,7 +98,7 @@ async function addPageNumbersToPdf({
   suffix,
 }: {
   file: File;
-  position: PageNumberPosition;
+  position: NumberPosition;
   startNumber: number;
   fontSize: number;
   prefix: string;
@@ -156,16 +114,16 @@ async function addPageNumbersToPdf({
     const pageNumber = startNumber + index;
     const text = `${prefix}${pageNumber}${suffix}`;
     const textWidth = font.widthOfTextAtSize(text, fontSize);
-    const margin = 28;
 
-    const { x, y } = getPageNumberPosition({
-      position,
-      pageWidth: width,
-      pageHeight: height,
-      textWidth,
-      fontSize,
-      margin,
-    });
+    const x = Math.min(
+      Math.max(12, (position.xPercent / 100) * width - textWidth / 2),
+      width - textWidth - 12
+    );
+
+    const y = Math.min(
+      Math.max(12, height - (position.yPercent / 100) * height - fontSize / 2),
+      height - fontSize - 12
+    );
 
     page.drawText(text, {
       x,
@@ -184,44 +142,61 @@ async function addPageNumbersToPdf({
   });
 }
 
-function getPreviewPositionClass(position: PageNumberPosition) {
-  const base = "absolute z-10 rounded-full bg-white/95 px-2 py-1 text-[10px] font-black text-slate-800 shadow-sm ring-1 ring-slate-200";
-
-  switch (position) {
-    case "top-left":
-      return `${base} left-4 top-4`;
-    case "top-center":
-      return `${base} left-1/2 top-4 -translate-x-1/2`;
-    case "top-right":
-      return `${base} right-4 top-4`;
-    case "bottom-left":
-      return `${base} bottom-4 left-4`;
-    case "bottom-right":
-      return `${base} bottom-4 right-4`;
-    case "bottom-center":
-    default:
-      return `${base} bottom-4 left-1/2 -translate-x-1/2`;
-  }
-}
-
 export default function PageNumbersPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const dragAreaRef = useRef<HTMLDivElement | null>(null);
 
   const [file, setFile] = useState<File | null>(null);
   const [pageCount, setPageCount] = useState(0);
   const [previews, setPreviews] = useState<PdfPagePreview[]>([]);
-  const [position, setPosition] =
-    useState<PageNumberPosition>("bottom-center");
+  const [position, setPosition] = useState<NumberPosition>({
+    xPercent: 50,
+    yPercent: 93,
+  });
+  const [isDragging, setIsDragging] = useState(false);
   const [startNumber, setStartNumber] = useState(1);
-  const [fontSize, setFontSize] = useState(11);
+  const [fontSize, setFontSize] = useState(13);
   const [prefix, setPrefix] = useState("");
   const [suffix, setSuffix] = useState("");
-  const [status, setStatus] = useState("Upload a PDF to add page numbers.");
+  const [status, setStatus] = useState(
+    "Upload a PDF, drag the page number into position, then export."
+  );
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
   }, []);
+
+  useEffect(() => {
+    function handleMouseMove(event: globalThis.MouseEvent) {
+      if (!isDragging || !dragAreaRef.current) return;
+
+      const rect = dragAreaRef.current.getBoundingClientRect();
+
+      const xPercent = ((event.clientX - rect.left) / rect.width) * 100;
+      const yPercent = ((event.clientY - rect.top) / rect.height) * 100;
+
+      setPosition({
+        xPercent: Math.min(96, Math.max(4, xPercent)),
+        yPercent: Math.min(96, Math.max(4, yPercent)),
+      });
+    }
+
+    function handleMouseUp() {
+      if (isDragging) {
+        setIsDragging(false);
+        setStatus("Page number position updated.");
+      }
+    }
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isDragging]);
 
   async function handleFile(selectedFile?: File) {
     if (!selectedFile) return;
@@ -257,7 +232,7 @@ export default function PageNumbersPage() {
       setStatus(
         `PDF loaded with ${pdf.numPages} page${
           pdf.numPages > 1 ? "s" : ""
-        }. Choose page number style.`
+        }. Drag the number on page 1 preview to set placement.`
       );
     } catch (error) {
       console.error(error);
@@ -274,7 +249,16 @@ export default function PageNumbersPage() {
     setFile(null);
     setPageCount(0);
     setPreviews([]);
-    setStatus("Upload a PDF to add page numbers.");
+    setStatus("Upload a PDF, drag the page number into position, then export.");
+  }
+
+  function resetPosition() {
+    setPosition({
+      xPercent: 50,
+      yPercent: 93,
+    });
+
+    setStatus("Page number position reset to bottom center.");
   }
 
   async function handleExport() {
@@ -311,6 +295,17 @@ export default function PageNumbersPage() {
     }
   }
 
+  function previewText(pageNumber: number) {
+    return `${prefix}${startNumber + pageNumber - 1}${suffix}`;
+  }
+
+  function startDrag(event: MouseEvent<HTMLDivElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragging(true);
+    setStatus("Dragging page number position...");
+  }
+
   return (
     <>
       <Header />
@@ -330,8 +325,8 @@ export default function PageNumbersPage() {
                 </h1>
 
                 <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-indigo-50 md:text-base">
-                  Add clean page numbers to your PDF with position, starting
-                  number, and label controls.
+                  Drag the page number directly on the preview and export the
+                  same placement across all PDF pages.
                 </p>
 
                 <input
@@ -386,11 +381,11 @@ export default function PageNumbersPage() {
                   <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
                     <div>
                       <h2 className="text-xl font-black text-slate-950">
-                        PDF Preview
+                        Drag Position Preview
                       </h2>
                       <p className="mt-1 text-sm font-semibold text-slate-500">
-                        Showing up to first 12 pages with approximate page
-                        number preview.
+                        Drag the number on page 1. Same relative position will
+                        apply to every page.
                       </p>
                     </div>
 
@@ -423,26 +418,36 @@ export default function PageNumbersPage() {
                           No PDF selected
                         </div>
                         <p className="mt-1 text-sm text-slate-500">
-                          Upload a PDF to preview page number placement.
+                          Upload a PDF to place page numbers visually.
                         </p>
                       </div>
                     </div>
                   ) : (
                     <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                       {previews.map((preview) => {
-                        const previewNumber = startNumber + preview.pageNumber - 1;
-                        const previewText = `${prefix}${previewNumber}${suffix}`;
+                        const isPrimary = preview.pageNumber === 1;
 
                         return (
                           <div
                             key={preview.pageNumber}
                             className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"
                           >
-                            <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-800">
-                              Page {preview.pageNumber}
+                            <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3">
+                              <div className="text-sm font-black text-slate-800">
+                                Page {preview.pageNumber}
+                              </div>
+
+                              {isPrimary && (
+                                <div className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-black text-indigo-700">
+                                  Drag here
+                                </div>
+                              )}
                             </div>
 
-                            <div className="relative flex min-h-56 items-center justify-center overflow-hidden bg-slate-100 p-4">
+                            <div
+                              ref={isPrimary ? dragAreaRef : null}
+                              className="relative flex min-h-56 items-center justify-center overflow-hidden bg-slate-100 p-4"
+                            >
                               <img
                                 src={preview.previewUrl}
                                 alt={`Page ${preview.pageNumber}`}
@@ -450,12 +455,26 @@ export default function PageNumbersPage() {
                               />
 
                               <div
-                                className={getPreviewPositionClass(position)}
+                                onMouseDown={isPrimary ? startDrag : undefined}
+                                className={`absolute z-20 inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-black shadow-lg ${
+                                  isPrimary
+                                    ? "cursor-move border-indigo-300 bg-white text-indigo-700 ring-4 ring-indigo-100"
+                                    : "pointer-events-none border-slate-200 bg-white/95 text-slate-800"
+                                }`}
                                 style={{
+                                  left: `${position.xPercent}%`,
+                                  top: `${position.yPercent}%`,
+                                  transform: "translate(-50%, -50%)",
                                   fontSize: Math.max(9, fontSize * 0.78),
                                 }}
+                                title={
+                                  isPrimary
+                                    ? "Drag page number position"
+                                    : undefined
+                                }
                               >
-                                {previewText}
+                                {isPrimary && <Grip size={12} />}
+                                {previewText(preview.pageNumber)}
                               </div>
                             </div>
                           </div>
@@ -472,25 +491,10 @@ export default function PageNumbersPage() {
                     Number Settings
                   </h2>
 
-                  <label className="mt-4 block">
-                    <span className="text-sm font-black text-slate-800">
-                      Position
-                    </span>
-
-                    <select
-                      value={position}
-                      onChange={(event) =>
-                        setPosition(event.target.value as PageNumberPosition)
-                      }
-                      className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
-                    >
-                      {POSITION_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <div className="mt-4 rounded-2xl border border-indigo-100 bg-indigo-50 p-4 text-sm font-bold leading-6 text-indigo-800">
+                    Drag the page number on page 1 preview. That placement will
+                    be used for every page during export.
+                  </div>
 
                   <label className="mt-4 block">
                     <span className="text-sm font-black text-slate-800">
@@ -517,7 +521,7 @@ export default function PageNumbersPage() {
                     <input
                       type="range"
                       min={8}
-                      max={24}
+                      max={28}
                       value={fontSize}
                       onChange={(event) =>
                         setFontSize(Number(event.target.value))
@@ -553,6 +557,15 @@ export default function PageNumbersPage() {
                       />
                     </label>
                   </div>
+
+                  <button
+                    onClick={resetPosition}
+                    disabled={!file}
+                    className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <RotateCcw size={17} />
+                    Reset Position
+                  </button>
 
                   <div className="mt-5 rounded-2xl bg-white p-4">
                     <div className="text-xs font-black uppercase tracking-wide text-slate-500">
@@ -595,14 +608,6 @@ export default function PageNumbersPage() {
                     Status
                   </div>
                   {status}
-                </div>
-
-                <div className="mt-5 rounded-3xl border border-indigo-100 bg-indigo-50 p-4 text-sm font-semibold leading-6 text-indigo-800">
-                  <div className="font-black">Preview note</div>
-                  <p className="mt-2">
-                    Preview placement is approximate. Export writes page numbers
-                    directly into every page of the PDF.
-                  </p>
                 </div>
               </aside>
             </div>
