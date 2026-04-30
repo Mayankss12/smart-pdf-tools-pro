@@ -1,17 +1,20 @@
-import { Header } from "@/components/Header";
+"use client";
+import { useState } from "react";
+import { FileDropzone } from "@/components/FileDropzone";
+import { StatusCard } from "@/components/StatusCard";
+import { ToolShell } from "@/components/ToolShell";
+import { downloadBlob, mergePdfs } from "@/lib/pdf-utils";
+import { SortableFileList } from "@/components/SortableFileList";
 
-export default function ToolPage() {
-  return (
-    <>
-      <Header />
-      <main className="mx-auto max-w-4xl px-6 py-14">
-        <h1 className="text-4xl font-black">Merge</h1>
-        <p className="mt-3 text-slate-600">Upload workflow placeholder. Full processing can be connected next.</p>
-        <div className="mt-8 rounded-3xl border-2 border-dashed border-slate-300 bg-white p-10 text-center">
-          <div className="font-bold">Upload files</div>
-          <p className="mt-2 text-sm text-slate-500">Drag and drop area for this tool.</p>
-        </div>
-      </main>
-    </>
-  );
+export default function MergePage() {
+  const [files, setFiles] = useState<File[]>([]);
+  const [status, setStatus] = useState("Upload PDFs, reorder them, then merge.");
+  async function run() {
+    if (files.length < 2) return setStatus("Please select at least 2 PDFs.");
+    setStatus("Merging in selected order...");
+    const blob = await mergePdfs(files);
+    downloadBlob(blob, "pdfmantra-merged.pdf");
+    setStatus("Merged PDF downloaded.");
+  }
+  return <ToolShell title="Merge PDF" description="Preview and reorder PDFs before merging."><div className="space-y-4"><FileDropzone label="Upload multiple PDFs" accept="application/pdf,.pdf" multiple onFiles={setFiles} /><SortableFileList files={files} setFiles={setFiles} /><button onClick={run} className="btn-primary">Merge & Download</button><StatusCard status={status} /></div></ToolShell>;
 }
