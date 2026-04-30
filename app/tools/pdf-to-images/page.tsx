@@ -24,6 +24,8 @@ type GeneratedImage = {
   fileName: string;
 };
 
+type ConvertMode = "first" | "all" | "custom";
+
 function isPdfFile(file: File) {
   return (
     file.type === "application/pdf" ||
@@ -40,6 +42,84 @@ function downloadUrl(url: string, fileName: string) {
   document.body.appendChild(link);
   link.click();
   link.remove();
+}
+
+function uniqueSortedNumbers(numbers: number[]) {
+  return Array.from(new Set(numbers)).sort((a, b) => a - b);
+}
+
+function parsePageSelection(input: string, totalPages: number) {
+  const cleaned = input.trim();
+
+  if (!cleaned) {
+    throw new Error("Enter custom pages first. Example: 1-3,5,7");
+  }
+
+  const parts = cleaned
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (parts.length === 0) {
+    throw new Error("Enter valid pages. Example: 1-3,5,7");
+  }
+
+  const pages: number[] = [];
+
+  for (const part of parts) {
+    if (part.includes("-")) {
+      const pieces = part.split("-").map((piece) => piece.trim());
+
+      if (pieces.length !== 2 || !pieces[0] || !pieces[1]) {
+        throw new Error(`Invalid range: ${part}`);
+      }
+
+      const start = Number(pieces[0]);
+      const end = Number(pieces[1]);
+
+      if (!Number.isInteger(start) || !Number.isInteger(end)) {
+        throw new Error(`Invalid number in range: ${part}`);
+      }
+
+      if (start <= 0 || end <= 0) {
+        throw new Error("Page number 0 is invalid. Pages start from 1.");
+      }
+
+      if (start > end) {
+        throw new Error(`Invalid reversed range: ${part}`);
+      }
+
+      if (end > totalPages) {
+        throw new Error(
+          `Page ${end} is outside this PDF. Total pages: ${totalPages}.`
+        );
+      }
+
+      for (let page = start; page <= end; page += 1) {
+        pages.push(page);
+      }
+    } else {
+      const page = Number(part);
+
+      if (!Number.isInteger(page)) {
+        throw new Error(`Invalid page number: ${part}`);
+      }
+
+      if (page <= 0) {
+        throw new Error("Page number 0 is invalid. Pages start from 1.");
+      }
+
+      if (page > totalPages) {
+        throw new Error(
+          `Page ${page} is outside this PDF. Total pages: ${totalPages}.`
+        );
+      }
+
+      pages.push(page);
+    }
+  }
+
+  return uniqueSortedNumbers(pages);
 }
 
 async function renderPdfPageToPng(
@@ -91,8 +171,11 @@ export default function PdfToImagesPage() {
   const [pageCount, setPageCount] = useState(0);
   const [previews, setPreviews] = useState<PdfPagePreview[]>([]);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
-  const [mode, setMode] = useState<"first" | "all">("first");
-  const [status, setStatus] = useState("Upload a PDF to convert pages to PNG images.");
+  const [mode, setMode] = useState<ConvertMode>("first");
+  const [customPages, setCustomPages] = useState("1-3,5");
+  const [status, setStatus] = useState(
+    "Upload a PDF to convert pages to PNG images."
+  );
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -157,6 +240,16 @@ export default function PdfToImagesPage() {
     setStatus("Upload a PDF to convert pages to PNG images.");
   }
 
+  function getPagesToConvert(totalPages: number) {
+    if (mode === "first") return [1];
+
+    if (mode === "all") {
+      return Array.from({ length: totalPages }, (_, index) => index + 1);
+    }
+
+    return parsePageSelection(customPages, totalPages);
+  }
+
   async function convertPages() {
     if (!file) {
       setStatus("Upload a PDF first.");
@@ -170,11 +263,11 @@ export default function PdfToImagesPage() {
       generatedImages.forEach((image) => URL.revokeObjectURL(image.imageUrl));
 
       const pdf = await loadPdfFromFile(file);
-      const totalToConvert = mode === "first" ? 1 : pdf.numPages;
+      const pagesToConvert = getPagesToConvert(pdf.numPages);
       const baseName = file.name.replace(/\.pdf$/i, "");
       const outputImages: GeneratedImage[] = [];
 
-      for (let pageNumber = 1; pageNumber <= totalToConvert; pageNumber += 1) {
+      for (const pageNumber of pagesToConvert) {
         const imageUrl = await renderPdfPageToPng(pdf, pageNumber, 2);
 
         outputImages.push({
@@ -197,7 +290,7 @@ export default function PdfToImagesPage() {
       );
     } catch (error) {
       console.error(error);
-      setStatus("Conversion failed. Please try another PDF.");
+      setStatus(error instanceof Error ? error.message : "Conversion failed.");
     } finally {
       setBusy(false);
     }
@@ -238,8 +331,8 @@ export default function PdfToImagesPage() {
                   </p>
                 </div>
 
-                <div className="hidden rounded-2xl bg-white/15 px-4 py-3 text-sm font-bold text-white ring-1 ring-white/20 lg:block">
-                  Click the drop zone below to upload PDF
+                <div className="hidden rounded-2xl bg-white/15 px-4 py-3 text-sm font-bold leading-6 text-white ring-1 ring-white/20 lg:block">
+                  Convert full PDFs or hand-pick exact pages like 1-3,5,7.
                 </div>
 
                 <input
@@ -339,7 +432,14 @@ export default function PdfToImagesPage() {
                       {previews.map((preview) => (
                         <div
                           key={preview.pageNumber}
-                          className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"
+                          className={`overflow-hidden rounded-3xl border bg-white shadow-sm ${
+                            mode === "custom" &&
+                            parsePageSelectionSafe(customPages, pageCount).includes(
+                              preview.pageNumber
+                            )
+                              ? "border-indigo-400 ring-4 ring-indigo-100"
+                              : "border-slate-200"
+                          }`}
                         >
                           <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-800">
                             Page {preview.pageNumber}
@@ -459,6 +559,43 @@ export default function PdfToImagesPage() {
                         </div>
                       </div>
                     </label>
+
+                    <label className="block rounded-2xl border border-slate-200 bg-white p-4 transition hover:border-indigo-200">
+                      <div className="flex cursor-pointer items-center gap-3">
+                        <input
+                          type="radio"
+                          name="mode"
+                          checked={mode === "custom"}
+                          onChange={() => setMode("custom")}
+                          className="h-4 w-4"
+                        />
+                        <div>
+                          <div className="font-black text-slate-900">
+                            Custom pages
+                          </div>
+                          <div className="text-sm font-semibold text-slate-500">
+                            Convert selected pages only.
+                          </div>
+                        </div>
+                      </div>
+
+                      {mode === "custom" && (
+                        <div className="mt-4">
+                          <input
+                            value={customPages}
+                            onChange={(event) =>
+                              setCustomPages(event.target.value)
+                            }
+                            placeholder="Example: 1-3,5,7"
+                            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                          />
+
+                          <p className="mt-2 text-xs font-bold text-slate-500">
+                            Example: 1-3,5,7 converts pages 1, 2, 3, 5 and 7.
+                          </p>
+                        </div>
+                      )}
+                    </label>
                   </div>
 
                   <div className="mt-5 rounded-2xl bg-white p-4">
@@ -492,7 +629,10 @@ export default function PdfToImagesPage() {
                 <div
                   className={`mt-5 rounded-3xl border p-4 text-sm font-bold leading-6 ${
                     status.toLowerCase().includes("failed") ||
-                    status.toLowerCase().includes("valid")
+                    status.toLowerCase().includes("valid") ||
+                    status.toLowerCase().includes("invalid") ||
+                    status.toLowerCase().includes("outside") ||
+                    status.toLowerCase().includes("reversed")
                       ? "border-red-100 bg-red-50 text-red-700"
                       : "border-amber-100 bg-amber-50 text-amber-900"
                   }`}
@@ -518,4 +658,12 @@ export default function PdfToImagesPage() {
       </main>
     </>
   );
+}
+
+function parsePageSelectionSafe(input: string, totalPages: number) {
+  try {
+    return parsePageSelection(input, totalPages);
+  } catch {
+    return [];
+  }
 }
