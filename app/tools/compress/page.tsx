@@ -3,9 +3,16 @@ import { useState } from "react";
 import { Header } from "@/components/Header";
 import { FileDropzone } from "@/components/FileDropzone";
 import { StatusCard } from "@/components/StatusCard";
-import { downloadBlob, formatFileSize, optimizePdf } from "@/lib/pdf-utils";
-import { PdfPreview } from "@/components/PdfPreview";
+import { downloadBlob, optimizePdf } from "@/lib/pdf-utils";
 
-export default function CompressPDFPage() { const [file,setFile]=useState<File|null>(null);const [mode,setMode]=useState("balanced");const [targetKb,setTargetKb]=useState(200);const [status,setStatus]=useState("Upload one PDF to optimize.");const [outSize,setOutSize]=useState<number|null>(null);
-async function run(){if(!file) return setStatus("Please upload a PDF.");const out=await optimizePdf(file);setOutSize(out.size);downloadBlob(out,"pdfmantra-optimized.pdf");if(out.size>targetKb*1024)setStatus("Best effort completed. Target size may require advanced backend compression.");else setStatus("Optimized PDF downloaded.");}
-return (<><Header/><main className="mx-auto max-w-5xl px-6 py-14"><h1 className="text-4xl font-black">Compress PDF</h1><p className="mt-3 text-slate-600">Browser-only compression is best-effort. Exact target size and high-quality image recompression require backend processing, which will be added later.</p><div className="mt-8 grid gap-6 lg:grid-cols-2"><div className="space-y-4 rounded-3xl border bg-white p-6"><FileDropzone label="Upload one PDF" accept="application/pdf,.pdf" onFiles={(f)=>setFile(f[0]||null)} /><select value={mode} onChange={(e)=>setMode(e.target.value)} className="w-full rounded-xl border px-3 py-2"><option value="light">Light optimization</option><option value="balanced">Balanced</option><option value="strong">Strong / smaller size</option></select><input type="number" value={targetKb} onChange={(e)=>setTargetKb(Number(e.target.value)||0)} className="w-full rounded-xl border px-3 py-2" placeholder="Target KB"/><div className="text-sm text-slate-600">Input: {file?formatFileSize(file.size):"-"} | Output: {outSize?formatFileSize(outSize):"-"}</div><button onClick={run} className="btn-primary">Optimize & Download</button><StatusCard status={status}/></div><PdfPreview file={file} maxPages={4} /></div></main></>)}
+export default function CompressPDFPage() {
+  const [file, setFile] = useState<File | null>(null);
+  const [status, setStatus] = useState("Upload one PDF to optimize.");
+  async function run() {
+    if (!file) return setStatus("Please upload a PDF.");
+    const b = await optimizePdf(file);
+    downloadBlob(b, "pdfmantra-optimized.pdf");
+    setStatus("Optimized PDF downloaded.");
+  }
+  return (<><Header /><main className="mx-auto max-w-4xl px-6 py-14"><h1 className="text-4xl font-black">Compress PDF</h1><p className="mt-3 text-slate-600">Browser-only compression is limited. This optimize tool rewrites the PDF and may reduce size for some files. Advanced compression will need backend later.</p><div className="mt-8 space-y-4 rounded-3xl border bg-white p-6"><FileDropzone label="Upload one PDF" accept="application/pdf,.pdf" onFiles={(f)=>setFile(f[0]||null)} /><button onClick={run} className="btn-primary">Optimize & Download</button><StatusCard status={status} /></div></main></>);
+}
