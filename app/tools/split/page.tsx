@@ -1,17 +1,18 @@
-import { Header } from "@/components/Header";
+"use client";
+import { useState } from "react";
+import { FileDropzone } from "@/components/FileDropzone";
+import { StatusCard } from "@/components/StatusCard";
+import { ToolShell } from "@/components/ToolShell";
+import { downloadBlob, splitPdfByPages } from "@/lib/pdf-utils";
 
-export default function ToolPage() {
-  return (
-    <>
-      <Header />
-      <main className="mx-auto max-w-4xl px-6 py-14">
-        <h1 className="text-4xl font-black">Split</h1>
-        <p className="mt-3 text-slate-600">Upload workflow placeholder. Full processing can be connected next.</p>
-        <div className="mt-8 rounded-3xl border-2 border-dashed border-slate-300 bg-white p-10 text-center">
-          <div className="font-bold">Upload files</div>
-          <p className="mt-2 text-sm text-slate-500">Drag and drop area for this tool.</p>
-        </div>
-      </main>
-    </>
-  );
+export default function SplitPage() {
+  const [file, setFile] = useState<File | null>(null);
+  const [pageInput, setPageInput] = useState("1-2");
+  const [status, setStatus] = useState("Upload one PDF and enter page range.");
+  async function run() {
+    if (!file) return setStatus("Please upload one PDF.");
+    try { const blob = await splitPdfByPages(file, pageInput); downloadBlob(blob, "pdfmantra-split.pdf"); setStatus("Split PDF downloaded."); }
+    catch (e) { setStatus(e instanceof Error ? e.message : "Split failed."); }
+  }
+  return <ToolShell title="Split PDF" description="Extract selected pages (e.g. 1-3,5)."><div className="space-y-4"><FileDropzone label="Upload one PDF" accept="application/pdf,.pdf" onFiles={(f)=>setFile(f[0]||null)} /><input value={pageInput} onChange={(e)=>setPageInput(e.target.value)} className="w-full rounded-xl border px-3 py-2" /><button onClick={run} className="btn-primary">Split & Download</button><StatusCard status={status} /></div></ToolShell>;
 }
