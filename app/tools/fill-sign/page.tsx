@@ -9,6 +9,8 @@ import {
   Grip,
   Image as ImageIcon,
   Loader2,
+  Maximize2,
+  Minimize2,
   PenLine,
   RotateCcw,
   Upload,
@@ -26,10 +28,29 @@ type PdfPagePreview = {
 type SignatureMode = "text" | "image";
 type SignatureStyle = "clean" | "bold" | "italic";
 
-type SignaturePosition = {
+type SignatureBox = {
+  pageNumber: number;
   xPercent: number;
   yPercent: number;
+  widthPercent: number;
+  heightPercent: number;
 };
+
+type DragState =
+  | {
+      type: "move";
+      startClientX: number;
+      startClientY: number;
+      startBox: SignatureBox;
+    }
+  | {
+      type: "resize";
+      handle: "nw" | "ne" | "sw" | "se";
+      startClientX: number;
+      startClientY: number;
+      startBox: SignatureBox;
+    }
+  | null;
 
 type SignatureImage = {
   file: File;
@@ -65,6 +86,14 @@ const STYLE_OPTIONS: Array<{
   },
 ];
 
+const DEFAULT_BOX: SignatureBox = {
+  pageNumber: 1,
+  xPercent: 58,
+  yPercent: 76,
+  widthPercent: 28,
+  heightPercent: 8,
+};
+
 function isPdfFile(file: File) {
   return (
     file.type === "application/pdf" ||
@@ -96,6 +125,10 @@ function downloadBlob(blob: Blob, fileName: string) {
   link.remove();
 
   URL.revokeObjectURL(url);
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
 }
 
 async function loadPdfFromFile(file: File) {
@@ -192,80 +225,22 @@ async function convertImageToPngBytes(file: File): Promise<{
   }
 }
 
-async function addTextSignatureToPdf({
+async function addSignatureToPdf({
   file,
+  signatureMode,
+  signatureBox,
   signerName,
-  position,
-  fontSize,
-  style,
-}: {
-  file: File;
-  signerName: string;
-  position: SignaturePosition;
-  fontSize: number;
-  style: SignatureStyle;
-}) {
-  const selectedStyle =
-    STYLE_OPTIONS.find((option) => option.value === style) || STYLE_OPTIONS[0];
-
-  const arrayBuffer = await file.arrayBuffer();
-  const pdfDoc = await PDFDocument.load(arrayBuffer);
-  const font = await pdfDoc.embedFont(selectedStyle.font);
-  const pages = pdfDoc.getPages();
-
-  if (pages.length === 0) {
-    throw new Error("This PDF has no pages.");
-  }
-
-  const firstPage = pages[0];
-  const { width, height } = firstPage.getSize();
-  const label = `Signed by ${signerName}`;
-  const textWidth = font.widthOfTextAtSize(label, fontSize);
-
-  const x = Math.min(
-    Math.max(12, (position.xPercent / 100) * width - textWidth / 2),
-    width - textWidth - 12
-  );
-
-  const y = Math.min(
-    Math.max(12, height - (position.yPercent / 100) * height - fontSize / 2),
-    height - fontSize - 12
-  );
-
-  firstPage.drawText(label, {
-    x,
-    y,
-    size: fontSize,
-    font,
-    color: rgb(0.18, 0.14, 0.52),
-    opacity: 0.95,
-  });
-
-  firstPage.drawLine({
-    start: { x, y: y - 6 },
-    end: { x: x + Math.min(textWidth, 180), y: y - 6 },
-    thickness: 1,
-    color: rgb(0.18, 0.14, 0.52),
-    opacity: 0.65,
-  });
-
-  const pdfBytes = await pdfDoc.save();
-
-  return new Blob([pdfBytes], {
-    type: "application/pdf",
-  });
-}
-
-async function addImageSignatureToPdf({
-  file,
+  signatureStyle,
+  textFontSize,
   signatureImage,
-  position,
-  imageWidthPercent,
 }: {
   file: File;
-  signatureImage: SignatureImage;
-  position: SignaturePosition;
-  imageWidthPercent: number;
+  signatureMode: SignatureMode;
+  signatureBox: SignatureBox;
+  signerName: string;
+  signatureStyle: SignatureStyle;
+  textFontSize: number;
+  signatureImage: SignatureImage | null;
 }) {
   const arrayBuffer = await file.arrayBuffer();
   const pdfDoc = await PDFDocument.load(arrayBuffer);
@@ -275,32 +250,73 @@ async function addImageSignatureToPdf({
     throw new Error("This PDF has no pages.");
   }
 
-  const firstPage = pages[0];
-  const { width, height } = firstPage.getSize();
+  const pageIndex = clamp(signatureBox.pageNumber - 1, 0, pages.length - 1);
+  const targetPage = pages[pageIndex];
+  const { width: pageWidth, height: pageHeight } = targetPage.getSize();
 
-  const embeddedImage = await pdfDoc.embedPng(signatureImage.pngBytes);
+  const boxX = (signatureBox.xPercent / 100) * pageWidth;
+  const boxYFromTop = (signatureBox.yPercent / 100) * pageHeight;
+  const boxWidth = (signatureBox.widthPercent / 100) * pageWidth;
+  const boxHeight = (signatureBox.heightPercent / 100) * pageHeight;
 
-  const imageWidth = width * (imageWidthPercent / 100);
-  const imageHeight =
-    imageWidth * (signatureImage.height / Math.max(signatureImage.width, 1));
-
-  const x = Math.min(
-    Math.max(12, (position.xPercent / 100) * width - imageWidth / 2),
-    width - imageWidth - 12
+  const pdfX = clamp(boxX, 8, pageWidth - boxWidth - 8);
+  const pdfY = clamp(
+    pageHeight - boxYFromTop - boxHeight,
+    8,
+    pageHeight - boxHeight - 8
   );
 
-  const y = Math.min(
-    Math.max(12, height - (position.yPercent / 100) * height - imageHeight / 2),
-    height - imageHeight - 12
-  );
+  if (signatureMode === "image") {
+    if (!signatureImage) {
+      throw new Error("Upload a signature image first.");
+    }
 
-  firstPage.drawImage(embeddedImage, {
-    x,
-    y,
-    width: imageWidth,
-    height: imageHeight,
-    opacity: 0.98,
-  });
+    const embeddedImage = await pdfDoc.embedPng(signatureImage.pngBytes);
+
+    targetPage.drawImage(embeddedImage, {
+      x: pdfX,
+      y: pdfY,
+      width: boxWidth,
+      height: boxHeight,
+      opacity: 0.98,
+    });
+  } else {
+    if (!signerName.trim()) {
+      throw new Error("Enter signer name first.");
+    }
+
+    const selectedStyle =
+      STYLE_OPTIONS.find((option) => option.value === signatureStyle) ||
+      STYLE_OPTIONS[0];
+
+    const font = await pdfDoc.embedFont(selectedStyle.font);
+    const label = `Signed by ${signerName.trim()}`;
+    const safeFontSize = clamp(textFontSize, 8, 48);
+    const textWidth = font.widthOfTextAtSize(label, safeFontSize);
+    const textX = clamp(pdfX + 6, 8, pageWidth - textWidth - 8);
+    const textY = clamp(
+      pdfY + boxHeight / 2 - safeFontSize / 2,
+      8,
+      pageHeight - safeFontSize - 8
+    );
+
+    targetPage.drawText(label, {
+      x: textX,
+      y: textY,
+      size: safeFontSize,
+      font,
+      color: rgb(0.18, 0.14, 0.52),
+      opacity: 0.95,
+    });
+
+    targetPage.drawLine({
+      start: { x: textX, y: textY - 6 },
+      end: { x: textX + Math.min(textWidth, boxWidth - 12), y: textY - 6 },
+      thickness: 1,
+      color: rgb(0.18, 0.14, 0.52),
+      opacity: 0.65,
+    });
+  }
 
   const pdfBytes = await pdfDoc.save();
 
@@ -312,30 +328,25 @@ async function addImageSignatureToPdf({
 export default function FillSignPage() {
   const pdfInputRef = useRef<HTMLInputElement | null>(null);
   const signatureInputRef = useRef<HTMLInputElement | null>(null);
-  const dragAreaRef = useRef<HTMLDivElement | null>(null);
+  const activePageRef = useRef<HTMLDivElement | null>(null);
+  const dragStateRef = useRef<DragState>(null);
 
   const [file, setFile] = useState<File | null>(null);
   const [pageCount, setPageCount] = useState(0);
   const [previews, setPreviews] = useState<PdfPagePreview[]>([]);
+  const [activePageNumber, setActivePageNumber] = useState(1);
 
   const [signatureMode, setSignatureMode] = useState<SignatureMode>("text");
   const [signerName, setSignerName] = useState("Mayank Singh");
   const [signatureStyle, setSignatureStyle] = useState<SignatureStyle>("italic");
-  const [fontSize, setFontSize] = useState(16);
-
+  const [textFontSize, setTextFontSize] = useState(16);
   const [signatureImage, setSignatureImage] = useState<SignatureImage | null>(
     null
   );
-  const [imageWidthPercent, setImageWidthPercent] = useState(24);
 
-  const [position, setPosition] = useState<SignaturePosition>({
-    xPercent: 78,
-    yPercent: 88,
-  });
-
-  const [isDragging, setIsDragging] = useState(false);
+  const [signatureBox, setSignatureBox] = useState<SignatureBox>(DEFAULT_BOX);
   const [status, setStatus] = useState(
-    "Upload a PDF, choose signature type, place it on page 1, then export."
+    "Upload a PDF, place your signature on any page, then export."
   );
   const [busy, setBusy] = useState(false);
 
@@ -345,23 +356,81 @@ export default function FillSignPage() {
 
   useEffect(() => {
     function handleMouseMove(event: globalThis.MouseEvent) {
-      if (!isDragging || !dragAreaRef.current) return;
+      const dragState = dragStateRef.current;
+      const pageBox = activePageRef.current;
 
-      const rect = dragAreaRef.current.getBoundingClientRect();
+      if (!dragState || !pageBox) return;
 
-      const xPercent = ((event.clientX - rect.left) / rect.width) * 100;
-      const yPercent = ((event.clientY - rect.top) / rect.height) * 100;
+      const rect = pageBox.getBoundingClientRect();
+      const dxPercent =
+        ((event.clientX - dragState.startClientX) / rect.width) * 100;
+      const dyPercent =
+        ((event.clientY - dragState.startClientY) / rect.height) * 100;
 
-      setPosition({
-        xPercent: Math.min(96, Math.max(4, xPercent)),
-        yPercent: Math.min(96, Math.max(4, yPercent)),
-      });
+      if (dragState.type === "move") {
+        setSignatureBox({
+          ...dragState.startBox,
+          xPercent: clamp(
+            dragState.startBox.xPercent + dxPercent,
+            0,
+            100 - dragState.startBox.widthPercent
+          ),
+          yPercent: clamp(
+            dragState.startBox.yPercent + dyPercent,
+            0,
+            100 - dragState.startBox.heightPercent
+          ),
+        });
+      }
+
+      if (dragState.type === "resize") {
+        const start = dragState.startBox;
+
+        let nextX = start.xPercent;
+        let nextY = start.yPercent;
+        let nextWidth = start.widthPercent;
+        let nextHeight = start.heightPercent;
+
+        if (dragState.handle.includes("e")) {
+          nextWidth = start.widthPercent + dxPercent;
+        }
+
+        if (dragState.handle.includes("s")) {
+          nextHeight = start.heightPercent + dyPercent;
+        }
+
+        if (dragState.handle.includes("w")) {
+          nextX = start.xPercent + dxPercent;
+          nextWidth = start.widthPercent - dxPercent;
+        }
+
+        if (dragState.handle.includes("n")) {
+          nextY = start.yPercent + dyPercent;
+          nextHeight = start.heightPercent - dyPercent;
+        }
+
+        const minWidth = signatureMode === "image" ? 8 : 14;
+        const minHeight = signatureMode === "image" ? 4 : 5;
+
+        nextWidth = clamp(nextWidth, minWidth, 75);
+        nextHeight = clamp(nextHeight, minHeight, 35);
+        nextX = clamp(nextX, 0, 100 - nextWidth);
+        nextY = clamp(nextY, 0, 100 - nextHeight);
+
+        setSignatureBox({
+          ...start,
+          xPercent: nextX,
+          yPercent: nextY,
+          widthPercent: nextWidth,
+          heightPercent: nextHeight,
+        });
+      }
     }
 
     function handleMouseUp() {
-      if (isDragging) {
-        setIsDragging(false);
-        setStatus("Signature position updated.");
+      if (dragStateRef.current) {
+        dragStateRef.current = null;
+        setStatus("Signature placement updated.");
       }
     }
 
@@ -372,7 +441,11 @@ export default function FillSignPage() {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [isDragging]);
+  }, [signatureMode]);
+
+  const activePreview = useMemo(() => {
+    return previews.find((preview) => preview.pageNumber === activePageNumber);
+  }, [activePageNumber, previews]);
 
   const selectedPreviewClass = useMemo(() => {
     return (
@@ -390,20 +463,21 @@ export default function FillSignPage() {
     }
 
     setBusy(true);
-    setStatus("Rendering PDF preview...");
+    setStatus("Rendering PDF pages...");
 
     try {
       setFile(selectedFile);
       setPreviews([]);
+      setActivePageNumber(1);
 
       const pdf = await loadPdfFromFile(selectedFile);
       setPageCount(pdf.numPages);
 
       const nextPreviews: PdfPagePreview[] = [];
-      const pagesToPreview = Math.min(pdf.numPages, 12);
+      const pagesToPreview = Math.min(pdf.numPages, 24);
 
       for (let pageNumber = 1; pageNumber <= pagesToPreview; pageNumber += 1) {
-        const previewUrl = await renderPdfPageToPng(pdf, pageNumber, 0.35);
+        const previewUrl = await renderPdfPageToPng(pdf, pageNumber, 0.55);
 
         nextPreviews.push({
           pageNumber,
@@ -412,10 +486,15 @@ export default function FillSignPage() {
       }
 
       setPreviews(nextPreviews);
+      setSignatureBox({
+        ...DEFAULT_BOX,
+        pageNumber: 1,
+      });
+
       setStatus(
         `PDF loaded with ${pdf.numPages} page${
           pdf.numPages > 1 ? "s" : ""
-        }. Drag signature on page 1 preview to set placement.`
+        }. Select a page and drag the signature anywhere.`
       );
     } catch (error) {
       console.error(error);
@@ -455,7 +534,18 @@ export default function FillSignPage() {
       });
 
       setSignatureMode("image");
-      setStatus("Signature image imported. Drag it on page 1 preview.");
+
+      const ratio = converted.height / Math.max(converted.width, 1);
+      const imageWidth = 26;
+      const imageHeight = clamp(imageWidth * ratio, 5, 16);
+
+      setSignatureBox((current) => ({
+        ...current,
+        widthPercent: imageWidth,
+        heightPercent: imageHeight,
+      }));
+
+      setStatus("Signature image imported. Drag and resize it on the page.");
     } catch (error) {
       console.error(error);
       setStatus("Unable to import signature image. Try PNG or JPG.");
@@ -468,7 +558,9 @@ export default function FillSignPage() {
     setFile(null);
     setPageCount(0);
     setPreviews([]);
-    setStatus("Upload a PDF, choose signature type, place it on page 1, then export.");
+    setActivePageNumber(1);
+    setSignatureBox(DEFAULT_BOX);
+    setStatus("Upload a PDF, place your signature on any page, then export.");
   }
 
   function clearSignatureImage() {
@@ -478,23 +570,61 @@ export default function FillSignPage() {
 
     setSignatureImage(null);
     setSignatureMode("text");
-    setStatus("Signature image removed. Text signature mode selected.");
+    setSignatureBox((current) => ({
+      ...current,
+      widthPercent: 28,
+      heightPercent: 8,
+    }));
+    setStatus("Signature image removed. Text signature selected.");
   }
 
-  function resetPosition() {
-    setPosition({
-      xPercent: 78,
-      yPercent: 88,
+  function selectPage(pageNumber: number) {
+    setActivePageNumber(pageNumber);
+    setSignatureBox((current) => ({
+      ...current,
+      pageNumber,
+    }));
+    setStatus(`Page ${pageNumber} selected. Place signature where needed.`);
+  }
+
+  function resetPlacement() {
+    setSignatureBox({
+      ...DEFAULT_BOX,
+      pageNumber: activePageNumber,
     });
-
-    setStatus("Signature position reset.");
+    setStatus("Signature placement reset on active page.");
   }
 
-  function startDrag(event: MouseEvent<HTMLDivElement>) {
+  function startMove(event: MouseEvent<HTMLDivElement>) {
     event.preventDefault();
     event.stopPropagation();
-    setIsDragging(true);
-    setStatus("Dragging signature position...");
+
+    dragStateRef.current = {
+      type: "move",
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startBox: signatureBox,
+    };
+
+    setStatus("Dragging signature...");
+  }
+
+  function startResize(
+    event: MouseEvent<HTMLButtonElement>,
+    handle: "nw" | "ne" | "sw" | "se"
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    dragStateRef.current = {
+      type: "resize",
+      handle,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startBox: signatureBox,
+    };
+
+    setStatus("Resizing signature...");
   }
 
   async function handleExport() {
@@ -509,32 +639,28 @@ export default function FillSignPage() {
     }
 
     if (signatureMode === "image" && !signatureImage) {
-      setStatus("Upload a signature image first.");
+      setStatus("Import a signature image first.");
       return;
     }
 
     setBusy(true);
-    setStatus("Adding signature to PDF...");
+    setStatus("Applying signature and exporting PDF...");
 
     try {
-      const blob =
-        signatureMode === "image" && signatureImage
-          ? await addImageSignatureToPdf({
-              file,
-              signatureImage,
-              position,
-              imageWidthPercent,
-            })
-          : await addTextSignatureToPdf({
-              file,
-              signerName: signerName.trim(),
-              position,
-              fontSize,
-              style: signatureStyle,
-            });
+      const blob = await addSignatureToPdf({
+        file,
+        signatureMode,
+        signatureBox,
+        signerName,
+        signatureStyle,
+        textFontSize,
+        signatureImage,
+      });
 
       downloadBlob(blob, "PDFMantra-signed.pdf");
-      setStatus("Signed PDF downloaded successfully.");
+      setStatus(
+        `Signed PDF downloaded. Signature applied to page ${signatureBox.pageNumber}.`
+      );
     } catch (error) {
       console.error(error);
       setStatus(
@@ -545,57 +671,82 @@ export default function FillSignPage() {
     }
   }
 
-  function renderSignaturePreview() {
-    if (signatureMode === "image") {
-      if (!signatureImage) {
-        return (
-          <div className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-2 text-xs font-black text-slate-500 shadow-lg ring-1 ring-slate-200">
-            Upload signature image
-          </div>
-        );
-      }
-
-      return (
-        <div
-          onMouseDown={startDrag}
-          className="absolute z-20 cursor-move rounded-2xl border border-indigo-300 bg-white/80 p-2 shadow-xl ring-4 ring-indigo-100"
-          style={{
-            left: `${position.xPercent}%`,
-            top: `${position.yPercent}%`,
-            transform: "translate(-50%, -50%)",
-            width: `${imageWidthPercent * 2.2}px`,
-            minWidth: 70,
-            maxWidth: 220,
-          }}
-          title="Drag signature image"
-        >
-          <div className="mb-1 flex items-center gap-1 text-[10px] font-black text-indigo-700">
-            <Grip size={11} />
-            Drag
-          </div>
-          <img
-            src={signatureImage.previewUrl}
-            alt="Signature preview"
-            className="h-auto w-full object-contain"
-          />
-        </div>
-      );
-    }
+  function renderSignatureBox() {
+    const isImageMode = signatureMode === "image";
 
     return (
       <div
-        onMouseDown={startDrag}
-        className={`absolute z-20 inline-flex cursor-move items-center gap-1 rounded-2xl border border-indigo-300 bg-white/95 px-3 py-2 text-indigo-700 shadow-xl ring-4 ring-indigo-100 ${selectedPreviewClass}`}
+        className="absolute z-20"
         style={{
-          left: `${position.xPercent}%`,
-          top: `${position.yPercent}%`,
-          transform: "translate(-50%, -50%)",
-          fontSize: Math.max(11, fontSize * 0.78),
+          left: `${signatureBox.xPercent}%`,
+          top: `${signatureBox.yPercent}%`,
+          width: `${signatureBox.widthPercent}%`,
+          height: `${signatureBox.heightPercent}%`,
         }}
-        title="Drag signature"
       >
-        <Grip size={12} />
-        Signed by {signerName || "Your name"}
+        <div
+          onMouseDown={startMove}
+          className="group relative h-full w-full cursor-move rounded-xl border border-indigo-500 bg-white/75 shadow-xl ring-4 ring-indigo-100 backdrop-blur-[1px]"
+          title="Drag signature"
+        >
+          <div className="absolute left-2 right-2 top-1 z-30 flex h-5 items-center justify-center gap-1 rounded-full bg-indigo-600/90 text-[10px] font-black text-white opacity-90">
+            <Grip size={11} />
+            Drag
+          </div>
+
+          <div className="flex h-full w-full items-center justify-center overflow-hidden px-3 pt-5">
+            {isImageMode ? (
+              signatureImage ? (
+                <img
+                  src={signatureImage.previewUrl}
+                  alt="Signature"
+                  className="max-h-full max-w-full object-contain"
+                />
+              ) : (
+                <div className="text-center text-xs font-black text-slate-500">
+                  Import Signature
+                </div>
+              )
+            ) : (
+              <div
+                className={`w-full truncate text-center text-indigo-700 ${selectedPreviewClass}`}
+                style={{
+                  fontSize: Math.max(10, textFontSize * 0.82),
+                }}
+              >
+                Signed by {signerName || "Your name"}
+              </div>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onMouseDown={(event) => startResize(event, "nw")}
+            className="absolute -left-2 -top-2 h-4 w-4 rounded-full border-2 border-white bg-indigo-600 shadow-md"
+            title="Resize"
+          />
+
+          <button
+            type="button"
+            onMouseDown={(event) => startResize(event, "ne")}
+            className="absolute -right-2 -top-2 h-4 w-4 rounded-full border-2 border-white bg-indigo-600 shadow-md"
+            title="Resize"
+          />
+
+          <button
+            type="button"
+            onMouseDown={(event) => startResize(event, "sw")}
+            className="absolute -bottom-2 -left-2 h-4 w-4 rounded-full border-2 border-white bg-indigo-600 shadow-md"
+            title="Resize"
+          />
+
+          <button
+            type="button"
+            onMouseDown={(event) => startResize(event, "se")}
+            className="absolute -bottom-2 -right-2 h-4 w-4 rounded-full border-2 border-white bg-indigo-600 shadow-md"
+            title="Resize"
+          />
+        </div>
       </div>
     );
   }
@@ -605,7 +756,7 @@ export default function FillSignPage() {
       <Header />
 
       <main className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-amber-50">
-        <section className="mx-auto max-w-7xl px-5 py-8">
+        <section className="mx-auto max-w-[1500px] px-5 py-8">
           <div className="overflow-hidden rounded-[2rem] border border-indigo-100 bg-white shadow-xl shadow-indigo-100/50">
             <div className="border-b border-slate-100 bg-gradient-to-r from-indigo-700 via-violet-700 to-fuchsia-700 p-6 text-white">
               <div>
@@ -619,8 +770,8 @@ export default function FillSignPage() {
                 </h1>
 
                 <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-indigo-50 md:text-base">
-                  Add a text signature or import your signature image, place it
-                  visually on page 1, and export a signed PDF.
+                  Add a text or image signature, drag it anywhere on the PDF
+                  page, resize it, and export the signed document.
                 </p>
 
                 <input
@@ -643,8 +794,8 @@ export default function FillSignPage() {
               </div>
             </div>
 
-            <div className="grid lg:grid-cols-[1fr_400px]">
-              <section className="min-h-[720px] border-r border-slate-200 bg-slate-50/70 p-5">
+            <div className="grid min-h-[760px] lg:grid-cols-[180px_1fr_390px]">
+              <aside className="border-r border-slate-200 bg-slate-50 p-4">
                 <div
                   onClick={() => pdfInputRef.current?.click()}
                   onDrop={(event) => {
@@ -659,131 +810,171 @@ export default function FillSignPage() {
                       pdfInputRef.current?.click();
                     }
                   }}
-                  className="cursor-pointer rounded-3xl border-2 border-dashed border-indigo-200 bg-white p-6 text-center shadow-sm transition hover:border-indigo-400 hover:bg-indigo-50/40"
+                  className="cursor-pointer rounded-2xl border-2 border-dashed border-indigo-200 bg-white p-4 text-center transition hover:border-indigo-400 hover:bg-indigo-50/40"
                 >
-                  <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-700 text-white shadow-lg shadow-indigo-200">
-                    <FileText size={23} />
+                  <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-700 text-white shadow-md shadow-indigo-100">
+                    <Upload size={18} />
                   </div>
 
-                  <div className="font-black text-slate-950">
-                    {file ? file.name : "Drop PDF here"}
+                  <div className="mt-3 text-sm font-black text-slate-950">
+                    Upload PDF
                   </div>
 
-                  <div className="mt-1 text-sm font-semibold text-slate-500">
-                    {file
-                      ? `${pageCount} page${pageCount > 1 ? "s" : ""} loaded`
-                      : "Click here or drag a PDF to begin."}
-                  </div>
-
-                  <div className="mt-4 inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-50 px-4 py-2 text-sm font-black text-indigo-700">
-                    <Upload size={17} />
-                    Click here to choose PDF
+                  <div className="mt-1 text-xs font-bold text-slate-500">
+                    Click or drop file
                   </div>
                 </div>
 
-                <div className="mt-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
-                    <div>
-                      <h2 className="text-xl font-black text-slate-950">
-                        Signature Placement
-                      </h2>
-                      <p className="mt-1 text-sm font-semibold text-slate-500">
-                        Drag the signature on page 1 preview. Export applies it
-                        to the first page.
-                      </p>
-                    </div>
+                <div className="mt-5 flex items-center justify-between">
+                  <div className="text-sm font-black text-slate-950">Pages</div>
+                  {file && (
+                    <button
+                      onClick={clearPdf}
+                      className="rounded-lg bg-red-50 p-1.5 text-red-700 transition hover:bg-red-100"
+                      title="Remove PDF"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
 
-                    {file && (
-                      <button
-                        onClick={clearPdf}
-                        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-2 text-sm font-bold text-red-700 transition hover:bg-red-100"
-                      >
-                        <X size={15} />
-                        Remove PDF
-                      </button>
-                    )}
-                  </div>
-
-                  {busy && previews.length === 0 ? (
-                    <div className="mt-5 flex min-h-80 items-center justify-center rounded-3xl bg-slate-50">
-                      <div className="flex items-center gap-2 rounded-2xl bg-white px-4 py-3 font-bold shadow-sm">
-                        <Loader2
-                          className="animate-spin text-indigo-600"
-                          size={18}
-                        />
-                        Rendering preview
-                      </div>
-                    </div>
-                  ) : previews.length === 0 ? (
-                    <div className="mt-5 flex min-h-80 items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50 text-center">
-                      <div>
-                        <PenLine className="mx-auto text-slate-400" size={38} />
-                        <div className="mt-3 font-black text-slate-900">
-                          No PDF selected
-                        </div>
-                        <p className="mt-1 text-sm text-slate-500">
-                          Upload a PDF to preview signature placement.
-                        </p>
-                      </div>
+                <div className="mt-3 space-y-3">
+                  {previews.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-center text-xs font-bold text-slate-500">
+                      No PDF uploaded
                     </div>
                   ) : (
-                    <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                      {previews.map((preview) => {
-                        const isPrimary = preview.pageNumber === 1;
+                    previews.map((preview) => (
+                      <button
+                        key={preview.pageNumber}
+                        onClick={() => selectPage(preview.pageNumber)}
+                        className={`block w-full overflow-hidden rounded-2xl border bg-white text-left shadow-sm transition ${
+                          activePageNumber === preview.pageNumber
+                            ? "border-indigo-500 ring-4 ring-indigo-100"
+                            : "border-slate-200 hover:border-indigo-200"
+                        }`}
+                      >
+                        <div className="border-b border-slate-100 px-3 py-2 text-xs font-black text-slate-700">
+                          Page {preview.pageNumber}
+                        </div>
 
-                        return (
-                          <div
-                            key={preview.pageNumber}
-                            className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"
-                          >
-                            <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3">
-                              <div className="text-sm font-black text-slate-800">
-                                Page {preview.pageNumber}
-                              </div>
+                        <div className="bg-slate-100 p-2">
+                          <img
+                            src={preview.previewUrl}
+                            alt={`Page ${preview.pageNumber}`}
+                            className="mx-auto max-h-36 rounded border border-slate-200 bg-white"
+                          />
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </aside>
 
-                              {isPrimary && (
-                                <div className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-black text-indigo-700">
-                                  Drag signature
-                                </div>
-                              )}
-                            </div>
+              <section className="bg-slate-100 p-5">
+                <div className="mb-4 flex flex-col justify-between gap-3 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm md:flex-row md:items-center">
+                  <div>
+                    <h2 className="text-xl font-black text-slate-950">
+                      Document Signing Workspace
+                    </h2>
+                    <p className="mt-1 text-sm font-semibold text-slate-500">
+                      Select a page, drag the signature anywhere, and resize
+                      from the corner handles.
+                    </p>
+                  </div>
 
-                            <div
-                              ref={isPrimary ? dragAreaRef : null}
-                              className="relative flex min-h-56 items-center justify-center overflow-hidden bg-slate-100 p-4"
-                            >
-                              <img
-                                src={preview.previewUrl}
-                                alt={`Page ${preview.pageNumber}`}
-                                className="max-h-64 rounded border border-slate-200 bg-white shadow-sm"
-                              />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={resetPlacement}
+                      disabled={!file}
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <RotateCcw size={16} />
+                      Reset
+                    </button>
 
-                              {isPrimary && renderSignaturePreview()}
-                            </div>
-                          </div>
-                        );
-                      })}
+                    <button
+                      onClick={handleExport}
+                      disabled={busy || !file}
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-700 px-4 py-2 text-sm font-black text-white shadow-lg shadow-indigo-100 transition hover:bg-indigo-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                    >
+                      {busy ? (
+                        <>
+                          <Loader2 className="animate-spin" size={16} />
+                          Processing
+                        </>
+                      ) : (
+                        <>
+                          <Download size={16} />
+                          Export
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex min-h-[630px] items-start justify-center overflow-auto rounded-3xl border border-slate-200 bg-slate-200/70 p-6">
+                  {busy && previews.length === 0 ? (
+                    <div className="mt-28 flex items-center gap-2 rounded-2xl bg-white px-5 py-4 text-sm font-black text-slate-700 shadow-sm">
+                      <Loader2
+                        className="animate-spin text-indigo-600"
+                        size={18}
+                      />
+                      Rendering PDF
+                    </div>
+                  ) : !activePreview ? (
+                    <div className="mt-28 max-w-md rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center shadow-sm">
+                      <PenLine className="mx-auto text-slate-400" size={42} />
+                      <div className="mt-4 text-xl font-black text-slate-950">
+                        Upload a PDF to start signing
+                      </div>
+                      <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
+                        Your PDF will appear here as a large page preview with a
+                        draggable signature overlay.
+                      </p>
+                    </div>
+                  ) : (
+                    <div
+                      ref={activePageRef}
+                      className="relative inline-block select-none rounded bg-white shadow-2xl shadow-slate-400/30"
+                    >
+                      <img
+                        src={activePreview.previewUrl}
+                        alt={`Active page ${activePageNumber}`}
+                        className="block max-h-[900px] max-w-full rounded bg-white"
+                        draggable={false}
+                      />
+
+                      {signatureBox.pageNumber === activePageNumber &&
+                        renderSignatureBox()}
                     </div>
                   )}
                 </div>
               </section>
 
-              <aside className="bg-white p-5">
+              <aside className="border-l border-slate-200 bg-white p-5">
                 <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
                   <h2 className="text-xl font-black text-slate-950">
-                    Signature Settings
+                    Signature Tools
                   </h2>
 
                   <div className="mt-4 grid grid-cols-2 gap-2 rounded-2xl bg-white p-2">
                     <button
-                      onClick={() => setSignatureMode("text")}
+                      onClick={() => {
+                        setSignatureMode("text");
+                        setSignatureBox((current) => ({
+                          ...current,
+                          widthPercent: Math.max(current.widthPercent, 24),
+                          heightPercent: 8,
+                        }));
+                      }}
                       className={`rounded-xl px-3 py-3 text-sm font-black transition ${
                         signatureMode === "text"
                           ? "bg-indigo-700 text-white shadow-md shadow-indigo-100"
                           : "text-slate-600 hover:bg-slate-50"
                       }`}
                     >
-                      Text Signature
+                      Text
                     </button>
 
                     <button
@@ -794,7 +985,7 @@ export default function FillSignPage() {
                           : "text-slate-600 hover:bg-slate-50"
                       }`}
                     >
-                      Image Signature
+                      Image
                     </button>
                   </div>
 
@@ -817,7 +1008,7 @@ export default function FillSignPage() {
 
                       <label className="mt-4 block">
                         <span className="text-sm font-black text-slate-800">
-                          Signature style
+                          Style
                         </span>
 
                         <select
@@ -840,16 +1031,16 @@ export default function FillSignPage() {
                       <label className="mt-4 block">
                         <span className="flex justify-between text-sm font-black text-slate-800">
                           Text size
-                          <span>{fontSize}px</span>
+                          <span>{textFontSize}px</span>
                         </span>
 
                         <input
                           type="range"
-                          min={10}
-                          max={36}
-                          value={fontSize}
+                          min={9}
+                          max={42}
+                          value={textFontSize}
                           onChange={(event) =>
-                            setFontSize(Number(event.target.value))
+                            setTextFontSize(Number(event.target.value))
                           }
                           className="mt-3 w-full"
                         />
@@ -873,7 +1064,7 @@ export default function FillSignPage() {
                                 {signatureImage.file.name}
                               </div>
                               <div className="mt-1 text-xs font-bold text-slate-500">
-                                Imported for current session
+                                Current session only
                               </div>
                             </div>
 
@@ -896,46 +1087,68 @@ export default function FillSignPage() {
                         </div>
                       ) : (
                         <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-sm font-bold leading-6 text-slate-500">
-                          Upload a transparent PNG signature for best result.
-                          JPG and WebP are also supported.
+                          Transparent PNG works best. JPG and WebP are also
+                          supported.
                         </div>
                       )}
-
-                      <label className="mt-4 block">
-                        <span className="flex justify-between text-sm font-black text-slate-800">
-                          Image size
-                          <span>{imageWidthPercent}% page width</span>
-                        </span>
-
-                        <input
-                          type="range"
-                          min={8}
-                          max={55}
-                          value={imageWidthPercent}
-                          onChange={(event) =>
-                            setImageWidthPercent(Number(event.target.value))
-                          }
-                          className="mt-3 w-full"
-                        />
-                      </label>
                     </>
                   )}
 
+                  <div className="mt-5 grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() =>
+                        setSignatureBox((current) => ({
+                          ...current,
+                          widthPercent: clamp(current.widthPercent - 3, 8, 75),
+                          heightPercent: clamp(
+                            current.heightPercent - 1.5,
+                            4,
+                            35
+                          ),
+                        }))
+                      }
+                      disabled={!file}
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <Minimize2 size={16} />
+                      Smaller
+                    </button>
+
+                    <button
+                      onClick={() =>
+                        setSignatureBox((current) => ({
+                          ...current,
+                          widthPercent: clamp(current.widthPercent + 3, 8, 75),
+                          heightPercent: clamp(
+                            current.heightPercent + 1.5,
+                            4,
+                            35
+                          ),
+                        }))
+                      }
+                      disabled={!file}
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <Maximize2 size={16} />
+                      Bigger
+                    </button>
+                  </div>
+
                   <button
-                    onClick={resetPosition}
+                    onClick={resetPlacement}
                     disabled={!file}
-                    className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <RotateCcw size={17} />
-                    Reset Position
+                    Reset Placement
                   </button>
 
                   <div className="mt-5 rounded-2xl bg-white p-4">
                     <div className="text-xs font-black uppercase tracking-wide text-slate-500">
-                      PDF pages
+                      Signing page
                     </div>
                     <div className="mt-1 text-3xl font-black text-slate-950">
-                      {pageCount || "-"}
+                      {file ? signatureBox.pageNumber : "-"}
                     </div>
                   </div>
 
@@ -962,7 +1175,8 @@ export default function FillSignPage() {
                   className={`mt-5 rounded-3xl border p-4 text-sm font-bold leading-6 ${
                     status.toLowerCase().includes("failed") ||
                     status.toLowerCase().includes("valid") ||
-                    status.toLowerCase().includes("unable")
+                    status.toLowerCase().includes("unable") ||
+                    status.toLowerCase().includes("upload a signature")
                       ? "border-red-100 bg-red-50 text-red-700"
                       : "border-amber-100 bg-amber-50 text-amber-900"
                   }`}
@@ -978,8 +1192,8 @@ export default function FillSignPage() {
                   <div className="font-black">Saved signatures later</div>
                   <p className="mt-2">
                     Signature saving will be added later for logged-in
-                    subscription users. For now, imported signatures are used in
-                    this browser session only.
+                    subscription users. Current image signatures are used only in
+                    this browser session.
                   </p>
                 </div>
               </aside>
