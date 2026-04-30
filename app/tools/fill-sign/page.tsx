@@ -1,402 +1,992 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Header } from "@/components/Header";
+import {
+  CheckCircle2,
+  Download,
+  FileSignature,
+  FileText,
+  Grip,
+  Image as ImageIcon,
+  Loader2,
+  PenLine,
+  RotateCcw,
+  Upload,
+  X,
+} from "lucide-react";
+import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
-import { Download, GripHorizontal, Image as ImageIcon, Type } from "lucide-react";
-import { downloadBlob, readFileAsArrayBuffer } from "@/lib/pdf-utils";
+import { MouseEvent, useEffect, useMemo, useRef, useState } from "react";
+
+type PdfPagePreview = {
+  pageNumber: number;
+  previewUrl: string;
+};
 
 type SignatureMode = "text" | "image";
-type TextStyle = "clean" | "bold" | "italic";
-type SigRect = { x: number; y: number; width: number; height: number };
+type SignatureStyle = "clean" | "bold" | "italic";
+
+type SignaturePosition = {
+  xPercent: number;
+  yPercent: number;
+};
+
+type SignatureImage = {
+  file: File;
+  previewUrl: string;
+  pngBytes: Uint8Array;
+  width: number;
+  height: number;
+};
+
+const STYLE_OPTIONS: Array<{
+  value: SignatureStyle;
+  label: string;
+  font: StandardFonts;
+  previewClass: string;
+}> = [
+  {
+    value: "clean",
+    label: "Clean",
+    font: StandardFonts.Helvetica,
+    previewClass: "font-semibold not-italic",
+  },
+  {
+    value: "bold",
+    label: "Bold",
+    font: StandardFonts.HelveticaBold,
+    previewClass: "font-black not-italic",
+  },
+  {
+    value: "italic",
+    label: "Italic",
+    font: StandardFonts.HelveticaOblique,
+    previewClass: "font-semibold italic",
+  },
+];
+
+function isPdfFile(file: File) {
+  return (
+    file.type === "application/pdf" ||
+    file.name.toLowerCase().endsWith(".pdf")
+  );
+}
+
+function isSignatureImageFile(file: File) {
+  const name = file.name.toLowerCase();
+
+  return (
+    file.type.startsWith("image/") ||
+    name.endsWith(".png") ||
+    name.endsWith(".jpg") ||
+    name.endsWith(".jpeg") ||
+    name.endsWith(".webp")
+  );
+}
+
+function downloadBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = fileName;
+
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+
+  URL.revokeObjectURL(url);
+}
+
+async function loadPdfFromFile(file: File) {
+  const buffer = await file.arrayBuffer();
+
+  const loadingTask = pdfjsLib.getDocument({
+    data: buffer.slice(0),
+  });
+
+  return loadingTask.promise;
+}
+
+async function renderPdfPageToPng(
+  pdf: pdfjsLib.PDFDocumentProxy,
+  pageNumber: number,
+  scale: number
+) {
+  const page = await pdf.getPage(pageNumber);
+  const viewport = page.getViewport({ scale });
+
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+
+  if (!context) {
+    throw new Error("Unable to create canvas preview.");
+  }
+
+  const outputScale = window.devicePixelRatio || 1;
+
+  canvas.width = Math.floor(viewport.width * outputScale);
+  canvas.height = Math.floor(viewport.height * outputScale);
+  canvas.style.width = `${viewport.width}px`;
+  canvas.style.height = `${viewport.height}px`;
+
+  context.setTransform(outputScale, 0, 0, outputScale, 0, 0);
+
+  await page.render({
+    canvasContext: context,
+    viewport,
+  }).promise;
+
+  return canvas.toDataURL("image/png");
+}
+
+async function convertImageToPngBytes(file: File): Promise<{
+  pngBytes: Uint8Array;
+  width: number;
+  height: number;
+}> {
+  const objectUrl = URL.createObjectURL(file);
+
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new Image();
+
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("Unable to read signature image."));
+      img.src = objectUrl;
+    });
+
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+
+    if (!context) {
+      throw new Error("Unable to process signature image.");
+    }
+
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, 0, 0);
+
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((outputBlob) => {
+        if (!outputBlob) {
+          reject(new Error("Unable to convert signature image."));
+          return;
+        }
+
+        resolve(outputBlob);
+      }, "image/png");
+    });
+
+    const arrayBuffer = await blob.arrayBuffer();
+
+    return {
+      pngBytes: new Uint8Array(arrayBuffer),
+      width: image.naturalWidth,
+      height: image.naturalHeight,
+    };
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+async function addTextSignatureToPdf({
+  file,
+  signerName,
+  position,
+  fontSize,
+  style,
+}: {
+  file: File;
+  signerName: string;
+  position: SignaturePosition;
+  fontSize: number;
+  style: SignatureStyle;
+}) {
+  const selectedStyle =
+    STYLE_OPTIONS.find((option) => option.value === style) || STYLE_OPTIONS[0];
+
+  const arrayBuffer = await file.arrayBuffer();
+  const pdfDoc = await PDFDocument.load(arrayBuffer);
+  const font = await pdfDoc.embedFont(selectedStyle.font);
+  const pages = pdfDoc.getPages();
+
+  if (pages.length === 0) {
+    throw new Error("This PDF has no pages.");
+  }
+
+  const firstPage = pages[0];
+  const { width, height } = firstPage.getSize();
+  const label = `Signed by ${signerName}`;
+  const textWidth = font.widthOfTextAtSize(label, fontSize);
+
+  const x = Math.min(
+    Math.max(12, (position.xPercent / 100) * width - textWidth / 2),
+    width - textWidth - 12
+  );
+
+  const y = Math.min(
+    Math.max(12, height - (position.yPercent / 100) * height - fontSize / 2),
+    height - fontSize - 12
+  );
+
+  firstPage.drawText(label, {
+    x,
+    y,
+    size: fontSize,
+    font,
+    color: rgb(0.18, 0.14, 0.52),
+    opacity: 0.95,
+  });
+
+  firstPage.drawLine({
+    start: { x, y: y - 6 },
+    end: { x: x + Math.min(textWidth, 180), y: y - 6 },
+    thickness: 1,
+    color: rgb(0.18, 0.14, 0.52),
+    opacity: 0.65,
+  });
+
+  const pdfBytes = await pdfDoc.save();
+
+  return new Blob([pdfBytes], {
+    type: "application/pdf",
+  });
+}
+
+async function addImageSignatureToPdf({
+  file,
+  signatureImage,
+  position,
+  imageWidthPercent,
+}: {
+  file: File;
+  signatureImage: SignatureImage;
+  position: SignaturePosition;
+  imageWidthPercent: number;
+}) {
+  const arrayBuffer = await file.arrayBuffer();
+  const pdfDoc = await PDFDocument.load(arrayBuffer);
+  const pages = pdfDoc.getPages();
+
+  if (pages.length === 0) {
+    throw new Error("This PDF has no pages.");
+  }
+
+  const firstPage = pages[0];
+  const { width, height } = firstPage.getSize();
+
+  const embeddedImage = await pdfDoc.embedPng(signatureImage.pngBytes);
+
+  const imageWidth = width * (imageWidthPercent / 100);
+  const imageHeight =
+    imageWidth * (signatureImage.height / Math.max(signatureImage.width, 1));
+
+  const x = Math.min(
+    Math.max(12, (position.xPercent / 100) * width - imageWidth / 2),
+    width - imageWidth - 12
+  );
+
+  const y = Math.min(
+    Math.max(12, height - (position.yPercent / 100) * height - imageHeight / 2),
+    height - imageHeight - 12
+  );
+
+  firstPage.drawImage(embeddedImage, {
+    x,
+    y,
+    width: imageWidth,
+    height: imageHeight,
+    opacity: 0.98,
+  });
+
+  const pdfBytes = await pdfDoc.save();
+
+  return new Blob([pdfBytes], {
+    type: "application/pdf",
+  });
+}
 
 export default function FillSignPage() {
+  const pdfInputRef = useRef<HTMLInputElement | null>(null);
+  const signatureInputRef = useRef<HTMLInputElement | null>(null);
+  const dragAreaRef = useRef<HTMLDivElement | null>(null);
+
   const [file, setFile] = useState<File | null>(null);
-  const [status, setStatus] = useState("Upload a PDF to start signing.");
-  const [numPages, setNumPages] = useState(0);
-  const [pageImages, setPageImages] = useState<string[]>([]);
-  const [activePage, setActivePage] = useState(0);
+  const [pageCount, setPageCount] = useState(0);
+  const [previews, setPreviews] = useState<PdfPagePreview[]>([]);
 
-  const [mode, setMode] = useState<SignatureMode>("text");
-  const [signerName, setSignerName] = useState("Signer Name");
-  const [textStyle, setTextStyle] = useState<TextStyle>("clean");
-  const [fontSize, setFontSize] = useState(28);
+  const [signatureMode, setSignatureMode] = useState<SignatureMode>("text");
+  const [signerName, setSignerName] = useState("Mayank Singh");
+  const [signatureStyle, setSignatureStyle] = useState<SignatureStyle>("italic");
+  const [fontSize, setFontSize] = useState(16);
 
-  const [signatureImage, setSignatureImage] = useState<File | null>(null);
-  const [signatureImageUrl, setSignatureImageUrl] = useState("");
+  const [signatureImage, setSignatureImage] = useState<SignatureImage | null>(
+    null
+  );
+  const [imageWidthPercent, setImageWidthPercent] = useState(24);
 
-  const [sigRect, setSigRect] = useState<SigRect>({ x: 60, y: 60, width: 240, height: 64 });
-  const [isSelected, setIsSelected] = useState(true);
-  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [position, setPosition] = useState<SignaturePosition>({
+    xPercent: 78,
+    yPercent: 88,
+  });
+
+  const [isDragging, setIsDragging] = useState(false);
+  const [status, setStatus] = useState(
+    "Upload a PDF, choose signature type, place it on page 1, then export."
+  );
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
   }, []);
 
   useEffect(() => {
+    function handleMouseMove(event: globalThis.MouseEvent) {
+      if (!isDragging || !dragAreaRef.current) return;
+
+      const rect = dragAreaRef.current.getBoundingClientRect();
+
+      const xPercent = ((event.clientX - rect.left) / rect.width) * 100;
+      const yPercent = ((event.clientY - rect.top) / rect.height) * 100;
+
+      setPosition({
+        xPercent: Math.min(96, Math.max(4, xPercent)),
+        yPercent: Math.min(96, Math.max(4, yPercent)),
+      });
+    }
+
+    function handleMouseUp() {
+      if (isDragging) {
+        setIsDragging(false);
+        setStatus("Signature position updated.");
+      }
+    }
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+
     return () => {
-      if (signatureImageUrl) URL.revokeObjectURL(signatureImageUrl);
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [signatureImageUrl]);
+  }, [isDragging]);
 
-  useEffect(() => {
-    async function renderPdfPreviews() {
-      if (!file) {
-        setPageImages([]);
-        setNumPages(0);
-        setActivePage(0);
-        return;
-      }
+  const selectedPreviewClass = useMemo(() => {
+    return (
+      STYLE_OPTIONS.find((option) => option.value === signatureStyle)
+        ?.previewClass || STYLE_OPTIONS[0].previewClass
+    );
+  }, [signatureStyle]);
 
-      try {
-        setStatus("Rendering PDF preview...");
-        const doc = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
-        const images: string[] = [];
+  async function handlePdfFile(selectedFile?: File) {
+    if (!selectedFile) return;
 
-        for (let pageNo = 1; pageNo <= doc.numPages; pageNo += 1) {
-          const page = await doc.getPage(pageNo);
-          const viewport = page.getViewport({ scale: 1.35 });
-          const canvas = document.createElement("canvas");
-          const context = canvas.getContext("2d");
-          if (!context) continue;
-          canvas.width = viewport.width;
-          canvas.height = viewport.height;
-          await page.render({ canvasContext: context, viewport }).promise;
-          images.push(canvas.toDataURL("image/png"));
-        }
-
-        setPageImages(images);
-        setNumPages(doc.numPages);
-        setActivePage(0);
-        setStatus("Drag and resize your signature, then export.");
-      } catch (error) {
-        setStatus(error instanceof Error ? error.message : "Failed to render PDF preview.");
-      }
-    }
-
-    renderPdfPreviews();
-  }, [file]);
-
-  const activePageSrc = pageImages[activePage] ?? "";
-
-  const startDrag = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!containerRef.current) return;
-    event.preventDefault();
-    const startX = event.clientX;
-    const startY = event.clientY;
-    const startRect = { ...sigRect };
-
-    const move = (moveEvent: PointerEvent) => {
-      if (!containerRef.current) return;
-      const bounds = containerRef.current.getBoundingClientRect();
-      const dx = moveEvent.clientX - startX;
-      const dy = moveEvent.clientY - startY;
-      const nextX = Math.max(0, Math.min(startRect.x + dx, bounds.width - startRect.width));
-      const nextY = Math.max(0, Math.min(startRect.y + dy, bounds.height - startRect.height));
-      setSigRect((prev) => ({ ...prev, x: nextX, y: nextY }));
-    };
-
-    const up = () => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
-    };
-
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-  };
-
-  const startResize = (event: React.PointerEvent<HTMLDivElement>, handle: "nw" | "ne" | "sw" | "se") => {
-    if (!containerRef.current) return;
-    event.preventDefault();
-    event.stopPropagation();
-    const startX = event.clientX;
-    const startY = event.clientY;
-    const startRect = { ...sigRect };
-
-    const move = (moveEvent: PointerEvent) => {
-      if (!containerRef.current) return;
-      const bounds = containerRef.current.getBoundingClientRect();
-      const dx = moveEvent.clientX - startX;
-      const dy = moveEvent.clientY - startY;
-
-      let next = { ...startRect };
-      if (handle.includes("e")) next.width = Math.max(80, startRect.width + dx);
-      if (handle.includes("s")) next.height = Math.max(36, startRect.height + dy);
-      if (handle.includes("w")) {
-        next.x = Math.max(0, startRect.x + dx);
-        next.width = Math.max(80, startRect.width - dx);
-      }
-      if (handle.includes("n")) {
-        next.y = Math.max(0, startRect.y + dy);
-        next.height = Math.max(36, startRect.height - dy);
-      }
-
-      next.width = Math.min(next.width, bounds.width - next.x);
-      next.height = Math.min(next.height, bounds.height - next.y);
-      setSigRect(next);
-    };
-
-    const up = () => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
-    };
-
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-  };
-
-  async function exportSignedPdf() {
-    if (!file) {
-      setStatus("Please upload a PDF.");
+    if (!isPdfFile(selectedFile)) {
+      setStatus("Please upload a valid PDF file.");
       return;
     }
 
-    if (mode === "image" && !signatureImage) {
-      setStatus("Please upload a signature image.");
-      return;
-    }
-
-    if (!containerRef.current) {
-      setStatus("Preview is not ready yet.");
-      return;
-    }
+    setBusy(true);
+    setStatus("Rendering PDF preview...");
 
     try {
-      const pdf = await PDFDocument.load(await readFileAsArrayBuffer(file));
-      const pages = pdf.getPages();
-      const page = pages[activePage];
-      if (!page) throw new Error("Selected page is not available.");
+      setFile(selectedFile);
+      setPreviews([]);
 
-      const { width: pdfWidth, height: pdfHeight } = page.getSize();
-      const previewBounds = containerRef.current.getBoundingClientRect();
-      const scaleX = pdfWidth / previewBounds.width;
-      const scaleY = pdfHeight / previewBounds.height;
+      const pdf = await loadPdfFromFile(selectedFile);
+      setPageCount(pdf.numPages);
 
-      const drawX = sigRect.x * scaleX;
-      const drawY = pdfHeight - (sigRect.y + sigRect.height) * scaleY;
-      const drawW = sigRect.width * scaleX;
-      const drawH = sigRect.height * scaleY;
+      const nextPreviews: PdfPagePreview[] = [];
+      const pagesToPreview = Math.min(pdf.numPages, 12);
 
-      if (mode === "text") {
-        const font =
-          textStyle === "bold"
-            ? await pdf.embedFont(StandardFonts.HelveticaBold)
-            : textStyle === "italic"
-              ? await pdf.embedFont(StandardFonts.HelveticaOblique)
-              : await pdf.embedFont(StandardFonts.Helvetica);
+      for (let pageNumber = 1; pageNumber <= pagesToPreview; pageNumber += 1) {
+        const previewUrl = await renderPdfPageToPng(pdf, pageNumber, 0.35);
 
-        const scaledFontSize = Math.max(10, fontSize * scaleY * 0.9);
-        page.drawText(signerName || "Signer Name", {
-          x: drawX + 6,
-          y: drawY + Math.max(4, drawH * 0.25),
-          size: scaledFontSize,
-          font,
-          color: rgb(0.13, 0.18, 0.36),
+        nextPreviews.push({
+          pageNumber,
+          previewUrl,
         });
-      } else if (signatureImage) {
-        const imageBytes = new Uint8Array(await signatureImage.arrayBuffer());
-        const embedded =
-          signatureImage.type.includes("png")
-            ? await pdf.embedPng(imageBytes)
-            : await pdf.embedJpg(imageBytes);
-        page.drawImage(embedded, { x: drawX, y: drawY, width: drawW, height: drawH });
       }
 
-      const bytes = await pdf.save();
-      downloadBlob(new Blob([bytes], { type: "application/pdf" }), "PDFMantra-signed.pdf");
-      setStatus(`Signed PDF exported on page ${activePage + 1}.`);
+      setPreviews(nextPreviews);
+      setStatus(
+        `PDF loaded with ${pdf.numPages} page${
+          pdf.numPages > 1 ? "s" : ""
+        }. Drag signature on page 1 preview to set placement.`
+      );
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Export failed.");
+      console.error(error);
+      setFile(null);
+      setPageCount(0);
+      setPreviews([]);
+      setStatus("Unable to read this PDF. Please try another file.");
+    } finally {
+      setBusy(false);
     }
   }
 
-  const signaturePreview = useMemo(() => {
-    if (mode === "image" && signatureImageUrl) {
-      return <img src={signatureImageUrl} alt="Signature preview" className="h-full w-full object-contain" />;
+  async function handleSignatureImage(selectedFile?: File) {
+    if (!selectedFile) return;
+
+    if (!isSignatureImageFile(selectedFile)) {
+      setStatus("Please upload PNG, JPG, or WebP signature image.");
+      return;
     }
+
+    setBusy(true);
+    setStatus("Importing signature image...");
+
+    try {
+      if (signatureImage) {
+        URL.revokeObjectURL(signatureImage.previewUrl);
+      }
+
+      const converted = await convertImageToPngBytes(selectedFile);
+
+      setSignatureImage({
+        file: selectedFile,
+        previewUrl: URL.createObjectURL(selectedFile),
+        pngBytes: converted.pngBytes,
+        width: converted.width,
+        height: converted.height,
+      });
+
+      setSignatureMode("image");
+      setStatus("Signature image imported. Drag it on page 1 preview.");
+    } catch (error) {
+      console.error(error);
+      setStatus("Unable to import signature image. Try PNG or JPG.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function clearPdf() {
+    setFile(null);
+    setPageCount(0);
+    setPreviews([]);
+    setStatus("Upload a PDF, choose signature type, place it on page 1, then export.");
+  }
+
+  function clearSignatureImage() {
+    if (signatureImage) {
+      URL.revokeObjectURL(signatureImage.previewUrl);
+    }
+
+    setSignatureImage(null);
+    setSignatureMode("text");
+    setStatus("Signature image removed. Text signature mode selected.");
+  }
+
+  function resetPosition() {
+    setPosition({
+      xPercent: 78,
+      yPercent: 88,
+    });
+
+    setStatus("Signature position reset.");
+  }
+
+  function startDrag(event: MouseEvent<HTMLDivElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragging(true);
+    setStatus("Dragging signature position...");
+  }
+
+  async function handleExport() {
+    if (!file) {
+      setStatus("Upload a PDF first.");
+      return;
+    }
+
+    if (signatureMode === "text" && !signerName.trim()) {
+      setStatus("Enter signer name first.");
+      return;
+    }
+
+    if (signatureMode === "image" && !signatureImage) {
+      setStatus("Upload a signature image first.");
+      return;
+    }
+
+    setBusy(true);
+    setStatus("Adding signature to PDF...");
+
+    try {
+      const blob =
+        signatureMode === "image" && signatureImage
+          ? await addImageSignatureToPdf({
+              file,
+              signatureImage,
+              position,
+              imageWidthPercent,
+            })
+          : await addTextSignatureToPdf({
+              file,
+              signerName: signerName.trim(),
+              position,
+              fontSize,
+              style: signatureStyle,
+            });
+
+      downloadBlob(blob, "PDFMantra-signed.pdf");
+      setStatus("Signed PDF downloaded successfully.");
+    } catch (error) {
+      console.error(error);
+      setStatus(
+        error instanceof Error ? error.message : "Signature export failed."
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function renderSignaturePreview() {
+    if (signatureMode === "image") {
+      if (!signatureImage) {
+        return (
+          <div className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-2 text-xs font-black text-slate-500 shadow-lg ring-1 ring-slate-200">
+            Upload signature image
+          </div>
+        );
+      }
+
+      return (
+        <div
+          onMouseDown={startDrag}
+          className="absolute z-20 cursor-move rounded-2xl border border-indigo-300 bg-white/80 p-2 shadow-xl ring-4 ring-indigo-100"
+          style={{
+            left: `${position.xPercent}%`,
+            top: `${position.yPercent}%`,
+            transform: "translate(-50%, -50%)",
+            width: `${imageWidthPercent * 2.2}px`,
+            minWidth: 70,
+            maxWidth: 220,
+          }}
+          title="Drag signature image"
+        >
+          <div className="mb-1 flex items-center gap-1 text-[10px] font-black text-indigo-700">
+            <Grip size={11} />
+            Drag
+          </div>
+          <img
+            src={signatureImage.previewUrl}
+            alt="Signature preview"
+            className="h-auto w-full object-contain"
+          />
+        </div>
+      );
+    }
+
     return (
-      <span
-        className={`block truncate px-2 ${
-          textStyle === "bold" ? "font-bold" : textStyle === "italic" ? "italic" : "font-medium"
-        }`}
-        style={{ fontSize: `${Math.max(14, fontSize)}px` }}
+      <div
+        onMouseDown={startDrag}
+        className={`absolute z-20 inline-flex cursor-move items-center gap-1 rounded-2xl border border-indigo-300 bg-white/95 px-3 py-2 text-indigo-700 shadow-xl ring-4 ring-indigo-100 ${selectedPreviewClass}`}
+        style={{
+          left: `${position.xPercent}%`,
+          top: `${position.yPercent}%`,
+          transform: "translate(-50%, -50%)",
+          fontSize: Math.max(11, fontSize * 0.78),
+        }}
+        title="Drag signature"
       >
-        {signerName || "Signer Name"}
-      </span>
+        <Grip size={12} />
+        Signed by {signerName || "Your name"}
+      </div>
     );
-  }, [fontSize, mode, signatureImageUrl, signerName, textStyle]);
+  }
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6">
-      <header className="space-y-2">
-        <span className="inline-flex rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
-          PDFMantra Tool
-        </span>
-        <h1 className="text-3xl font-bold text-slate-900">Fill &amp; Sign PDF</h1>
-        <p className="text-sm text-slate-600">Upload, place, and export your signature with precise drag-and-resize controls.</p>
-      </header>
+    <>
+      <Header />
 
-      <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)_300px]">
-        <aside className="rounded-2xl border bg-white p-3">
-          <p className="mb-3 text-sm font-semibold text-slate-700">Pages</p>
-          <input
-            type="file"
-            accept="application/pdf,.pdf"
-            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-            className="mb-3 block w-full text-xs"
-          />
-          <div className="max-h-[70vh] space-y-2 overflow-auto pr-1">
-            {pageImages.map((src, index) => (
-              <button
-                key={src}
-                className={`w-full rounded-lg border p-1 text-left ${
-                  activePage === index ? "border-indigo-500 ring-2 ring-indigo-200" : "border-slate-200"
-                }`}
-                onClick={() => setActivePage(index)}
-              >
-                <img src={src} alt={`Page ${index + 1}`} className="w-full rounded" />
-                <p className="px-1 pt-1 text-xs text-slate-600">Page {index + 1}</p>
-              </button>
-            ))}
-          </div>
-        </aside>
-
-        <main className="rounded-2xl border bg-slate-50 p-4">
-          <div
-            ref={containerRef}
-            className="relative mx-auto min-h-[520px] w-full max-w-3xl overflow-hidden rounded-xl border bg-white"
-            onClick={() => setIsSelected(true)}
-          >
-            {activePageSrc ? (
-              <img src={activePageSrc} alt={`Active page ${activePage + 1}`} className="h-full w-full object-contain" />
-            ) : (
-              <div className="flex h-[520px] items-center justify-center text-slate-400">Upload a PDF to preview pages.</div>
-            )}
-
-            {activePageSrc && (
-              <div
-                className={`absolute bg-white/85 shadow-sm ${isSelected ? "border border-indigo-500" : "border border-slate-300"}`}
-                style={{ left: sigRect.x, top: sigRect.y, width: sigRect.width, height: sigRect.height }}
-                onPointerDown={(event) => event.stopPropagation()}
-              >
-                <div
-                  className="flex h-6 cursor-move items-center gap-1 border-b bg-indigo-50 px-2 text-xs text-indigo-700"
-                  onPointerDown={startDrag}
-                >
-                  <GripHorizontal className="h-3 w-3" /> Drag
+      <main className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-amber-50">
+        <section className="mx-auto max-w-7xl px-5 py-8">
+          <div className="overflow-hidden rounded-[2rem] border border-indigo-100 bg-white shadow-xl shadow-indigo-100/50">
+            <div className="border-b border-slate-100 bg-gradient-to-r from-indigo-700 via-violet-700 to-fuchsia-700 p-6 text-white">
+              <div>
+                <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-bold ring-1 ring-white/20">
+                  <FileSignature size={14} />
+                  PDFMantra Fill & Sign
                 </div>
-                <div className="flex h-[calc(100%-24px)] items-center justify-center overflow-hidden">{signaturePreview}</div>
 
-                {(["nw", "ne", "sw", "se"] as const).map((handle) => {
-                  const pos: Record<typeof handle, string> = {
-                    nw: "-left-1 -top-1 cursor-nwse-resize",
-                    ne: "-right-1 -top-1 cursor-nesw-resize",
-                    sw: "-bottom-1 -left-1 cursor-nesw-resize",
-                    se: "-bottom-1 -right-1 cursor-nwse-resize",
-                  };
-                  return (
-                    <div
-                      key={handle}
-                      className={`absolute h-3 w-3 rounded-full border border-indigo-500 bg-white ${pos[handle]}`}
-                      onPointerDown={(event) => startResize(event, handle)}
-                    />
-                  );
-                })}
+                <h1 className="text-4xl font-black tracking-[-0.03em] md:text-5xl">
+                  Fill & Sign PDF
+                </h1>
+
+                <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-indigo-50 md:text-base">
+                  Add a text signature or import your signature image, place it
+                  visually on page 1, and export a signed PDF.
+                </p>
+
+                <input
+                  ref={pdfInputRef}
+                  type="file"
+                  accept="application/pdf"
+                  className="hidden"
+                  onChange={(event) => handlePdfFile(event.target.files?.[0])}
+                />
+
+                <input
+                  ref={signatureInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg,image/webp"
+                  className="hidden"
+                  onChange={(event) =>
+                    handleSignatureImage(event.target.files?.[0])
+                  }
+                />
               </div>
-            )}
-          </div>
-        </main>
-
-        <aside className="space-y-4 rounded-2xl border bg-white p-4">
-          <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1">
-            <button
-              className={`rounded-lg px-3 py-2 text-sm ${mode === "text" ? "bg-white font-semibold text-indigo-700" : "text-slate-600"}`}
-              onClick={() => setMode("text")}
-            >
-              <Type className="mr-1 inline h-4 w-4" /> Text
-            </button>
-            <button
-              className={`rounded-lg px-3 py-2 text-sm ${mode === "image" ? "bg-white font-semibold text-indigo-700" : "text-slate-600"}`}
-              onClick={() => setMode("image")}
-            >
-              <ImageIcon className="mr-1 inline h-4 w-4" /> Image
-            </button>
-          </div>
-
-          {mode === "text" ? (
-            <div className="space-y-3">
-              <label className="block text-sm font-medium text-slate-700">Signer name</label>
-              <input value={signerName} onChange={(e) => setSignerName(e.target.value)} className="w-full rounded-lg border px-3 py-2" />
-              <label className="block text-sm font-medium text-slate-700">Style</label>
-              <select
-                value={textStyle}
-                onChange={(e) => setTextStyle(e.target.value as TextStyle)}
-                className="w-full rounded-lg border px-3 py-2"
-              >
-                <option value="clean">Clean</option>
-                <option value="bold">Bold</option>
-                <option value="italic">Italic</option>
-              </select>
-              <label className="block text-sm font-medium text-slate-700">Font size</label>
-              <input
-                type="number"
-                min={12}
-                max={72}
-                value={fontSize}
-                onChange={(e) => setFontSize(Number(e.target.value) || 28)}
-                className="w-full rounded-lg border px-3 py-2"
-              />
             </div>
-          ) : (
-            <div className="space-y-3">
-              <label className="block text-sm font-medium text-slate-700">Upload signature image</label>
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                onChange={(event) => {
-                  const selected = event.target.files?.[0] ?? null;
-                  setSignatureImage(selected);
-                  if (signatureImageUrl) URL.revokeObjectURL(signatureImageUrl);
-                  setSignatureImageUrl(selected ? URL.createObjectURL(selected) : "");
-                }}
-                className="w-full text-sm"
-              />
-              {signatureImageUrl && <img src={signatureImageUrl} alt="Uploaded signature" className="max-h-32 rounded border" />}
-              <label className="block text-sm font-medium text-slate-700">Image size</label>
-              <input
-                type="range"
-                min={120}
-                max={520}
-                value={sigRect.width}
-                onChange={(e) =>
-                  setSigRect((prev) => ({
-                    ...prev,
-                    width: Number(e.target.value),
-                    height: Math.max(40, Number(e.target.value) * 0.35),
-                  }))
-                }
-                className="w-full"
-              />
+
+            <div className="grid lg:grid-cols-[1fr_400px]">
+              <section className="min-h-[720px] border-r border-slate-200 bg-slate-50/70 p-5">
+                <div
+                  onClick={() => pdfInputRef.current?.click()}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    handlePdfFile(event.dataTransfer.files?.[0]);
+                  }}
+                  onDragOver={(event) => event.preventDefault()}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      pdfInputRef.current?.click();
+                    }
+                  }}
+                  className="cursor-pointer rounded-3xl border-2 border-dashed border-indigo-200 bg-white p-6 text-center shadow-sm transition hover:border-indigo-400 hover:bg-indigo-50/40"
+                >
+                  <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-700 text-white shadow-lg shadow-indigo-200">
+                    <FileText size={23} />
+                  </div>
+
+                  <div className="font-black text-slate-950">
+                    {file ? file.name : "Drop PDF here"}
+                  </div>
+
+                  <div className="mt-1 text-sm font-semibold text-slate-500">
+                    {file
+                      ? `${pageCount} page${pageCount > 1 ? "s" : ""} loaded`
+                      : "Click here or drag a PDF to begin."}
+                  </div>
+
+                  <div className="mt-4 inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-50 px-4 py-2 text-sm font-black text-indigo-700">
+                    <Upload size={17} />
+                    Click here to choose PDF
+                  </div>
+                </div>
+
+                <div className="mt-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
+                    <div>
+                      <h2 className="text-xl font-black text-slate-950">
+                        Signature Placement
+                      </h2>
+                      <p className="mt-1 text-sm font-semibold text-slate-500">
+                        Drag the signature on page 1 preview. Export applies it
+                        to the first page.
+                      </p>
+                    </div>
+
+                    {file && (
+                      <button
+                        onClick={clearPdf}
+                        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-2 text-sm font-bold text-red-700 transition hover:bg-red-100"
+                      >
+                        <X size={15} />
+                        Remove PDF
+                      </button>
+                    )}
+                  </div>
+
+                  {busy && previews.length === 0 ? (
+                    <div className="mt-5 flex min-h-80 items-center justify-center rounded-3xl bg-slate-50">
+                      <div className="flex items-center gap-2 rounded-2xl bg-white px-4 py-3 font-bold shadow-sm">
+                        <Loader2
+                          className="animate-spin text-indigo-600"
+                          size={18}
+                        />
+                        Rendering preview
+                      </div>
+                    </div>
+                  ) : previews.length === 0 ? (
+                    <div className="mt-5 flex min-h-80 items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50 text-center">
+                      <div>
+                        <PenLine className="mx-auto text-slate-400" size={38} />
+                        <div className="mt-3 font-black text-slate-900">
+                          No PDF selected
+                        </div>
+                        <p className="mt-1 text-sm text-slate-500">
+                          Upload a PDF to preview signature placement.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                      {previews.map((preview) => {
+                        const isPrimary = preview.pageNumber === 1;
+
+                        return (
+                          <div
+                            key={preview.pageNumber}
+                            className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"
+                          >
+                            <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3">
+                              <div className="text-sm font-black text-slate-800">
+                                Page {preview.pageNumber}
+                              </div>
+
+                              {isPrimary && (
+                                <div className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-black text-indigo-700">
+                                  Drag signature
+                                </div>
+                              )}
+                            </div>
+
+                            <div
+                              ref={isPrimary ? dragAreaRef : null}
+                              className="relative flex min-h-56 items-center justify-center overflow-hidden bg-slate-100 p-4"
+                            >
+                              <img
+                                src={preview.previewUrl}
+                                alt={`Page ${preview.pageNumber}`}
+                                className="max-h-64 rounded border border-slate-200 bg-white shadow-sm"
+                              />
+
+                              {isPrimary && renderSignaturePreview()}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              <aside className="bg-white p-5">
+                <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+                  <h2 className="text-xl font-black text-slate-950">
+                    Signature Settings
+                  </h2>
+
+                  <div className="mt-4 grid grid-cols-2 gap-2 rounded-2xl bg-white p-2">
+                    <button
+                      onClick={() => setSignatureMode("text")}
+                      className={`rounded-xl px-3 py-3 text-sm font-black transition ${
+                        signatureMode === "text"
+                          ? "bg-indigo-700 text-white shadow-md shadow-indigo-100"
+                          : "text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      Text Signature
+                    </button>
+
+                    <button
+                      onClick={() => setSignatureMode("image")}
+                      className={`rounded-xl px-3 py-3 text-sm font-black transition ${
+                        signatureMode === "image"
+                          ? "bg-indigo-700 text-white shadow-md shadow-indigo-100"
+                          : "text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      Image Signature
+                    </button>
+                  </div>
+
+                  {signatureMode === "text" ? (
+                    <>
+                      <label className="mt-4 block">
+                        <span className="text-sm font-black text-slate-800">
+                          Signer name
+                        </span>
+
+                        <input
+                          value={signerName}
+                          onChange={(event) =>
+                            setSignerName(event.target.value)
+                          }
+                          placeholder="Enter signer name"
+                          className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                        />
+                      </label>
+
+                      <label className="mt-4 block">
+                        <span className="text-sm font-black text-slate-800">
+                          Signature style
+                        </span>
+
+                        <select
+                          value={signatureStyle}
+                          onChange={(event) =>
+                            setSignatureStyle(
+                              event.target.value as SignatureStyle
+                            )
+                          }
+                          className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                        >
+                          {STYLE_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label className="mt-4 block">
+                        <span className="flex justify-between text-sm font-black text-slate-800">
+                          Text size
+                          <span>{fontSize}px</span>
+                        </span>
+
+                        <input
+                          type="range"
+                          min={10}
+                          max={36}
+                          value={fontSize}
+                          onChange={(event) =>
+                            setFontSize(Number(event.target.value))
+                          }
+                          className="mt-3 w-full"
+                        />
+                      </label>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => signatureInputRef.current?.click()}
+                        className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-indigo-100 bg-white px-5 py-4 text-sm font-black text-indigo-700 transition hover:bg-indigo-50"
+                      >
+                        <ImageIcon size={18} />
+                        Import Signature Image
+                      </button>
+
+                      {signatureImage ? (
+                        <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <div className="text-sm font-black text-slate-900">
+                                {signatureImage.file.name}
+                              </div>
+                              <div className="mt-1 text-xs font-bold text-slate-500">
+                                Imported for current session
+                              </div>
+                            </div>
+
+                            <button
+                              onClick={clearSignatureImage}
+                              className="rounded-xl border border-red-100 bg-red-50 p-2 text-red-700 transition hover:bg-red-100"
+                              title="Remove signature image"
+                            >
+                              <X size={15} />
+                            </button>
+                          </div>
+
+                          <div className="mt-4 flex min-h-24 items-center justify-center rounded-2xl bg-slate-50 p-3">
+                            <img
+                              src={signatureImage.previewUrl}
+                              alt="Imported signature"
+                              className="max-h-28 object-contain"
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-sm font-bold leading-6 text-slate-500">
+                          Upload a transparent PNG signature for best result.
+                          JPG and WebP are also supported.
+                        </div>
+                      )}
+
+                      <label className="mt-4 block">
+                        <span className="flex justify-between text-sm font-black text-slate-800">
+                          Image size
+                          <span>{imageWidthPercent}% page width</span>
+                        </span>
+
+                        <input
+                          type="range"
+                          min={8}
+                          max={55}
+                          value={imageWidthPercent}
+                          onChange={(event) =>
+                            setImageWidthPercent(Number(event.target.value))
+                          }
+                          className="mt-3 w-full"
+                        />
+                      </label>
+                    </>
+                  )}
+
+                  <button
+                    onClick={resetPosition}
+                    disabled={!file}
+                    className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <RotateCcw size={17} />
+                    Reset Position
+                  </button>
+
+                  <div className="mt-5 rounded-2xl bg-white p-4">
+                    <div className="text-xs font-black uppercase tracking-wide text-slate-500">
+                      PDF pages
+                    </div>
+                    <div className="mt-1 text-3xl font-black text-slate-950">
+                      {pageCount || "-"}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleExport}
+                    disabled={busy || !file}
+                    className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-700 px-5 py-4 text-sm font-black text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                  >
+                    {busy ? (
+                      <>
+                        <Loader2 className="animate-spin" size={18} />
+                        Processing
+                      </>
+                    ) : (
+                      <>
+                        <Download size={18} />
+                        Export Signed PDF
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <div
+                  className={`mt-5 rounded-3xl border p-4 text-sm font-bold leading-6 ${
+                    status.toLowerCase().includes("failed") ||
+                    status.toLowerCase().includes("valid") ||
+                    status.toLowerCase().includes("unable")
+                      ? "border-red-100 bg-red-50 text-red-700"
+                      : "border-amber-100 bg-amber-50 text-amber-900"
+                  }`}
+                >
+                  <div className="mb-1 flex items-center gap-2 font-black">
+                    <CheckCircle2 size={16} />
+                    Status
+                  </div>
+                  {status}
+                </div>
+
+                <div className="mt-5 rounded-3xl border border-indigo-100 bg-indigo-50 p-4 text-sm font-semibold leading-6 text-indigo-800">
+                  <div className="font-black">Saved signatures later</div>
+                  <p className="mt-2">
+                    Signature saving will be added later for logged-in
+                    subscription users. For now, imported signatures are used in
+                    this browser session only.
+                  </p>
+                </div>
+              </aside>
             </div>
-          )}
-
-          <div className="grid gap-2">
-            <button
-              className="rounded-lg border px-3 py-2 text-sm text-slate-700"
-              onClick={() => setSigRect({ x: 60, y: 60, width: 240, height: 64 })}
-            >
-              Reset position
-            </button>
-            <button className="btn-primary inline-flex items-center justify-center gap-2" onClick={exportSignedPdf}>
-              <Download className="h-4 w-4" /> Export PDF
-            </button>
           </div>
-
-          <p className="text-xs text-slate-500">Saved signature library will be added later for logged-in subscription users.</p>
-          <p className="text-xs text-slate-500">Active page: {numPages ? `${activePage + 1} of ${numPages}` : "No PDF selected"}</p>
-          <p className="text-xs text-slate-600">{status}</p>
-        </aside>
-      </div>
-    </div>
+        </section>
+      </main>
+    </>
   );
 }

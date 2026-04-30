@@ -14,11 +14,6 @@ export function downloadBlob(blob: Blob, fileName: string) {
 export function readFileAsArrayBuffer(file: File): Promise<ArrayBuffer> {
   return file.arrayBuffer();
 }
-export function formatFileSize(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-}
 
 export async function mergePdfs(files: File[]): Promise<Blob> {
   const out = await PDFDocument.create();
@@ -61,43 +56,9 @@ export async function splitPdfByPages(file: File, pageInput: string): Promise<Bl
   return new Blob([await out.save()], { type: "application/pdf" });
 }
 
-export type SplitGroup = { label: string; pages: number[] };
-
-export function parseSplitGroups(groupsInput: string, maxPages: number): SplitGroup[] {
-  const clean = groupsInput.replace(/\s+/g, "");
-  if (!clean) throw new Error("Enter at least one page or range.");
-
-  const groups = clean.split(",").filter(Boolean);
-  if (!groups.length) throw new Error("Enter at least one page or range.");
-
-  return groups.map((group) => {
-    const pages = parsePageInput(group, maxPages).map((index) => index + 1);
-    return { label: group, pages };
-  });
-}
-
-export async function splitPdfByGroups(file: File, groupsInput: string): Promise<Blob[]> {
-  const src = await PDFDocument.load(await readFileAsArrayBuffer(file));
-  const groups = parseSplitGroups(groupsInput, src.getPageCount());
-  const out: Blob[] = [];
-  for (const group of groups) {
-    const outPdf = await PDFDocument.create();
-    const indices = group.pages.map((page) => page - 1);
-    const pages = await outPdf.copyPages(src, indices);
-    pages.forEach((p) => outPdf.addPage(p));
-    out.push(new Blob([await outPdf.save()], { type: "application/pdf" }));
-  }
-  return out;
-}
-
 export async function rotatePdf(file: File, deg: 90 | 180 | 270): Promise<Blob> {
   const pdf = await PDFDocument.load(await readFileAsArrayBuffer(file));
   pdf.getPages().forEach((p) => p.setRotation(degrees(deg)));
-  return new Blob([await pdf.save()], { type: "application/pdf" });
-}
-export async function rotatePdfByPage(file: File, perPageRotations: number[]): Promise<Blob> {
-  const pdf = await PDFDocument.load(await readFileAsArrayBuffer(file));
-  pdf.getPages().forEach((p, i) => p.setRotation(degrees(perPageRotations[i] || 0)));
   return new Blob([await pdf.save()], { type: "application/pdf" });
 }
 
@@ -134,7 +95,7 @@ export async function addWatermark(file: File, watermarkText: string): Promise<B
   return new Blob([await pdf.save()], { type: "application/pdf" });
 }
 
-export async function addPageNumbers(file: File, position: "center" | "right" = "center"): Promise<Blob> {
+export async function addPageNumbers(file: File): Promise<Blob> {
   const pdf = await PDFDocument.load(await readFileAsArrayBuffer(file));
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const total = pdf.getPageCount();
@@ -143,14 +104,13 @@ export async function addPageNumbers(file: File, position: "center" | "right" = 
     const text = `${i + 1} / ${total}`;
     const size = 11;
     const textWidth = font.widthOfTextAtSize(text, size);
-    const x = position === "right" ? width - textWidth - 24 : (width - textWidth) / 2;
-    page.drawText(text, { x, y: 20, size, font, color: rgb(0.2, 0.2, 0.25) });
+    page.drawText(text, { x: (width - textWidth) / 2, y: 20, size, font, color: rgb(0.2, 0.2, 0.25) });
   });
   return new Blob([await pdf.save()], { type: "application/pdf" });
 }
 
 export async function optimizePdf(file: File): Promise<Blob> {
   const pdf = await PDFDocument.load(await readFileAsArrayBuffer(file));
-  const saved = await pdf.save({ useObjectStreams: true, addDefaultPage: false, updateFieldAppearances: false });
+  const saved = await pdf.save({ useObjectStreams: true });
   return new Blob([saved], { type: "application/pdf" });
 }
