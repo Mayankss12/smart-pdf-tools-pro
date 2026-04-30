@@ -16,6 +16,10 @@ import {
   RotateCcw,
   Minus,
   Plus,
+  Bold,
+  Italic,
+  Palette,
+  Copy,
 } from "lucide-react";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
@@ -31,7 +35,8 @@ type PdfLayer = {
   height: number;
   text?: string;
   fontSize?: number;
-  fontStyle?: "normal" | "bold" | "italic";
+  isBold?: boolean;
+  isItalic?: boolean;
   opacity?: number;
 };
 
@@ -397,15 +402,64 @@ export default function EditorPage() {
     setStatus("Highlight box added. Drag it or resize from any side/corner.");
   }
 
+  function deleteLayer(layerId: string) {
+    setLayers((prev) => prev.filter((layer) => layer.id !== layerId));
+
+    if (selectedLayerId === layerId) {
+      setSelectedLayerId(null);
+    }
+
+    setStatus("Layer deleted.");
+  }
+
   function deleteSelectedLayer() {
     if (!selectedLayerId) {
       setStatus("Select a layer first.");
       return;
     }
 
-    setLayers((prev) => prev.filter((layer) => layer.id !== selectedLayerId));
-    setSelectedLayerId(null);
-    setStatus("Selected layer deleted.");
+    deleteLayer(selectedLayerId);
+  }
+  function duplicateSelectedLayer() {
+    if (!selectedLayerId) {
+      setStatus("Select a layer first.");
+      return;
+    }
+
+    const layer = layers.find((item) => item.id === selectedLayerId);
+    if (!layer) return;
+
+    const duplicateLayer: PdfLayer = {
+      ...layer,
+      id: crypto.randomUUID(),
+      x: clamp(layer.x + 20, 0, canvasSize.width - layer.width),
+      y: clamp(layer.y + 20, 0, canvasSize.height - layer.height),
+    };
+
+    setLayers((prev) => [...prev, duplicateLayer]);
+    setSelectedLayerId(duplicateLayer.id);
+    setStatus("Layer duplicated.");
+  }
+
+  function duplicateSelectedLayer() {
+    if (!selectedLayerId) {
+      setStatus("Select a layer first.");
+      return;
+    }
+
+    const layer = layers.find((item) => item.id === selectedLayerId);
+    if (!layer) return;
+
+    const duplicateLayer: PdfLayer = {
+      ...layer,
+      id: crypto.randomUUID(),
+      x: clamp(layer.x + 20, 0, canvasSize.width - layer.width),
+      y: clamp(layer.y + 20, 0, canvasSize.height - layer.height),
+    };
+
+    setLayers((prev) => [...prev, duplicateLayer]);
+    setSelectedLayerId(duplicateLayer.id);
+    setStatus("Layer duplicated.");
   }
 
   function duplicateSelectedLayer() {
@@ -536,12 +590,12 @@ export default function EditorPage() {
           const paddingX = 2 / renderScale;
           const paddingY = 1 / renderScale;
 
-          const textFont =
-            layer.fontStyle === "bold"
-              ? helveticaBoldFont
-              : layer.fontStyle === "italic"
+          const textFont = layer.isBold
+            ? helveticaBoldFont
+            : layer.isItalic
               ? helveticaObliqueFont
               : helveticaFont;
+
           page.drawText(layer.text || "", {
             x: pdfX + paddingX,
             y: pdfY + scaledHeight - paddingY - scaledFontSize,
@@ -553,7 +607,6 @@ export default function EditorPage() {
           });
         }
       }
-
       const pdfBytes = await pdfDoc.save();
       const blob = new Blob([pdfBytes], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
@@ -586,8 +639,7 @@ export default function EditorPage() {
       <button
         key={handle.id}
         onMouseDown={(event) => startResize(event, layer, handle.id)}
-        data-resize-handle="true"
-        className={`absolute z-20 h-4 w-4 rounded-full border-2 border-white bg-indigo-600 shadow-md ${handle.className}`}
+        className={`absolute z-20 h-3.5 w-3.5 rounded-full border-2 border-white bg-indigo-500 shadow-sm transition hover:scale-110 ${handle.className}`}
         style={{ cursor: handle.cursor }}
         title={`Resize ${handle.id}`}
       />
@@ -909,19 +961,19 @@ export default function EditorPage() {
                             }}
                             className={`absolute cursor-move rounded-md border transition ${
                               isSelected
-                                ? "border-indigo-700"
-                                : "border-amber-500"
-                            } bg-amber-300/45`}
-                            style={{
-                              left: layer.x,
-                              top: layer.y,
-                              width: layer.width,
-                              height: layer.height,
-                              opacity: layer.opacity ?? 0.42,
-                            }}
+                                  ? "border-amber-500 ring-2 ring-amber-100"
+                                  : "border-transparent hover:border-amber-300"
+                              }`}
+                              style={{
+                                left: layer.x,
+                                top: layer.y,
+                                width: layer.width,
+                                height: layer.height,
+                                backgroundColor: `rgba(251, 191, 36, ${layer.opacity || 0.42})`,
+                              }}
                             title="Drag highlight layer"
                           >
-                            {renderResizeHandles(layer)}
+                          {renderResizeHandles(layer)}
                           </div>
                         );
                       }
@@ -933,10 +985,10 @@ export default function EditorPage() {
                             event.stopPropagation();
                             setSelectedLayerId(layer.id);
                           }}
-                          className={`absolute rounded-md border bg-white text-slate-950 transition ${
+                          className={`absolute rounded-lg border bg-white/95 text-slate-950 shadow-sm transition ${
                             isSelected
-                              ? "border-indigo-500"
-                              : "border-indigo-300"
+                              ? "border-indigo-400 ring-2 ring-indigo-100"
+                              : "border-transparent hover:border-indigo-200"
                           }`}
                           style={{
                             left: layer.x,
@@ -959,19 +1011,17 @@ export default function EditorPage() {
                             }
                             className="h-full w-full resize-none rounded-md bg-transparent px-2 py-1 font-semibold outline-none"
                             style={{
-                              fontSize: layer.fontSize || 16,
-                              lineHeight: 1.15,
-                              fontWeight:
-                                layer.fontStyle === "bold" ? 700 : 600,
-                              fontStyle:
-                                layer.fontStyle === "italic" ? "italic" : "normal",
-                            }}
+                             fontSize: layer.fontSize || 16,
+                             lineHeight: 1.2,
+                             fontWeight: layer.isBold ? 800 : 600,
+                             fontStyle: layer.isItalic ? "italic" : "normal",
+                             letterSpacing: "-0.01em",
+                           }}
                           />
                           {isSelected && (
                             <div
                               onMouseDown={(event) => startMove(event, layer)}
-                              data-no-drag="true"
-                              className="absolute left-0 top-0 h-2 w-full cursor-move rounded-t-md bg-indigo-500/20"
+                              className="absolute left-2 right-2 top-1 h-1.5 cursor-move rounded-full bg-indigo-500/25 transition hover:bg-indigo-500/40"
                               title="Drag text box"
                             />
                           )}
