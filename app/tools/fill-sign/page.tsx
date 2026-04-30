@@ -3,16 +3,18 @@
 import { Header } from "@/components/Header";
 import {
   CheckCircle2,
+  Copy,
   Download,
   FileSignature,
-  FileText,
   Grip,
   Image as ImageIcon,
   Loader2,
   Maximize2,
   Minimize2,
   PenLine,
+  Plus,
   RotateCcw,
+  Trash2,
   Upload,
   X,
 } from "lucide-react";
@@ -29,28 +31,11 @@ type SignatureMode = "text" | "image";
 type SignatureStyle = "clean" | "bold" | "italic";
 
 type SignatureBox = {
-  pageNumber: number;
   xPercent: number;
   yPercent: number;
   widthPercent: number;
   heightPercent: number;
 };
-
-type DragState =
-  | {
-      type: "move";
-      startClientX: number;
-      startClientY: number;
-      startBox: SignatureBox;
-    }
-  | {
-      type: "resize";
-      handle: "nw" | "ne" | "sw" | "se";
-      startClientX: number;
-      startClientY: number;
-      startBox: SignatureBox;
-    }
-  | null;
 
 type SignatureImage = {
   file: File;
@@ -59,6 +44,35 @@ type SignatureImage = {
   width: number;
   height: number;
 };
+
+type SignatureItem = {
+  id: string;
+  pageNumber: number;
+  mode: SignatureMode;
+  box: SignatureBox;
+  text: string;
+  style: SignatureStyle;
+  textFontSize: number;
+  image?: SignatureImage;
+};
+
+type DragState =
+  | {
+      type: "move";
+      signatureId: string;
+      startClientX: number;
+      startClientY: number;
+      startBox: SignatureBox;
+    }
+  | {
+      type: "resize";
+      signatureId: string;
+      handle: "nw" | "ne" | "sw" | "se";
+      startClientX: number;
+      startClientY: number;
+      startBox: SignatureBox;
+    }
+  | null;
 
 const STYLE_OPTIONS: Array<{
   value: SignatureStyle;
@@ -86,12 +100,18 @@ const STYLE_OPTIONS: Array<{
   },
 ];
 
-const DEFAULT_BOX: SignatureBox = {
-  pageNumber: 1,
+const DEFAULT_TEXT_BOX: SignatureBox = {
   xPercent: 58,
   yPercent: 76,
   widthPercent: 28,
   heightPercent: 8,
+};
+
+const DEFAULT_IMAGE_BOX: SignatureBox = {
+  xPercent: 58,
+  yPercent: 76,
+  widthPercent: 26,
+  heightPercent: 9,
 };
 
 function isPdfFile(file: File) {
@@ -129,6 +149,20 @@ function downloadBlob(blob: Blob, fileName: string) {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
+}
+
+function getSignaturePreviewClass(style: SignatureStyle) {
+  return (
+    STYLE_OPTIONS.find((option) => option.value === style)?.previewClass ||
+    STYLE_OPTIONS[0].previewClass
+  );
+}
+
+function getSignatureFont(style: SignatureStyle) {
+  return (
+    STYLE_OPTIONS.find((option) => option.value === style)?.font ||
+    STYLE_OPTIONS[0].font
+  );
 }
 
 async function loadPdfFromFile(file: File) {
@@ -225,22 +259,12 @@ async function convertImageToPngBytes(file: File): Promise<{
   }
 }
 
-async function addSignatureToPdf({
+async function applySignaturesToPdf({
   file,
-  signatureMode,
-  signatureBox,
-  signerName,
-  signatureStyle,
-  textFontSize,
-  signatureImage,
+  signatures,
 }: {
   file: File;
-  signatureMode: SignatureMode;
-  signatureBox: SignatureBox;
-  signerName: string;
-  signatureStyle: SignatureStyle;
-  textFontSize: number;
-  signatureImage: SignatureImage | null;
+  signatures: SignatureItem[];
 }) {
   const arrayBuffer = await file.arrayBuffer();
   const pdfDoc = await PDFDocument.load(arrayBuffer);
@@ -250,49 +274,60 @@ async function addSignatureToPdf({
     throw new Error("This PDF has no pages.");
   }
 
-  const pageIndex = clamp(signatureBox.pageNumber - 1, 0, pages.length - 1);
-  const targetPage = pages[pageIndex];
-  const { width: pageWidth, height: pageHeight } = targetPage.getSize();
+  const fontCache = new Map<SignatureStyle, Awaited<ReturnType<typeof pdfDoc.embedFont>>>();
+  const imageCache = new Map<string, Awaited<ReturnType<typeof pdfDoc.embedPng>>>();
 
-  const boxX = (signatureBox.xPercent / 100) * pageWidth;
-  const boxYFromTop = (signatureBox.yPercent / 100) * pageHeight;
-  const boxWidth = (signatureBox.widthPercent / 100) * pageWidth;
-  const boxHeight = (signatureBox.heightPercent / 100) * pageHeight;
+  for (const signature of signatures) {
+    const pageIndex = clamp(signature.pageNumber - 1, 0, pages.length - 1);
+    const targetPage = pages[pageIndex];
+    const { width: pageWidth, height: pageHeight } = targetPage.getSize();
 
-  const pdfX = clamp(boxX, 8, pageWidth - boxWidth - 8);
-  const pdfY = clamp(
-    pageHeight - boxYFromTop - boxHeight,
-    8,
-    pageHeight - boxHeight - 8
-  );
+    const boxWidth = (signature.box.widthPercent / 100) * pageWidth;
+    const boxHeight = (signature.box.heightPercent / 100) * pageHeight;
+    const boxX = (signature.box.xPercent / 100) * pageWidth;
+    const boxYFromTop = (signature.box.yPercent / 100) * pageHeight;
 
-  if (signatureMode === "image") {
-    if (!signatureImage) {
-      throw new Error("Upload a signature image first.");
+    const pdfX = clamp(boxX, 8, pageWidth - boxWidth - 8);
+    const pdfY = clamp(
+      pageHeight - boxYFromTop - boxHeight,
+      8,
+      pageHeight - boxHeight - 8
+    );
+
+    if (signature.mode === "image") {
+      if (!signature.image) continue;
+
+      const cacheKey = `${signature.image.file.name}-${signature.image.file.size}`;
+
+      let embeddedImage = imageCache.get(cacheKey);
+
+      if (!embeddedImage) {
+        embeddedImage = await pdfDoc.embedPng(signature.image.pngBytes);
+        imageCache.set(cacheKey, embeddedImage);
+      }
+
+      targetPage.drawImage(embeddedImage, {
+        x: pdfX,
+        y: pdfY,
+        width: boxWidth,
+        height: boxHeight,
+        opacity: 0.98,
+      });
+
+      continue;
     }
 
-    const embeddedImage = await pdfDoc.embedPng(signatureImage.pngBytes);
+    if (!signature.text.trim()) continue;
 
-    targetPage.drawImage(embeddedImage, {
-      x: pdfX,
-      y: pdfY,
-      width: boxWidth,
-      height: boxHeight,
-      opacity: 0.98,
-    });
-  } else {
-    if (!signerName.trim()) {
-      throw new Error("Enter signer name first.");
+    let font = fontCache.get(signature.style);
+
+    if (!font) {
+      font = await pdfDoc.embedFont(getSignatureFont(signature.style));
+      fontCache.set(signature.style, font);
     }
 
-    const selectedStyle =
-      STYLE_OPTIONS.find((option) => option.value === signatureStyle) ||
-      STYLE_OPTIONS[0];
-
-    const font = await pdfDoc.embedFont(selectedStyle.font);
-    const label = `Signed by ${signerName.trim()}`;
-    const safeFontSize = clamp(textFontSize, 8, 48);
-    const textWidth = font.widthOfTextAtSize(label, safeFontSize);
+    const safeFontSize = clamp(signature.textFontSize, 8, 48);
+    const textWidth = font.widthOfTextAtSize(signature.text, safeFontSize);
     const textX = clamp(pdfX + 6, 8, pageWidth - textWidth - 8);
     const textY = clamp(
       pdfY + boxHeight / 2 - safeFontSize / 2,
@@ -300,21 +335,13 @@ async function addSignatureToPdf({
       pageHeight - safeFontSize - 8
     );
 
-    targetPage.drawText(label, {
+    targetPage.drawText(signature.text, {
       x: textX,
       y: textY,
       size: safeFontSize,
       font,
       color: rgb(0.18, 0.14, 0.52),
-      opacity: 0.95,
-    });
-
-    targetPage.drawLine({
-      start: { x: textX, y: textY - 6 },
-      end: { x: textX + Math.min(textWidth, boxWidth - 12), y: textY - 6 },
-      thickness: 1,
-      color: rgb(0.18, 0.14, 0.52),
-      opacity: 0.65,
+      opacity: 0.96,
     });
   }
 
@@ -344,9 +371,12 @@ export default function FillSignPage() {
     null
   );
 
-  const [signatureBox, setSignatureBox] = useState<SignatureBox>(DEFAULT_BOX);
+  const [signatures, setSignatures] = useState<SignatureItem[]>([]);
+  const [selectedSignatureId, setSelectedSignatureId] = useState<string | null>(
+    null
+  );
   const [status, setStatus] = useState(
-    "Upload a PDF, place your signature on any page, then export."
+    "Upload a PDF, click Add Signature, place it on any page, then export."
   );
   const [busy, setBusy] = useState(false);
 
@@ -367,64 +397,73 @@ export default function FillSignPage() {
       const dyPercent =
         ((event.clientY - dragState.startClientY) / rect.height) * 100;
 
-      if (dragState.type === "move") {
-        setSignatureBox({
-          ...dragState.startBox,
-          xPercent: clamp(
-            dragState.startBox.xPercent + dxPercent,
-            0,
-            100 - dragState.startBox.widthPercent
-          ),
-          yPercent: clamp(
-            dragState.startBox.yPercent + dyPercent,
-            0,
-            100 - dragState.startBox.heightPercent
-          ),
-        });
-      }
+      setSignatures((current) =>
+        current.map((signature) => {
+          if (signature.id !== dragState.signatureId) return signature;
 
-      if (dragState.type === "resize") {
-        const start = dragState.startBox;
+          if (dragState.type === "move") {
+            return {
+              ...signature,
+              box: {
+                ...dragState.startBox,
+                xPercent: clamp(
+                  dragState.startBox.xPercent + dxPercent,
+                  0,
+                  100 - dragState.startBox.widthPercent
+                ),
+                yPercent: clamp(
+                  dragState.startBox.yPercent + dyPercent,
+                  0,
+                  100 - dragState.startBox.heightPercent
+                ),
+              },
+            };
+          }
 
-        let nextX = start.xPercent;
-        let nextY = start.yPercent;
-        let nextWidth = start.widthPercent;
-        let nextHeight = start.heightPercent;
+          const start = dragState.startBox;
 
-        if (dragState.handle.includes("e")) {
-          nextWidth = start.widthPercent + dxPercent;
-        }
+          let nextX = start.xPercent;
+          let nextY = start.yPercent;
+          let nextWidth = start.widthPercent;
+          let nextHeight = start.heightPercent;
 
-        if (dragState.handle.includes("s")) {
-          nextHeight = start.heightPercent + dyPercent;
-        }
+          if (dragState.handle.includes("e")) {
+            nextWidth = start.widthPercent + dxPercent;
+          }
 
-        if (dragState.handle.includes("w")) {
-          nextX = start.xPercent + dxPercent;
-          nextWidth = start.widthPercent - dxPercent;
-        }
+          if (dragState.handle.includes("s")) {
+            nextHeight = start.heightPercent + dyPercent;
+          }
 
-        if (dragState.handle.includes("n")) {
-          nextY = start.yPercent + dyPercent;
-          nextHeight = start.heightPercent - dyPercent;
-        }
+          if (dragState.handle.includes("w")) {
+            nextX = start.xPercent + dxPercent;
+            nextWidth = start.widthPercent - dxPercent;
+          }
 
-        const minWidth = signatureMode === "image" ? 8 : 14;
-        const minHeight = signatureMode === "image" ? 4 : 5;
+          if (dragState.handle.includes("n")) {
+            nextY = start.yPercent + dyPercent;
+            nextHeight = start.heightPercent - dyPercent;
+          }
 
-        nextWidth = clamp(nextWidth, minWidth, 75);
-        nextHeight = clamp(nextHeight, minHeight, 35);
-        nextX = clamp(nextX, 0, 100 - nextWidth);
-        nextY = clamp(nextY, 0, 100 - nextHeight);
+          const minWidth = signature.mode === "image" ? 8 : 12;
+          const minHeight = signature.mode === "image" ? 4 : 5;
 
-        setSignatureBox({
-          ...start,
-          xPercent: nextX,
-          yPercent: nextY,
-          widthPercent: nextWidth,
-          heightPercent: nextHeight,
-        });
-      }
+          nextWidth = clamp(nextWidth, minWidth, 78);
+          nextHeight = clamp(nextHeight, minHeight, 40);
+          nextX = clamp(nextX, 0, 100 - nextWidth);
+          nextY = clamp(nextY, 0, 100 - nextHeight);
+
+          return {
+            ...signature,
+            box: {
+              xPercent: nextX,
+              yPercent: nextY,
+              widthPercent: nextWidth,
+              heightPercent: nextHeight,
+            },
+          };
+        })
+      );
     }
 
     function handleMouseUp() {
@@ -441,18 +480,21 @@ export default function FillSignPage() {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [signatureMode]);
+  }, []);
 
   const activePreview = useMemo(() => {
     return previews.find((preview) => preview.pageNumber === activePageNumber);
   }, [activePageNumber, previews]);
 
-  const selectedPreviewClass = useMemo(() => {
-    return (
-      STYLE_OPTIONS.find((option) => option.value === signatureStyle)
-        ?.previewClass || STYLE_OPTIONS[0].previewClass
+  const activePageSignatures = useMemo(() => {
+    return signatures.filter(
+      (signature) => signature.pageNumber === activePageNumber
     );
-  }, [signatureStyle]);
+  }, [activePageNumber, signatures]);
+
+  const selectedSignature = useMemo(() => {
+    return signatures.find((signature) => signature.id === selectedSignatureId);
+  }, [selectedSignatureId, signatures]);
 
   async function handlePdfFile(selectedFile?: File) {
     if (!selectedFile) return;
@@ -469,6 +511,8 @@ export default function FillSignPage() {
       setFile(selectedFile);
       setPreviews([]);
       setActivePageNumber(1);
+      setSignatures([]);
+      setSelectedSignatureId(null);
 
       const pdf = await loadPdfFromFile(selectedFile);
       setPageCount(pdf.numPages);
@@ -486,21 +530,19 @@ export default function FillSignPage() {
       }
 
       setPreviews(nextPreviews);
-      setSignatureBox({
-        ...DEFAULT_BOX,
-        pageNumber: 1,
-      });
 
       setStatus(
         `PDF loaded with ${pdf.numPages} page${
           pdf.numPages > 1 ? "s" : ""
-        }. Select a page and drag the signature anywhere.`
+        }. Click Add Signature when ready.`
       );
     } catch (error) {
       console.error(error);
       setFile(null);
       setPageCount(0);
       setPreviews([]);
+      setSignatures([]);
+      setSelectedSignatureId(null);
       setStatus("Unable to read this PDF. Please try another file.");
     } finally {
       setBusy(false);
@@ -534,18 +576,7 @@ export default function FillSignPage() {
       });
 
       setSignatureMode("image");
-
-      const ratio = converted.height / Math.max(converted.width, 1);
-      const imageWidth = 26;
-      const imageHeight = clamp(imageWidth * ratio, 5, 16);
-
-      setSignatureBox((current) => ({
-        ...current,
-        widthPercent: imageWidth,
-        heightPercent: imageHeight,
-      }));
-
-      setStatus("Signature image imported. Drag and resize it on the page.");
+      setStatus("Signature image imported. Click Add Signature to place it.");
     } catch (error) {
       console.error(error);
       setStatus("Unable to import signature image. Try PNG or JPG.");
@@ -559,8 +590,9 @@ export default function FillSignPage() {
     setPageCount(0);
     setPreviews([]);
     setActivePageNumber(1);
-    setSignatureBox(DEFAULT_BOX);
-    setStatus("Upload a PDF, place your signature on any page, then export.");
+    setSignatures([]);
+    setSelectedSignatureId(null);
+    setStatus("Upload a PDF, click Add Signature, place it on any page, then export.");
   }
 
   function clearSignatureImage() {
@@ -570,40 +602,204 @@ export default function FillSignPage() {
 
     setSignatureImage(null);
     setSignatureMode("text");
-    setSignatureBox((current) => ({
-      ...current,
-      widthPercent: 28,
-      heightPercent: 8,
-    }));
     setStatus("Signature image removed. Text signature selected.");
   }
 
   function selectPage(pageNumber: number) {
     setActivePageNumber(pageNumber);
-    setSignatureBox((current) => ({
-      ...current,
+    setSelectedSignatureId(null);
+    setStatus(`Page ${pageNumber} selected. Add or move signatures here.`);
+  }
+
+  function getNewSignatureBox() {
+    if (signatureMode === "image" && signatureImage) {
+      const ratio = signatureImage.height / Math.max(signatureImage.width, 1);
+      const widthPercent = 26;
+      const heightPercent = clamp(widthPercent * ratio, 5, 16);
+
+      return {
+        ...DEFAULT_IMAGE_BOX,
+        widthPercent,
+        heightPercent,
+      };
+    }
+
+    return DEFAULT_TEXT_BOX;
+  }
+
+  function addSignatureToPage(pageNumber = activePageNumber) {
+    if (!file) {
+      setStatus("Upload a PDF first.");
+      return;
+    }
+
+    if (signatureMode === "text" && !signerName.trim()) {
+      setStatus("Enter signature text/name first.");
+      return;
+    }
+
+    if (signatureMode === "image" && !signatureImage) {
+      setStatus("Import a signature image first.");
+      return;
+    }
+
+    const id = crypto.randomUUID();
+
+    const newSignature: SignatureItem = {
+      id,
       pageNumber,
-    }));
-    setStatus(`Page ${pageNumber} selected. Place signature where needed.`);
+      mode: signatureMode,
+      box: getNewSignatureBox(),
+      text: signerName.trim(),
+      style: signatureStyle,
+      textFontSize,
+      image: signatureMode === "image" ? signatureImage || undefined : undefined,
+    };
+
+    setSignatures((current) => [...current, newSignature]);
+    setSelectedSignatureId(id);
+    setActivePageNumber(pageNumber);
+    setStatus(`Signature added to page ${pageNumber}. Drag or resize it.`);
   }
 
-  function resetPlacement() {
-    setSignatureBox({
-      ...DEFAULT_BOX,
+  function addSignatureToAllPages() {
+    if (!file || pageCount === 0) {
+      setStatus("Upload a PDF first.");
+      return;
+    }
+
+    if (signatureMode === "text" && !signerName.trim()) {
+      setStatus("Enter signature text/name first.");
+      return;
+    }
+
+    if (signatureMode === "image" && !signatureImage) {
+      setStatus("Import a signature image first.");
+      return;
+    }
+
+    const newSignatures: SignatureItem[] = [];
+
+    for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
+      newSignatures.push({
+        id: crypto.randomUUID(),
+        pageNumber,
+        mode: signatureMode,
+        box: getNewSignatureBox(),
+        text: signerName.trim(),
+        style: signatureStyle,
+        textFontSize,
+        image:
+          signatureMode === "image" ? signatureImage || undefined : undefined,
+      });
+    }
+
+    setSignatures((current) => [...current, ...newSignatures]);
+    setSelectedSignatureId(newSignatures[0]?.id || null);
+    setActivePageNumber(1);
+    setStatus(`Signature added to all ${pageCount} pages.`);
+  }
+
+  function duplicateSelectedSignature() {
+    if (!selectedSignature) {
+      setStatus("Select a signature first.");
+      return;
+    }
+
+    const duplicated: SignatureItem = {
+      ...selectedSignature,
+      id: crypto.randomUUID(),
       pageNumber: activePageNumber,
-    });
-    setStatus("Signature placement reset on active page.");
+      box: {
+        ...selectedSignature.box,
+        xPercent: clamp(selectedSignature.box.xPercent + 3, 0, 95),
+        yPercent: clamp(selectedSignature.box.yPercent + 3, 0, 95),
+      },
+    };
+
+    setSignatures((current) => [...current, duplicated]);
+    setSelectedSignatureId(duplicated.id);
+    setStatus(`Signature duplicated on page ${activePageNumber}.`);
   }
 
-  function startMove(event: MouseEvent<HTMLDivElement>) {
+  function deleteSelectedSignature() {
+    if (!selectedSignatureId) {
+      setStatus("Select a signature to delete.");
+      return;
+    }
+
+    setSignatures((current) =>
+      current.filter((signature) => signature.id !== selectedSignatureId)
+    );
+    setSelectedSignatureId(null);
+    setStatus("Selected signature deleted.");
+  }
+
+  function resetSelectedPlacement() {
+    if (!selectedSignatureId) {
+      setStatus("Select a signature first.");
+      return;
+    }
+
+    setSignatures((current) =>
+      current.map((signature) => {
+        if (signature.id !== selectedSignatureId) return signature;
+
+        return {
+          ...signature,
+          box:
+            signature.mode === "image"
+              ? {
+                  ...getNewSignatureBox(),
+                }
+              : {
+                  ...DEFAULT_TEXT_BOX,
+                },
+        };
+      })
+    );
+
+    setStatus("Selected signature placement reset.");
+  }
+
+  function resizeSelectedSignature(direction: "smaller" | "bigger") {
+    if (!selectedSignatureId) {
+      setStatus("Select a signature first.");
+      return;
+    }
+
+    const delta = direction === "bigger" ? 3 : -3;
+
+    setSignatures((current) =>
+      current.map((signature) => {
+        if (signature.id !== selectedSignatureId) return signature;
+
+        return {
+          ...signature,
+          box: {
+            ...signature.box,
+            widthPercent: clamp(signature.box.widthPercent + delta, 8, 78),
+            heightPercent: clamp(signature.box.heightPercent + delta * 0.45, 4, 40),
+          },
+        };
+      })
+    );
+
+    setStatus(`Selected signature made ${direction}.`);
+  }
+
+  function startMove(event: MouseEvent<HTMLDivElement>, signature: SignatureItem) {
     event.preventDefault();
     event.stopPropagation();
 
+    setSelectedSignatureId(signature.id);
+
     dragStateRef.current = {
       type: "move",
+      signatureId: signature.id,
       startClientX: event.clientX,
       startClientY: event.clientY,
-      startBox: signatureBox,
+      startBox: signature.box,
     };
 
     setStatus("Dragging signature...");
@@ -611,17 +807,21 @@ export default function FillSignPage() {
 
   function startResize(
     event: MouseEvent<HTMLButtonElement>,
+    signature: SignatureItem,
     handle: "nw" | "ne" | "sw" | "se"
   ) {
     event.preventDefault();
     event.stopPropagation();
 
+    setSelectedSignatureId(signature.id);
+
     dragStateRef.current = {
       type: "resize",
+      signatureId: signature.id,
       handle,
       startClientX: event.clientX,
       startClientY: event.clientY,
-      startBox: signatureBox,
+      startBox: signature.box,
     };
 
     setStatus("Resizing signature...");
@@ -633,34 +833,22 @@ export default function FillSignPage() {
       return;
     }
 
-    if (signatureMode === "text" && !signerName.trim()) {
-      setStatus("Enter signer name first.");
-      return;
-    }
-
-    if (signatureMode === "image" && !signatureImage) {
-      setStatus("Import a signature image first.");
+    if (signatures.length === 0) {
+      setStatus("Add at least one signature first.");
       return;
     }
 
     setBusy(true);
-    setStatus("Applying signature and exporting PDF...");
+    setStatus("Applying signatures and exporting PDF...");
 
     try {
-      const blob = await addSignatureToPdf({
+      const blob = await applySignaturesToPdf({
         file,
-        signatureMode,
-        signatureBox,
-        signerName,
-        signatureStyle,
-        textFontSize,
-        signatureImage,
+        signatures,
       });
 
       downloadBlob(blob, "PDFMantra-signed.pdf");
-      setStatus(
-        `Signed PDF downloaded. Signature applied to page ${signatureBox.pageNumber}.`
-      );
+      setStatus(`Signed PDF downloaded with ${signatures.length} signature(s).`);
     } catch (error) {
       console.error(error);
       setStatus(
@@ -671,81 +859,94 @@ export default function FillSignPage() {
     }
   }
 
-  function renderSignatureBox() {
-    const isImageMode = signatureMode === "image";
+  function renderSignatureBox(signature: SignatureItem) {
+    const isSelected = selectedSignatureId === signature.id;
+    const previewClass = getSignaturePreviewClass(signature.style);
 
     return (
       <div
+        key={signature.id}
         className="absolute z-20"
         style={{
-          left: `${signatureBox.xPercent}%`,
-          top: `${signatureBox.yPercent}%`,
-          width: `${signatureBox.widthPercent}%`,
-          height: `${signatureBox.heightPercent}%`,
+          left: `${signature.box.xPercent}%`,
+          top: `${signature.box.yPercent}%`,
+          width: `${signature.box.widthPercent}%`,
+          height: `${signature.box.heightPercent}%`,
         }}
+        onMouseDown={() => setSelectedSignatureId(signature.id)}
       >
         <div
-          onMouseDown={startMove}
-          className="group relative h-full w-full cursor-move rounded-xl border border-indigo-500 bg-white/75 shadow-xl ring-4 ring-indigo-100 backdrop-blur-[1px]"
+          onMouseDown={(event) => startMove(event, signature)}
+          className={`group relative h-full w-full cursor-move rounded-xl bg-white/70 shadow-xl backdrop-blur-[1px] ${
+            isSelected
+              ? "border border-indigo-500 ring-4 ring-indigo-100"
+              : "border border-indigo-300/60"
+          }`}
           title="Drag signature"
         >
-          <div className="absolute left-2 right-2 top-1 z-30 flex h-5 items-center justify-center gap-1 rounded-full bg-indigo-600/90 text-[10px] font-black text-white opacity-90">
-            <Grip size={11} />
-            Drag
-          </div>
+          {isSelected && (
+            <div className="absolute left-2 right-2 top-1 z-30 flex h-5 items-center justify-center gap-1 rounded-full bg-indigo-600/90 text-[10px] font-black text-white opacity-90">
+              <Grip size={11} />
+              Drag
+            </div>
+          )}
 
           <div className="flex h-full w-full items-center justify-center overflow-hidden px-3 pt-5">
-            {isImageMode ? (
-              signatureImage ? (
+            {signature.mode === "image" ? (
+              signature.image ? (
                 <img
-                  src={signatureImage.previewUrl}
+                  src={signature.image.previewUrl}
                   alt="Signature"
                   className="max-h-full max-w-full object-contain"
                 />
               ) : (
                 <div className="text-center text-xs font-black text-slate-500">
-                  Import Signature
+                  Signature image missing
                 </div>
               )
             ) : (
               <div
-                className={`w-full truncate text-center text-indigo-700 ${selectedPreviewClass}`}
+                className={`w-full truncate text-center text-indigo-700 ${previewClass}`}
                 style={{
-                  fontSize: Math.max(10, textFontSize * 0.82),
+                  fontSize: Math.max(10, signature.textFontSize * 0.82),
                 }}
               >
-                Signed by {signerName || "Your name"}
+                {signature.text || "Signature"}
               </div>
             )}
           </div>
 
-          <button
-            type="button"
-            onMouseDown={(event) => startResize(event, "nw")}
-            className="absolute -left-2 -top-2 h-4 w-4 rounded-full border-2 border-white bg-indigo-600 shadow-md"
-            title="Resize"
-          />
+          {isSelected && (
+            <>
+              <button
+                type="button"
+                onMouseDown={(event) => startResize(event, signature, "nw")}
+                className="absolute -left-2 -top-2 h-4 w-4 rounded-full border-2 border-white bg-indigo-600 shadow-md"
+                title="Resize"
+              />
 
-          <button
-            type="button"
-            onMouseDown={(event) => startResize(event, "ne")}
-            className="absolute -right-2 -top-2 h-4 w-4 rounded-full border-2 border-white bg-indigo-600 shadow-md"
-            title="Resize"
-          />
+              <button
+                type="button"
+                onMouseDown={(event) => startResize(event, signature, "ne")}
+                className="absolute -right-2 -top-2 h-4 w-4 rounded-full border-2 border-white bg-indigo-600 shadow-md"
+                title="Resize"
+              />
 
-          <button
-            type="button"
-            onMouseDown={(event) => startResize(event, "sw")}
-            className="absolute -bottom-2 -left-2 h-4 w-4 rounded-full border-2 border-white bg-indigo-600 shadow-md"
-            title="Resize"
-          />
+              <button
+                type="button"
+                onMouseDown={(event) => startResize(event, signature, "sw")}
+                className="absolute -bottom-2 -left-2 h-4 w-4 rounded-full border-2 border-white bg-indigo-600 shadow-md"
+                title="Resize"
+              />
 
-          <button
-            type="button"
-            onMouseDown={(event) => startResize(event, "se")}
-            className="absolute -bottom-2 -right-2 h-4 w-4 rounded-full border-2 border-white bg-indigo-600 shadow-md"
-            title="Resize"
-          />
+              <button
+                type="button"
+                onMouseDown={(event) => startResize(event, signature, "se")}
+                className="absolute -bottom-2 -right-2 h-4 w-4 rounded-full border-2 border-white bg-indigo-600 shadow-md"
+                title="Resize"
+              />
+            </>
+          )}
         </div>
       </div>
     );
@@ -769,9 +970,9 @@ export default function FillSignPage() {
                   Fill & Sign PDF
                 </h1>
 
-                <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-indigo-50 md:text-base">
-                  Add a text or image signature, drag it anywhere on the PDF
-                  page, resize it, and export the signed document.
+                <p className="mt-3 max-w-3xl text-sm font-semibold leading-6 text-indigo-50 md:text-base">
+                  Add one or multiple text/image signatures, place them on any
+                  page, resize them, and export your signed document.
                 </p>
 
                 <input
@@ -794,7 +995,7 @@ export default function FillSignPage() {
               </div>
             </div>
 
-            <div className="grid min-h-[760px] lg:grid-cols-[180px_1fr_390px]">
+            <div className="grid min-h-[760px] lg:grid-cols-[180px_1fr_410px]">
               <aside className="border-r border-slate-200 bg-slate-50 p-4">
                 <div
                   onClick={() => pdfInputRef.current?.click()}
@@ -844,29 +1045,40 @@ export default function FillSignPage() {
                       No PDF uploaded
                     </div>
                   ) : (
-                    previews.map((preview) => (
-                      <button
-                        key={preview.pageNumber}
-                        onClick={() => selectPage(preview.pageNumber)}
-                        className={`block w-full overflow-hidden rounded-2xl border bg-white text-left shadow-sm transition ${
-                          activePageNumber === preview.pageNumber
-                            ? "border-indigo-500 ring-4 ring-indigo-100"
-                            : "border-slate-200 hover:border-indigo-200"
-                        }`}
-                      >
-                        <div className="border-b border-slate-100 px-3 py-2 text-xs font-black text-slate-700">
-                          Page {preview.pageNumber}
-                        </div>
+                    previews.map((preview) => {
+                      const count = signatures.filter(
+                        (signature) => signature.pageNumber === preview.pageNumber
+                      ).length;
 
-                        <div className="bg-slate-100 p-2">
-                          <img
-                            src={preview.previewUrl}
-                            alt={`Page ${preview.pageNumber}`}
-                            className="mx-auto max-h-36 rounded border border-slate-200 bg-white"
-                          />
-                        </div>
-                      </button>
-                    ))
+                      return (
+                        <button
+                          key={preview.pageNumber}
+                          onClick={() => selectPage(preview.pageNumber)}
+                          className={`block w-full overflow-hidden rounded-2xl border bg-white text-left shadow-sm transition ${
+                            activePageNumber === preview.pageNumber
+                              ? "border-indigo-500 ring-4 ring-indigo-100"
+                              : "border-slate-200 hover:border-indigo-200"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2 text-xs font-black text-slate-700">
+                            <span>Page {preview.pageNumber}</span>
+                            {count > 0 && (
+                              <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] text-indigo-700">
+                                {count} sign
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="bg-slate-100 p-2">
+                            <img
+                              src={preview.previewUrl}
+                              alt={`Page ${preview.pageNumber}`}
+                              className="mx-auto max-h-36 rounded border border-slate-200 bg-white"
+                            />
+                          </div>
+                        </button>
+                      );
+                    })
                   )}
                 </div>
               </aside>
@@ -878,25 +1090,25 @@ export default function FillSignPage() {
                       Document Signing Workspace
                     </h2>
                     <p className="mt-1 text-sm font-semibold text-slate-500">
-                      Select a page, drag the signature anywhere, and resize
-                      from the corner handles.
+                      Select a page, click Add Signature, then drag and resize
+                      the sign anywhere.
                     </p>
                   </div>
 
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <button
-                      onClick={resetPlacement}
+                      onClick={() => addSignatureToPage(activePageNumber)}
                       disabled={!file}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-700 px-4 py-2 text-sm font-black text-white shadow-lg shadow-indigo-100 transition hover:bg-indigo-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                     >
-                      <RotateCcw size={16} />
-                      Reset
+                      <Plus size={16} />
+                      Add Sign
                     </button>
 
                     <button
                       onClick={handleExport}
-                      disabled={busy || !file}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-700 px-4 py-2 text-sm font-black text-white shadow-lg shadow-indigo-100 transition hover:bg-indigo-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                      disabled={busy || !file || signatures.length === 0}
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-black text-white shadow-lg shadow-emerald-100 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                     >
                       {busy ? (
                         <>
@@ -929,14 +1141,15 @@ export default function FillSignPage() {
                         Upload a PDF to start signing
                       </div>
                       <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
-                        Your PDF will appear here as a large page preview with a
-                        draggable signature overlay.
+                        Your PDF will appear here as a large page preview.
+                        Signatures are added only when you click Add Sign.
                       </p>
                     </div>
                   ) : (
                     <div
                       ref={activePageRef}
                       className="relative inline-block select-none rounded bg-white shadow-2xl shadow-slate-400/30"
+                      onMouseDown={() => setSelectedSignatureId(null)}
                     >
                       <img
                         src={activePreview.previewUrl}
@@ -945,8 +1158,7 @@ export default function FillSignPage() {
                         draggable={false}
                       />
 
-                      {signatureBox.pageNumber === activePageNumber &&
-                        renderSignatureBox()}
+                      {activePageSignatures.map(renderSignatureBox)}
                     </div>
                   )}
                 </div>
@@ -960,14 +1172,7 @@ export default function FillSignPage() {
 
                   <div className="mt-4 grid grid-cols-2 gap-2 rounded-2xl bg-white p-2">
                     <button
-                      onClick={() => {
-                        setSignatureMode("text");
-                        setSignatureBox((current) => ({
-                          ...current,
-                          widthPercent: Math.max(current.widthPercent, 24),
-                          heightPercent: 8,
-                        }));
-                      }}
+                      onClick={() => setSignatureMode("text")}
                       className={`rounded-xl px-3 py-3 text-sm font-black transition ${
                         signatureMode === "text"
                           ? "bg-indigo-700 text-white shadow-md shadow-indigo-100"
@@ -993,7 +1198,7 @@ export default function FillSignPage() {
                     <>
                       <label className="mt-4 block">
                         <span className="text-sm font-black text-slate-800">
-                          Signer name
+                          Signature text
                         </span>
 
                         <input
@@ -1001,7 +1206,7 @@ export default function FillSignPage() {
                           onChange={(event) =>
                             setSignerName(event.target.value)
                           }
-                          placeholder="Enter signer name"
+                          placeholder="Enter signature"
                           className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                         />
                       </label>
@@ -1096,66 +1301,103 @@ export default function FillSignPage() {
 
                   <div className="mt-5 grid grid-cols-2 gap-3">
                     <button
-                      onClick={() =>
-                        setSignatureBox((current) => ({
-                          ...current,
-                          widthPercent: clamp(current.widthPercent - 3, 8, 75),
-                          heightPercent: clamp(
-                            current.heightPercent - 1.5,
-                            4,
-                            35
-                          ),
-                        }))
-                      }
+                      onClick={() => addSignatureToPage(activePageNumber)}
                       disabled={!file}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-700 px-4 py-3 text-sm font-black text-white transition hover:bg-indigo-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                     >
-                      <Minimize2 size={16} />
-                      Smaller
+                      <Plus size={16} />
+                      Add Sign
                     </button>
 
                     <button
-                      onClick={() =>
-                        setSignatureBox((current) => ({
-                          ...current,
-                          widthPercent: clamp(current.widthPercent + 3, 8, 75),
-                          heightPercent: clamp(
-                            current.heightPercent + 1.5,
-                            4,
-                            35
-                          ),
-                        }))
-                      }
+                      onClick={addSignatureToAllPages}
                       disabled={!file}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-indigo-100 bg-white px-4 py-3 text-sm font-black text-indigo-700 transition hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      <Maximize2 size={16} />
-                      Bigger
+                      <Copy size={16} />
+                      All Pages
                     </button>
                   </div>
 
-                  <button
-                    onClick={resetPlacement}
-                    disabled={!file}
-                    className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <RotateCcw size={17} />
-                    Reset Placement
-                  </button>
-
-                  <div className="mt-5 rounded-2xl bg-white p-4">
-                    <div className="text-xs font-black uppercase tracking-wide text-slate-500">
-                      Signing page
+                  <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
+                    <div className="text-sm font-black text-slate-900">
+                      Selected Signature
                     </div>
-                    <div className="mt-1 text-3xl font-black text-slate-950">
-                      {file ? signatureBox.pageNumber : "-"}
+
+                    <div className="mt-2 text-xs font-bold text-slate-500">
+                      {selectedSignature
+                        ? `Page ${selectedSignature.pageNumber} • ${selectedSignature.mode}`
+                        : "No signature selected"}
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => resizeSelectedSignature("smaller")}
+                        disabled={!selectedSignature}
+                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        Smaller
+                      </button>
+
+                      <button
+                        onClick={() => resizeSelectedSignature("bigger")}
+                        disabled={!selectedSignature}
+                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        Bigger
+                      </button>
+
+                      <button
+                        onClick={duplicateSelectedSignature}
+                        disabled={!selectedSignature}
+                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        Duplicate
+                      </button>
+
+                      <button
+                        onClick={resetSelectedPlacement}
+                        disabled={!selectedSignature}
+                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        Reset
+                      </button>
+                    </div>
+
+                    <button
+                      onClick={deleteSelectedSignature}
+                      disabled={!selectedSignature}
+                      className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-black text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <Trash2 size={14} />
+                      Delete Selected
+                    </button>
+                  </div>
+
+                  <div className="mt-5 grid grid-cols-2 gap-3">
+                    <div className="rounded-2xl bg-white p-4">
+                      <div className="text-xs font-black uppercase tracking-wide text-slate-500">
+                        Page
+                      </div>
+                      <div className="mt-1 text-3xl font-black text-slate-950">
+                        {file ? activePageNumber : "-"}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl bg-white p-4">
+                      <div className="text-xs font-black uppercase tracking-wide text-slate-500">
+                        Signs
+                      </div>
+                      <div className="mt-1 text-3xl font-black text-slate-950">
+                        {signatures.length || "-"}
+                      </div>
                     </div>
                   </div>
 
                   <button
                     onClick={handleExport}
-                    disabled={busy || !file}
-                    className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-700 px-5 py-4 text-sm font-black text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                    disabled={busy || !file || signatures.length === 0}
+                    className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-4 text-sm font-black text-white shadow-lg shadow-emerald-100 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                   >
                     {busy ? (
                       <>
@@ -1176,7 +1418,8 @@ export default function FillSignPage() {
                     status.toLowerCase().includes("failed") ||
                     status.toLowerCase().includes("valid") ||
                     status.toLowerCase().includes("unable") ||
-                    status.toLowerCase().includes("upload a signature")
+                    status.toLowerCase().includes("import a signature") ||
+                    status.toLowerCase().includes("add at least")
                       ? "border-red-100 bg-red-50 text-red-700"
                       : "border-amber-100 bg-amber-50 text-amber-900"
                   }`}
@@ -1192,8 +1435,8 @@ export default function FillSignPage() {
                   <div className="font-black">Saved signatures later</div>
                   <p className="mt-2">
                     Signature saving will be added later for logged-in
-                    subscription users. Current image signatures are used only in
-                    this browser session.
+                    subscription users. Current imported signatures are used only
+                    in this browser session.
                   </p>
                 </div>
               </aside>
