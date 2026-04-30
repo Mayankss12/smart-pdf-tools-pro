@@ -12,12 +12,46 @@ import {
 } from "lucide-react";
 import { degrees, PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type PdfPagePreview = {
   pageNumber: number;
   previewUrl: string;
 };
+
+type FontStyle = "regular" | "bold" | "italic" | "boldItalic";
+
+const FONT_OPTIONS: Array<{
+  value: FontStyle;
+  label: string;
+  pdfFont: StandardFonts;
+  previewClass: string;
+}> = [
+  {
+    value: "regular",
+    label: "Regular",
+    pdfFont: StandardFonts.Helvetica,
+    previewClass: "font-semibold not-italic",
+  },
+  {
+    value: "bold",
+    label: "Bold",
+    pdfFont: StandardFonts.HelveticaBold,
+    previewClass: "font-black not-italic",
+  },
+  {
+    value: "italic",
+    label: "Italic",
+    pdfFont: StandardFonts.HelveticaOblique,
+    previewClass: "font-semibold italic",
+  },
+  {
+    value: "boldItalic",
+    label: "Bold Italic",
+    pdfFont: StandardFonts.HelveticaBoldOblique,
+    previewClass: "font-black italic",
+  },
+];
 
 function isPdfFile(file: File) {
   return (
@@ -82,15 +116,27 @@ async function renderPdfPageToPng(
   return canvas.toDataURL("image/png");
 }
 
-async function addWatermarkToPdf(
-  file: File,
-  watermarkText: string,
-  fontSize: number,
-  opacity: number
-) {
+async function addWatermarkToPdf({
+  file,
+  watermarkText,
+  fontSize,
+  opacity,
+  angle,
+  fontStyle,
+}: {
+  file: File;
+  watermarkText: string;
+  fontSize: number;
+  opacity: number;
+  angle: number;
+  fontStyle: FontStyle;
+}) {
+  const selectedFont =
+    FONT_OPTIONS.find((font) => font.value === fontStyle) || FONT_OPTIONS[0];
+
   const arrayBuffer = await file.arrayBuffer();
   const pdfDoc = await PDFDocument.load(arrayBuffer);
-  const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const font = await pdfDoc.embedFont(selectedFont.pdfFont);
 
   const pages = pdfDoc.getPages();
 
@@ -105,7 +151,7 @@ async function addWatermarkToPdf(
       font,
       color: rgb(0.28, 0.2, 0.82),
       opacity,
-      rotate: degrees(-32),
+      rotate: degrees(angle),
     });
   });
 
@@ -125,12 +171,21 @@ export default function WatermarkPage() {
   const [watermarkText, setWatermarkText] = useState("PDFMantra");
   const [fontSize, setFontSize] = useState(48);
   const [opacity, setOpacity] = useState(0.18);
+  const [angle, setAngle] = useState(-32);
+  const [fontStyle, setFontStyle] = useState<FontStyle>("bold");
   const [status, setStatus] = useState("Upload a PDF to add watermark.");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
   }, []);
+
+  const selectedFontPreviewClass = useMemo(() => {
+    return (
+      FONT_OPTIONS.find((font) => font.value === fontStyle)?.previewClass ||
+      FONT_OPTIONS[0].previewClass
+    );
+  }, [fontStyle]);
 
   async function handleFile(selectedFile?: File) {
     if (!selectedFile) return;
@@ -201,12 +256,14 @@ export default function WatermarkPage() {
     setStatus("Adding watermark to PDF...");
 
     try {
-      const blob = await addWatermarkToPdf(
+      const blob = await addWatermarkToPdf({
         file,
-        watermarkText.trim(),
+        watermarkText: watermarkText.trim(),
         fontSize,
-        opacity
-      );
+        opacity,
+        angle,
+        fontStyle,
+      });
 
       downloadBlob(blob, "PDFMantra-watermarked.pdf");
       setStatus("Watermarked PDF downloaded successfully.");
@@ -226,26 +283,20 @@ export default function WatermarkPage() {
         <section className="mx-auto max-w-7xl px-5 py-8">
           <div className="overflow-hidden rounded-[2rem] border border-indigo-100 bg-white shadow-xl shadow-indigo-100/50">
             <div className="border-b border-slate-100 bg-gradient-to-r from-indigo-700 via-violet-700 to-fuchsia-700 p-6 text-white">
-              <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
-                <div>
-                  <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-bold ring-1 ring-white/20">
-                    <Type size={14} />
-                    PDFMantra Watermark Tool
-                  </div>
-
-                  <h1 className="text-4xl font-black tracking-[-0.03em] md:text-5xl">
-                    Watermark PDF
-                  </h1>
-
-                  <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-indigo-50 md:text-base">
-                    Add a clean text watermark across every page before sharing
-                    or sending important documents.
-                  </p>
+              <div>
+                <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-bold ring-1 ring-white/20">
+                  <Type size={14} />
+                  PDFMantra Watermark Tool
                 </div>
 
-                <div className="hidden rounded-2xl bg-white/15 px-4 py-3 text-sm font-bold leading-6 text-white ring-1 ring-white/20 lg:block">
-                  Protect files with custom branding or draft marks.
-                </div>
+                <h1 className="text-4xl font-black tracking-[-0.03em] md:text-5xl">
+                  Watermark PDF
+                </h1>
+
+                <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-indigo-50 md:text-base">
+                  Add a custom text watermark to every page of your PDF with
+                  control over style, size, opacity, and angle.
+                </p>
 
                 <input
                   ref={fileInputRef}
@@ -257,7 +308,7 @@ export default function WatermarkPage() {
               </div>
             </div>
 
-            <div className="grid lg:grid-cols-[1fr_360px]">
+            <div className="grid lg:grid-cols-[1fr_380px]">
               <section className="min-h-[720px] border-r border-slate-200 bg-slate-50/70 p-5">
                 <div
                   onClick={() => fileInputRef.current?.click()}
@@ -302,7 +353,8 @@ export default function WatermarkPage() {
                         PDF Preview
                       </h2>
                       <p className="mt-1 text-sm font-semibold text-slate-500">
-                        Showing up to first 12 pages with watermark preview.
+                        Showing up to first 12 pages with approximate watermark
+                        preview.
                       </p>
                     </div>
 
@@ -359,9 +411,10 @@ export default function WatermarkPage() {
 
                             {watermarkText.trim() && (
                               <div
-                                className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 -rotate-[32deg] whitespace-nowrap font-black text-indigo-700"
+                                className={`pointer-events-none absolute left-1/2 top-1/2 whitespace-nowrap text-indigo-700 ${selectedFontPreviewClass}`}
                                 style={{
-                                  fontSize: Math.max(18, fontSize * 0.42),
+                                  transform: `translate(-50%, -50%) rotate(${angle}deg)`,
+                                  fontSize: Math.max(14, fontSize * 0.42),
                                   opacity,
                                 }}
                               >
@@ -395,18 +448,71 @@ export default function WatermarkPage() {
                   </label>
 
                   <label className="mt-4 block">
+                    <span className="text-sm font-black text-slate-800">
+                      Font style
+                    </span>
+                    <select
+                      value={fontStyle}
+                      onChange={(event) =>
+                        setFontStyle(event.target.value as FontStyle)
+                      }
+                      className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                    >
+                      {FONT_OPTIONS.map((font) => (
+                        <option key={font.value} value={font.value}>
+                          {font.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="mt-4 block">
                     <span className="flex justify-between text-sm font-black text-slate-800">
                       Font size
                       <span>{fontSize}px</span>
                     </span>
                     <input
                       type="range"
-                      min={24}
-                      max={96}
+                      min={18}
+                      max={120}
                       value={fontSize}
-                      onChange={(event) => setFontSize(Number(event.target.value))}
+                      onChange={(event) =>
+                        setFontSize(Number(event.target.value))
+                      }
                       className="mt-3 w-full"
                     />
+                  </label>
+
+                  <label className="mt-4 block">
+                    <span className="flex justify-between text-sm font-black text-slate-800">
+                      Watermark angle
+                      <span>{angle}°</span>
+                    </span>
+                    <input
+                      type="range"
+                      min={-90}
+                      max={90}
+                      value={angle}
+                      onChange={(event) => setAngle(Number(event.target.value))}
+                      className="mt-3 w-full"
+                    />
+
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                      {[-45, 0, 45].map((presetAngle) => (
+                        <button
+                          key={presetAngle}
+                          type="button"
+                          onClick={() => setAngle(presetAngle)}
+                          className={`rounded-xl border px-3 py-2 text-xs font-black transition ${
+                            angle === presetAngle
+                              ? "border-indigo-200 bg-indigo-700 text-white"
+                              : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                          }`}
+                        >
+                          {presetAngle}°
+                        </button>
+                      ))}
+                    </div>
                   </label>
 
                   <label className="mt-4 block">
@@ -416,11 +522,13 @@ export default function WatermarkPage() {
                     </span>
                     <input
                       type="range"
-                      min={0.08}
-                      max={0.5}
+                      min={0.06}
+                      max={0.6}
                       step={0.01}
                       value={opacity}
-                      onChange={(event) => setOpacity(Number(event.target.value))}
+                      onChange={(event) =>
+                        setOpacity(Number(event.target.value))
+                      }
                       className="mt-3 w-full"
                     />
                   </label>
@@ -471,8 +579,8 @@ export default function WatermarkPage() {
                 <div className="mt-5 rounded-3xl border border-indigo-100 bg-indigo-50 p-4 text-sm font-semibold leading-6 text-indigo-800">
                   <div className="font-black">Preview note</div>
                   <p className="mt-2">
-                    The preview shows approximate placement. Export applies the
-                    watermark directly to every PDF page.
+                    Preview placement is approximate. Export writes the
+                    watermark directly into every page of the PDF.
                   </p>
                 </div>
               </aside>
