@@ -78,6 +78,22 @@ type ResizeHandle =
   | "left";
 
 type ExportMode = "full" | "current" | "range";
+type ActiveTool = "select" | "text" | "highlight";
+
+type DraftBox = {
+  xPercent: number;
+  yPercent: number;
+  widthPercent: number;
+  heightPercent: number;
+};
+
+type DrawState = {
+  tool: Exclude<ActiveTool, "select">;
+  startXPercent: number;
+  startYPercent: number;
+  currentXPercent: number;
+  currentYPercent: number;
+};
 
 const resizeHandles: { id: ResizeHandle; className: string; cursor: string }[] =
   [
@@ -267,6 +283,7 @@ export default function EditorPage() {
   const fileBytesRef = useRef<ArrayBuffer | null>(null);
   const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
   const dragStateRef = useRef<DragState | null>(null);
+  const drawStateRef = useRef<DrawState | null>(null);
 
   const [fileName, setFileName] = useState("");
   const [status, setStatus] = useState("Upload a PDF to start editing.");
@@ -280,6 +297,8 @@ export default function EditorPage() {
   const [layers, setLayers] = useState<PdfLayer[]>([]);
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [activeTool, setActiveTool] = useState<ActiveTool>("select");
+  const [draftBox, setDraftBox] = useState<DraftBox | null>(null);
 
   const [exportMode, setExportMode] = useState<ExportMode>("full");
   const [exportRange, setExportRange] = useState("1-3");
@@ -456,10 +475,7 @@ useEffect(() => {
 
     function endPointerInteraction() {
       dragStateRef.current = null;
-      document.body.style.touchAction = "";
-      document.body.style.overscrollBehavior = "";
-      document.documentElement.style.touchAction = "";
-      document.documentElement.style.overscrollBehavior = "";
+      cancelDrawingState();
     }
 
     window.addEventListener("pointermove", handlePointerMove, {
@@ -567,51 +583,26 @@ useEffect(() => {
     }
   }
 
-  function addTextLayer() {
+  function activateTextTool() {
     if (!fileBytesRef.current) {
       setStatus("Upload a PDF first.");
       return;
     }
 
-    const newLayer: PdfLayer = {
-      id: crypto.randomUUID(),
-      page: currentPage,
-      type: "text",
-      xPercent: 10,
-      yPercent: 16,
-      widthPercent: 46,
-      heightPercent: 7,
-      text: "Edit text",
-      fontSize: 15,
-      isBold: false,
-      isItalic: false,
-    };
-
-    setLayers((prev) => [...prev, newLayer]);
-    setSelectedLayerId(newLayer.id);
-    setStatus("Text layer added. Type directly, drag from top strip, or resize.");
+    setActiveTool("text");
+    setSelectedLayerId(null);
+    setStatus("Text tool active. Drag on the PDF page to draw a text box.");
   }
 
-  function addHighlightLayer() {
+  function activateHighlightTool() {
     if (!fileBytesRef.current) {
       setStatus("Upload a PDF first.");
       return;
     }
 
-    const newLayer: PdfLayer = {
-      id: crypto.randomUUID(),
-      page: currentPage,
-      type: "highlight",
-      xPercent: 10,
-      yPercent: 26,
-      widthPercent: 48,
-      heightPercent: 4,
-      opacity: 0.42,
-    };
-
-    setLayers((prev) => [...prev, newLayer]);
-    setSelectedLayerId(newLayer.id);
-    setStatus("Highlight layer added. Drag or resize it.");
+    setActiveTool("highlight");
+    setSelectedLayerId(null);
+    setStatus("Highlight tool active. Drag on the PDF page to highlight an area.");
   }
 
   async function addImageLayer(file?: File) {
@@ -651,6 +642,7 @@ useEffect(() => {
 
       setLayers((prev) => [...prev, newLayer]);
       setSelectedLayerId(newLayer.id);
+      setActiveTool("select");
       setStatus("Image layer added. Drag or resize it.");
     } catch (error) {
       console.error(error);
@@ -682,10 +674,11 @@ useEffect(() => {
 
     setLayers((prev) => [...prev, newLayer]);
     setSelectedLayerId(newLayer.id);
+    setActiveTool("select");
     setStatus("Text signature added. Drag or resize it.");
   }
-  
-async function addImageSignatureLayer(file?: File) {
+
+  async function addImageSignatureLayer(file?: File) {
     if (!fileBytesRef.current) {
       setStatus("Upload a PDF first.");
       return;
@@ -722,6 +715,7 @@ async function addImageSignatureLayer(file?: File) {
 
       setLayers((prev) => [...prev, newLayer]);
       setSelectedLayerId(newLayer.id);
+      setActiveTool("select");
       setStatus("Signature image added. Drag or resize it.");
     } catch (error) {
       console.error(error);
@@ -768,18 +762,25 @@ async function addImageSignatureLayer(file?: File) {
 
     setLayers((prev) => [...prev, duplicateLayer]);
     setSelectedLayerId(duplicateLayer.id);
+    setActiveTool("select");
     setStatus("Layer duplicated.");
   }
 
   function resetEditor() {
     setLayers([]);
     setSelectedLayerId(null);
+    setActiveTool("select");
+    setDraftBox(null);
+    drawStateRef.current = null;
     setStatus("All edit layers cleared.");
   }
 
   function clearCurrentPageLayers() {
     setLayers((prev) => prev.filter((layer) => layer.page !== currentPage));
     setSelectedLayerId(null);
+    setActiveTool("select");
+    setDraftBox(null);
+    drawStateRef.current = null;
     setStatus(`All layers on page ${currentPage} cleared.`);
   }
 
@@ -798,7 +799,7 @@ async function addImageSignatureLayer(file?: File) {
     ) {
       return;
     }
-
+    
     event.currentTarget.setPointerCapture(event.pointerId);
 
     dragStateRef.current = {
@@ -874,6 +875,181 @@ async function addImageSignatureLayer(file?: File) {
       height: `${layer.heightPercent}%`,
     };
   }
+
+function getPointerPercent(event: React.PointerEvent<HTMLDivElement>) {
+  const rect = event.currentTarget.getBoundingClientRect();
+
+  const xPercent = clamp(
+    ((event.clientX - rect.left) / rect.width) * 100,
+    0,
+    100
+  );
+
+  const yPercent = clamp(
+    ((event.clientY - rect.top) / rect.height) * 100,
+    0,
+    100
+  );
+
+  return { xPercent, yPercent };
+}
+
+function normalizeDraftBox(draw: DrawState): DraftBox {
+  const left = Math.min(draw.startXPercent, draw.currentXPercent);
+  const top = Math.min(draw.startYPercent, draw.currentYPercent);
+  const width = Math.abs(draw.currentXPercent - draw.startXPercent);
+  const height = Math.abs(draw.currentYPercent - draw.startYPercent);
+
+  return {
+    xPercent: clamp(left, 0, 100),
+    yPercent: clamp(top, 0, 100),
+    widthPercent: clamp(width, 0, 100 - left),
+    heightPercent: clamp(height, 0, 100 - top),
+  };
+}
+
+function startPageDraw(event: React.PointerEvent<HTMLDivElement>) {
+  if (activeTool === "select") {
+    setSelectedLayerId(null);
+    return;
+  }
+
+  if (!fileBytesRef.current) {
+    setStatus("Upload a PDF first.");
+    return;
+  }
+
+  const target = event.target as HTMLElement;
+
+  if (
+    target.closest("[data-editor-layer='true']") ||
+    target.closest("textarea") ||
+    target.closest("button")
+  ) {
+    return;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+
+  const { xPercent, yPercent } = getPointerPercent(event);
+
+  const nextDrawState: DrawState = {
+    tool: activeTool,
+    startXPercent: xPercent,
+    startYPercent: yPercent,
+    currentXPercent: xPercent,
+    currentYPercent: yPercent,
+  };
+
+  drawStateRef.current = nextDrawState;
+  setDraftBox(normalizeDraftBox(nextDrawState));
+
+  event.currentTarget.setPointerCapture(event.pointerId);
+
+  document.body.style.touchAction = "none";
+  document.body.style.overscrollBehavior = "none";
+  document.documentElement.style.touchAction = "none";
+  document.documentElement.style.overscrollBehavior = "none";
+}
+
+function updatePageDraw(event: React.PointerEvent<HTMLDivElement>) {
+  const draw = drawStateRef.current;
+
+  if (!draw) return;
+
+  event.preventDefault();
+  event.stopPropagation();
+
+  const { xPercent, yPercent } = getPointerPercent(event);
+
+  const nextDrawState: DrawState = {
+    ...draw,
+    currentXPercent: xPercent,
+    currentYPercent: yPercent,
+  };
+
+  drawStateRef.current = nextDrawState;
+  setDraftBox(normalizeDraftBox(nextDrawState));
+}
+
+function endPageDraw(event: React.PointerEvent<HTMLDivElement>) {
+  const draw = drawStateRef.current;
+
+  if (!draw) return;
+
+  event.preventDefault();
+  event.stopPropagation();
+
+  const finalBox = normalizeDraftBox(draw);
+
+  drawStateRef.current = null;
+  setDraftBox(null);
+
+  document.body.style.touchAction = "";
+  document.body.style.overscrollBehavior = "";
+  document.documentElement.style.touchAction = "";
+  document.documentElement.style.overscrollBehavior = "";
+
+  const minimumWidth = draw.tool === "text" ? 5 : 3;
+  const minimumHeight = draw.tool === "text" ? 3 : 1.5;
+
+  if (
+    finalBox.widthPercent < minimumWidth ||
+    finalBox.heightPercent < minimumHeight
+  ) {
+    setStatus("Drag a larger area to create the box.");
+    return;
+  }
+
+  if (draw.tool === "text") {
+    const newLayer: PdfLayer = {
+      id: crypto.randomUUID(),
+      page: currentPage,
+      type: "text",
+      xPercent: finalBox.xPercent,
+      yPercent: finalBox.yPercent,
+      widthPercent: finalBox.widthPercent,
+      heightPercent: finalBox.heightPercent,
+      text: "Edit text",
+      fontSize: 15,
+      isBold: false,
+      isItalic: false,
+    };
+
+    setLayers((prev) => [...prev, newLayer]);
+    setSelectedLayerId(newLayer.id);
+    setActiveTool("select");
+    setStatus("Text box created. Type directly or resize with dots.");
+    return;
+  }
+
+  const newLayer: PdfLayer = {
+    id: crypto.randomUUID(),
+    page: currentPage,
+    type: "highlight",
+    xPercent: finalBox.xPercent,
+    yPercent: finalBox.yPercent,
+    widthPercent: finalBox.widthPercent,
+    heightPercent: finalBox.heightPercent,
+    opacity: 0.42,
+  };
+
+  setLayers((prev) => [...prev, newLayer]);
+  setSelectedLayerId(newLayer.id);
+  setActiveTool("select");
+  setStatus("Highlight created. Drag or resize it.");
+}
+
+function cancelDrawingState() {
+  drawStateRef.current = null;
+  setDraftBox(null);
+
+  document.body.style.touchAction = "";
+  document.body.style.overscrollBehavior = "";
+  document.documentElement.style.touchAction = "";
+  document.documentElement.style.overscrollBehavior = "";
+}
 
   function getSelectedToolbarLabel() {
     if (!selectedLayer) return "No layer selected";
@@ -1137,10 +1313,11 @@ function addRewriteAsTextLayer() {
   function renderLayer(layer: PdfLayer) {
     const isSelected = selectedLayerId === layer.id;
 
-    if (layer.type === "highlight") {
+       if (layer.type === "highlight") {
       return (
         <div
           key={layer.id}
+          data-editor-layer="true"
           onClick={(event) => {
             event.stopPropagation();
             setSelectedLayerId(layer.id);
@@ -1167,6 +1344,7 @@ function addRewriteAsTextLayer() {
       return (
         <div
           key={layer.id}
+          data-editor-layer="true"
           onClick={(event) => {
             event.stopPropagation();
             setSelectedLayerId(layer.id);
@@ -1201,10 +1379,12 @@ function addRewriteAsTextLayer() {
     return (
       <div
         key={layer.id}
+        data-editor-layer="true"
         onClick={(event) => {
           event.stopPropagation();
           setSelectedLayerId(layer.id);
         }}
+        onPointerDown={(event) => startMove(event, layer)}
         className={`absolute rounded-lg border bg-white/95 text-slate-950 shadow-sm transition ${
           isSelected
             ? "border-indigo-400 ring-2 ring-indigo-100"
@@ -1212,7 +1392,7 @@ function addRewriteAsTextLayer() {
         }`}
         style={{
           ...getLayerStyle(layer),
-          touchAction: "auto",
+          touchAction: "none",
         }}
       >
         {layer.imageUrl ? (
@@ -1250,6 +1430,10 @@ function addRewriteAsTextLayer() {
             }}
           />
         )}
+
+        {renderResizeHandles(layer)}
+      </div>
+    );
 
         {isSelected && (
           <div
@@ -1397,8 +1581,29 @@ function addRewriteAsTextLayer() {
               <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white p-3">
                 <button
                   type="button"
-                  onClick={addTextLayer}
-                  className="inline-flex min-h-11 items-center gap-2 rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-2.5 text-sm font-black text-indigo-700 transition hover:bg-indigo-100"
+                  onClick={() => {
+                    setActiveTool("select");
+                    setDraftBox(null);
+                    drawStateRef.current = null;
+                    setStatus("Select tool active. Click a layer to edit or move it.");
+                  }}
+                  className={`inline-flex min-h-11 items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-black transition ${
+                    activeTool === "select"
+                      ? "border-slate-300 bg-slate-900 text-white shadow-md shadow-slate-200"
+                      : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  <MousePointer2 size={16} />
+                  Select
+                </button>
+                <button
+                  type="button"
+                  onClick={activateTextTool}
+                  className={`inline-flex min-h-11 items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-black transition ${
+                    activeTool === "text"
+                      ? "border-indigo-300 bg-indigo-700 text-white shadow-md shadow-indigo-100"
+                      : "border-indigo-100 bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+                 }`}
                 >
                   <Type size={16} />
                   Text
@@ -1406,8 +1611,12 @@ function addRewriteAsTextLayer() {
 
                 <button
                   type="button"
-                  onClick={addHighlightLayer}
-                  className="inline-flex min-h-11 items-center gap-2 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-2.5 text-sm font-black text-amber-700 transition hover:bg-amber-100"
+                  onClick={activateHighlightTool}
+                  className={`inline-flex min-h-11 items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-black transition ${
+                    activeTool === "highlight"
+                      ? "border-amber-300 bg-amber-500 text-slate-950 shadow-md shadow-amber-100"
+                      : "border-amber-100 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                  }`}                
                 >
                   <Highlighter size={16} />
                   Highlight
@@ -1638,7 +1847,7 @@ function addRewriteAsTextLayer() {
                       <MousePointer2 size={14} />
                       Mobile tip
                     </div>
-                    Use the top strip on text/signature boxes to move. Use dots
+                    Drag a selected box from its border or empty area to move. Use dots
                     to resize.
                   </div>
                 </aside>
@@ -1648,12 +1857,25 @@ function addRewriteAsTextLayer() {
                   className="flex w-full items-start justify-start overflow-auto bg-[radial-gradient(circle_at_top,_#ddd6fe,_#f8fafc_42%,_#e2e8f0)] p-3 sm:justify-center sm:p-6"
                 >
                   <div
-                    className="relative mx-auto rounded-xl bg-white shadow-2xl shadow-slate-500/20 ring-1 ring-slate-200"
+                    className={`relative mx-auto rounded-xl bg-white shadow-2xl shadow-slate-500/20 ring-1 ring-slate-200 ${
+                      activeTool === "text" || activeTool === "highlight"
+                        ? "cursor-crosshair"
+                        : "cursor-default"
+                    }`}
                     style={{
                       width: canvasSize.width,
                       minHeight: canvasSize.height,
+                      touchAction: activeTool === "select" ? "auto" : "none",
                     }}
-                    onClick={() => setSelectedLayerId(null)}
+                    onPointerDown={startPageDraw}
+                    onPointerMove={updatePageDraw}
+                    onPointerUp={endPageDraw}
+                    onPointerCancel={() => cancelDrawingState()}
+                    onClick={() => {
+                      if (activeTool === "select") {
+                        setSelectedLayerId(null);
+                      }
+                    }}
                   >
                     {busy && (
                       <div className="absolute inset-0 z-30 flex items-center justify-center rounded-xl bg-white/75 backdrop-blur-sm">
@@ -1687,6 +1909,22 @@ function addRewriteAsTextLayer() {
                       ref={canvasRef}
                       className={fileName ? "block" : "hidden"}
                     />
+
+                    {draftBox && (
+                      <div
+                        className={`pointer-events-none absolute z-20 rounded-md border-2 border-dashed ${
+                          activeTool === "highlight"
+                            ? "border-amber-500 bg-amber-300/35"
+                            : "border-indigo-500 bg-indigo-100/35"
+                        }`}
+                        style={{
+                          left: `${draftBox.xPercent}%`,
+                          top: `${draftBox.yPercent}%`,
+                          width: `${draftBox.widthPercent}%`,
+                          height: `${draftBox.heightPercent}%`,
+                        }}
+                      />
+                    )}
 
                     {currentPageLayers.map((layer) => renderLayer(layer))}
                   </div>
