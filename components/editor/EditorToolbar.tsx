@@ -8,6 +8,7 @@ import {
   Image as ImageIcon,
   Layers,
   MousePointer2,
+  Move,
   PenLine,
   RotateCcw,
   Trash2,
@@ -49,12 +50,22 @@ export function EditorToolbar(props: EditorToolbarProps) {
     <div className="flex flex-wrap items-center gap-2">
       <div className="flex items-center gap-2 rounded-3xl border border-slate-100 bg-slate-50 p-1">
         <EditorIconButton
-          label="Select"
-          description="Select, move, resize, duplicate, or delete layers."
+          label="Select text"
+          description="Select and copy real PDF text."
           active={activeTool === "select"}
           onClick={() => onSelectTool("select")}
         >
           <MousePointer2 size={17} />
+        </EditorIconButton>
+
+        <EditorIconButton
+          label="Edit object"
+          description="Select, move, resize, duplicate, or delete editor objects."
+          active={activeTool === "object"}
+          tone="sky"
+          onClick={() => onSelectTool("object")}
+        >
+          <Move size={17} />
         </EditorIconButton>
 
         <EditorIconButton
@@ -120,7 +131,7 @@ export function EditorToolbar(props: EditorToolbarProps) {
       <div className="flex items-center gap-2 rounded-3xl border border-slate-100 bg-slate-50 p-1">
         <EditorIconButton
           label="Duplicate"
-          description="Duplicate selected layer."
+          description="Duplicate selected editor object."
           disabled={!hasSelectedLayer}
           onClick={onDuplicate}
         >
@@ -129,7 +140,7 @@ export function EditorToolbar(props: EditorToolbarProps) {
 
         <EditorIconButton
           label="Delete"
-          description="Delete selected layer."
+          description="Delete selected editor object."
           disabled={!hasSelectedLayer}
           tone="red"
           onClick={onDelete}
@@ -139,7 +150,7 @@ export function EditorToolbar(props: EditorToolbarProps) {
 
         <EditorIconButton
           label="Clear page"
-          description="Clear all layers on the current page."
+          description="Clear all editor objects on the current page."
           onClick={onClearPage}
         >
           <Layers size={17} />
@@ -147,7 +158,7 @@ export function EditorToolbar(props: EditorToolbarProps) {
 
         <EditorIconButton
           label="Reset"
-          description="Clear all editor layers."
+          description="Clear all editor objects."
           onClick={onReset}
         >
           <RotateCcw size={17} />
