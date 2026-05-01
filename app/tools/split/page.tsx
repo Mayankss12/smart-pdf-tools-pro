@@ -2,14 +2,16 @@
 
 import { Header } from "@/components/Header";
 import {
+  AlertTriangle,
+  CheckCircle2,
   Download,
   FileText,
+  Layers,
   Loader2,
   Scissors,
+  Sparkles,
   Upload,
   X,
-  CheckCircle2,
-  AlertTriangle,
 } from "lucide-react";
 import { PDFDocument } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
@@ -28,11 +30,14 @@ type PdfThumb = {
 function downloadBlob(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
+
   link.href = url;
   link.download = fileName;
+
   document.body.appendChild(link);
   link.click();
   link.remove();
+
   URL.revokeObjectURL(url);
 }
 
@@ -151,10 +156,14 @@ async function splitPdfIntoGroups(file: File, groups: SplitGroup[]) {
 async function getPdfPageCount(file: File) {
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await PDFDocument.load(arrayBuffer);
+
   return pdf.getPageCount();
 }
 
-async function renderPdfThumbnails(file: File, maxPages = 12): Promise<PdfThumb[]> {
+async function renderPdfThumbnails(
+  file: File,
+  maxPages = 16
+): Promise<PdfThumb[]> {
   const buffer = await file.arrayBuffer();
   const loadingTask = pdfjsLib.getDocument({ data: buffer.slice(0) });
   const pdf = await loadingTask.promise;
@@ -164,7 +173,7 @@ async function renderPdfThumbnails(file: File, maxPages = 12): Promise<PdfThumb[
 
   for (let pageNumber = 1; pageNumber <= totalToRender; pageNumber += 1) {
     const page = await pdf.getPage(pageNumber);
-    const viewport = page.getViewport({ scale: 0.32 });
+    const viewport = page.getViewport({ scale: 0.34 });
 
     const canvas = document.createElement("canvas");
     const context = canvas.getContext("2d");
@@ -194,6 +203,13 @@ async function renderPdfThumbnails(file: File, maxPages = 12): Promise<PdfThumb[
   return thumbnails;
 }
 
+function isPdfFile(file: File) {
+  return (
+    file.type === "application/pdf" ||
+    file.name.toLowerCase().endsWith(".pdf")
+  );
+}
+
 export default function SplitPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -201,7 +217,7 @@ export default function SplitPage() {
   const [pageInput, setPageInput] = useState("1-4,5-8");
   const [pageCount, setPageCount] = useState(0);
   const [thumbs, setThumbs] = useState<PdfThumb[]>([]);
-  const [status, setStatus] = useState("Upload a PDF and enter split groups.");
+  const [status, setStatus] = useState("Upload a PDF and define split groups.");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -218,14 +234,22 @@ export default function SplitPage() {
     }
   }, [pageInput, pageCount]);
 
+  const selectedPageSet = useMemo(() => {
+    return new Set(groups.flatMap((group) => group.pages));
+  }, [groups]);
+
+  const unassignedPages = useMemo(() => {
+    if (!pageCount) return [];
+
+    const allPages = Array.from({ length: pageCount }, (_, index) => index + 1);
+
+    return allPages.filter((page) => !selectedPageSet.has(page));
+  }, [pageCount, selectedPageSet]);
+
   async function handleFile(selectedFile?: File) {
     if (!selectedFile) return;
 
-    const isPdf =
-      selectedFile.type === "application/pdf" ||
-      selectedFile.name.toLowerCase().endsWith(".pdf");
-
-    if (!isPdf) {
+    if (!isPdfFile(selectedFile)) {
       setStatus("Please upload a valid PDF file.");
       return;
     }
@@ -244,7 +268,7 @@ export default function SplitPage() {
       setThumbs(renderedThumbs);
 
       setStatus(
-        `PDF loaded with ${totalPages} page${totalPages > 1 ? "s" : ""}. Enter groups like 1-4,5-8.`
+        `PDF loaded with ${totalPages} page${totalPages > 1 ? "s" : ""}. Define groups like 1-4,5-8.`
       );
     } catch (error) {
       console.error(error);
@@ -268,19 +292,23 @@ export default function SplitPage() {
     try {
       const parsedGroups = parseSplitGroups(pageInput, pageCount);
 
-      setStatus(`Creating ${parsedGroups.length} split file${parsedGroups.length > 1 ? "s" : ""}...`);
+      setStatus(
+        `Creating ${parsedGroups.length} split file${
+          parsedGroups.length > 1 ? "s" : ""
+        }...`
+      );
 
       const outputs = await splitPdfIntoGroups(file, parsedGroups);
 
       for (const output of outputs) {
         downloadBlob(output.blob, output.fileName);
-
-        // Small delay helps browser handle multiple downloads better.
         await new Promise((resolve) => setTimeout(resolve, 300));
       }
 
       setStatus(
-        `Done. Downloaded ${outputs.length} split PDF${outputs.length > 1 ? "s" : ""}.`
+        `Done. Downloaded ${outputs.length} split PDF${
+          outputs.length > 1 ? "s" : ""
+        }.`
       );
     } catch (error) {
       console.error(error);
@@ -294,41 +322,75 @@ export default function SplitPage() {
     setFile(null);
     setPageCount(0);
     setThumbs([]);
-    setStatus("Upload a PDF and enter split groups.");
+    setStatus("Upload a PDF and define split groups.");
   }
+
+  function applyPreset(preset: string) {
+    setPageInput(preset);
+    setStatus(`Preset applied: ${preset}`);
+  }
+
+  const hasValidGroups = Boolean(file && groups.length > 0);
+  const canSplit = Boolean(file && groups.length > 0 && !busy);
 
   return (
     <>
       <Header />
 
-      <main className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-amber-50">
-        <section className="mx-auto max-w-7xl px-5 py-8">
-          <div className="rounded-[2rem] border border-indigo-100 bg-white shadow-xl shadow-indigo-100/50">
-            <div className="border-b border-slate-100 bg-gradient-to-r from-indigo-700 via-violet-700 to-fuchsia-700 p-6 text-white">
-              <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
+      <main className="page-shell">
+        <section className="page-container">
+          <div className="surface overflow-hidden">
+            <section className="relative overflow-hidden border-b border-slate-100 bg-gradient-to-br from-indigo-700 via-violet-700 to-purple-700 px-6 py-12 text-white sm:px-10 lg:px-14">
+              <div className="absolute right-[-140px] top-[-140px] h-80 w-80 rounded-full bg-white/10 blur-3xl" />
+              <div className="absolute bottom-[-160px] left-[-120px] h-96 w-96 rounded-full bg-amber-300/10 blur-3xl" />
+
+              <div className="relative grid gap-8 lg:grid-cols-[1fr_360px] lg:items-center">
                 <div>
-                  <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-bold ring-1 ring-white/20">
+                  <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white ring-1 ring-white/20">
                     <Scissors size={14} />
                     PDFMantra Split Tool
                   </div>
 
-                  <h1 className="text-4xl font-black tracking-[-0.03em] md:text-5xl">
-                    Split PDF
+                  <h1 className="max-w-3xl text-4xl font-semibold leading-[1.08] tracking-[-0.04em] text-white sm:text-5xl">
+                    Split PDFs into smart page groups.
                   </h1>
 
-                  <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-indigo-50 md:text-base">
-                    Split one PDF into separate files using groups like{" "}
-                    <span className="rounded bg-white/15 px-2 py-1">1-4,5-8</span>.
+                  <p className="mt-5 max-w-2xl text-base font-medium leading-8 text-indigo-50/95">
+                    Upload one PDF, preview its pages, define ranges like 1-4,5-8,
+                    and download separate files for each group.
                   </p>
                 </div>
 
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-amber-400 px-5 py-3 text-sm font-black text-slate-950 shadow-lg shadow-amber-900/20 transition hover:bg-amber-300"
-                >
-                  <Upload size={18} />
-                  Upload PDF
-                </button>
+                <div className="rounded-[1.5rem] border border-white/15 bg-white/10 p-4 backdrop-blur">
+                  <div className="grid grid-cols-3 gap-3 text-center">
+                    <div className="rounded-2xl bg-white/12 p-4 ring-1 ring-white/15">
+                      <div className="text-2xl font-semibold">
+                        {pageCount || "-"}
+                      </div>
+                      <div className="mt-1 text-xs font-medium text-indigo-50">
+                        Pages
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl bg-white/12 p-4 ring-1 ring-white/15">
+                      <div className="text-2xl font-semibold">
+                        {groups.length || "-"}
+                      </div>
+                      <div className="mt-1 text-xs font-medium text-indigo-50">
+                        Outputs
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl bg-white/12 p-4 ring-1 ring-white/15">
+                      <div className="text-2xl font-semibold">
+                        {selectedPageSet.size || "-"}
+                      </div>
+                      <div className="mt-1 text-xs font-medium text-indigo-50">
+                        Selected
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
                 <input
                   ref={fileInputRef}
@@ -338,91 +400,122 @@ export default function SplitPage() {
                   onChange={(event) => handleFile(event.target.files?.[0])}
                 />
               </div>
-            </div>
+            </section>
 
-            <div className="grid gap-0 lg:grid-cols-[1fr_380px]">
-              <section className="min-h-[720px] border-r border-slate-200 bg-slate-50/70 p-5">
+            <div className="grid lg:grid-cols-[1fr_390px]">
+              <section className="min-h-[700px] border-r border-slate-200 bg-slate-50/70 p-5 sm:p-6">
                 <div
+                  onClick={() => fileInputRef.current?.click()}
                   onDrop={(event) => {
                     event.preventDefault();
                     handleFile(event.dataTransfer.files?.[0]);
                   }}
                   onDragOver={(event) => event.preventDefault()}
-                  className="rounded-3xl border-2 border-dashed border-indigo-200 bg-white p-6 text-center shadow-sm"
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      fileInputRef.current?.click();
+                    }
+                  }}
+                  className="cursor-pointer rounded-[1.75rem] border-2 border-dashed border-indigo-200 bg-white p-6 text-center shadow-sm transition hover:border-indigo-400 hover:bg-indigo-50/40"
                 >
-                  <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-700 text-white shadow-lg shadow-indigo-200">
-                    <FileText size={23} />
+                  <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-sm shadow-indigo-200">
+                    <FileText size={22} />
                   </div>
 
-                  <div className="font-black text-slate-950">
-                    {file ? file.name : "Drop your PDF here"}
+                  <div className="font-semibold tracking-[-0.02em] text-slate-950">
+                    {file ? file.name : "Drop PDF here"}
                   </div>
 
-                  <div className="mt-1 text-sm font-semibold text-slate-500">
+                  <div className="mt-1 text-sm font-medium text-slate-500">
                     {file
                       ? `${pageCount} page${pageCount > 1 ? "s" : ""} loaded`
-                      : "Click upload or drag one PDF file here."}
+                      : "Click here or drag one PDF to begin."}
                   </div>
 
-                  {file && (
-                    <button
-                      onClick={clearFile}
-                      className="mt-4 inline-flex items-center gap-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-2 text-sm font-bold text-red-700 transition hover:bg-red-100"
-                    >
-                      <X size={15} />
-                      Remove PDF
-                    </button>
-                  )}
+                  <div className="mt-4 inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700">
+                    <Upload size={17} />
+                    Choose PDF
+                  </div>
                 </div>
 
-                <div className="mt-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <div className="flex items-center justify-between gap-3">
+                <div className="mt-5 rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
                     <div>
-                      <h2 className="text-lg font-black text-slate-950">
-                        PDF Preview
+                      <h2 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">
+                        Visual Page Map
                       </h2>
                       <p className="mt-1 text-sm font-medium text-slate-500">
-                        Showing up to first 16 pages for quick selection.
+                        Highlighted pages are included in your current split groups.
                       </p>
                     </div>
+
+                    {file && (
+                      <button
+                        onClick={clearFile}
+                        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100"
+                      >
+                        <X size={15} />
+                        Remove PDF
+                      </button>
+                    )}
                   </div>
 
                   {busy && thumbs.length === 0 ? (
-                    <div className="mt-5 flex min-h-64 items-center justify-center rounded-3xl bg-slate-50">
-                      <div className="flex items-center gap-2 rounded-2xl bg-white px-4 py-3 font-bold shadow-sm">
-                        <Loader2 className="animate-spin text-indigo-600" size={18} />
+                    <div className="mt-5 flex min-h-80 items-center justify-center rounded-[1.5rem] bg-slate-50">
+                      <div className="flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold shadow-sm">
+                        <Loader2
+                          className="animate-spin text-indigo-600"
+                          size={18}
+                        />
                         Rendering preview
                       </div>
                     </div>
                   ) : thumbs.length > 0 ? (
                     <div className="mt-5 grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
-                      {thumbs.map((thumb) => (
-                        <div
-                          key={thumb.pageNumber}
-                          className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-sm"
-                        >
-                          <div className="border-b border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600">
-                            Page {thumb.pageNumber}
+                      {thumbs.map((thumb) => {
+                        const isSelected = selectedPageSet.has(thumb.pageNumber);
+
+                        return (
+                          <div
+                            key={thumb.pageNumber}
+                            className={`overflow-hidden rounded-[1.25rem] border bg-white shadow-sm transition ${
+                              isSelected
+                                ? "border-indigo-400 ring-4 ring-indigo-100"
+                                : "border-slate-200"
+                            }`}
+                          >
+                            <div
+                              className={`border-b px-3 py-2 text-xs font-semibold ${
+                                isSelected
+                                  ? "border-indigo-200 bg-indigo-50 text-indigo-700"
+                                  : "border-slate-200 bg-slate-50 text-slate-600"
+                              }`}
+                            >
+                              Page {thumb.pageNumber}
+                            </div>
+
+                            <div className="flex min-h-40 items-start justify-center bg-slate-100 p-2">
+                              <img
+                                src={thumb.url}
+                                alt={`Page ${thumb.pageNumber}`}
+                                className="max-h-56 rounded border border-slate-200 bg-white"
+                              />
+                            </div>
                           </div>
-                          <div className="flex min-h-40 items-start justify-center bg-slate-100 p-2">
-                            <img
-                              src={thumb.url}
-                              alt={`Page ${thumb.pageNumber}`}
-                              className="max-h-56 rounded border border-slate-200 bg-white"
-                            />
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : (
-                    <div className="mt-5 flex min-h-64 items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50 text-center">
+                    <div className="mt-5 flex min-h-80 items-center justify-center rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50 text-center">
                       <div>
-                        <FileText className="mx-auto text-slate-400" size={36} />
-                        <div className="mt-3 font-black text-slate-800">
+                        <FileText className="mx-auto text-slate-400" size={38} />
+                        <div className="mt-3 font-semibold text-slate-900">
                           No PDF preview yet
                         </div>
-                        <p className="mt-1 text-sm text-slate-500">
-                          Upload a PDF to see page thumbnails.
+                        <p className="mt-1 text-sm font-medium text-slate-500">
+                          Upload a PDF to see page thumbnails and split planning.
                         </p>
                       </div>
                     </div>
@@ -430,22 +523,50 @@ export default function SplitPage() {
                 </div>
               </section>
 
-              <aside className="bg-white p-5">
-                <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-                  <h2 className="text-xl font-black text-slate-950">
-                    Split Settings
+              <aside className="bg-white p-5 sm:p-6">
+                <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5">
+                  <h2 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">
+                    Split Planner
                   </h2>
 
-                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                    Use comma to create separate split files. Example:{" "}
-                    <span className="rounded-lg bg-white px-2 py-1 font-black text-indigo-700">
+                  <p className="mt-2 text-sm font-medium leading-6 text-slate-500">
+                    Use commas to create separate output files. Example{" "}
+                    <span className="rounded-lg bg-white px-2 py-1 font-semibold text-indigo-700">
                       1-4,5-8
                     </span>{" "}
                     creates two PDFs.
                   </p>
 
+                  <div className="mt-4 grid grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => applyPreset("1-1,2-2")}
+                      className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
+                    >
+                      First 2
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => applyPreset("1-4,5-8")}
+                      className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
+                    >
+                      4-page sets
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        applyPreset(pageCount ? `1-${pageCount}` : "1-3")
+                      }
+                      className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
+                    >
+                      All pages
+                    </button>
+                  </div>
+
                   <label className="mt-5 block">
-                    <span className="text-sm font-black text-slate-800">
+                    <span className="text-sm font-semibold text-slate-800">
                       Page groups
                     </span>
 
@@ -453,87 +574,91 @@ export default function SplitPage() {
                       value={pageInput}
                       onChange={(event) => setPageInput(event.target.value)}
                       placeholder="Example: 1-4,5-8"
-                      className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                      className="input-premium mt-2"
                     />
                   </label>
 
                   <div className="mt-5 rounded-2xl border border-indigo-100 bg-indigo-50 p-4">
-                    <div className="flex items-center gap-2 text-sm font-black text-indigo-800">
-                      <CheckCircle2 size={17} />
-                      Output summary
+                    <div className="flex items-center gap-2 text-sm font-semibold text-indigo-800">
+                      <Layers size={17} />
+                      Output files
                     </div>
 
-                    {file && groups.length > 0 ? (
+                    {hasValidGroups ? (
                       <div className="mt-3 space-y-2">
                         {groups.map((group, index) => (
                           <div
                             key={`${group.label}-${index}`}
-                            className="rounded-xl bg-white px-3 py-2 text-sm font-bold text-slate-700"
+                            className="rounded-xl bg-white px-3 py-3 text-sm font-medium text-slate-700"
                           >
-                            File {index + 1}: pages {group.label}
-                            <div className="text-xs font-semibold text-slate-500">
-                              {group.pages.length} page
-                              {group.pages.length > 1 ? "s" : ""}
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="font-semibold text-slate-900">
+                                Split file {index + 1}
+                              </span>
+                              <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">
+                                {group.pages.length} page
+                                {group.pages.length > 1 ? "s" : ""}
+                              </span>
+                            </div>
+
+                            <div className="mt-1 text-xs font-medium text-slate-500">
+                              Pages {group.label}
                             </div>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <p className="mt-2 text-sm font-semibold text-indigo-700">
+                      <p className="mt-2 text-sm font-medium text-indigo-700">
                         Upload a PDF to preview split output.
                       </p>
                     )}
                   </div>
 
+                  {file && unassignedPages.length > 0 && (
+                    <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-medium leading-6 text-amber-900">
+                      <div className="mb-1 flex items-center gap-2 font-semibold">
+                        <AlertTriangle size={16} />
+                        Pages not included
+                      </div>
+                      {unassignedPages.length > 12
+                        ? `${unassignedPages.length} pages are not included in the output groups.`
+                        : `Pages ${unassignedPages.join(", ")} are not included.`}
+                    </div>
+                  )}
+
                   <button
                     onClick={handleSplit}
-                    disabled={busy || !file}
-                    className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-700 px-5 py-4 text-sm font-black text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                    disabled={!canSplit}
+                    className="btn-primary mt-5 w-full"
                   >
                     {busy ? (
                       <>
                         <Loader2 className="animate-spin" size={18} />
-                        Processing
+                        Splitting
                       </>
                     ) : (
                       <>
                         <Download size={18} />
-                        Split into files
+                        Split & Download
                       </>
                     )}
                   </button>
                 </div>
 
-                <div
-                  className={`mt-5 rounded-3xl border p-4 text-sm font-bold leading-6 ${
-                    status.toLowerCase().includes("invalid") ||
-                    status.toLowerCase().includes("failed") ||
-                    status.toLowerCase().includes("outside") ||
-                    status.toLowerCase().includes("reversed")
-                      ? "border-red-100 bg-red-50 text-red-700"
-                      : "border-amber-100 bg-amber-50 text-amber-900"
-                  }`}
-                >
-                  <div className="mb-1 flex items-center gap-2 font-black">
-                    <AlertTriangle size={16} />
+                <div className="mt-5 rounded-[1.5rem] border border-slate-200 bg-white p-4 text-sm font-medium leading-6 text-slate-600">
+                  <div className="mb-1 flex items-center gap-2 font-semibold text-slate-900">
+                    <Sparkles size={16} />
+                    Smart grouping
+                  </div>
+                  Each comma-separated group becomes a separate PDF file.
+                </div>
+
+                <div className="mt-5 rounded-[1.5rem] border border-indigo-100 bg-indigo-50 p-4 text-sm font-medium leading-6 text-indigo-800">
+                  <div className="mb-1 flex items-center gap-2 font-semibold">
+                    <CheckCircle2 size={16} />
                     Status
                   </div>
                   {status}
-                </div>
-
-                <div className="mt-5 rounded-3xl border border-slate-200 bg-white p-4 text-sm font-semibold leading-6 text-slate-600">
-                  <div className="font-black text-slate-950">Examples</div>
-                  <div className="mt-2 space-y-1">
-                    <div>
-                      <span className="font-black text-indigo-700">1-4</span> = one PDF
-                    </div>
-                    <div>
-                      <span className="font-black text-indigo-700">1-4,5-8</span> = two PDFs
-                    </div>
-                    <div>
-                      <span className="font-black text-indigo-700">1-4,5,6-7</span> = three PDFs
-                    </div>
-                  </div>
                 </div>
               </aside>
             </div>
