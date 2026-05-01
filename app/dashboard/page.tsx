@@ -4,10 +4,13 @@ import { useEffect, useState } from "react";
 import Header from "@/components/Header";
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabase =
+  supabaseUrl && supabaseAnonKey
+    ? createClient(supabaseUrl, supabaseAnonKey)
+    : null;
 
 type PdfTask = {
   id: string;
@@ -21,9 +24,16 @@ export default function DashboardPage() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [tasks, setTasks] = useState<PdfTask[]>([]);
   const [loading, setLoading] = useState(true);
+  const [supabaseMissing, setSupabaseMissing] = useState(false);
 
   useEffect(() => {
     async function loadDashboard() {
+      if (!supabase) {
+        setSupabaseMissing(true);
+        setLoading(false);
+        return;
+      }
+
       const { data: userData } = await supabase.auth.getUser();
       const user = userData.user;
 
@@ -34,14 +44,17 @@ export default function DashboardPage() {
 
       setUserEmail(user.email || null);
 
-      const { data: taskData } = await supabase
+      const { data: taskData, error } = await supabase
         .from("pdf_tasks")
         .select("id, tool_name, input_file_name, status, created_at")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(10);
 
-      setTasks(taskData || []);
+      if (!error) {
+        setTasks(taskData || []);
+      }
+
       setLoading(false);
     }
 
@@ -49,7 +62,10 @@ export default function DashboardPage() {
   }, []);
 
   async function handleLogout() {
-    await supabase.auth.signOut();
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
+
     window.location.href = "/";
   }
 
@@ -58,8 +74,33 @@ export default function DashboardPage() {
       <>
         <Header />
         <main className="mx-auto max-w-7xl px-6 py-14">
-          <h1 className="text-4xl font-black">Dashboard</h1>
+          <h1 className="text-4xl font-black text-slate-950">Dashboard</h1>
           <p className="mt-3 text-slate-600">Loading your account...</p>
+        </main>
+      </>
+    );
+  }
+
+  if (supabaseMissing) {
+    return (
+      <>
+        <Header />
+        <main className="mx-auto max-w-7xl px-6 py-14">
+          <h1 className="text-4xl font-black text-slate-950">Dashboard</h1>
+
+          <div className="mt-8 rounded-2xl border border-amber-200 bg-amber-50 p-6">
+            <h2 className="text-xl font-black text-amber-900">
+              Supabase is not connected
+            </h2>
+            <p className="mt-3 text-amber-800">
+              Add these environment variables in Vercel, then redeploy:
+            </p>
+
+            <div className="mt-4 rounded-xl bg-white p-4 font-mono text-sm text-slate-800">
+              <p>NEXT_PUBLIC_SUPABASE_URL</p>
+              <p>NEXT_PUBLIC_SUPABASE_ANON_KEY</p>
+            </div>
+          </div>
         </main>
       </>
     );
@@ -70,8 +111,8 @@ export default function DashboardPage() {
       <>
         <Header />
         <main className="mx-auto max-w-7xl px-6 py-14">
-          <h1 className="text-4xl font-black">Dashboard</h1>
-          <p className="mt-3 text-slate-600">
+          <h1 className="text-4xl font-black text-slate-950">Dashboard</h1>
+          <p className="mt-3 max-w-2xl text-slate-600">
             Sign in to save your PDF history, usage, and account details.
           </p>
 
@@ -92,7 +133,7 @@ export default function DashboardPage() {
       <main className="mx-auto max-w-7xl px-6 py-14">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-4xl font-black">Dashboard</h1>
+            <h1 className="text-4xl font-black text-slate-950">Dashboard</h1>
             <p className="mt-3 text-slate-600">Signed in as {userEmail}</p>
           </div>
 
@@ -107,26 +148,33 @@ export default function DashboardPage() {
         <section className="mt-10 grid gap-5 md:grid-cols-3">
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <p className="text-sm font-bold text-slate-500">Plan</p>
-            <h2 className="mt-2 text-2xl font-black">Free</h2>
+            <h2 className="mt-2 text-2xl font-black text-slate-950">Free</h2>
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <p className="text-sm font-bold text-slate-500">Recent Tasks</p>
-            <h2 className="mt-2 text-2xl font-black">{tasks.length}</h2>
+            <h2 className="mt-2 text-2xl font-black text-slate-950">
+              {tasks.length}
+            </h2>
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <p className="text-sm font-bold text-slate-500">Workspace</p>
-            <h2 className="mt-2 text-2xl font-black">PDFMantra</h2>
+            <h2 className="mt-2 text-2xl font-black text-slate-950">
+              PDFMantra
+            </h2>
           </div>
         </section>
 
         <section className="mt-10 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-2xl font-black">Recent PDF Tasks</h2>
+          <h2 className="text-2xl font-black text-slate-950">
+            Recent PDF Tasks
+          </h2>
 
           {tasks.length === 0 ? (
             <p className="mt-4 text-slate-600">
-              No PDF tasks saved yet. Process a PDF while signed in to see your history here.
+              No PDF tasks saved yet. Process a PDF while signed in to see your
+              history here.
             </p>
           ) : (
             <div className="mt-6 overflow-x-auto">
@@ -142,8 +190,12 @@ export default function DashboardPage() {
                 <tbody>
                   {tasks.map((task) => (
                     <tr key={task.id} className="border-b border-slate-100">
-                      <td className="py-3 pr-4 font-semibold">{task.tool_name}</td>
-                      <td className="py-3 pr-4">{task.input_file_name || "-"}</td>
+                      <td className="py-3 pr-4 font-semibold">
+                        {task.tool_name}
+                      </td>
+                      <td className="py-3 pr-4">
+                        {task.input_file_name || "-"}
+                      </td>
                       <td className="py-3 pr-4">{task.status}</td>
                       <td className="py-3 pr-4">
                         {new Date(task.created_at).toLocaleString()}
