@@ -300,27 +300,34 @@ export default function CompressPage() {
     }
   }
 
+  const statusIsError =
+    status.toLowerCase().includes("failed") ||
+    status.toLowerCase().includes("valid") ||
+    status.toLowerCase().includes("unsupported");
+
   return (
     <>
       <Header />
 
-      <main className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-amber-50">
-        <section className="mx-auto max-w-7xl px-5 py-8">
-          <div className="overflow-hidden rounded-[2rem] border border-indigo-100 bg-white shadow-xl shadow-indigo-100/50">
-            <div className="border-b border-slate-100 bg-gradient-to-r from-indigo-700 via-violet-700 to-fuchsia-700 p-6 text-white">
-              <div>
-                <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-bold ring-1 ring-white/20">
+      <main className="page-shell">
+        <section className="page-container">
+          <div className="surface overflow-hidden">
+            <section className="relative overflow-hidden border-b border-slate-100 bg-gradient-to-br from-indigo-700 via-violet-700 to-purple-700 px-6 py-12 text-white sm:px-10 lg:px-14">
+              <div className="absolute right-[-140px] top-[-140px] h-80 w-80 rounded-full bg-white/10 blur-3xl" />
+              <div className="absolute bottom-[-160px] left-[-120px] h-96 w-96 rounded-full bg-amber-300/10 blur-3xl" />
+
+              <div className="relative max-w-4xl">
+                <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white ring-1 ring-white/20">
                   <Zap size={14} />
                   PDFMantra Optimize Tool
                 </div>
 
-                <h1 className="text-4xl font-black tracking-[-0.03em] md:text-5xl">
+                <h1 className="max-w-3xl text-4xl font-semibold leading-[1.08] tracking-[-0.04em] text-white sm:text-5xl">
                   Compress PDF
                 </h1>
 
-                <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-indigo-50 md:text-base">
-                  Optimize PDF file size with browser-only best-effort
-                  compression and clear size reporting.
+                <p className="mt-5 max-w-2xl text-base font-medium leading-8 text-indigo-50/95">
+                  Optimize PDF file size with browser-only best-effort compression and clear size reporting.
                 </p>
 
                 <input
@@ -331,10 +338,10 @@ export default function CompressPage() {
                   onChange={(event) => handleFile(event.target.files?.[0])}
                 />
               </div>
-            </div>
+            </section>
 
             <div className="grid lg:grid-cols-[1fr_380px]">
-              <section className="min-h-[720px] border-r border-slate-200 bg-slate-50/70 p-5">
+              <section className="min-h-[700px] border-r border-slate-200 bg-slate-50/70 p-5 sm:p-6">
                 <div
                   onClick={() => fileInputRef.current?.click()}
                   onDrop={(event) => {
@@ -349,35 +356,35 @@ export default function CompressPage() {
                       fileInputRef.current?.click();
                     }
                   }}
-                  className="cursor-pointer rounded-3xl border-2 border-dashed border-indigo-200 bg-white p-6 text-center shadow-sm transition hover:border-indigo-400 hover:bg-indigo-50/40"
+                  className="cursor-pointer rounded-[1.75rem] border-2 border-dashed border-indigo-200 bg-white p-6 text-center shadow-sm transition hover:border-indigo-400 hover:bg-indigo-50/40"
                 >
-                  <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-700 text-white shadow-lg shadow-indigo-200">
-                    <FileText size={23} />
+                  <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-sm shadow-indigo-200">
+                    <FileText size={22} />
                   </div>
 
-                  <div className="font-black text-slate-950">
+                  <div className="font-semibold tracking-[-0.02em] text-slate-950">
                     {file ? file.name : "Drop PDF here"}
                   </div>
 
-                  <div className="mt-1 text-sm font-semibold text-slate-500">
+                  <div className="mt-1 text-sm font-medium text-slate-500">
                     {file
                       ? `${pageCount} page${pageCount > 1 ? "s" : ""} loaded`
                       : "Click here or drag a PDF to begin."}
                   </div>
 
-                  <div className="mt-4 inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-50 px-4 py-2 text-sm font-black text-indigo-700">
+                  <div className="mt-4 inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700">
                     <Upload size={17} />
-                    Click here to choose PDF
+                    Choose PDF
                   </div>
                 </div>
 
-                <div className="mt-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="mt-5 rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
                   <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
                     <div>
-                      <h2 className="text-xl font-black text-slate-950">
+                      <h2 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">
                         PDF Preview
                       </h2>
-                      <p className="mt-1 text-sm font-semibold text-slate-500">
+                      <p className="mt-1 text-sm font-medium text-slate-500">
                         Showing up to first 12 pages.
                       </p>
                     </div>
@@ -385,7 +392,7 @@ export default function CompressPage() {
                     {file && (
                       <button
                         onClick={clearFile}
-                        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-2 text-sm font-bold text-red-700 transition hover:bg-red-100"
+                        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100"
                       >
                         <X size={15} />
                         Remove PDF
@@ -394,8 +401,8 @@ export default function CompressPage() {
                   </div>
 
                   {busy && previews.length === 0 ? (
-                    <div className="mt-5 flex min-h-80 items-center justify-center rounded-3xl bg-slate-50">
-                      <div className="flex items-center gap-2 rounded-2xl bg-white px-4 py-3 font-bold shadow-sm">
+                    <div className="mt-5 flex min-h-80 items-center justify-center rounded-[1.5rem] bg-slate-50">
+                      <div className="flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold shadow-sm">
                         <Loader2
                           className="animate-spin text-indigo-600"
                           size={18}
@@ -404,13 +411,13 @@ export default function CompressPage() {
                       </div>
                     </div>
                   ) : previews.length === 0 ? (
-                    <div className="mt-5 flex min-h-80 items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50 text-center">
+                    <div className="mt-5 flex min-h-80 items-center justify-center rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50 text-center">
                       <div>
                         <FileText className="mx-auto text-slate-400" size={38} />
-                        <div className="mt-3 font-black text-slate-900">
+                        <div className="mt-3 font-semibold text-slate-900">
                           No PDF selected
                         </div>
-                        <p className="mt-1 text-sm text-slate-500">
+                        <p className="mt-1 text-sm font-medium text-slate-500">
                           Upload a PDF to preview and optimize it.
                         </p>
                       </div>
@@ -420,9 +427,9 @@ export default function CompressPage() {
                       {previews.map((preview) => (
                         <div
                           key={preview.pageNumber}
-                          className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"
+                          className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm"
                         >
-                          <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-800">
+                          <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800">
                             Page {preview.pageNumber}
                           </div>
 
@@ -440,9 +447,9 @@ export default function CompressPage() {
                 </div>
               </section>
 
-              <aside className="bg-white p-5">
-                <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-                  <h2 className="text-xl font-black text-slate-950">
+              <aside className="bg-white p-5 sm:p-6">
+                <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5">
+                  <h2 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">
                     Compression Settings
                   </h2>
 
@@ -461,10 +468,10 @@ export default function CompressPage() {
                         />
 
                         <div>
-                          <div className="font-black text-slate-900">
+                          <div className="font-semibold text-slate-900">
                             {option.label}
                           </div>
-                          <div className="mt-1 text-sm font-semibold leading-5 text-slate-500">
+                          <div className="mt-1 text-sm font-medium leading-5 text-slate-500">
                             {option.description}
                           </div>
                         </div>
@@ -473,9 +480,9 @@ export default function CompressPage() {
                   </div>
 
                   <label className="mt-4 block">
-                    <span className="text-sm font-black text-slate-800">
+                    <span className="text-sm font-semibold text-slate-800">
                       Target size in KB{" "}
-                      <span className="font-semibold text-slate-500">
+                      <span className="font-medium text-slate-500">
                         (best effort)
                       </span>
                     </span>
@@ -486,35 +493,35 @@ export default function CompressPage() {
                       value={targetKb}
                       onChange={(event) => setTargetKb(event.target.value)}
                       placeholder="Example: 200"
-                      className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                      className="input-premium mt-2"
                     />
                   </label>
 
                   <div className="mt-5 grid grid-cols-2 gap-3">
                     <div className="rounded-2xl bg-white p-4">
-                      <div className="text-xs font-black uppercase tracking-wide text-slate-500">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                         Original
                       </div>
-                      <div className="mt-1 text-xl font-black text-slate-950">
+                      <div className="mt-1 text-xl font-semibold text-slate-950">
                         {file ? formatFileSize(file.size) : "-"}
                       </div>
                     </div>
 
                     <div className="rounded-2xl bg-white p-4">
-                      <div className="text-xs font-black uppercase tracking-wide text-slate-500">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                         Output
                       </div>
-                      <div className="mt-1 text-xl font-black text-slate-950">
+                      <div className="mt-1 text-xl font-semibold text-slate-950">
                         {result ? formatFileSize(result.outputSize) : "-"}
                       </div>
                     </div>
                   </div>
 
                   <div className="mt-3 rounded-2xl bg-white p-4">
-                    <div className="text-xs font-black uppercase tracking-wide text-slate-500">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                       Reduction
                     </div>
-                    <div className="mt-1 text-3xl font-black text-slate-950">
+                    <div className="mt-1 text-3xl font-semibold tracking-[-0.04em] text-slate-950">
                       {result ? `${result.ratio}%` : "-"}
                     </div>
                   </div>
@@ -522,7 +529,7 @@ export default function CompressPage() {
                   <button
                     onClick={handleCompress}
                     disabled={busy || !file}
-                    className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-700 px-5 py-4 text-sm font-black text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                    className="btn-primary mt-5 w-full"
                   >
                     {busy ? (
                       <>
@@ -538,8 +545,8 @@ export default function CompressPage() {
                   </button>
                 </div>
 
-                <div className="mt-5 rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold leading-6 text-amber-900">
-                  <div className="mb-1 flex items-center gap-2 font-black">
+                <div className="mt-5 rounded-[1.5rem] border border-amber-200 bg-amber-50 p-4 text-sm font-medium leading-6 text-amber-900">
+                  <div className="mb-1 flex items-center gap-2 font-semibold">
                     <AlertTriangle size={16} />
                     Important limitation
                   </div>
@@ -549,15 +556,13 @@ export default function CompressPage() {
                 </div>
 
                 <div
-                  className={`mt-5 rounded-3xl border p-4 text-sm font-bold leading-6 ${
-                    status.toLowerCase().includes("failed") ||
-                    status.toLowerCase().includes("valid") ||
-                    status.toLowerCase().includes("unsupported")
+                  className={`mt-5 rounded-[1.5rem] border p-4 text-sm font-medium leading-6 ${
+                    statusIsError
                       ? "border-red-100 bg-red-50 text-red-700"
                       : "border-indigo-100 bg-indigo-50 text-indigo-800"
                   }`}
                 >
-                  <div className="mb-1 flex items-center gap-2 font-black">
+                  <div className="mb-1 flex items-center gap-2 font-semibold">
                     <CheckCircle2 size={16} />
                     Status
                   </div>
