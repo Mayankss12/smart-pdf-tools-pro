@@ -1,25 +1,18 @@
 "use client";
 
 import { Header } from "@/components/Header";
+import { EditorToolbar } from "@/components/editor/EditorToolbar";
 import {
   Bold,
   Copy,
-  Download,
-  FileImage,
   FileText,
-  Highlighter,
-  Image as ImageIcon,
   Italic,
-  Layers,
   Loader2,
   Lock,
   Minus,
   MousePointer2,
-  PenLine,
   Plus,
-  RotateCcw,
   Sparkles,
-  Trash2,
   Upload,
   Wand2,
   ZoomIn,
@@ -28,68 +21,17 @@ import {
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-
-type LayerType = "text" | "highlight" | "image" | "signature";
-type ActiveTool = "edit" | "text" | "highlight";
-type ExportMode = "full" | "current" | "range";
-type ResizeHandle = "tl" | "tm" | "tr" | "mr" | "br" | "bm" | "bl" | "ml";
-
-type PdfLayer = {
-  id: string;
-  page: number;
-  type: LayerType;
-  xPercent: number;
-  yPercent: number;
-  widthPercent: number;
-  heightPercent: number;
-  text?: string;
-  fontSize?: number;
-  isBold?: boolean;
-  isItalic?: boolean;
-  opacity?: number;
-  imageUrl?: string;
-  imageBytes?: Uint8Array;
-  imageKind?: "png" | "jpg";
-  coverText?: boolean;
-};
-
-type PageThumb = { pageNumber: number; url: string };
-
-type DragState = {
-  id: string;
-  mode: "move" | "resize";
-  handle?: ResizeHandle;
-  startPointerX: number;
-  startPointerY: number;
-  startXPercent: number;
-  startYPercent: number;
-  startWidthPercent: number;
-  startHeightPercent: number;
-};
-
-type DraftBox = {
-  xPercent: number;
-  yPercent: number;
-  widthPercent: number;
-  heightPercent: number;
-};
-
-type DrawState = {
-  startXPercent: number;
-  startYPercent: number;
-  currentXPercent: number;
-  currentYPercent: number;
-};
-
-type TextOverlayItem = {
-  id: string;
-  text: string;
-  leftPercent: number;
-  topPercent: number;
-  widthPercent: number;
-  heightPercent: number;
-  fontSizePx: number;
-};
+import type {
+  ActiveTool,
+  DragState,
+  DraftBox,
+  DrawState,
+  ExportMode,
+  PageThumb,
+  PdfLayer,
+  ResizeHandle,
+  TextOverlayItem,
+} from "@/lib/editor/types";
 
 const resizeHandles: { id: ResizeHandle; className: string; cursor: string }[] = [
   { id: "tl", className: "-left-3 -top-3", cursor: "nwse-resize" },
@@ -425,6 +367,22 @@ export default function EditorPage() {
       setStatus("Unable to load PDF. Please try another file.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  function selectEditorTool(tool: ActiveTool) {
+    if (tool === "edit") {
+      activateEditTool();
+      return;
+    }
+
+    if (tool === "text") {
+      activateTextTool();
+      return;
+    }
+
+    if (tool === "highlight") {
+      activateHighlightTool();
     }
   }
 
@@ -1327,42 +1285,114 @@ export default function EditorPage() {
             )}
 
             <div className="mx-3 mb-3 overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm sm:mx-5 sm:mb-5 sm:rounded-[1.7rem]">
-              <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white p-3">
-                <button type="button" onClick={activateEditTool} title="Edit existing PDF text or select objects" className={`inline-flex min-h-11 items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-black transition ${activeTool === "edit" ? "border-slate-300 bg-slate-900 text-white shadow-md shadow-slate-200" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"}`}>
-                  <MousePointer2 size={16} /> Edit
-                </button>
-                <button type="button" onClick={activateTextTool} title="T symbol: drag on the PDF to create a text box" className={`group inline-flex min-h-11 items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-black transition ${activeTool === "text" ? "border-indigo-300 bg-indigo-700 text-white shadow-md shadow-indigo-100" : "border-indigo-100 bg-indigo-50 text-indigo-700 hover:bg-indigo-100"}`}>
-                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-white/80 text-base font-black text-indigo-700 group-hover:ring-2 group-hover:ring-indigo-200">T</span><span className="sr-only">Text</span>
-                </button>
-                <button type="button" onClick={activateHighlightTool} title="Select exact PDF text to highlight" className={`inline-flex min-h-11 items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-black transition ${activeTool === "highlight" ? "border-amber-300 bg-amber-500 text-slate-950 shadow-md shadow-amber-100" : "border-amber-100 bg-amber-50 text-amber-700 hover:bg-amber-100"}`}>
-                  <Highlighter size={16} /> Highlight
-                </button>
-                <button type="button" onClick={() => imageInputRef.current?.click()} className="inline-flex min-h-11 items-center gap-2 rounded-2xl border border-sky-100 bg-sky-50 px-4 py-2.5 text-sm font-black text-sky-700 transition hover:bg-sky-100"><ImageIcon size={16} /> Image</button>
-                <button type="button" onClick={addTextSignatureLayer} className="inline-flex min-h-11 items-center gap-2 rounded-2xl border border-violet-100 bg-violet-50 px-4 py-2.5 text-sm font-black text-violet-700 transition hover:bg-violet-100"><PenLine size={16} /> Sign</button>
-                <button type="button" onClick={() => signatureImageInputRef.current?.click()} className="inline-flex min-h-11 items-center gap-2 rounded-2xl border border-fuchsia-100 bg-fuchsia-50 px-4 py-2.5 text-sm font-black text-fuchsia-700 transition hover:bg-fuchsia-100"><FileImage size={16} /> Sign Image</button>
-                <button type="button" onClick={deleteSelectedLayer} className="inline-flex min-h-11 items-center gap-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-2.5 text-sm font-black text-red-700 transition hover:bg-red-100"><Trash2 size={16} /> Delete</button>
-                <button type="button" onClick={clearCurrentPageLayers} className="inline-flex min-h-11 items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-black text-slate-700 transition hover:bg-slate-100"><Layers size={16} /> Clear Page</button>
-                <button type="button" onClick={resetEditor} className="inline-flex min-h-11 items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-black text-slate-700 transition hover:bg-slate-100"><RotateCcw size={16} /> Reset</button>
-                <button type="button" onClick={exportPdf} className="inline-flex min-h-11 items-center gap-2 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-2.5 text-sm font-black text-emerald-700 transition hover:bg-emerald-100"><Download size={16} /> Export</button>
+              <div className="border-b border-slate-200 bg-white p-3">
+                <EditorToolbar
+                  activeTool={activeTool}
+                  hasSelectedLayer={Boolean(selectedLayer)}
+                  onSelectTool={selectEditorTool}
+                  onImageClick={() => imageInputRef.current?.click()}
+                  onSignatureClick={addTextSignatureLayer}
+                  onSignatureImageClick={() => signatureImageInputRef.current?.click()}
+                  onDelete={deleteSelectedLayer}
+                  onDuplicate={duplicateSelectedLayer}
+                  onClearPage={clearCurrentPageLayers}
+                  onReset={resetEditor}
+                  onExport={exportPdf}
+                />
 
                 {selectedLayer && (
-                  <div className="flex min-h-11 flex-wrap items-center gap-2 rounded-2xl border border-indigo-100 bg-white px-3 py-2 shadow-sm">
-                    <div className="rounded-xl bg-indigo-50 px-3 py-2 text-xs font-black text-indigo-700">{getSelectedToolbarLabel()}</div>
+                  <div className="mt-3 flex min-h-11 flex-wrap items-center gap-2 rounded-2xl border border-indigo-100 bg-white px-3 py-2 shadow-sm">
+                    <div className="rounded-xl bg-indigo-50 px-3 py-2 text-xs font-black text-indigo-700">
+                      {getSelectedToolbarLabel()}
+                    </div>
+
                     {(selectedLayer.type === "text" || selectedLayer.type === "signature") && !selectedLayer.imageUrl && (
                       <>
-                        <button type="button" onClick={() => updateLayer(selectedLayer.id, { isBold: !selectedLayer.isBold })} className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border transition ${selectedLayer.isBold ? "border-indigo-200 bg-indigo-50 text-indigo-700" : "border-slate-200 text-slate-700 hover:bg-slate-50"}`} title="Bold"><Bold size={16} /></button>
-                        <button type="button" onClick={() => updateLayer(selectedLayer.id, { isItalic: !selectedLayer.isItalic })} className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border transition ${selectedLayer.isItalic ? "border-indigo-200 bg-indigo-50 text-indigo-700" : "border-slate-200 text-slate-700 hover:bg-slate-50"}`} title="Italic"><Italic size={16} /></button>
-                        <button type="button" onClick={() => updateLayer(selectedLayer.id, { fontSize: Math.max(8, (selectedLayer.fontSize || 15) - 1) })} className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-700 transition hover:bg-slate-50" title="Decrease font size"><Minus size={15} /></button>
-                        <div className="min-w-10 text-center text-sm font-black text-slate-800">{selectedLayer.fontSize || 15}</div>
-                        <button type="button" onClick={() => updateLayer(selectedLayer.id, { fontSize: Math.min(72, (selectedLayer.fontSize || 15) + 1) })} className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-700 transition hover:bg-slate-50" title="Increase font size"><Plus size={15} /></button>
+                        <button
+                          type="button"
+                          onClick={() => updateLayer(selectedLayer.id, { isBold: !selectedLayer.isBold })}
+                          className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border transition ${
+                            selectedLayer.isBold
+                              ? "border-indigo-200 bg-indigo-50 text-indigo-700"
+                              : "border-slate-200 text-slate-700 hover:bg-slate-50"
+                          }`}
+                          title="Bold"
+                        >
+                          <Bold size={16} />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => updateLayer(selectedLayer.id, { isItalic: !selectedLayer.isItalic })}
+                          className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border transition ${
+                            selectedLayer.isItalic
+                              ? "border-indigo-200 bg-indigo-50 text-indigo-700"
+                              : "border-slate-200 text-slate-700 hover:bg-slate-50"
+                          }`}
+                          title="Italic"
+                        >
+                          <Italic size={16} />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            updateLayer(selectedLayer.id, {
+                              fontSize: Math.max(8, (selectedLayer.fontSize || 15) - 1),
+                            })
+                          }
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-700 transition hover:bg-slate-50"
+                          title="Decrease font size"
+                        >
+                          <Minus size={15} />
+                        </button>
+
+                        <div className="min-w-10 text-center text-sm font-black text-slate-800">
+                          {selectedLayer.fontSize || 15}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            updateLayer(selectedLayer.id, {
+                              fontSize: Math.min(72, (selectedLayer.fontSize || 15) + 1),
+                            })
+                          }
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-700 transition hover:bg-slate-50"
+                          title="Increase font size"
+                        >
+                          <Plus size={15} />
+                        </button>
                       </>
                     )}
+
                     {selectedLayer.type === "highlight" && (
-                      <select value={selectedLayer.opacity || 0.42} onChange={(event) => updateLayer(selectedLayer.id, { opacity: Number(event.target.value) })} className="min-h-9 rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-bold text-slate-700 outline-none" title="Opacity">
-                        <option value={0.2}>20%</option><option value={0.3}>30%</option><option value={0.42}>42%</option><option value={0.5}>50%</option><option value={0.65}>65%</option>
+                      <select
+                        value={selectedLayer.opacity || 0.42}
+                        onChange={(event) =>
+                          updateLayer(selectedLayer.id, {
+                            opacity: Number(event.target.value),
+                          })
+                        }
+                        className="min-h-9 rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-bold text-slate-700 outline-none"
+                        title="Opacity"
+                      >
+                        <option value={0.2}>20%</option>
+                        <option value={0.3}>30%</option>
+                        <option value={0.42}>42%</option>
+                        <option value={0.5}>50%</option>
+                        <option value={0.65}>65%</option>
                       </select>
                     )}
-                    <button type="button" onClick={duplicateSelectedLayer} className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-700 transition hover:bg-slate-50" title="Duplicate"><Copy size={16} /></button>
+
+                    <button
+                      type="button"
+                      onClick={duplicateSelectedLayer}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-700 transition hover:bg-slate-50"
+                      title="Duplicate"
+                    >
+                      <Copy size={16} />
+                    </button>
                   </div>
                 )}
               </div>
