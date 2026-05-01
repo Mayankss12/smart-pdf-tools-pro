@@ -1048,11 +1048,19 @@ export default function EditorPage() {
             setSelectedLayerId(layer.id);
           }}
           onPointerDown={(event) => startMove(event, layer)}
-          className={`absolute rounded-sm border transition ${isSelected ? "border-amber-500 ring-2 ring-amber-100" : "border-transparent hover:border-amber-300"}`}
-          style={{ ...getLayerStyle(layer), backgroundColor: `rgba(251, 191, 36, ${layer.opacity || 0.42})`, touchAction: "none", zIndex: 5 }}
-          title="Highlight layer"
+          className={`absolute rounded-[2px] transition ${
+            isSelected ? "ring-2 ring-amber-300" : ""
+          }`}
+          style={{
+            ...getLayerStyle(layer),
+            backgroundColor: `rgba(251, 191, 36, ${layer.opacity || 0.38})`,
+            mixBlendMode: "multiply",
+            touchAction: "none",
+            zIndex: 5,
+          }}
+          title="Highlight"
         >
-          {renderResizeHandles(layer)}
+          {isSelected ? renderResizeHandles(layer) : null}
         </div>
       );
     }
@@ -1113,28 +1121,105 @@ export default function EditorPage() {
     );
   }
 
+   function createHighlightFromSelection() {
+    if (activeTool !== "highlight") return;
+
+    const selection = window.getSelection();
+
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+      return;
+    }
+
+    const canvasElement = canvasRef.current;
+
+    if (!canvasElement) {
+      selection.removeAllRanges();
+      return;
+    }
+
+    const pageRect = canvasElement.getBoundingClientRect();
+    const range = selection.getRangeAt(0);
+
+    const selectedRects = Array.from(range.getClientRects()).filter((rect) => {
+      const isInsidePage =
+        rect.right > pageRect.left &&
+        rect.left < pageRect.right &&
+        rect.bottom > pageRect.top &&
+        rect.top < pageRect.bottom;
+
+      return rect.width > 1 && rect.height > 1 && isInsidePage;
+    });
+
+    if (selectedRects.length === 0) {
+      selection.removeAllRanges();
+      setStatus(
+        "No selectable text found in this area. OCR highlight will require premium/backend OCR later."
+      );
+      return;
+    }
+
+    const newHighlights: PdfLayer[] = selectedRects.map((rect) => {
+      const left = clamp(rect.left - pageRect.left, 0, pageRect.width);
+      const top = clamp(rect.top - pageRect.top, 0, pageRect.height);
+      const width = clamp(rect.width, 1, pageRect.width - left);
+      const height = clamp(rect.height, 1, pageRect.height - top);
+
+      return {
+        id: crypto.randomUUID(),
+        page: currentPage,
+        type: "highlight",
+        xPercent: (left / pageRect.width) * 100,
+        yPercent: ((top + height * 0.12) / pageRect.height) * 100,
+        widthPercent: (width / pageRect.width) * 100,
+        heightPercent: ((height * 0.76) / pageRect.height) * 100,
+        opacity: 0.38,
+      };
+    });
+
+    setLayers((prev) => [...prev, ...newHighlights]);
+    setSelectedLayerId(null);
+    setStatus(
+      `Highlighted selected text (${newHighlights.length} ${
+        newHighlights.length === 1 ? "area" : "areas"
+      }).`
+    );
+
+    selection.removeAllRanges();
+  }
+
   function renderTextOverlay() {
     if (!showTextOverlay || !fileName) return null;
+
     return (
-      <div className="absolute inset-0 z-40 pointer-events-none" style={{ userSelect: "none" }}>
+      <div
+        className="absolute inset-0 z-40"
+        onMouseUp={createHighlightFromSelection}
+        onPointerUp={createHighlightFromSelection}
+        style={{
+          pointerEvents:
+            activeTool === "highlight" || activeTool === "edit" ? "auto" : "none",
+          userSelect: activeTool === "highlight" ? "text" : "none",
+        }}
+      >
         {textOverlay.map((item) => {
           const isHovered = hoveredTextId === item.id;
+
           return (
-            <button
+            <span
               key={item.id}
-              type="button"
               onMouseEnter={() => setHoveredTextId(item.id)}
               onMouseLeave={() => setHoveredTextId(null)}
               onClick={(event) => {
                 if (activeTool !== "edit") return;
+
                 event.preventDefault();
                 event.stopPropagation();
                 addReplacementTextLayer(item);
               }}
-              className={`absolute whitespace-pre rounded-[2px] border-0 p-0 text-left ${
+              className={`absolute whitespace-pre rounded-[2px] ${
                 activeTool === "edit" && isHovered
-                  ? "bg-indigo-300/30 outline outline-1 outline-indigo-300/60"
-                  : "bg-transparent"
+                  ? "bg-indigo-300/25 outline outline-1 outline-indigo-300/60"
+                  : ""
               }`}
               style={{
                 left: `${item.leftPercent}%`,
@@ -1144,13 +1229,15 @@ export default function EditorPage() {
                 fontSize: item.fontSizePx,
                 lineHeight: 1,
                 color: "transparent",
-                cursor: "pointer",
-                pointerEvents: activeTool === "edit" ? "auto" : "none",
+                WebkitTextFillColor: "transparent",
+                caretColor: "transparent",
+                cursor: activeTool === "highlight" ? "text" : "pointer",
+                userSelect: activeTool === "highlight" ? "text" : "none",
               }}
-              title={`Edit: ${item.text}`}
+              title={activeTool === "edit" ? `Edit: ${item.text}` : item.text}
             >
               {item.text}
-            </button>
+            </span>
           );
         })}
       </div>
