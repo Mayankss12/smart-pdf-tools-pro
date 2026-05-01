@@ -22,7 +22,6 @@ import {
   Trash2,
   Type,
   Upload,
-  Wand2,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
@@ -51,7 +50,12 @@ type PdfLayer = {
   imageUrl?: string;
   imageBytes?: Uint8Array;
   imageKind?: "png" | "jpg";
+<<<<<<< codex/fix-floating-mini-toolbar-in-pdf-editor-r338iy
+  coverOriginal?: boolean;
+  coverColor?: "white";
+=======
   coverText?: boolean;
+>>>>>>> main
 };
 
 type PageThumb = { pageNumber: number; url: string };
@@ -75,11 +79,25 @@ type DraftBox = {
   heightPercent: number;
 };
 
+<<<<<<< codex/fix-floating-mini-toolbar-in-pdf-editor-r338iy
+type ExportMode = "full" | "current" | "range";
+type ActiveTool = "select" | "text" | "highlight";
+type PageTextItem = {
+  id: string;
+  page: number;
+  text: string;
+  xPercent: number;
+  yPercent: number;
+  widthPercent: number;
+  heightPercent: number;
+  fontSize: number;
+=======
 type DrawState = {
   startXPercent: number;
   startYPercent: number;
   currentXPercent: number;
   currentYPercent: number;
+>>>>>>> main
 };
 
 type TextOverlayItem = {
@@ -202,10 +220,17 @@ export default function EditorPage() {
   const [exportMode, setExportMode] = useState<ExportMode>("full");
   const [exportRange, setExportRange] = useState("1-3");
   const [showFreeLimitNote, setShowFreeLimitNote] = useState(true);
+<<<<<<< codex/fix-floating-mini-toolbar-in-pdf-editor-r338iy
+  const [activeTool, setActiveTool] = useState<ActiveTool>("select");
+  const [pageTextItems, setPageTextItems] = useState<PageTextItem[]>([]);
+  const [hoveredTextItemId, setHoveredTextItemId] = useState<string | null>(null);
+  const highlightDragRef = useRef<{ startX: number; startY: number; endX: number; endY: number } | null>(null);
+=======
   const [ocrText, setOcrText] = useState("");
   const [ocrRewriteText, setOcrRewriteText] = useState("");
   const [ocrBusy, setOcrBusy] = useState(false);
   const [hoveredTextId, setHoveredTextId] = useState<string | null>(null);
+>>>>>>> main
 
   useEffect(() => {
     pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
@@ -272,10 +297,44 @@ export default function EditorPage() {
       canvas.style.width = `${viewport.width}px`;
       canvas.style.height = `${viewport.height}px`;
       context.setTransform(outputScale, 0, 0, outputScale, 0, 0);
+<<<<<<< codex/fix-floating-mini-toolbar-in-pdf-editor-r338iy
+
+      setCanvasSize({
+        width: viewport.width,
+        height: viewport.height,
+      });
+
+      await page.render({
+        canvasContext: context,
+        viewport,
+      }).promise;
+
+      const textContent = await page.getTextContent();
+      const items: PageTextItem[] = textContent.items
+        .map((item, index) => {
+          const textItem = item as { str: string; transform: number[]; width: number; height: number };
+          const tx = pdfjsLib.Util.transform(viewport.transform, textItem.transform);
+          const left = tx[4];
+          const top = tx[5] - textItem.height;
+          return {
+            id: `${pageNumber}-${index}`,
+            page: pageNumber,
+            text: textItem.str,
+            xPercent: clamp((left / viewport.width) * 100, 0, 100),
+            yPercent: clamp((top / viewport.height) * 100, 0, 100),
+            widthPercent: clamp(((textItem.width * viewerScale) / viewport.width) * 100, 0.2, 100),
+            heightPercent: clamp((textItem.height / viewport.height) * 100, 0.2, 100),
+            fontSize: Math.max(8, textItem.height),
+          };
+        })
+        .filter((it) => it.text.trim().length > 0);
+      setPageTextItems(items);
+=======
       setCanvasSize({ width: viewport.width, height: viewport.height });
       setRenderScale(finalScale);
       await page.render({ canvasContext: context, viewport }).promise;
       await extractTextOverlay(page, viewport, finalScale);
+>>>>>>> main
     },
     [extractTextOverlay, zoomLevel]
   );
@@ -285,6 +344,8 @@ export default function EditorPage() {
   }, [currentPage, renderPage]);
 
   useEffect(() => {
+<<<<<<< codex/fix-floating-mini-toolbar-in-pdf-editor-r338iy
+=======
     function handleResize() {
       renderPage(currentPage);
     }
@@ -297,6 +358,7 @@ export default function EditorPage() {
   }, [currentPage, renderPage]);
 
   useEffect(() => {
+>>>>>>> main
     function handlePointerMove(event: PointerEvent) {
       const drag = dragStateRef.current;
       if (!drag) return;
@@ -337,6 +399,23 @@ export default function EditorPage() {
         })
       );
     }
+<<<<<<< codex/fix-floating-mini-toolbar-in-pdf-editor-r338iy
+
+    function handlePointerUp() {
+      dragStateRef.current = null;
+      document.body.style.touchAction = "";
+      document.body.style.overscrollBehavior = "";
+    }
+
+    window.addEventListener("pointermove", handlePointerMove, { passive: false });
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerUp);
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerUp);
+=======
     function endPointerInteraction() {
       dragStateRef.current = null;
       cancelDrawingState();
@@ -348,6 +427,7 @@ export default function EditorPage() {
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", endPointerInteraction);
       window.removeEventListener("pointercancel", endPointerInteraction);
+>>>>>>> main
     };
   }, [canvasSize.height, canvasSize.width]);
 
@@ -411,6 +491,36 @@ export default function EditorPage() {
     }
   }
 
+<<<<<<< codex/fix-floating-mini-toolbar-in-pdf-editor-r338iy
+  function createTextLayer() {
+    if (!fileBytesRef.current) {
+      setStatus("Upload a PDF first.");
+      return;
+    }
+
+    const newLayer: PdfLayer = {
+      id: crypto.randomUUID(),
+      page: currentPage,
+      type: "text",
+      xPercent: 12,
+      yPercent: 16,
+      widthPercent: 32,
+      heightPercent: 6,
+      text: "Edit text",
+      fontSize: 16,
+      isBold: false,
+      isItalic: false,
+    };
+
+    setLayers((prev) => [...prev, newLayer]);
+    setSelectedLayerId(newLayer.id);
+    setStatus("Text layer added. Type directly, drag, or resize.");
+  }
+
+  function enableHighlightMode() {
+    setActiveTool("highlight");
+    setStatus("Highlight mode active. Drag over PDF text to highlight.");
+=======
   function activateEditTool() {
     setActiveTool("edit");
     setDraftBox(null);
@@ -431,6 +541,7 @@ export default function EditorPage() {
     setSelectedLayerId(null);
     setDraftBox(null);
     setStatus(textOverlay.length === 0 ? "Highlight mode active, but no selectable text found. OCR highlight will require premium/backend OCR later." : "Highlight mode active. Select exact PDF text to highlight it.");
+>>>>>>> main
   }
 
   async function addImageLayer(file?: File) {
@@ -567,12 +678,27 @@ export default function EditorPage() {
     setStatus(`All layers on page ${currentPage} cleared.`);
   }
 
+<<<<<<< codex/fix-floating-mini-toolbar-in-pdf-editor-r338iy
+  function startMove(
+    event: React.PointerEvent<HTMLDivElement | HTMLButtonElement>,
+    layer: PdfLayer
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    document.body.style.touchAction = "none";
+    document.body.style.overscrollBehavior = "none";
+
+    setSelectedLayerId(layer.id);
+
+=======
   function startMove(event: React.PointerEvent<HTMLDivElement | HTMLButtonElement>, layer: PdfLayer) {
     const target = event.target as HTMLElement;
     if (target.closest("textarea") || target.closest("button") || target.closest("[data-no-drag='true']")) return;
     event.preventDefault();
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
+>>>>>>> main
     dragStateRef.current = {
       id: layer.id,
       mode: "move",
@@ -590,10 +716,26 @@ export default function EditorPage() {
     document.documentElement.style.overscrollBehavior = "none";
   }
 
+<<<<<<< codex/fix-floating-mini-toolbar-in-pdf-editor-r338iy
+  function startResize(
+    event: React.PointerEvent<HTMLButtonElement>,
+    layer: PdfLayer,
+    handle: ResizeHandle
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    document.body.style.touchAction = "none";
+    document.body.style.overscrollBehavior = "none";
+
+    setSelectedLayerId(layer.id);
+
+=======
   function startResize(event: React.PointerEvent<HTMLButtonElement>, layer: PdfLayer, handle: ResizeHandle) {
     event.preventDefault();
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
+>>>>>>> main
     dragStateRef.current = {
       id: layer.id,
       mode: "resize",
@@ -682,6 +824,27 @@ export default function EditorPage() {
     document.documentElement.style.overscrollBehavior = "none";
   }
 
+<<<<<<< codex/fix-floating-mini-toolbar-in-pdf-editor-r338iy
+    if (layer.type === "text" || layer.type === "signature") {
+      if (layer.coverOriginal) {
+        page.drawRectangle({
+          x: pdfX,
+          y: pdfY,
+          width: boxWidth,
+          height: boxHeight,
+          color: rgb(1, 1, 1),
+          opacity: 1,
+        });
+      }
+      const fontSize = clamp(layer.fontSize || 16, 8, 96);
+      const font = await pdfDoc.embedFont(
+        layer.isBold
+          ? StandardFonts.HelveticaBold
+          : layer.isItalic
+            ? StandardFonts.HelveticaOblique
+            : StandardFonts.Helvetica
+      );
+=======
   function updatePageDraw(event: React.PointerEvent<HTMLDivElement>) {
     const draw = drawStateRef.current;
     if (!draw) return;
@@ -692,6 +855,7 @@ export default function EditorPage() {
     drawStateRef.current = nextDrawState;
     setDraftBox(normalizeDraftBox(nextDrawState));
   }
+>>>>>>> main
 
   function endPageDraw(event: React.PointerEvent<HTMLDivElement>) {
     const draw = drawStateRef.current;
@@ -935,11 +1099,17 @@ export default function EditorPage() {
     return resizeHandles.map((handle) => (
       <button
         key={handle.id}
+<<<<<<< codex/fix-floating-mini-toolbar-in-pdf-editor-r338iy
+        onPointerDown={(event) => startResize(event, layer, handle.id)}
+        className={`absolute z-30 h-4.5 w-4.5 md:h-3.5 md:w-3.5 rounded-full border-2 border-white bg-indigo-500 shadow-sm transition hover:scale-110 ${handle.className}`}
+        style={{ cursor: handle.cursor }}
+=======
         type="button"
         data-no-drag="true"
         onPointerDown={(event) => startResize(event, layer, handle.id)}
         className={`absolute z-30 h-5 w-5 rounded-full border-2 border-white bg-indigo-500 shadow-md transition hover:scale-110 sm:h-4 sm:w-4 ${handle.className}`}
         style={{ cursor: handle.cursor, touchAction: "none" }}
+>>>>>>> main
         title={`Resize ${handle.id}`}
       />
     ));
@@ -952,7 +1122,11 @@ export default function EditorPage() {
       return (
         <div
           key={layer.id}
+<<<<<<< codex/fix-floating-mini-toolbar-in-pdf-editor-r338iy
+          onPointerDown={(event) => startMove(event, layer)}
+=======
           data-editor-layer="true"
+>>>>>>> main
           onClick={(event) => {
             event.stopPropagation();
             setSelectedLayerId(layer.id);
@@ -971,7 +1145,11 @@ export default function EditorPage() {
       return (
         <div
           key={layer.id}
+<<<<<<< codex/fix-floating-mini-toolbar-in-pdf-editor-r338iy
+          onPointerDown={(event) => startMove(event, layer)}
+=======
           data-editor-layer="true"
+>>>>>>> main
           onClick={(event) => {
             event.stopPropagation();
             setSelectedLayerId(layer.id);
@@ -986,7 +1164,36 @@ export default function EditorPage() {
       );
     }
 
+<<<<<<< codex/fix-floating-mini-toolbar-in-pdf-editor-r338iy
+    if (layer.type === "signature" && layer.imageUrl) {
+      return (
+        <div
+          key={layer.id}
+          onPointerDown={(event) => startMove(event, layer)}
+          onClick={(event) => {
+            event.stopPropagation();
+            setSelectedLayerId(layer.id);
+          }}
+          className={`absolute cursor-move overflow-hidden rounded-lg border bg-white/70 p-1 shadow-sm transition ${
+            isSelected
+              ? "border-indigo-500 ring-2 ring-indigo-100"
+              : "border-transparent hover:border-indigo-200"
+          }`}
+          style={style}
+        >
+          <img
+            src={layer.imageUrl}
+            alt="Signature"
+            className="h-full w-full object-contain"
+            draggable={false}
+          />
+          {renderResizeHandles(layer)}
+        </div>
+      );
+    }
+=======
     const isSignature = layer.type === "signature";
+>>>>>>> main
 
     return (
       <div
@@ -1002,6 +1209,36 @@ export default function EditorPage() {
         }`}
         style={{ ...getLayerStyle(layer), touchAction: "none", zIndex: 25 }}
       >
+<<<<<<< codex/fix-floating-mini-toolbar-in-pdf-editor-r338iy
+        <textarea
+          value={layer.text || ""}
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation();
+            setSelectedLayerId(layer.id);
+          }}
+          onChange={(event) =>
+            updateLayer(layer.id, {
+              text: event.target.value,
+            })
+          }
+          className="h-full w-full resize-none rounded-md px-2 py-1 font-semibold outline-none"
+          style={{
+            fontSize: layer.fontSize || 16,
+            lineHeight: 1.2,
+            fontWeight: layer.isBold ? 800 : 600,
+            fontStyle: layer.isItalic ? "italic" : "normal",
+            letterSpacing: "-0.01em",
+            backgroundColor: layer.coverOriginal ? "rgba(255,255,255,0.96)" : "transparent",
+          }}
+        />
+
+        {isSelected && (
+          <div
+            onPointerDown={(event) => startMove(event, layer)}
+            className="absolute inset-x-2 top-1 h-1.5 cursor-move rounded-full bg-indigo-500/25 transition hover:bg-indigo-500/40"
+            title="Drag layer"
+=======
         {layer.imageUrl ? (
           <img src={layer.imageUrl} alt={isSignature ? "Signature layer" : "PDF layer"} className="h-full w-full object-contain" draggable={false} />
         ) : (
@@ -1016,6 +1253,7 @@ export default function EditorPage() {
             onChange={(event) => updateLayer(layer.id, { text: event.target.value })}
             className={`h-full w-full resize-none rounded-md bg-transparent px-2 py-1 outline-none ${isSignature ? "font-serif" : "font-sans"}`}
             style={{ fontSize: layer.fontSize || 15, lineHeight: 1.2, fontWeight: layer.isBold ? 800 : 600, fontStyle: layer.isItalic ? "italic" : "normal", letterSpacing: "-0.01em" }}
+>>>>>>> main
           />
         )}
         {renderResizeHandles(layer)}
@@ -1023,6 +1261,10 @@ export default function EditorPage() {
     );
   }
 
+<<<<<<< codex/fix-floating-mini-toolbar-in-pdf-editor-r338iy
+  function rectanglesIntersect(a: {x:number;y:number;width:number;height:number}, b: {x:number;y:number;width:number;height:number}) {
+    return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+=======
   function renderTextOverlay() {
     if (!showTextOverlay || !fileName) return null;
     return (
@@ -1055,6 +1297,7 @@ export default function EditorPage() {
         })}
       </div>
     );
+>>>>>>> main
   }
 
   return (
@@ -1113,6 +1356,187 @@ export default function EditorPage() {
               </div>
             )}
 
+<<<<<<< codex/fix-floating-mini-toolbar-in-pdf-editor-r338iy
+            <div className="mx-5 mb-5 overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white shadow-sm">
+              <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white p-3 [&>button]:min-h-10">
+                <button
+                  onClick={() => {
+                    setActiveTool("select");
+                    setStatus("Edit mode active. Select an object or use future text edit zones.");
+                  }}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 transition hover:bg-slate-50"
+                >
+                  <MousePointer2 size={16} />
+                  Edit
+                </button>
+                <button
+                  onClick={() => {
+                    setActiveTool("text");
+                    createTextLayer();
+                  }}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-2.5 text-sm font-black text-indigo-700 transition hover:bg-indigo-100"
+                >
+                  <Type size={16} />
+                  Text
+                </button>
+
+                <button
+                  onClick={enableHighlightMode}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-2.5 text-sm font-black text-amber-700 transition hover:bg-amber-100"
+                >
+                  <Highlighter size={16} />
+                  Highlight
+                </button>
+
+                <button
+                  onClick={() => imageInputRef.current?.click()}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-sky-100 bg-sky-50 px-4 py-2.5 text-sm font-black text-sky-700 transition hover:bg-sky-100"
+                >
+                  <FileImage size={16} />
+                  Image
+                </button>
+
+                <button
+                  onClick={addTextSignatureLayer}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-violet-100 bg-violet-50 px-4 py-2.5 text-sm font-black text-violet-700 transition hover:bg-violet-100"
+                >
+                  <PenLine size={16} />
+                  Text Sign
+                </button>
+
+                <button
+                  onClick={() => signatureImageInputRef.current?.click()}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-violet-100 bg-white px-4 py-2.5 text-sm font-black text-violet-700 transition hover:bg-violet-50"
+                >
+                  <ImageIcon size={16} />
+                  Image Sign
+                </button>
+
+
+
+                <button
+                  onClick={resetEditor}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-black text-slate-700 transition hover:bg-slate-100"
+                >
+                  <RotateCcw size={16} />
+                  Clear All
+                </button>
+
+                <button
+                  onClick={exportPdf}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-2.5 text-sm font-black text-emerald-700 transition hover:bg-emerald-100"
+                >
+                  <Download size={16} />
+                  Export
+                </button>
+
+
+
+                {selectedLayer && (
+                  <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-indigo-100 bg-indigo-50/70 px-2 py-1">
+                    {(selectedLayer.type === "text" ||
+                      (selectedLayer.type === "signature" && !selectedLayer.imageUrl)) && (
+                      <>
+                        <button
+                          onClick={() =>
+                            updateLayer(selectedLayer.id, {
+                              isBold: !selectedLayer.isBold,
+                            })
+                          }
+                          className={`inline-flex items-center gap-1 rounded-xl border px-3 py-2 text-xs font-black ${
+                            selectedLayer.isBold
+                              ? "border-indigo-200 bg-indigo-700 text-white"
+                              : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                          }`}
+                        >
+                          <Bold size={14} />
+                          B
+                        </button>
+                        <button
+                          onClick={() =>
+                            updateLayer(selectedLayer.id, {
+                              isItalic: !selectedLayer.isItalic,
+                            })
+                          }
+                          className={`inline-flex items-center gap-1 rounded-xl border px-3 py-2 text-xs font-black ${
+                            selectedLayer.isItalic
+                              ? "border-indigo-200 bg-indigo-700 text-white"
+                              : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                          }`}
+                        >
+                          <Italic size={14} />
+                          I
+                        </button>
+                        <button
+                          onClick={() =>
+                            updateLayer(selectedLayer.id, {
+                              fontSize: Math.max(8, (selectedLayer.fontSize || 16) - 1),
+                            })
+                          }
+                          className="rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-black text-slate-700 hover:bg-slate-50"
+                        >
+                          A-
+                        </button>
+                        <span className="rounded-xl bg-white px-2 py-1 text-xs font-black text-slate-700">
+                          {selectedLayer.fontSize || 16}px
+                        </span>
+                        <button
+                          onClick={() =>
+                            updateLayer(selectedLayer.id, {
+                              fontSize: Math.min(72, (selectedLayer.fontSize || 16) + 1),
+                            })
+                          }
+                          className="rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-black text-slate-700 hover:bg-slate-50"
+                        >
+                          A+
+                        </button>
+                      </>
+                    )}
+
+                    {selectedLayer.type === "highlight" && (
+                      <select
+                        value={selectedLayer.opacity ?? 0.42}
+                        onChange={(event) =>
+                          updateLayer(selectedLayer.id, {
+                            opacity: Number(event.target.value),
+                          })
+                        }
+                        className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-black text-slate-700"
+                      >
+                        {[0.2,0.3,0.42,0.55,0.7].map((v) => (
+                          <option key={v} value={v}>{Math.round(v*100)}%</option>
+                        ))}
+                      </select>
+                    )}
+
+                    <button
+                      onClick={duplicateSelectedLayer}
+                      className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50"
+                    >
+                      <Copy size={14} />
+                      Duplicate
+                    </button>
+                    <button
+                      onClick={deleteSelectedLayer}
+                      className="inline-flex items-center gap-1 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-black text-red-700 hover:bg-red-100"
+                    >
+                      <Trash2 size={14} />
+                      Delete
+                    </button>
+                  </div>
+                )}
+                <div className="ml-auto flex items-center gap-2">
+                  <button
+                    onClick={zoomOut}
+                    className="rounded-2xl border border-slate-200 bg-white p-2.5 text-slate-700 transition hover:bg-slate-50"
+                    title="Zoom out"
+                  >
+                    <ZoomOut size={17} />
+                  </button>
+
+                  <div className="rounded-2xl bg-slate-100 px-3 py-2 text-xs font-black text-slate-700">
+                    {Math.round(viewerScale * 100)}%
+=======
             <div className="mx-3 mb-3 overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm sm:mx-5 sm:mb-5 sm:rounded-[1.7rem]">
               <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white p-3">
                 <button type="button" onClick={activateEditTool} title="Edit existing PDF text or select objects" className={`inline-flex min-h-11 items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-black transition ${activeTool === "edit" ? "border-slate-300 bg-slate-900 text-white shadow-md shadow-slate-200" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"}`}>
@@ -1150,10 +1574,40 @@ export default function EditorPage() {
                       </select>
                     )}
                     <button type="button" onClick={duplicateSelectedLayer} className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-700 transition hover:bg-slate-50" title="Duplicate"><Copy size={16} /></button>
+>>>>>>> main
                   </div>
                 )}
               </div>
 
+<<<<<<< codex/fix-floating-mini-toolbar-in-pdf-editor-r338iy
+              <div className="grid min-h-[720px] grid-cols-1 lg:grid-cols-[190px_1fr_360px]">
+                <aside className="order-2 border-t border-slate-200 bg-slate-50/80 p-3 lg:order-none lg:border-r lg:border-t-0 lg:p-4">
+                  <div className="mb-3 flex items-center gap-2 text-sm font-black text-slate-950">
+                    <FileText size={16} />
+                    Pages
+                  </div>
+
+                  {numPages > 0 && (
+                    <label className="mb-3 block lg:hidden">
+                      <span className="mb-1 block text-xs font-black text-slate-600">Jump to page</span>
+                      <select
+                        value={currentPage}
+                        onChange={(event) => {
+                          setCurrentPage(Number(event.target.value));
+                          setSelectedLayerId(null);
+                        }}
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700"
+                      >
+                        {Array.from({ length: numPages }).map((_, index) => (
+                          <option key={index + 1} value={index + 1}>
+                            Page {index + 1}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+
+=======
               <div className="grid min-h-[560px] grid-cols-1 lg:grid-cols-[180px_1fr]">
                 <aside className="border-b border-slate-200 bg-slate-50/80 p-3 lg:border-b-0 lg:border-r lg:p-4">
                   <div className="mb-3 flex items-center gap-2 text-sm font-black text-slate-950"><FileText size={16} /> Pages</div>
@@ -1165,17 +1619,59 @@ export default function EditorPage() {
                       </select>
                     </label>
                   )}
+>>>>>>> main
                   {numPages === 0 ? (
                     <p className="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-sm text-slate-500">No PDF uploaded.</p>
                   ) : (
+<<<<<<< codex/fix-floating-mini-toolbar-in-pdf-editor-r338iy
+                    <div className="flex gap-2 overflow-x-auto pb-1 lg:block lg:space-y-3">
+=======
                     <div className="flex gap-2 overflow-x-auto pb-2 lg:block lg:overflow-visible lg:pb-0">
+>>>>>>> main
                       {Array.from({ length: numPages }).map((_, index) => {
                         const pageNumber = index + 1;
                         const thumb = pageThumbs.find((item) => item.pageNumber === pageNumber);
                         return (
+<<<<<<< codex/fix-floating-mini-toolbar-in-pdf-editor-r338iy
+                          <button
+                            key={pageNumber}
+                            onClick={() => {
+                              setCurrentPage(pageNumber);
+                              setSelectedLayerId(null);
+                            }}
+                            className={`block min-w-[132px] overflow-hidden rounded-2xl border bg-white text-left shadow-sm transition lg:w-full ${
+                              currentPage === pageNumber
+                                ? "border-indigo-600 ring-4 ring-indigo-100"
+                                : "border-slate-200 hover:border-indigo-200"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2 text-xs font-black text-slate-700">
+                              <span>Page {pageNumber}</span>
+                              {count > 0 && (
+                                <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] text-indigo-700">
+                                  {count}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="bg-slate-100 p-2">
+                              {thumb?.url ? (
+                                <img
+                                  src={thumb.url}
+                                  alt={`Page ${pageNumber}`}
+                                  className="mx-auto max-h-36 rounded border border-slate-200 bg-white"
+                                />
+                              ) : (
+                                <div className="flex h-24 items-center justify-center text-xs font-bold text-slate-400">
+                                  Preview
+                                </div>
+                              )}
+                            </div>
+=======
                           <button key={pageNumber} type="button" onClick={() => selectPage(pageNumber)} className={`min-w-[86px] rounded-2xl border p-2 text-left text-xs transition lg:mb-2 lg:w-full lg:min-w-0 lg:p-3 lg:text-sm ${currentPage === pageNumber ? "border-indigo-600 bg-indigo-50 font-black text-indigo-700 shadow-sm" : "border-slate-200 bg-white font-semibold text-slate-700 hover:border-indigo-200 hover:bg-indigo-50"}`}>
                             {thumb?.url ? <img src={thumb.url} alt={`Page ${pageNumber}`} className="mb-2 h-20 w-full rounded-lg object-contain bg-slate-100 lg:h-24" /> : null}
                             Page {pageNumber}
+>>>>>>> main
                           </button>
                         );
                       })}
@@ -1187,7 +1683,11 @@ export default function EditorPage() {
                   </div>
                 </aside>
 
+<<<<<<< codex/fix-floating-mini-toolbar-in-pdf-editor-r338iy
+                <section className="order-1 flex items-start justify-start overflow-x-auto overflow-y-auto bg-[radial-gradient(circle_at_top,_#ddd6fe,_#f8fafc_42%,_#e2e8f0)] p-3 sm:p-4 lg:order-none lg:justify-center lg:p-6">
+=======
                 <section ref={pdfViewportRef} className="flex w-full items-start justify-start overflow-auto bg-[radial-gradient(circle_at_top,_#ddd6fe,_#f8fafc_42%,_#e2e8f0)] p-3 sm:justify-center sm:p-6">
+>>>>>>> main
                   <div
                     className={`relative mx-auto rounded-xl bg-white shadow-2xl shadow-slate-500/20 ring-1 ring-slate-200 ${activeTool === "text" ? "cursor-crosshair" : activeTool === "highlight" ? "cursor-text" : "cursor-default"}`}
                     style={{ width: canvasSize.width, minHeight: canvasSize.height, touchAction: activeTool === "text" ? "none" : "auto" }}
@@ -1198,6 +1698,263 @@ export default function EditorPage() {
                     onClick={() => {
                       if (activeTool === "edit") setSelectedLayerId(null);
                     }}
+<<<<<<< codex/fix-floating-mini-toolbar-in-pdf-editor-r338iy
+                    onClick={() => {
+                      if (activeTool === "select" && hoveredTextItemId) {
+                        const item = pageTextItems.find((x) => x.id === hoveredTextItemId);
+                        if (item) {
+                          const newLayer: PdfLayer = {
+                            id: crypto.randomUUID(),
+                            page: currentPage,
+                            type: "text",
+                            xPercent: item.xPercent,
+                            yPercent: item.yPercent,
+                            widthPercent: Math.max(item.widthPercent, 4),
+                            heightPercent: Math.max(item.heightPercent, 2.5),
+                            text: item.text,
+                            fontSize: item.fontSize,
+                            isBold: false,
+                            isItalic: false,
+                            coverOriginal: true,
+                            coverColor: "white",
+                          };
+                          setLayers((prev) => [...prev, newLayer]);
+                          setSelectedLayerId(newLayer.id);
+                          setStatus("Edit layer created inline from PDF text.");
+                        }
+                      } else {
+                        setSelectedLayerId(null);
+                      }
+                    }}
+                    onPointerDown={(event) => {
+                      if (activeTool !== "highlight") return;
+                      const rect = event.currentTarget.getBoundingClientRect();
+                      highlightDragRef.current = {
+                        startX: event.clientX - rect.left,
+                        startY: event.clientY - rect.top,
+                        endX: event.clientX - rect.left,
+                        endY: event.clientY - rect.top,
+                      };
+                    }}
+                    onPointerMove={(event) => {
+                      const rect = event.currentTarget.getBoundingClientRect();
+                      if (activeTool === "highlight" && highlightDragRef.current) {
+                        highlightDragRef.current.endX = event.clientX - rect.left;
+                        highlightDragRef.current.endY = event.clientY - rect.top;
+                      }
+                      if (activeTool === "select") {
+                        const xPercent = ((event.clientX - rect.left) / rect.width) * 100;
+                        const yPercent = ((event.clientY - rect.top) / rect.height) * 100;
+                        const hit = pageTextItems.find((item) =>
+                          xPercent >= item.xPercent &&
+                          xPercent <= item.xPercent + item.widthPercent &&
+                          yPercent >= item.yPercent &&
+                          yPercent <= item.yPercent + item.heightPercent
+                        );
+                        setHoveredTextItemId(hit?.id || null);
+                      }
+                    }}
+                    onPointerUp={() => {
+                      if (activeTool === "highlight" && highlightDragRef.current) {
+                        const drag = highlightDragRef.current;
+                        highlightDragRef.current = null;
+                        const dragRect = {
+                          x: (Math.min(drag.startX, drag.endX) / canvasSize.width) * 100,
+                          y: (Math.min(drag.startY, drag.endY) / canvasSize.height) * 100,
+                          width: (Math.abs(drag.endX - drag.startX) / canvasSize.width) * 100,
+                          height: (Math.abs(drag.endY - drag.startY) / canvasSize.height) * 100,
+                        };
+                        const hits = pageTextItems.filter((item) =>
+                          rectanglesIntersect(
+                            dragRect,
+                            { x: item.xPercent, y: item.yPercent, width: item.widthPercent, height: item.heightPercent }
+                          )
+                        );
+                        if (!hits.length) {
+                          setStatus("No selectable text found in this area. OCR highlight will require premium/backend OCR later.");
+                          return;
+                        }
+                        const newLayers = hits.map((item) => ({
+                          id: crypto.randomUUID(),
+                          page: currentPage,
+                          type: "highlight" as const,
+                          xPercent: item.xPercent,
+                          yPercent: item.yPercent,
+                          widthPercent: item.widthPercent,
+                          heightPercent: item.heightPercent,
+                          opacity: 0.42,
+                        }));
+                        setLayers((prev) => [...prev, ...newLayers]);
+                      }
+                    }}
+                  >
+                    {busy && (
+                      <div className="absolute inset-0 z-40 flex items-center justify-center rounded-xl bg-white/75 backdrop-blur-sm">
+                        <div className="flex items-center gap-2 rounded-2xl bg-white px-5 py-4 font-bold shadow-xl">
+                          <Loader2
+                            className="animate-spin text-indigo-600"
+                            size={20}
+                          />
+                          Processing
+                        </div>
+                      </div>
+                    )}
+
+                    {!fileName && (
+                      <div className="flex min-h-[540px] items-center justify-center p-10 text-center">
+                        <div>
+                          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-3xl bg-indigo-50 text-indigo-600">
+                            <Upload size={26} />
+                          </div>
+                          <div className="font-black text-slate-900">
+                            Upload a PDF to preview it here
+                          </div>
+                          <p className="mt-2 text-sm text-slate-500">
+                            Your PDF pages will appear in this workspace.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    <canvas
+                      ref={canvasRef}
+                      className={fileName ? "block" : "hidden"}
+                    />
+
+                    {activeTool === "select" && hoveredTextItemId && (
+                      <div
+                        className="absolute z-10 rounded-sm bg-indigo-200/30 ring-1 ring-indigo-300/60"
+                        style={{
+                          left: `${pageTextItems.find((x) => x.id === hoveredTextItemId)?.xPercent || 0}%`,
+                          top: `${pageTextItems.find((x) => x.id === hoveredTextItemId)?.yPercent || 0}%`,
+                          width: `${pageTextItems.find((x) => x.id === hoveredTextItemId)?.widthPercent || 0}%`,
+                          height: `${pageTextItems.find((x) => x.id === hoveredTextItemId)?.heightPercent || 0}%`,
+                        }}
+                      />
+                    )}
+
+                    {currentPageLayers.map(renderLayer)}
+                  </div>
+                </section>
+
+                <aside className="order-3 border-t border-slate-200 bg-white p-4 lg:border-l lg:border-t-0">
+                  <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="flex items-center gap-2 text-lg font-black text-slate-950">
+                      <Layers size={18} />
+                      Properties
+                    </div>
+
+                    {!selectedLayer ? (
+                      <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-sm font-bold leading-6 text-slate-500">
+                        Select a layer on the PDF to edit properties.
+                      </div>
+                    ) : (
+                      <div className="mt-4 space-y-4">
+                        <div className="rounded-2xl bg-white p-4">
+                          <div className="text-xs font-black uppercase tracking-wide text-slate-500">
+                            Selected
+                          </div>
+                          <div className="mt-1 text-xl font-black capitalize text-slate-950">
+                            {selectedLayer.type}
+                          </div>
+                          <div className="mt-1 text-xs font-bold text-slate-500">
+                            Page {selectedLayer.page}
+                          </div>
+                        </div>
+
+                        {(selectedLayer.type === "text" ||
+                          (selectedLayer.type === "signature" &&
+                            !selectedLayer.imageUrl)) && (
+                          <>
+                            <label className="block">
+                              <span className="text-sm font-black text-slate-800">
+                                Text
+                              </span>
+                              <textarea
+                                value={selectedLayer.text || ""}
+                                onChange={(event) =>
+                                  updateLayer(selectedLayer.id, {
+                                    text: event.target.value,
+                                  })
+                                }
+                                className="mt-2 h-24 w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-950 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                              />
+                            </label>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-4 rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="text-lg font-black text-slate-950">
+                      Export Options
+                    </div>
+
+                    <div className="mt-4 space-y-2">
+                      {[
+                        { value: "full", label: "Full PDF" },
+                        { value: "current", label: "Current page only" },
+                        { value: "range", label: "Page range" },
+                      ].map((option) => (
+                        <label
+                          key={option.value}
+                          className="flex cursor-pointer items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-sm font-bold text-slate-700"
+                        >
+                          <input
+                            type="radio"
+                            name="exportMode"
+                            checked={exportMode === option.value}
+                            onChange={() =>
+                              setExportMode(option.value as ExportMode)
+                            }
+                          />
+                          {option.label}
+                        </label>
+                      ))}
+                    </div>
+
+                    {exportMode === "range" && (
+                      <input
+                        value={exportRange}
+                        onChange={(event) => setExportRange(event.target.value)}
+                        placeholder="Example: 1-3,5"
+                        className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                      />
+                    )}
+
+                    <label className="mt-4 flex items-start gap-3 rounded-2xl border border-amber-100 bg-amber-50 p-3 text-xs font-bold leading-5 text-amber-900">
+                      <input
+                        type="checkbox"
+                        checked={showFreeLimitNote}
+                        onChange={(event) =>
+                          setShowFreeLimitNote(event.target.checked)
+                        }
+                        className="mt-1"
+                      />
+                      Free export note / watermark placeholder. Later this will
+                      be controlled by login and subscription.
+                    </label>
+
+                    <button
+                      onClick={exportPdf}
+                      className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-4 text-sm font-black text-white shadow-lg shadow-emerald-100 transition hover:bg-emerald-700"
+                    >
+                      <Download size={18} />
+                      Export PDF
+                    </button>
+                  </div>
+
+                  <div className="mt-4 rounded-3xl border border-indigo-100 bg-indigo-50 p-4 text-sm font-semibold leading-6 text-indigo-800">
+                    <div className="mb-2 flex items-center gap-2 font-black">
+                      <Lock size={16} />
+                      Premium OCR
+                    </div>
+                    OCR text rewrite will be available for premium users. This
+                    will require backend/OCR processing later.
+                  </div>
+                </aside>
+=======
                   >
                     {busy && <div className="absolute inset-0 z-50 flex items-center justify-center rounded-xl bg-white/75 backdrop-blur-sm"><div className="flex items-center gap-2 rounded-2xl bg-white px-5 py-4 font-bold shadow-xl"><Loader2 className="animate-spin text-indigo-600" size={20} /> Processing</div></div>}
                     {!fileName && <div className="flex min-h-[440px] items-center justify-center p-6 text-center sm:min-h-[540px] sm:p-10"><div><div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-3xl bg-indigo-50 text-indigo-600"><Upload size={26} /></div><div className="font-black text-slate-900">Upload a PDF to preview it here</div><p className="mt-2 text-sm text-slate-500">The page will auto-fit your screen.</p></div></div>}
@@ -1207,6 +1964,7 @@ export default function EditorPage() {
                     {renderTextOverlay()}
                   </div>
                 </section>
+>>>>>>> main
               </div>
             </div>
 
