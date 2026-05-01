@@ -351,9 +351,26 @@ export default function EditorPage() {
     };
   }, [canvasSize.height, canvasSize.width]);
 
+  useEffect(() => {
+    if (activeTool !== "highlight") return;
+
+    function handleGlobalMouseUp() {
+      window.setTimeout(() => {
+        createHighlightFromSelection();
+      }, 0);
+    }
+
+    document.addEventListener("mouseup", handleGlobalMouseUp);
+
+    return () => {
+      document.removeEventListener("mouseup", handleGlobalMouseUp);
+    };
+  }, [activeTool, currentPage, textOverlay]);
+  
+  
   const currentPageLayers = useMemo(() => layers.filter((layer) => layer.page === currentPage), [currentPage, layers]);
   const selectedLayer = useMemo(() => layers.find((layer) => layer.id === selectedLayerId), [layers, selectedLayerId]);
-  const showTextOverlay = activeTool === "edit";
+  const showTextOverlay = activeTool === "highlight" || activeTool === "edit";
 
   function updateLayer(id: string, updates: Partial<PdfLayer>) {
     setLayers((prev) => prev.map((layer) => (layer.id === id ? { ...layer, ...updates } : layer)));
@@ -1202,7 +1219,6 @@ export default function EditorPage() {
     return (
       <div
         className="absolute inset-0 z-40"
-        onMouseUp={createHighlightFromSelection}
         style={{
           pointerEvents:
             activeTool === "highlight" || activeTool === "edit" ? "auto" : "none",
