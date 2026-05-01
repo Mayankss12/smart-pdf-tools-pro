@@ -1,4 +1,10 @@
-export type ActiveTool = "select" | "edit" | "text" | "highlight";
+export type ActiveTool =
+  | "none"
+  | "select"
+  | "object"
+  | "edit"
+  | "text"
+  | "highlight";
 
 export type EditorTool = ActiveTool;
 
