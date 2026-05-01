@@ -1,70 +1,92 @@
 "use client";
 
-import type { LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
+
+type EditorIconButtonTone =
+  | "default"
+  | "indigo"
+  | "amber"
+  | "sky"
+  | "violet"
+  | "red"
+  | "emerald";
 
 type EditorIconButtonProps = {
   label: string;
   description?: string;
-  icon: LucideIcon;
   active?: boolean;
   disabled?: boolean;
-  tone?: "default" | "primary" | "warning" | "danger" | "success";
+  tone?: EditorIconButtonTone;
   onClick: () => void;
+  children: ReactNode;
 };
 
-const toneStyles = {
+const toneClasses: Record<
+  EditorIconButtonTone,
+  {
+    idle: string;
+    active: string;
+  }
+> = {
   default: {
-    idle: "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50",
-    active: "border-slate-900 bg-slate-950 text-white shadow-lg shadow-slate-200",
+    idle: "border-slate-200 bg-white text-slate-700 hover:bg-slate-100",
+    active: "border-slate-800 bg-slate-900 text-white shadow-slate-200",
   },
-  primary: {
-    idle: "border-indigo-100 bg-indigo-50 text-indigo-700 hover:border-indigo-200 hover:bg-indigo-100",
-    active: "border-indigo-600 bg-indigo-600 text-white shadow-lg shadow-indigo-100",
+  indigo: {
+    idle: "border-indigo-100 bg-indigo-50 text-indigo-700 hover:bg-indigo-100",
+    active: "border-indigo-500 bg-indigo-700 text-white shadow-indigo-100",
   },
-  warning: {
-    idle: "border-amber-100 bg-amber-50 text-amber-700 hover:border-amber-200 hover:bg-amber-100",
-    active: "border-amber-500 bg-amber-500 text-slate-950 shadow-lg shadow-amber-100",
+  amber: {
+    idle: "border-amber-100 bg-amber-50 text-amber-700 hover:bg-amber-100",
+    active: "border-amber-400 bg-amber-400 text-slate-950 shadow-amber-100",
   },
-  danger: {
-    idle: "border-red-100 bg-red-50 text-red-700 hover:border-red-200 hover:bg-red-100",
-    active: "border-red-600 bg-red-600 text-white shadow-lg shadow-red-100",
+  sky: {
+    idle: "border-sky-100 bg-sky-50 text-sky-700 hover:bg-sky-100",
+    active: "border-sky-500 bg-sky-600 text-white shadow-sky-100",
   },
-  success: {
-    idle: "border-emerald-100 bg-emerald-50 text-emerald-700 hover:border-emerald-200 hover:bg-emerald-100",
-    active: "border-emerald-600 bg-emerald-600 text-white shadow-lg shadow-emerald-100",
+  violet: {
+    idle: "border-violet-100 bg-violet-50 text-violet-700 hover:bg-violet-100",
+    active: "border-violet-500 bg-violet-700 text-white shadow-violet-100",
+  },
+  red: {
+    idle: "border-red-100 bg-red-50 text-red-700 hover:bg-red-100",
+    active: "border-red-500 bg-red-600 text-white shadow-red-100",
+  },
+  emerald: {
+    idle: "border-emerald-100 bg-emerald-50 text-emerald-700 hover:bg-emerald-100",
+    active: "border-emerald-500 bg-emerald-600 text-white shadow-emerald-100",
   },
 };
 
-export default function EditorIconButton({
+export function EditorIconButton({
   label,
   description,
-  icon: Icon,
   active = false,
   disabled = false,
   tone = "default",
   onClick,
+  children,
 }: EditorIconButtonProps) {
-  const styles = toneStyles[tone];
+  const selectedTone = toneClasses[tone];
+  const visualClass = active ? selectedTone.active : selectedTone.idle;
 
   return (
     <div className="group relative inline-flex">
       <button
         type="button"
         aria-label={label}
-        title={label}
+        title={description || label}
         disabled={disabled}
         onClick={onClick}
-        className={`inline-flex h-12 w-12 items-center justify-center rounded-2xl border text-sm font-black transition ${
-          active ? styles.active : styles.idle
-        } disabled:cursor-not-allowed disabled:opacity-45`}
+        className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl border text-sm font-black shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:shadow-sm ${visualClass}`}
       >
-        <Icon size={20} strokeWidth={2.4} />
+        {children}
       </button>
 
-      <div className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 hidden w-max max-w-[220px] -translate-x-1/2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-left text-xs font-bold text-slate-700 shadow-xl shadow-slate-200 group-hover:block">
-        <div className="text-sm font-black text-slate-950">{label}</div>
+      <div className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 hidden w-max max-w-[220px] -translate-x-1/2 rounded-xl bg-slate-950 px-3 py-2 text-center text-xs font-bold leading-4 text-white shadow-xl group-hover:block">
+        <div>{label}</div>
         {description ? (
-          <div className="mt-0.5 max-w-[190px] text-[11px] font-semibold leading-4 text-slate-500">
+          <div className="mt-1 text-[11px] font-semibold text-slate-300">
             {description}
           </div>
         ) : null}
