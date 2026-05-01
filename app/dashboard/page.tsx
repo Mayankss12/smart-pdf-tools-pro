@@ -1,243 +1,171 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import { createClient } from "@supabase/supabase-js";
+import { Header } from "@/components/Header";
+import {
+  ArrowRight,
+  BadgeCheck,
+  Clock,
+  FileText,
+  Lock,
+  ShieldCheck,
+  Sparkles,
+  UserRound,
+} from "lucide-react";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-const supabase =
-  supabaseUrl && supabaseAnonKey
-    ? createClient(supabaseUrl, supabaseAnonKey)
-    : null;
-
-type PdfTask = {
-  id: string;
-  tool_name: string;
-  input_file_name: string | null;
-  status: string;
-  created_at: string;
-};
-
-function DashboardHeader() {
-  return (
-    <header className="border-b border-slate-200 bg-white">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-        <Link href="/" className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-purple-600 text-xl font-black text-white">
-            PDF
-          </div>
-          <div>
-            <div className="text-xl font-black text-slate-950">PDFMantra</div>
-            <div className="text-sm font-semibold text-slate-500">
-              Smart PDF Workspace
-            </div>
-          </div>
-        </Link>
-
-        <nav className="flex items-center gap-6 text-sm font-bold text-slate-700">
-          <Link href="/#tools" className="hover:text-blue-600">
-            Tools
-          </Link>
-          <Link href="/pricing" className="hover:text-blue-600">
-            Pricing
-          </Link>
-          <Link href="/login" className="hover:text-blue-600">
-            Login
-          </Link>
-        </nav>
-      </div>
-    </header>
-  );
-}
+const dashboardItems = [
+  "Saved documents",
+  "Recent PDF edits",
+  "Saved signatures",
+  "Premium usage limits",
+  "Team workspace",
+  "Billing and subscription",
+];
 
 export default function DashboardPage() {
-  const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [tasks, setTasks] = useState<PdfTask[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [supabaseMissing, setSupabaseMissing] = useState(false);
-
-  useEffect(() => {
-    async function loadDashboard() {
-      if (!supabase) {
-        setSupabaseMissing(true);
-        setLoading(false);
-        return;
-      }
-
-      const { data: userData } = await supabase.auth.getUser();
-      const user = userData.user;
-
-      if (!user) {
-        setLoading(false);
-        return;
-      }
-
-      setUserEmail(user.email || null);
-
-      const { data: taskData, error } = await supabase
-        .from("pdf_tasks")
-        .select("id, tool_name, input_file_name, status, created_at")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(10);
-
-      if (!error) {
-        setTasks(taskData || []);
-      }
-
-      setLoading(false);
-    }
-
-    loadDashboard();
-  }, []);
-
-  async function handleLogout() {
-    if (supabase) {
-      await supabase.auth.signOut();
-    }
-
-    window.location.href = "/";
-  }
-
-  if (loading) {
-    return (
-      <>
-        <DashboardHeader />
-        <main className="mx-auto max-w-7xl px-6 py-14">
-          <h1 className="text-4xl font-black text-slate-950">Dashboard</h1>
-          <p className="mt-3 text-slate-600">Loading your account...</p>
-        </main>
-      </>
-    );
-  }
-
-  if (supabaseMissing) {
-    return (
-      <>
-        <DashboardHeader />
-        <main className="mx-auto max-w-7xl px-6 py-14">
-          <h1 className="text-4xl font-black text-slate-950">Dashboard</h1>
-
-          <div className="mt-8 rounded-2xl border border-amber-200 bg-amber-50 p-6">
-            <h2 className="text-xl font-black text-amber-900">
-              Supabase is not connected
-            </h2>
-            <p className="mt-3 text-amber-800">
-              Add these environment variables in Vercel, then redeploy:
-            </p>
-
-            <div className="mt-4 rounded-xl bg-white p-4 font-mono text-sm text-slate-800">
-              <p>NEXT_PUBLIC_SUPABASE_URL</p>
-              <p>NEXT_PUBLIC_SUPABASE_ANON_KEY</p>
-            </div>
-          </div>
-        </main>
-      </>
-    );
-  }
-
-  if (!userEmail) {
-    return (
-      <>
-        <DashboardHeader />
-        <main className="mx-auto max-w-7xl px-6 py-14">
-          <h1 className="text-4xl font-black text-slate-950">Dashboard</h1>
-          <p className="mt-3 max-w-2xl text-slate-600">
-            Sign in to save your PDF history, usage, and account details.
-          </p>
-
-          <Link
-            href="/login"
-            className="mt-8 inline-flex rounded-xl bg-blue-600 px-6 py-3 font-bold text-white shadow hover:bg-blue-700"
-          >
-            Login / Create Account
-          </Link>
-        </main>
-      </>
-    );
-  }
-
   return (
     <>
-      <DashboardHeader />
-      <main className="mx-auto max-w-7xl px-6 py-14">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-4xl font-black text-slate-950">Dashboard</h1>
-            <p className="mt-3 text-slate-600">Signed in as {userEmail}</p>
-          </div>
+      <Header />
 
-          <button
-            onClick={handleLogout}
-            className="rounded-xl border border-slate-200 px-5 py-3 font-bold text-slate-700 hover:bg-slate-50"
-          >
-            Logout
-          </button>
-        </div>
+      <main className="page-shell">
+        <section className="page-container">
+          <div className="surface overflow-hidden">
+            <section className="relative overflow-hidden border-b border-slate-100 bg-gradient-to-br from-indigo-700 via-violet-700 to-purple-700 px-6 py-14 text-white sm:px-10 lg:px-14">
+              <div className="absolute right-[-140px] top-[-140px] h-80 w-80 rounded-full bg-white/10 blur-3xl" />
+              <div className="absolute bottom-[-160px] left-[-120px] h-96 w-96 rounded-full bg-amber-300/10 blur-3xl" />
 
-        <section className="mt-10 grid gap-5 md:grid-cols-3">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <p className="text-sm font-bold text-slate-500">Plan</p>
-            <h2 className="mt-2 text-2xl font-black text-slate-950">Free</h2>
-          </div>
+              <div className="relative max-w-4xl">
+                <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white ring-1 ring-white/20">
+                  <Sparkles size={14} />
+                  PDFMantra Dashboard
+                </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <p className="text-sm font-bold text-slate-500">Recent Tasks</p>
-            <h2 className="mt-2 text-2xl font-black text-slate-950">
-              {tasks.length}
-            </h2>
-          </div>
+                <h1 className="max-w-3xl text-4xl font-semibold leading-[1.08] tracking-[-0.04em] text-white sm:text-5xl lg:text-[3.4rem]">
+                  Account dashboard will be added after backend setup.
+                </h1>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <p className="text-sm font-bold text-slate-500">Workspace</p>
-            <h2 className="mt-2 text-2xl font-black text-slate-950">
-              PDFMantra
-            </h2>
-          </div>
-        </section>
+                <p className="mt-6 max-w-2xl text-base font-medium leading-8 text-indigo-50/95 sm:text-lg">
+                  Login, saved files, usage limits, billing, and team workspace
+                  features will be connected later with Supabase, storage, and
+                  payment integration.
+                </p>
 
-        <section className="mt-10 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-2xl font-black text-slate-950">
-            Recent PDF Tasks
-          </h2>
+                <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                  <Link href="/editor" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-amber-400 px-6 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-black/10 transition hover:bg-amber-300">
+                    Open PDF Editor
+                    <ArrowRight size={18} />
+                  </Link>
 
-          {tasks.length === 0 ? (
-            <p className="mt-4 text-slate-600">
-              No PDF tasks saved yet. Process a PDF while signed in to see your
-              history here.
-            </p>
-          ) : (
-            <div className="mt-6 overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 text-slate-500">
-                    <th className="py-3 pr-4">Tool</th>
-                    <th className="py-3 pr-4">File</th>
-                    <th className="py-3 pr-4">Status</th>
-                    <th className="py-3 pr-4">Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tasks.map((task) => (
-                    <tr key={task.id} className="border-b border-slate-100">
-                      <td className="py-3 pr-4 font-semibold">
-                        {task.tool_name}
-                      </td>
-                      <td className="py-3 pr-4">
-                        {task.input_file_name || "-"}
-                      </td>
-                      <td className="py-3 pr-4">{task.status}</td>
-                      <td className="py-3 pr-4">
-                        {new Date(task.created_at).toLocaleString()}
-                      </td>
-                    </tr>
+                  <Link href="/pricing" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-white/12 px-6 py-3 text-sm font-semibold text-white ring-1 ring-white/25 transition hover:bg-white/20">
+                    View Pricing
+                  </Link>
+                </div>
+              </div>
+            </section>
+
+            <section className="px-6 py-10 sm:px-10 lg:px-14">
+              <div className="mb-8 grid gap-4 lg:grid-cols-[0.8fr_1fr] lg:items-end">
+                <div>
+                  <div className="section-eyebrow">Coming later</div>
+                  <h2 className="mt-2 section-title">Dashboard roadmap</h2>
+                </div>
+
+                <p className="section-description max-w-2xl lg:justify-self-end">
+                  This page is intentionally a placeholder for now so the product
+                  demo has complete navigation without pretending backend features
+                  already exist.
+                </p>
+              </div>
+
+              <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
+                <div className="premium-card">
+                  <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-700">
+                    <UserRound size={22} />
+                  </div>
+
+                  <h3 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+                    Login not enabled yet
+                  </h3>
+
+                  <p className="mt-3 text-sm font-medium leading-7 text-slate-500">
+                    User accounts should be added after the frontend demo and
+                    backend architecture are finalized. Supabase Auth is the
+                    planned option.
+                  </p>
+
+                  <div className="mt-6 rounded-2xl border border-amber-100 bg-amber-50 p-4">
+                    <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-amber-900">
+                      <Lock size={16} />
+                      Backend phase
+                    </div>
+                    <p className="text-sm font-medium leading-6 text-amber-800">
+                      Auth, database, file storage, and payment gating should be
+                      implemented together to avoid rebuilding access control later.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {dashboardItems.map((item) => (
+                    <div
+                      key={item}
+                      className="rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm"
+                    >
+                      <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-50 text-slate-700">
+                        <Clock size={18} />
+                      </div>
+
+                      <h3 className="text-base font-semibold tracking-[-0.02em] text-slate-950">
+                        {item}
+                      </h3>
+
+                      <p className="mt-2 text-sm font-medium leading-6 text-slate-500">
+                        Planned for backend and account system phase.
+                      </p>
+                    </div>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                </div>
+              </div>
+            </section>
+
+            <section className="border-t border-slate-100 bg-slate-50 px-6 py-10 sm:px-10 lg:px-14">
+              <div className="grid gap-5 lg:grid-cols-3">
+                <div className="premium-card">
+                  <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
+                    <BadgeCheck size={20} />
+                  </div>
+                  <h3 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">
+                    Current focus
+                  </h3>
+                  <p className="mt-2 text-sm font-medium leading-7 text-slate-500">
+                    Browser-side PDF tools and product demo polish.
+                  </p>
+                </div>
+
+                <div className="premium-card">
+                  <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-700">
+                    <ShieldCheck size={20} />
+                  </div>
+                  <h3 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">
+                    Backend later
+                  </h3>
+                  <p className="mt-2 text-sm font-medium leading-7 text-slate-500">
+                    Supabase Auth, database, and protected premium usage.
+                  </p>
+                </div>
+
+                <div className="premium-card">
+                  <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-50 text-amber-700">
+                    <FileText size={20} />
+                  </div>
+                  <h3 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">
+                    File storage later
+                  </h3>
+                  <p className="mt-2 text-sm font-medium leading-7 text-slate-500">
+                    Cloudflare R2 or Supabase Storage for saved documents.
+                  </p>
+                </div>
+              </div>
+            </section>
+          </div>
         </section>
       </main>
     </>
