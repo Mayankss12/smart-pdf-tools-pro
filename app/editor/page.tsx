@@ -272,7 +272,6 @@ export default function EditorPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [canvasSize, setCanvasSize] = useState({ width: 360, height: 520 });
   const [renderScale, setRenderScale] = useState(1);
-  const [baseFitScale, setBaseFitScale] = useState(1);
   const [zoomLevel, setZoomLevel] = useState(1);
 
   const [pageThumbs, setPageThumbs] = useState<PageThumb[]>([]);
@@ -328,7 +327,6 @@ export default function EditorPage() {
         height: viewport.height,
       });
 
-      setBaseFitScale(fitScale);
       setRenderScale(finalScale);
 
       await page.render({
