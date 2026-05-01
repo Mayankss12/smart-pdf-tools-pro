@@ -958,7 +958,7 @@ export default function EditorPage() {
     setOcrText(selectedText);
     setOcrRewriteText(selectedText);
     setSelectedTextRects(rects);
-    setActiveTool("select");
+    setActiveTool("object");
     setStatus("Selected text captured. Edit the replacement text, then click Replace Visually.");
   }
 
@@ -1147,7 +1147,7 @@ export default function EditorPage() {
   }
 
   function renderResizeHandles(layer: PdfLayer) {
-    if (selectedLayerId !== layer.id) return null;
+    if (activeTool !== "object" || selectedLayerId !== layer.id) return null;
     return resizeHandles.map((handle) => (
       <button
         key={handle.id}
