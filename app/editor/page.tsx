@@ -661,7 +661,18 @@ export default function EditorPage() {
   }
 
   function startPageDraw(event: React.PointerEvent<HTMLDivElement>) {
+    if (activeTool === "highlight") {
+      return;
+    }
+
     if (!fileBytesRef.current) return setStatus("Upload a PDF first.");
+  
+    if (activeTool !== "text") {
+      if (activeTool === "edit") setSelectedLayerId(null);
+      return;
+    }
+
+    const target = event.target as HTMLElement;
 
     const target = event.target as HTMLElement;
     if (
@@ -1194,7 +1205,6 @@ export default function EditorPage() {
       <div
         className="absolute inset-0 z-40"
         onMouseUp={createHighlightFromSelection}
-        onPointerUp={createHighlightFromSelection}
         style={{
           pointerEvents:
             activeTool === "highlight" || activeTool === "edit" ? "auto" : "none",
@@ -1233,6 +1243,8 @@ export default function EditorPage() {
                 caretColor: "transparent",
                 cursor: activeTool === "highlight" ? "text" : "pointer",
                 userSelect: activeTool === "highlight" ? "text" : "none",
+                pointerEvents:
+                  activeTool === "highlight" || activeTool === "edit" ? "auto" : "none",
               }}
               title={activeTool === "edit" ? `Edit: ${item.text}` : item.text}
             >
