@@ -1,6 +1,18 @@
 "use client";
 
-import { Copy, Download, FileImage, Highlighter, Image as ImageIcon, Layers, MousePointer2, PenLine, RotateCcw, Trash2 } from "lucide-react";
+import {
+  Copy,
+  Download,
+  FileImage,
+  Highlighter,
+  Image as ImageIcon,
+  Layers,
+  MousePointer2,
+  PenLine,
+  RotateCcw,
+  Trash2,
+  Type,
+} from "lucide-react";
 import type { ActiveTool } from "@/lib/editor/types";
 import { EditorIconButton } from "./EditorIconButton";
 
@@ -19,27 +31,138 @@ type EditorToolbarProps = {
 };
 
 export function EditorToolbar(props: EditorToolbarProps) {
-  const { activeTool, hasSelectedLayer, onSelectTool, onImageClick, onSignatureClick, onSignatureImageClick, onDelete, onDuplicate, onClearPage, onReset, onExport } = props;
+  const {
+    activeTool,
+    hasSelectedLayer,
+    onSelectTool,
+    onImageClick,
+    onSignatureClick,
+    onSignatureImageClick,
+    onDelete,
+    onDuplicate,
+    onClearPage,
+    onReset,
+    onExport,
+  } = props;
+
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white p-3">
+    <div className="flex flex-wrap items-center gap-2">
       <div className="flex items-center gap-2 rounded-3xl border border-slate-100 bg-slate-50 p-1">
-        <EditorIconButton label="Edit" description="Hover text and click to edit visually." active={activeTool === "edit"} onClick={() => onSelectTool("edit")}><MousePointer2 size={17} /></EditorIconButton>
-        <EditorIconButton label="Text" description="Drag on the page to draw a text box." active={activeTool === "text"} tone="indigo" onClick={() => onSelectTool("text")}><span className="text-base font-black">T</span></EditorIconButton>
-        <EditorIconButton label="Highlight" description="Select PDF text to highlight like a marker." active={activeTool === "highlight"} tone="amber" onClick={() => onSelectTool("highlight")}><Highlighter size={17} /></EditorIconButton>
+        <EditorIconButton
+          label="Select"
+          description="Select, move, resize, duplicate, or delete layers."
+          active={activeTool === "select"}
+          onClick={() => onSelectTool("select")}
+        >
+          <MousePointer2 size={17} />
+        </EditorIconButton>
+
+        <EditorIconButton
+          label="Edit text"
+          description="Click real PDF text to create an editable replacement layer."
+          active={activeTool === "edit"}
+          tone="indigo"
+          onClick={() => onSelectTool("edit")}
+        >
+          <Type size={17} />
+        </EditorIconButton>
+
+        <EditorIconButton
+          label="Text"
+          description="Drag on the page to draw a text box."
+          active={activeTool === "text"}
+          tone="indigo"
+          onClick={() => onSelectTool("text")}
+        >
+          <span className="text-base font-black">T</span>
+        </EditorIconButton>
+
+        <EditorIconButton
+          label="Highlight"
+          description="Select real PDF text to highlight like a marker."
+          active={activeTool === "highlight"}
+          tone="amber"
+          onClick={() => onSelectTool("highlight")}
+        >
+          <Highlighter size={17} />
+        </EditorIconButton>
       </div>
+
       <div className="flex items-center gap-2 rounded-3xl border border-slate-100 bg-slate-50 p-1">
-        <EditorIconButton label="Image" description="Insert an image." tone="sky" onClick={onImageClick}><ImageIcon size={17} /></EditorIconButton>
-        <EditorIconButton label="Sign" description="Add typed signature." tone="violet" onClick={onSignatureClick}><PenLine size={17} /></EditorIconButton>
-        <EditorIconButton label="Sign image" description="Upload signature image." tone="violet" onClick={onSignatureImageClick}><FileImage size={17} /></EditorIconButton>
+        <EditorIconButton
+          label="Image"
+          description="Insert an image layer."
+          tone="sky"
+          onClick={onImageClick}
+        >
+          <ImageIcon size={17} />
+        </EditorIconButton>
+
+        <EditorIconButton
+          label="Sign"
+          description="Add a typed signature layer."
+          tone="violet"
+          onClick={onSignatureClick}
+        >
+          <PenLine size={17} />
+        </EditorIconButton>
+
+        <EditorIconButton
+          label="Sign image"
+          description="Upload a signature image layer."
+          tone="violet"
+          onClick={onSignatureImageClick}
+        >
+          <FileImage size={17} />
+        </EditorIconButton>
       </div>
+
       <div className="flex items-center gap-2 rounded-3xl border border-slate-100 bg-slate-50 p-1">
-        <EditorIconButton label="Duplicate" description="Duplicate selected layer." disabled={!hasSelectedLayer} onClick={onDuplicate}><Copy size={17} /></EditorIconButton>
-        <EditorIconButton label="Delete" description="Delete selected layer." disabled={!hasSelectedLayer} tone="red" onClick={onDelete}><Trash2 size={17} /></EditorIconButton>
-        <EditorIconButton label="Clear page" description="Clear current page." onClick={onClearPage}><Layers size={17} /></EditorIconButton>
-        <EditorIconButton label="Reset" description="Clear all layers." onClick={onReset}><RotateCcw size={17} /></EditorIconButton>
+        <EditorIconButton
+          label="Duplicate"
+          description="Duplicate selected layer."
+          disabled={!hasSelectedLayer}
+          onClick={onDuplicate}
+        >
+          <Copy size={17} />
+        </EditorIconButton>
+
+        <EditorIconButton
+          label="Delete"
+          description="Delete selected layer."
+          disabled={!hasSelectedLayer}
+          tone="red"
+          onClick={onDelete}
+        >
+          <Trash2 size={17} />
+        </EditorIconButton>
+
+        <EditorIconButton
+          label="Clear page"
+          description="Clear all layers on the current page."
+          onClick={onClearPage}
+        >
+          <Layers size={17} />
+        </EditorIconButton>
+
+        <EditorIconButton
+          label="Reset"
+          description="Clear all editor layers."
+          onClick={onReset}
+        >
+          <RotateCcw size={17} />
+        </EditorIconButton>
       </div>
+
       <div className="ml-auto">
-        <EditorIconButton label="Export" description="Download edited PDF." tone="emerald" onClick={onExport}><Download size={17} /></EditorIconButton>
+        <EditorIconButton
+          label="Export"
+          description="Download edited PDF."
+          tone="emerald"
+          onClick={onExport}
+        >
+          <Download size={17} />
+        </EditorIconButton>
       </div>
     </div>
   );
