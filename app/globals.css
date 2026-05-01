@@ -2,20 +2,144 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --muted: #64748b;
+  --border: #e2e8f0;
+  --brand: #4f46e5;
+  --brand-dark: #4338ca;
+  --brand-soft: #eef2ff;
+  --accent: #f59e0b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  text-rendering: optimizeLegibility;
+}
+
 body {
-  background: #f8fafc;
-  color: #0f172a;
-  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(79, 70, 229, 0.08), transparent 32rem),
+    radial-gradient(circle at top right, rgba(245, 158, 11, 0.08), transparent 28rem),
+    var(--background);
+  color: var(--foreground);
+  font-family:
+    var(--font-inter),
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-.btn-primary {
-  @apply inline-flex items-center justify-center rounded-xl bg-brand-600 px-5 py-3 font-semibold text-white shadow-sm transition hover:bg-brand-700;
+::selection {
+  background: rgba(79, 70, 229, 0.18);
+  color: #111827;
 }
 
-.btn-secondary {
-  @apply inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-3 font-semibold text-slate-800 transition hover:bg-slate-50;
+button,
+input,
+textarea,
+select {
+  font: inherit;
 }
 
-.tool-card {
-  @apply rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md;
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+@layer base {
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.035em;
+  }
+
+  h1 {
+    @apply font-semibold;
+  }
+
+  h2,
+  h3 {
+    @apply font-semibold;
+  }
+
+  p {
+    @apply text-slate-600;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-sm shadow-indigo-200 transition duration-200 hover:-translate-y-0.5 hover:bg-indigo-700 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0;
+  }
+
+  .btn-secondary {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-800 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0;
+  }
+
+  .btn-soft {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-indigo-50 px-5 py-3 text-sm font-semibold text-indigo-700 transition duration-200 hover:bg-indigo-100 focus:outline-none focus:ring-4 focus:ring-indigo-100;
+  }
+
+  .page-shell {
+    @apply min-h-screen bg-slate-50 text-slate-950;
+  }
+
+  .page-container {
+    @apply mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8;
+  }
+
+  .surface {
+    @apply rounded-[2rem] border border-slate-200 bg-white shadow-sm;
+  }
+
+  .surface-soft {
+    @apply rounded-[2rem] border border-slate-200 bg-white/90 shadow-sm backdrop-blur;
+  }
+
+  .section-eyebrow {
+    @apply text-sm font-semibold uppercase tracking-wide text-indigo-600;
+  }
+
+  .section-title {
+    @apply text-3xl font-semibold tracking-[-0.035em] text-slate-950 sm:text-4xl;
+  }
+
+  .section-description {
+    @apply text-sm font-medium leading-7 text-slate-500 sm:text-base;
+  }
+
+  .tool-card {
+    @apply rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm transition duration-200 hover:-translate-y-1 hover:border-indigo-200 hover:shadow-lg;
+  }
+
+  .premium-card {
+    @apply rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm;
+  }
+
+  .status-live {
+    @apply rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700;
+  }
+
+  .status-soon {
+    @apply rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600;
+  }
+
+  .input-premium {
+    @apply w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 disabled:bg-slate-100 disabled:text-slate-400;
+  }
 }
