@@ -22,7 +22,6 @@ import {
   Trash2,
   Type,
   Upload,
-  Wand2,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
@@ -48,6 +47,8 @@ type PdfLayer = {
   imageUrl?: string;
   imageBytes?: Uint8Array;
   imageKind?: "png" | "jpg";
+  coverOriginal?: boolean;
+  coverColor?: "white";
 };
 
 type PageThumb = {
@@ -78,6 +79,17 @@ type ResizeHandle =
   | "left";
 
 type ExportMode = "full" | "current" | "range";
+type ActiveTool = "select" | "text" | "highlight";
+type PageTextItem = {
+  id: string;
+  page: number;
+  text: string;
+  xPercent: number;
+  yPercent: number;
+  widthPercent: number;
+  heightPercent: number;
+  fontSize: number;
+};
 
 const resizeHandles: { id: ResizeHandle; className: string; cursor: string }[] =
   [
@@ -281,6 +293,10 @@ export default function EditorPage() {
   const [exportMode, setExportMode] = useState<ExportMode>("full");
   const [exportRange, setExportRange] = useState("1-3");
   const [showFreeLimitNote, setShowFreeLimitNote] = useState(true);
+  const [activeTool, setActiveTool] = useState<ActiveTool>("select");
+  const [pageTextItems, setPageTextItems] = useState<PageTextItem[]>([]);
+  const [hoveredTextItemId, setHoveredTextItemId] = useState<string | null>(null);
+  const highlightDragRef = useRef<{ startX: number; startY: number; endX: number; endY: number } | null>(null);
 
   useEffect(() => {
     pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
@@ -316,6 +332,27 @@ export default function EditorPage() {
         canvasContext: context,
         viewport,
       }).promise;
+
+      const textContent = await page.getTextContent();
+      const items: PageTextItem[] = textContent.items
+        .map((item, index) => {
+          const textItem = item as { str: string; transform: number[]; width: number; height: number };
+          const tx = pdfjsLib.Util.transform(viewport.transform, textItem.transform);
+          const left = tx[4];
+          const top = tx[5] - textItem.height;
+          return {
+            id: `${pageNumber}-${index}`,
+            page: pageNumber,
+            text: textItem.str,
+            xPercent: clamp((left / viewport.width) * 100, 0, 100),
+            yPercent: clamp((top / viewport.height) * 100, 0, 100),
+            widthPercent: clamp(((textItem.width * viewerScale) / viewport.width) * 100, 0.2, 100),
+            heightPercent: clamp((textItem.height / viewport.height) * 100, 0.2, 100),
+            fontSize: Math.max(8, textItem.height),
+          };
+        })
+        .filter((it) => it.text.trim().length > 0);
+      setPageTextItems(items);
     },
     [viewerScale]
   );
@@ -325,7 +362,7 @@ export default function EditorPage() {
   }, [currentPage, renderPage]);
 
   useEffect(() => {
-    function handleMouseMove(event: MouseEvent) {
+    function handlePointerMove(event: PointerEvent) {
       const drag = dragStateRef.current;
       if (!drag) return;
 
@@ -416,16 +453,20 @@ export default function EditorPage() {
       );
     }
 
-    function handleMouseUp() {
+    function handlePointerUp() {
       dragStateRef.current = null;
+      document.body.style.touchAction = "";
+      document.body.style.overscrollBehavior = "";
     }
 
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
+    window.addEventListener("pointermove", handlePointerMove, { passive: false });
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerUp);
 
     return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerUp);
     };
   }, [canvasSize.height, canvasSize.width]);
 
@@ -521,7 +562,7 @@ export default function EditorPage() {
     }
   }
 
-  function addTextLayer() {
+  function createTextLayer() {
     if (!fileBytesRef.current) {
       setStatus("Upload a PDF first.");
       return;
@@ -546,26 +587,9 @@ export default function EditorPage() {
     setStatus("Text layer added. Type directly, drag, or resize.");
   }
 
-  function addHighlightLayer() {
-    if (!fileBytesRef.current) {
-      setStatus("Upload a PDF first.");
-      return;
-    }
-
-    const newLayer: PdfLayer = {
-      id: crypto.randomUUID(),
-      page: currentPage,
-      type: "highlight",
-      xPercent: 12,
-      yPercent: 26,
-      widthPercent: 36,
-      heightPercent: 4,
-      opacity: 0.42,
-    };
-
-    setLayers((prev) => [...prev, newLayer]);
-    setSelectedLayerId(newLayer.id);
-    setStatus("Highlight layer added. Drag or resize it.");
+  function enableHighlightMode() {
+    setActiveTool("highlight");
+    setStatus("Highlight mode active. Drag over PDF text to highlight.");
   }
 
   async function addImageLayer(file?: File) {
@@ -738,11 +762,14 @@ export default function EditorPage() {
   }
 
   function startMove(
-    event: React.MouseEvent<HTMLDivElement | HTMLButtonElement>,
+    event: React.PointerEvent<HTMLDivElement | HTMLButtonElement>,
     layer: PdfLayer
   ) {
     event.preventDefault();
     event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    document.body.style.touchAction = "none";
+    document.body.style.overscrollBehavior = "none";
 
     setSelectedLayerId(layer.id);
 
@@ -759,12 +786,15 @@ export default function EditorPage() {
   }
 
   function startResize(
-    event: React.MouseEvent<HTMLButtonElement>,
+    event: React.PointerEvent<HTMLButtonElement>,
     layer: PdfLayer,
     handle: ResizeHandle
   ) {
     event.preventDefault();
     event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    document.body.style.touchAction = "none";
+    document.body.style.overscrollBehavior = "none";
 
     setSelectedLayerId(layer.id);
 
@@ -848,6 +878,16 @@ export default function EditorPage() {
     }
 
     if (layer.type === "text" || layer.type === "signature") {
+      if (layer.coverOriginal) {
+        page.drawRectangle({
+          x: pdfX,
+          y: pdfY,
+          width: boxWidth,
+          height: boxHeight,
+          color: rgb(1, 1, 1),
+          opacity: 1,
+        });
+      }
       const fontSize = clamp(layer.fontSize || 16, 8, 96);
       const font = await pdfDoc.embedFont(
         layer.isBold
@@ -951,8 +991,8 @@ export default function EditorPage() {
     return resizeHandles.map((handle) => (
       <button
         key={handle.id}
-        onMouseDown={(event) => startResize(event, layer, handle.id)}
-        className={`absolute z-30 h-3.5 w-3.5 rounded-full border-2 border-white bg-indigo-500 shadow-sm transition hover:scale-110 ${handle.className}`}
+        onPointerDown={(event) => startResize(event, layer, handle.id)}
+        className={`absolute z-30 h-4.5 w-4.5 md:h-3.5 md:w-3.5 rounded-full border-2 border-white bg-indigo-500 shadow-sm transition hover:scale-110 ${handle.className}`}
         style={{ cursor: handle.cursor }}
         title={`Resize ${handle.id}`}
       />
@@ -973,7 +1013,7 @@ export default function EditorPage() {
       return (
         <div
           key={layer.id}
-          onMouseDown={(event) => startMove(event, layer)}
+          onPointerDown={(event) => startMove(event, layer)}
           onClick={(event) => {
             event.stopPropagation();
             setSelectedLayerId(layer.id);
@@ -998,7 +1038,7 @@ export default function EditorPage() {
       return (
         <div
           key={layer.id}
-          onMouseDown={(event) => startMove(event, layer)}
+          onPointerDown={(event) => startMove(event, layer)}
           onClick={(event) => {
             event.stopPropagation();
             setSelectedLayerId(layer.id);
@@ -1031,7 +1071,7 @@ export default function EditorPage() {
       return (
         <div
           key={layer.id}
-          onMouseDown={(event) => startMove(event, layer)}
+          onPointerDown={(event) => startMove(event, layer)}
           onClick={(event) => {
             event.stopPropagation();
             setSelectedLayerId(layer.id);
@@ -1070,7 +1110,7 @@ export default function EditorPage() {
       >
         <textarea
           value={layer.text || ""}
-          onMouseDown={(event) => event.stopPropagation()}
+          onPointerDown={(event) => event.stopPropagation()}
           onClick={(event) => {
             event.stopPropagation();
             setSelectedLayerId(layer.id);
@@ -1080,20 +1120,21 @@ export default function EditorPage() {
               text: event.target.value,
             })
           }
-          className="h-full w-full resize-none rounded-md bg-transparent px-2 py-1 font-semibold outline-none"
+          className="h-full w-full resize-none rounded-md px-2 py-1 font-semibold outline-none"
           style={{
             fontSize: layer.fontSize || 16,
             lineHeight: 1.2,
             fontWeight: layer.isBold ? 800 : 600,
             fontStyle: layer.isItalic ? "italic" : "normal",
             letterSpacing: "-0.01em",
+            backgroundColor: layer.coverOriginal ? "rgba(255,255,255,0.96)" : "transparent",
           }}
         />
 
         {isSelected && (
           <div
-            onMouseDown={(event) => startMove(event, layer)}
-            className="absolute left-2 right-2 top-1 h-1.5 cursor-move rounded-full bg-indigo-500/25 transition hover:bg-indigo-500/40"
+            onPointerDown={(event) => startMove(event, layer)}
+            className="absolute inset-x-2 top-1 h-1.5 cursor-move rounded-full bg-indigo-500/25 transition hover:bg-indigo-500/40"
             title="Drag layer"
           />
         )}
@@ -1101,6 +1142,10 @@ export default function EditorPage() {
         {renderResizeHandles(layer)}
       </div>
     );
+  }
+
+  function rectanglesIntersect(a: {x:number;y:number;width:number;height:number}, b: {x:number;y:number;width:number;height:number}) {
+    return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
   }
 
   return (
@@ -1192,9 +1237,22 @@ export default function EditorPage() {
             </div>
 
             <div className="mx-5 mb-5 overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white shadow-sm">
-              <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white p-3">
+              <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white p-3 [&>button]:min-h-10">
                 <button
-                  onClick={addTextLayer}
+                  onClick={() => {
+                    setActiveTool("select");
+                    setStatus("Edit mode active. Select an object or use future text edit zones.");
+                  }}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 transition hover:bg-slate-50"
+                >
+                  <MousePointer2 size={16} />
+                  Edit
+                </button>
+                <button
+                  onClick={() => {
+                    setActiveTool("text");
+                    createTextLayer();
+                  }}
                   className="inline-flex items-center gap-2 rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-2.5 text-sm font-black text-indigo-700 transition hover:bg-indigo-100"
                 >
                   <Type size={16} />
@@ -1202,7 +1260,7 @@ export default function EditorPage() {
                 </button>
 
                 <button
-                  onClick={addHighlightLayer}
+                  onClick={enableHighlightMode}
                   className="inline-flex items-center gap-2 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-2.5 text-sm font-black text-amber-700 transition hover:bg-amber-100"
                 >
                   <Highlighter size={16} />
@@ -1233,21 +1291,7 @@ export default function EditorPage() {
                   Image Sign
                 </button>
 
-                <button
-                  onClick={duplicateSelectedLayer}
-                  className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-black text-slate-700 transition hover:bg-slate-100"
-                >
-                  <Copy size={16} />
-                  Duplicate
-                </button>
 
-                <button
-                  onClick={deleteSelectedLayer}
-                  className="inline-flex items-center gap-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-2.5 text-sm font-black text-red-700 transition hover:bg-red-100"
-                >
-                  <Trash2 size={16} />
-                  Delete
-                </button>
 
                 <button
                   onClick={resetEditor}
@@ -1265,6 +1309,101 @@ export default function EditorPage() {
                   Export
                 </button>
 
+
+
+                {selectedLayer && (
+                  <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-indigo-100 bg-indigo-50/70 px-2 py-1">
+                    {(selectedLayer.type === "text" ||
+                      (selectedLayer.type === "signature" && !selectedLayer.imageUrl)) && (
+                      <>
+                        <button
+                          onClick={() =>
+                            updateLayer(selectedLayer.id, {
+                              isBold: !selectedLayer.isBold,
+                            })
+                          }
+                          className={`inline-flex items-center gap-1 rounded-xl border px-3 py-2 text-xs font-black ${
+                            selectedLayer.isBold
+                              ? "border-indigo-200 bg-indigo-700 text-white"
+                              : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                          }`}
+                        >
+                          <Bold size={14} />
+                          B
+                        </button>
+                        <button
+                          onClick={() =>
+                            updateLayer(selectedLayer.id, {
+                              isItalic: !selectedLayer.isItalic,
+                            })
+                          }
+                          className={`inline-flex items-center gap-1 rounded-xl border px-3 py-2 text-xs font-black ${
+                            selectedLayer.isItalic
+                              ? "border-indigo-200 bg-indigo-700 text-white"
+                              : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                          }`}
+                        >
+                          <Italic size={14} />
+                          I
+                        </button>
+                        <button
+                          onClick={() =>
+                            updateLayer(selectedLayer.id, {
+                              fontSize: Math.max(8, (selectedLayer.fontSize || 16) - 1),
+                            })
+                          }
+                          className="rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-black text-slate-700 hover:bg-slate-50"
+                        >
+                          A-
+                        </button>
+                        <span className="rounded-xl bg-white px-2 py-1 text-xs font-black text-slate-700">
+                          {selectedLayer.fontSize || 16}px
+                        </span>
+                        <button
+                          onClick={() =>
+                            updateLayer(selectedLayer.id, {
+                              fontSize: Math.min(72, (selectedLayer.fontSize || 16) + 1),
+                            })
+                          }
+                          className="rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-black text-slate-700 hover:bg-slate-50"
+                        >
+                          A+
+                        </button>
+                      </>
+                    )}
+
+                    {selectedLayer.type === "highlight" && (
+                      <select
+                        value={selectedLayer.opacity ?? 0.42}
+                        onChange={(event) =>
+                          updateLayer(selectedLayer.id, {
+                            opacity: Number(event.target.value),
+                          })
+                        }
+                        className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-black text-slate-700"
+                      >
+                        {[0.2,0.3,0.42,0.55,0.7].map((v) => (
+                          <option key={v} value={v}>{Math.round(v*100)}%</option>
+                        ))}
+                      </select>
+                    )}
+
+                    <button
+                      onClick={duplicateSelectedLayer}
+                      className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50"
+                    >
+                      <Copy size={14} />
+                      Duplicate
+                    </button>
+                    <button
+                      onClick={deleteSelectedLayer}
+                      className="inline-flex items-center gap-1 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-black text-red-700 hover:bg-red-100"
+                    >
+                      <Trash2 size={14} />
+                      Delete
+                    </button>
+                  </div>
+                )}
                 <div className="ml-auto flex items-center gap-2">
                   <button
                     onClick={zoomOut}
@@ -1288,19 +1427,39 @@ export default function EditorPage() {
                 </div>
               </div>
 
-              <div className="grid min-h-[720px] lg:grid-cols-[190px_1fr_360px]">
-                <aside className="border-r border-slate-200 bg-slate-50/80 p-4">
+              <div className="grid min-h-[720px] grid-cols-1 lg:grid-cols-[190px_1fr_360px]">
+                <aside className="order-2 border-t border-slate-200 bg-slate-50/80 p-3 lg:order-none lg:border-r lg:border-t-0 lg:p-4">
                   <div className="mb-3 flex items-center gap-2 text-sm font-black text-slate-950">
                     <FileText size={16} />
                     Pages
                   </div>
+
+                  {numPages > 0 && (
+                    <label className="mb-3 block lg:hidden">
+                      <span className="mb-1 block text-xs font-black text-slate-600">Jump to page</span>
+                      <select
+                        value={currentPage}
+                        onChange={(event) => {
+                          setCurrentPage(Number(event.target.value));
+                          setSelectedLayerId(null);
+                        }}
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700"
+                      >
+                        {Array.from({ length: numPages }).map((_, index) => (
+                          <option key={index + 1} value={index + 1}>
+                            Page {index + 1}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
 
                   {numPages === 0 ? (
                     <p className="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-sm text-slate-500">
                       No PDF uploaded.
                     </p>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="flex gap-2 overflow-x-auto pb-1 lg:block lg:space-y-3">
                       {Array.from({ length: numPages }).map((_, index) => {
                         const pageNumber = index + 1;
                         const thumb = pageThumbs.find(
@@ -1317,7 +1476,7 @@ export default function EditorPage() {
                               setCurrentPage(pageNumber);
                               setSelectedLayerId(null);
                             }}
-                            className={`block w-full overflow-hidden rounded-2xl border bg-white text-left shadow-sm transition ${
+                            className={`block min-w-[132px] overflow-hidden rounded-2xl border bg-white text-left shadow-sm transition lg:w-full ${
                               currentPage === pageNumber
                                 ? "border-indigo-600 ring-4 ring-indigo-100"
                                 : "border-slate-200 hover:border-indigo-200"
@@ -1352,14 +1511,101 @@ export default function EditorPage() {
                   )}
                 </aside>
 
-                <section className="flex items-start justify-center overflow-auto bg-[radial-gradient(circle_at_top,_#ddd6fe,_#f8fafc_42%,_#e2e8f0)] p-6">
+                <section className="order-1 flex items-start justify-start overflow-x-auto overflow-y-auto bg-[radial-gradient(circle_at_top,_#ddd6fe,_#f8fafc_42%,_#e2e8f0)] p-3 sm:p-4 lg:order-none lg:justify-center lg:p-6">
                   <div
                     className="relative rounded-xl bg-white shadow-2xl shadow-slate-500/20 ring-1 ring-slate-200"
                     style={{
                       width: canvasSize.width,
                       minHeight: canvasSize.height,
                     }}
-                    onClick={() => setSelectedLayerId(null)}
+                    onClick={() => {
+                      if (activeTool === "select" && hoveredTextItemId) {
+                        const item = pageTextItems.find((x) => x.id === hoveredTextItemId);
+                        if (item) {
+                          const newLayer: PdfLayer = {
+                            id: crypto.randomUUID(),
+                            page: currentPage,
+                            type: "text",
+                            xPercent: item.xPercent,
+                            yPercent: item.yPercent,
+                            widthPercent: Math.max(item.widthPercent, 4),
+                            heightPercent: Math.max(item.heightPercent, 2.5),
+                            text: item.text,
+                            fontSize: item.fontSize,
+                            isBold: false,
+                            isItalic: false,
+                            coverOriginal: true,
+                            coverColor: "white",
+                          };
+                          setLayers((prev) => [...prev, newLayer]);
+                          setSelectedLayerId(newLayer.id);
+                          setStatus("Edit layer created inline from PDF text.");
+                        }
+                      } else {
+                        setSelectedLayerId(null);
+                      }
+                    }}
+                    onPointerDown={(event) => {
+                      if (activeTool !== "highlight") return;
+                      const rect = event.currentTarget.getBoundingClientRect();
+                      highlightDragRef.current = {
+                        startX: event.clientX - rect.left,
+                        startY: event.clientY - rect.top,
+                        endX: event.clientX - rect.left,
+                        endY: event.clientY - rect.top,
+                      };
+                    }}
+                    onPointerMove={(event) => {
+                      const rect = event.currentTarget.getBoundingClientRect();
+                      if (activeTool === "highlight" && highlightDragRef.current) {
+                        highlightDragRef.current.endX = event.clientX - rect.left;
+                        highlightDragRef.current.endY = event.clientY - rect.top;
+                      }
+                      if (activeTool === "select") {
+                        const xPercent = ((event.clientX - rect.left) / rect.width) * 100;
+                        const yPercent = ((event.clientY - rect.top) / rect.height) * 100;
+                        const hit = pageTextItems.find((item) =>
+                          xPercent >= item.xPercent &&
+                          xPercent <= item.xPercent + item.widthPercent &&
+                          yPercent >= item.yPercent &&
+                          yPercent <= item.yPercent + item.heightPercent
+                        );
+                        setHoveredTextItemId(hit?.id || null);
+                      }
+                    }}
+                    onPointerUp={() => {
+                      if (activeTool === "highlight" && highlightDragRef.current) {
+                        const drag = highlightDragRef.current;
+                        highlightDragRef.current = null;
+                        const dragRect = {
+                          x: (Math.min(drag.startX, drag.endX) / canvasSize.width) * 100,
+                          y: (Math.min(drag.startY, drag.endY) / canvasSize.height) * 100,
+                          width: (Math.abs(drag.endX - drag.startX) / canvasSize.width) * 100,
+                          height: (Math.abs(drag.endY - drag.startY) / canvasSize.height) * 100,
+                        };
+                        const hits = pageTextItems.filter((item) =>
+                          rectanglesIntersect(
+                            dragRect,
+                            { x: item.xPercent, y: item.yPercent, width: item.widthPercent, height: item.heightPercent }
+                          )
+                        );
+                        if (!hits.length) {
+                          setStatus("No selectable text found in this area. OCR highlight will require premium/backend OCR later.");
+                          return;
+                        }
+                        const newLayers = hits.map((item) => ({
+                          id: crypto.randomUUID(),
+                          page: currentPage,
+                          type: "highlight" as const,
+                          xPercent: item.xPercent,
+                          yPercent: item.yPercent,
+                          widthPercent: item.widthPercent,
+                          heightPercent: item.heightPercent,
+                          opacity: 0.42,
+                        }));
+                        setLayers((prev) => [...prev, ...newLayers]);
+                      }
+                    }}
                   >
                     {busy && (
                       <div className="absolute inset-0 z-40 flex items-center justify-center rounded-xl bg-white/75 backdrop-blur-sm">
@@ -1394,11 +1640,23 @@ export default function EditorPage() {
                       className={fileName ? "block" : "hidden"}
                     />
 
+                    {activeTool === "select" && hoveredTextItemId && (
+                      <div
+                        className="absolute z-10 rounded-sm bg-indigo-200/30 ring-1 ring-indigo-300/60"
+                        style={{
+                          left: `${pageTextItems.find((x) => x.id === hoveredTextItemId)?.xPercent || 0}%`,
+                          top: `${pageTextItems.find((x) => x.id === hoveredTextItemId)?.yPercent || 0}%`,
+                          width: `${pageTextItems.find((x) => x.id === hoveredTextItemId)?.widthPercent || 0}%`,
+                          height: `${pageTextItems.find((x) => x.id === hoveredTextItemId)?.heightPercent || 0}%`,
+                        }}
+                      />
+                    )}
+
                     {currentPageLayers.map(renderLayer)}
                   </div>
                 </section>
 
-                <aside className="border-l border-slate-200 bg-white p-4">
+                <aside className="order-3 border-t border-slate-200 bg-white p-4 lg:border-l lg:border-t-0">
                   <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
                     <div className="flex items-center gap-2 text-lg font-black text-slate-950">
                       <Layers size={18} />
@@ -1441,104 +1699,8 @@ export default function EditorPage() {
                                 className="mt-2 h-24 w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-950 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                               />
                             </label>
-
-                            <label className="block">
-                              <span className="flex justify-between text-sm font-black text-slate-800">
-                                Font size
-                                <span>{selectedLayer.fontSize || 16}px</span>
-                              </span>
-                              <input
-                                type="range"
-                                min={8}
-                                max={72}
-                                value={selectedLayer.fontSize || 16}
-                                onChange={(event) =>
-                                  updateLayer(selectedLayer.id, {
-                                    fontSize: Number(event.target.value),
-                                  })
-                                }
-                                className="mt-3 w-full"
-                              />
-                            </label>
-
-                            <div className="grid grid-cols-2 gap-2">
-                              <button
-                                onClick={() =>
-                                  updateLayer(selectedLayer.id, {
-                                    isBold: !selectedLayer.isBold,
-                                  })
-                                }
-                                className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-black ${
-                                  selectedLayer.isBold
-                                    ? "border-indigo-200 bg-indigo-700 text-white"
-                                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                                }`}
-                              >
-                                <Bold size={16} />
-                                Bold
-                              </button>
-
-                              <button
-                                onClick={() =>
-                                  updateLayer(selectedLayer.id, {
-                                    isItalic: !selectedLayer.isItalic,
-                                  })
-                                }
-                                className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-black ${
-                                  selectedLayer.isItalic
-                                    ? "border-indigo-200 bg-indigo-700 text-white"
-                                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                                }`}
-                              >
-                                <Italic size={16} />
-                                Italic
-                              </button>
-                            </div>
                           </>
                         )}
-
-                        {selectedLayer.type === "highlight" && (
-                          <label className="block">
-                            <span className="flex justify-between text-sm font-black text-slate-800">
-                              Opacity
-                              <span>
-                                {Math.round((selectedLayer.opacity ?? 0.42) * 100)}
-                                %
-                              </span>
-                            </span>
-                            <input
-                              type="range"
-                              min={0.15}
-                              max={0.85}
-                              step={0.01}
-                              value={selectedLayer.opacity ?? 0.42}
-                              onChange={(event) =>
-                                updateLayer(selectedLayer.id, {
-                                  opacity: Number(event.target.value),
-                                })
-                              }
-                              className="mt-3 w-full"
-                            />
-                          </label>
-                        )}
-
-                        <div className="grid grid-cols-2 gap-2">
-                          <button
-                            onClick={duplicateSelectedLayer}
-                            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50"
-                          >
-                            <Copy size={16} />
-                            Duplicate
-                          </button>
-
-                          <button
-                            onClick={deleteSelectedLayer}
-                            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-black text-red-700 transition hover:bg-red-100"
-                          >
-                            <Trash2 size={16} />
-                            Delete
-                          </button>
-                        </div>
                       </div>
                     )}
                   </div>
