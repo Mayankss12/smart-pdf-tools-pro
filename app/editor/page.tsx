@@ -1233,21 +1233,7 @@ export default function EditorPage() {
                   Image Sign
                 </button>
 
-                <button
-                  onClick={duplicateSelectedLayer}
-                  className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-black text-slate-700 transition hover:bg-slate-100"
-                >
-                  <Copy size={16} />
-                  Duplicate
-                </button>
 
-                <button
-                  onClick={deleteSelectedLayer}
-                  className="inline-flex items-center gap-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-2.5 text-sm font-black text-red-700 transition hover:bg-red-100"
-                >
-                  <Trash2 size={16} />
-                  Delete
-                </button>
 
                 <button
                   onClick={resetEditor}
@@ -1265,6 +1251,101 @@ export default function EditorPage() {
                   Export
                 </button>
 
+
+
+                {selectedLayer && (
+                  <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-indigo-100 bg-indigo-50/70 px-2 py-1">
+                    {(selectedLayer.type === "text" ||
+                      (selectedLayer.type === "signature" && !selectedLayer.imageUrl)) && (
+                      <>
+                        <button
+                          onClick={() =>
+                            updateLayer(selectedLayer.id, {
+                              isBold: !selectedLayer.isBold,
+                            })
+                          }
+                          className={`inline-flex items-center gap-1 rounded-xl border px-3 py-2 text-xs font-black ${
+                            selectedLayer.isBold
+                              ? "border-indigo-200 bg-indigo-700 text-white"
+                              : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                          }`}
+                        >
+                          <Bold size={14} />
+                          B
+                        </button>
+                        <button
+                          onClick={() =>
+                            updateLayer(selectedLayer.id, {
+                              isItalic: !selectedLayer.isItalic,
+                            })
+                          }
+                          className={`inline-flex items-center gap-1 rounded-xl border px-3 py-2 text-xs font-black ${
+                            selectedLayer.isItalic
+                              ? "border-indigo-200 bg-indigo-700 text-white"
+                              : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                          }`}
+                        >
+                          <Italic size={14} />
+                          I
+                        </button>
+                        <button
+                          onClick={() =>
+                            updateLayer(selectedLayer.id, {
+                              fontSize: Math.max(8, (selectedLayer.fontSize || 16) - 1),
+                            })
+                          }
+                          className="rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-black text-slate-700 hover:bg-slate-50"
+                        >
+                          A-
+                        </button>
+                        <span className="rounded-xl bg-white px-2 py-1 text-xs font-black text-slate-700">
+                          {selectedLayer.fontSize || 16}px
+                        </span>
+                        <button
+                          onClick={() =>
+                            updateLayer(selectedLayer.id, {
+                              fontSize: Math.min(72, (selectedLayer.fontSize || 16) + 1),
+                            })
+                          }
+                          className="rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-black text-slate-700 hover:bg-slate-50"
+                        >
+                          A+
+                        </button>
+                      </>
+                    )}
+
+                    {selectedLayer.type === "highlight" && (
+                      <select
+                        value={selectedLayer.opacity ?? 0.42}
+                        onChange={(event) =>
+                          updateLayer(selectedLayer.id, {
+                            opacity: Number(event.target.value),
+                          })
+                        }
+                        className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-black text-slate-700"
+                      >
+                        {[0.2,0.3,0.42,0.55,0.7].map((v) => (
+                          <option key={v} value={v}>{Math.round(v*100)}%</option>
+                        ))}
+                      </select>
+                    )}
+
+                    <button
+                      onClick={duplicateSelectedLayer}
+                      className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50"
+                    >
+                      <Copy size={14} />
+                      Duplicate
+                    </button>
+                    <button
+                      onClick={deleteSelectedLayer}
+                      className="inline-flex items-center gap-1 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-black text-red-700 hover:bg-red-100"
+                    >
+                      <Trash2 size={14} />
+                      Delete
+                    </button>
+                  </div>
+                )}
                 <div className="ml-auto flex items-center gap-2">
                   <button
                     onClick={zoomOut}
@@ -1441,104 +1522,8 @@ export default function EditorPage() {
                                 className="mt-2 h-24 w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-950 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                               />
                             </label>
-
-                            <label className="block">
-                              <span className="flex justify-between text-sm font-black text-slate-800">
-                                Font size
-                                <span>{selectedLayer.fontSize || 16}px</span>
-                              </span>
-                              <input
-                                type="range"
-                                min={8}
-                                max={72}
-                                value={selectedLayer.fontSize || 16}
-                                onChange={(event) =>
-                                  updateLayer(selectedLayer.id, {
-                                    fontSize: Number(event.target.value),
-                                  })
-                                }
-                                className="mt-3 w-full"
-                              />
-                            </label>
-
-                            <div className="grid grid-cols-2 gap-2">
-                              <button
-                                onClick={() =>
-                                  updateLayer(selectedLayer.id, {
-                                    isBold: !selectedLayer.isBold,
-                                  })
-                                }
-                                className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-black ${
-                                  selectedLayer.isBold
-                                    ? "border-indigo-200 bg-indigo-700 text-white"
-                                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                                }`}
-                              >
-                                <Bold size={16} />
-                                Bold
-                              </button>
-
-                              <button
-                                onClick={() =>
-                                  updateLayer(selectedLayer.id, {
-                                    isItalic: !selectedLayer.isItalic,
-                                  })
-                                }
-                                className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-black ${
-                                  selectedLayer.isItalic
-                                    ? "border-indigo-200 bg-indigo-700 text-white"
-                                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                                }`}
-                              >
-                                <Italic size={16} />
-                                Italic
-                              </button>
-                            </div>
                           </>
                         )}
-
-                        {selectedLayer.type === "highlight" && (
-                          <label className="block">
-                            <span className="flex justify-between text-sm font-black text-slate-800">
-                              Opacity
-                              <span>
-                                {Math.round((selectedLayer.opacity ?? 0.42) * 100)}
-                                %
-                              </span>
-                            </span>
-                            <input
-                              type="range"
-                              min={0.15}
-                              max={0.85}
-                              step={0.01}
-                              value={selectedLayer.opacity ?? 0.42}
-                              onChange={(event) =>
-                                updateLayer(selectedLayer.id, {
-                                  opacity: Number(event.target.value),
-                                })
-                              }
-                              className="mt-3 w-full"
-                            />
-                          </label>
-                        )}
-
-                        <div className="grid grid-cols-2 gap-2">
-                          <button
-                            onClick={duplicateSelectedLayer}
-                            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50"
-                          >
-                            <Copy size={16} />
-                            Duplicate
-                          </button>
-
-                          <button
-                            onClick={deleteSelectedLayer}
-                            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-black text-red-700 transition hover:bg-red-100"
-                          >
-                            <Trash2 size={16} />
-                            Delete
-                          </button>
-                        </div>
                       </div>
                     )}
                   </div>
