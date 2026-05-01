@@ -12,6 +12,7 @@ import {
   Italic,
   Layers,
   Loader2,
+  Lock,
   Minus,
   MousePointer2,
   PenLine,
@@ -21,6 +22,7 @@ import {
   Trash2,
   Type,
   Upload,
+  Wand2,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
@@ -282,6 +284,10 @@ export default function EditorPage() {
   const [exportMode, setExportMode] = useState<ExportMode>("full");
   const [exportRange, setExportRange] = useState("1-3");
   const [showFreeLimitNote, setShowFreeLimitNote] = useState(true);
+
+  const [ocrText, setOcrText] = useState("");
+  const [ocrRewriteText, setOcrRewriteText] = useState("");
+  const [ocrBusy, setOcrBusy] = useState(false);
 
   useEffect(() => {
     pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
@@ -678,6 +684,7 @@ useEffect(() => {
     setSelectedLayerId(newLayer.id);
     setStatus("Text signature added. Drag or resize it.");
   }
+  
 async function addImageSignatureLayer(file?: File) {
     if (!fileBytesRef.current) {
       setStatus("Upload a PDF first.");
@@ -877,6 +884,81 @@ async function addImageSignatureLayer(file?: File) {
     return "Signature selected";
   }
 
+  async function extractCurrentPageText() {
+  if (!pdfDocRef.current) {
+    setStatus("Upload a PDF first.");
+    return;
+  }
+
+  setOcrBusy(true);
+  setStatus("Reading selectable text from current page...");
+
+  try {
+    const page = await pdfDocRef.current.getPage(currentPage);
+    const textContent = await page.getTextContent();
+
+    const textItems = textContent.items
+      .map((item) => {
+        if ("str" in item) {
+          return item.str;
+        }
+
+        return "";
+      })
+      .filter(Boolean);
+
+    const extractedText = textItems.join(" ").replace(/\s+/g, " ").trim();
+
+    if (!extractedText) {
+      setOcrText("");
+      setOcrRewriteText("");
+      setStatus(
+        "No selectable text found. This may be a scanned PDF. Full OCR will be premium/backend later."
+      );
+      return;
+    }
+
+    setOcrText(extractedText);
+    setOcrRewriteText(extractedText);
+    setStatus(`Text extracted from page ${currentPage}. You can rewrite it now.`);
+  } catch (error) {
+    console.error(error);
+    setStatus("Unable to extract text from this page.");
+  } finally {
+    setOcrBusy(false);
+  }
+}
+
+function addRewriteAsTextLayer() {
+  if (!fileBytesRef.current) {
+    setStatus("Upload a PDF first.");
+    return;
+  }
+
+  if (!ocrRewriteText.trim()) {
+    setStatus("Extract or enter rewritten text first.");
+    return;
+  }
+
+  const newLayer: PdfLayer = {
+    id: crypto.randomUUID(),
+    page: currentPage,
+    type: "text",
+    xPercent: 8,
+    yPercent: 10,
+    widthPercent: 78,
+    heightPercent: 22,
+    text: ocrRewriteText.trim(),
+    fontSize: 13,
+    isBold: false,
+    isItalic: false,
+  };
+
+  setLayers((prev) => [...prev, newLayer]);
+  setSelectedLayerId(newLayer.id);
+  setStatus("Rewritten text added as editable layer.");
+}
+
   async function exportPdf() {
     if (!fileBytesRef.current) {
       setStatus("Upload a PDF first.");
@@ -960,11 +1042,7 @@ async function addImageSignatureLayer(file?: File) {
                     ? helveticaItalic
                     : helvetica;
 
-            const fontSize = Math.max(
-              6,
-              ((layer.fontSize || 15) / renderScale) * 0.95
-            );
-
+            const fontSize = Math.max(6, layer.fontSize || 15);
             const text = layer.text || "";
             const lines = text.split("\n");
             const lineHeight = fontSize * 1.22;
@@ -1036,7 +1114,8 @@ async function addImageSignatureLayer(file?: File) {
       setBusy(false);
     }
   }
-function renderResizeHandles(layer: PdfLayer) {
+
+  function renderResizeHandles(layer: PdfLayer) {
     if (selectedLayerId !== layer.id) return null;
 
     return resizeHandles.map((handle) => (
@@ -1612,6 +1691,82 @@ function renderResizeHandles(layer: PdfLayer) {
                     {currentPageLayers.map((layer) => renderLayer(layer))}
                   </div>
                 </section>
+              </div>
+            </div>
+
+            <div className="mx-3 mb-3 rounded-3xl border border-indigo-100 bg-indigo-50 p-4 sm:mx-5">
+              <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[1fr_1.4fr_auto] lg:items-end">
+                <div>
+                  <div className="flex items-center gap-2 text-lg font-black text-indigo-950">
+                    <Wand2 size={18} />
+                    OCR / Rewrite
+                  </div>
+
+                  <p className="mt-2 text-sm font-semibold leading-6 text-indigo-800">
+                    Extract selectable text from the current page, rewrite it,
+                    then add it back as an editable text layer.
+                  </p>
+
+                  <div className="mt-3 rounded-2xl border border-amber-100 bg-amber-50 p-3 text-xs font-bold leading-5 text-amber-900">
+                    <div className="mb-1 flex items-center gap-2 font-black">
+                      <Lock size={14} />
+                      Premium OCR later
+                    </div>
+                    Scanned PDF OCR, automatic text replacement, and no-watermark
+                    full export will be premium/backend features later.
+                  </div>
+                </div>
+
+                <label className="block">
+                  <span className="text-sm font-black text-indigo-950">
+                    Extracted / rewritten text
+                  </span>
+
+                  <textarea
+                    value={ocrRewriteText}
+                    onChange={(event) => setOcrRewriteText(event.target.value)}
+                    placeholder="Extracted text will appear here..."
+                    className="mt-2 h-32 w-full resize-none rounded-2xl border border-indigo-100 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                  />
+                </label>
+
+                <div className="flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={extractCurrentPageText}
+                    disabled={ocrBusy || !fileName}
+                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-indigo-700 px-5 py-3 text-sm font-black text-white transition hover:bg-indigo-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                  >
+                    {ocrBusy ? (
+                      <>
+                        <Loader2 className="animate-spin" size={16} />
+                        Reading
+                      </>
+                    ) : (
+                      <>
+                        <Wand2 size={16} />
+                        Extract Text
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={addRewriteAsTextLayer}
+                    disabled={!ocrRewriteText.trim()}
+                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-indigo-100 bg-white px-5 py-3 text-sm font-black text-indigo-700 transition hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Plus size={16} />
+                    Add as Layer
+                  </button>
+
+                  {ocrText && (
+                    <div className="rounded-2xl bg-white/75 px-3 py-2 text-xs font-bold text-slate-600">
+                      {ocrText.length} characters extracted from page{" "}
+                      {currentPage}.
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
