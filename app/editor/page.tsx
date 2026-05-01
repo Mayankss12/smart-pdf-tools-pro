@@ -325,7 +325,7 @@ export default function EditorPage() {
   }, [currentPage, renderPage]);
 
   useEffect(() => {
-    function handleMouseMove(event: MouseEvent) {
+    function handlePointerMove(event: PointerEvent) {
       const drag = dragStateRef.current;
       if (!drag) return;
 
@@ -416,16 +416,20 @@ export default function EditorPage() {
       );
     }
 
-    function handleMouseUp() {
+    function handlePointerUp() {
       dragStateRef.current = null;
+      document.body.style.touchAction = "";
+      document.body.style.overscrollBehavior = "";
     }
 
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
+    window.addEventListener("pointermove", handlePointerMove, { passive: false });
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerUp);
 
     return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerUp);
     };
   }, [canvasSize.height, canvasSize.width]);
 
@@ -738,11 +742,14 @@ export default function EditorPage() {
   }
 
   function startMove(
-    event: React.MouseEvent<HTMLDivElement | HTMLButtonElement>,
+    event: React.PointerEvent<HTMLDivElement | HTMLButtonElement>,
     layer: PdfLayer
   ) {
     event.preventDefault();
     event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    document.body.style.touchAction = "none";
+    document.body.style.overscrollBehavior = "none";
 
     setSelectedLayerId(layer.id);
 
@@ -759,12 +766,15 @@ export default function EditorPage() {
   }
 
   function startResize(
-    event: React.MouseEvent<HTMLButtonElement>,
+    event: React.PointerEvent<HTMLButtonElement>,
     layer: PdfLayer,
     handle: ResizeHandle
   ) {
     event.preventDefault();
     event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    document.body.style.touchAction = "none";
+    document.body.style.overscrollBehavior = "none";
 
     setSelectedLayerId(layer.id);
 
@@ -951,8 +961,8 @@ export default function EditorPage() {
     return resizeHandles.map((handle) => (
       <button
         key={handle.id}
-        onMouseDown={(event) => startResize(event, layer, handle.id)}
-        className={`absolute z-30 h-3.5 w-3.5 rounded-full border-2 border-white bg-indigo-500 shadow-sm transition hover:scale-110 ${handle.className}`}
+        onPointerDown={(event) => startResize(event, layer, handle.id)}
+        className={`absolute z-30 h-4.5 w-4.5 md:h-3.5 md:w-3.5 rounded-full border-2 border-white bg-indigo-500 shadow-sm transition hover:scale-110 ${handle.className}`}
         style={{ cursor: handle.cursor }}
         title={`Resize ${handle.id}`}
       />
@@ -973,7 +983,7 @@ export default function EditorPage() {
       return (
         <div
           key={layer.id}
-          onMouseDown={(event) => startMove(event, layer)}
+          onPointerDown={(event) => startMove(event, layer)}
           onClick={(event) => {
             event.stopPropagation();
             setSelectedLayerId(layer.id);
@@ -998,7 +1008,7 @@ export default function EditorPage() {
       return (
         <div
           key={layer.id}
-          onMouseDown={(event) => startMove(event, layer)}
+          onPointerDown={(event) => startMove(event, layer)}
           onClick={(event) => {
             event.stopPropagation();
             setSelectedLayerId(layer.id);
@@ -1031,7 +1041,7 @@ export default function EditorPage() {
       return (
         <div
           key={layer.id}
-          onMouseDown={(event) => startMove(event, layer)}
+          onPointerDown={(event) => startMove(event, layer)}
           onClick={(event) => {
             event.stopPropagation();
             setSelectedLayerId(layer.id);
@@ -1070,7 +1080,7 @@ export default function EditorPage() {
       >
         <textarea
           value={layer.text || ""}
-          onMouseDown={(event) => event.stopPropagation()}
+          onPointerDown={(event) => event.stopPropagation()}
           onClick={(event) => {
             event.stopPropagation();
             setSelectedLayerId(layer.id);
@@ -1092,7 +1102,7 @@ export default function EditorPage() {
 
         {isSelected && (
           <div
-            onMouseDown={(event) => startMove(event, layer)}
+            onPointerDown={(event) => startMove(event, layer)}
             className="absolute left-2 right-2 top-1 h-1.5 cursor-move rounded-full bg-indigo-500/25 transition hover:bg-indigo-500/40"
             title="Drag layer"
           />
@@ -1192,7 +1202,7 @@ export default function EditorPage() {
             </div>
 
             <div className="mx-5 mb-5 overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white shadow-sm">
-              <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white p-3">
+              <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white p-3 [&>button]:min-h-10">
                 <button
                   onClick={addTextLayer}
                   className="inline-flex items-center gap-2 rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-2.5 text-sm font-black text-indigo-700 transition hover:bg-indigo-100"
@@ -1369,19 +1379,39 @@ export default function EditorPage() {
                 </div>
               </div>
 
-              <div className="grid min-h-[720px] lg:grid-cols-[190px_1fr_360px]">
-                <aside className="border-r border-slate-200 bg-slate-50/80 p-4">
+              <div className="grid min-h-[720px] grid-cols-1 lg:grid-cols-[190px_1fr_360px]">
+                <aside className="order-2 border-t border-slate-200 bg-slate-50/80 p-3 lg:order-none lg:border-r lg:border-t-0 lg:p-4">
                   <div className="mb-3 flex items-center gap-2 text-sm font-black text-slate-950">
                     <FileText size={16} />
                     Pages
                   </div>
+
+                  {numPages > 0 && (
+                    <label className="mb-3 block lg:hidden">
+                      <span className="mb-1 block text-xs font-black text-slate-600">Jump to page</span>
+                      <select
+                        value={currentPage}
+                        onChange={(event) => {
+                          setCurrentPage(Number(event.target.value));
+                          setSelectedLayerId(null);
+                        }}
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700"
+                      >
+                        {Array.from({ length: numPages }).map((_, index) => (
+                          <option key={index + 1} value={index + 1}>
+                            Page {index + 1}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
 
                   {numPages === 0 ? (
                     <p className="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-sm text-slate-500">
                       No PDF uploaded.
                     </p>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="flex gap-2 overflow-x-auto pb-1 lg:block lg:space-y-3">
                       {Array.from({ length: numPages }).map((_, index) => {
                         const pageNumber = index + 1;
                         const thumb = pageThumbs.find(
@@ -1398,7 +1428,7 @@ export default function EditorPage() {
                               setCurrentPage(pageNumber);
                               setSelectedLayerId(null);
                             }}
-                            className={`block w-full overflow-hidden rounded-2xl border bg-white text-left shadow-sm transition ${
+                            className={`block min-w-[132px] overflow-hidden rounded-2xl border bg-white text-left shadow-sm transition lg:w-full ${
                               currentPage === pageNumber
                                 ? "border-indigo-600 ring-4 ring-indigo-100"
                                 : "border-slate-200 hover:border-indigo-200"
@@ -1433,7 +1463,7 @@ export default function EditorPage() {
                   )}
                 </aside>
 
-                <section className="flex items-start justify-center overflow-auto bg-[radial-gradient(circle_at_top,_#ddd6fe,_#f8fafc_42%,_#e2e8f0)] p-6">
+                <section className="order-1 flex items-start justify-start overflow-x-auto overflow-y-auto bg-[radial-gradient(circle_at_top,_#ddd6fe,_#f8fafc_42%,_#e2e8f0)] p-3 sm:p-4 lg:order-none lg:justify-center lg:p-6">
                   <div
                     className="relative rounded-xl bg-white shadow-2xl shadow-slate-500/20 ring-1 ring-slate-200"
                     style={{
@@ -1479,7 +1509,7 @@ export default function EditorPage() {
                   </div>
                 </section>
 
-                <aside className="border-l border-slate-200 bg-white p-4">
+                <aside className="order-3 border-t border-slate-200 bg-white p-4 lg:border-l lg:border-t-0">
                   <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
                     <div className="flex items-center gap-2 text-lg font-black text-slate-950">
                       <Layers size={18} />
