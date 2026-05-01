@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Header from "@/components/Header";
+import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -19,6 +19,38 @@ type PdfTask = {
   status: string;
   created_at: string;
 };
+
+function DashboardHeader() {
+  return (
+    <header className="border-b border-slate-200 bg-white">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+        <Link href="/" className="flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-purple-600 text-xl font-black text-white">
+            PDF
+          </div>
+          <div>
+            <div className="text-xl font-black text-slate-950">PDFMantra</div>
+            <div className="text-sm font-semibold text-slate-500">
+              Smart PDF Workspace
+            </div>
+          </div>
+        </Link>
+
+        <nav className="flex items-center gap-6 text-sm font-bold text-slate-700">
+          <Link href="/#tools" className="hover:text-blue-600">
+            Tools
+          </Link>
+          <Link href="/pricing" className="hover:text-blue-600">
+            Pricing
+          </Link>
+          <Link href="/login" className="hover:text-blue-600">
+            Login
+          </Link>
+        </nav>
+      </div>
+    </header>
+  );
+}
 
 export default function DashboardPage() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
@@ -72,7 +104,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <>
-        <Header />
+        <DashboardHeader />
         <main className="mx-auto max-w-7xl px-6 py-14">
           <h1 className="text-4xl font-black text-slate-950">Dashboard</h1>
           <p className="mt-3 text-slate-600">Loading your account...</p>
@@ -84,7 +116,7 @@ export default function DashboardPage() {
   if (supabaseMissing) {
     return (
       <>
-        <Header />
+        <DashboardHeader />
         <main className="mx-auto max-w-7xl px-6 py-14">
           <h1 className="text-4xl font-black text-slate-950">Dashboard</h1>
 
@@ -109,19 +141,19 @@ export default function DashboardPage() {
   if (!userEmail) {
     return (
       <>
-        <Header />
+        <DashboardHeader />
         <main className="mx-auto max-w-7xl px-6 py-14">
           <h1 className="text-4xl font-black text-slate-950">Dashboard</h1>
           <p className="mt-3 max-w-2xl text-slate-600">
             Sign in to save your PDF history, usage, and account details.
           </p>
 
-          <a
+          <Link
             href="/login"
             className="mt-8 inline-flex rounded-xl bg-blue-600 px-6 py-3 font-bold text-white shadow hover:bg-blue-700"
           >
             Login / Create Account
-          </a>
+          </Link>
         </main>
       </>
     );
@@ -129,7 +161,7 @@ export default function DashboardPage() {
 
   return (
     <>
-      <Header />
+      <DashboardHeader />
       <main className="mx-auto max-w-7xl px-6 py-14">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
