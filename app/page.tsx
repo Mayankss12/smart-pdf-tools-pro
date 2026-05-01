@@ -90,10 +90,10 @@ export default function HomePage() {
     <>
       <Header />
 
-      <main className="min-h-screen bg-slate-50 text-slate-950">
-        <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          <div className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
-            <section className="relative overflow-hidden border-b border-slate-100 bg-gradient-to-br from-indigo-700 via-violet-700 to-purple-700 px-6 py-14 text-white sm:px-10 lg:px-14 lg:py-18">
+      <main className="page-shell">
+        <section className="page-container">
+          <div className="surface overflow-hidden">
+            <section className="relative overflow-hidden border-b border-slate-100 bg-gradient-to-br from-indigo-700 via-violet-700 to-purple-700 px-6 py-14 text-white sm:px-10 lg:px-14 lg:py-16">
               <div className="absolute right-[-140px] top-[-140px] h-80 w-80 rounded-full bg-white/10 blur-3xl" />
               <div className="absolute bottom-[-160px] left-[-120px] h-96 w-96 rounded-full bg-amber-300/10 blur-3xl" />
 
@@ -104,7 +104,7 @@ export default function HomePage() {
                     PDFMantra Smart PDF Tools
                   </div>
 
-                  <h1 className="max-w-3xl text-4xl font-semibold leading-[1.08] tracking-[-0.04em] text-white sm:text-5xl lg:text-[3.6rem]">
+                  <h1 className="max-w-3xl text-4xl font-semibold leading-[1.08] tracking-[-0.04em] text-white sm:text-5xl lg:text-[3.55rem]">
                     Professional PDF tools for modern document workflows.
                   </h1>
 
@@ -115,18 +115,12 @@ export default function HomePage() {
                   </p>
 
                   <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                    <Link
-                      href="/editor"
-                      className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-amber-400 px-6 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-black/10 transition hover:bg-amber-300"
-                    >
+                    <Link href="/editor" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-amber-400 px-6 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-black/10 transition hover:bg-amber-300">
                       Open PDF Editor
                       <ArrowRight size={18} />
                     </Link>
 
-                    <a
-                      href="#tools"
-                      className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-white/12 px-6 py-3 text-sm font-semibold text-white ring-1 ring-white/25 transition hover:bg-white/18"
-                    >
+                    <a href="#tools" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-white/12 px-6 py-3 text-sm font-semibold text-white ring-1 ring-white/25 transition hover:bg-white/20">
                       View Tools
                     </a>
                   </div>
@@ -144,9 +138,7 @@ export default function HomePage() {
                         </div>
                       </div>
 
-                      <div className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                        Browser-side
-                      </div>
+                      <div className="status-live">Browser-side</div>
                     </div>
 
                     <div className="space-y-3">
@@ -174,15 +166,11 @@ export default function HomePage() {
             <section id="tools" className="px-6 py-10 sm:px-10 lg:px-14">
               <div className="mb-7 grid gap-4 lg:grid-cols-[0.8fr_1fr] lg:items-end">
                 <div>
-                  <div className="text-sm font-semibold uppercase tracking-wide text-indigo-600">
-                    Current tools
-                  </div>
-                  <h2 className="mt-2 text-3xl font-semibold tracking-[-0.03em] text-slate-950">
-                    Live PDF editing tools
-                  </h2>
+                  <div className="section-eyebrow">Current tools</div>
+                  <h2 className="mt-2 section-title">Live PDF editing tools</h2>
                 </div>
 
-                <p className="max-w-2xl text-sm font-medium leading-6 text-slate-500 lg:justify-self-end">
+                <p className="section-description max-w-2xl lg:justify-self-end">
                   These tools are focused on the current browser-side phase and
                   are suitable for demo.
                 </p>
@@ -193,19 +181,13 @@ export default function HomePage() {
                   const Icon = tool.icon;
 
                   return (
-                    <Link
-                      key={tool.title}
-                      href={tool.href}
-                      className="group rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-indigo-200 hover:shadow-lg"
-                    >
+                    <Link key={tool.title} href={tool.href} className="tool-card group">
                       <div className="mb-5 flex items-center justify-between">
                         <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-700 transition group-hover:bg-indigo-700 group-hover:text-white">
                           <Icon size={21} />
                         </div>
 
-                        <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                          Live
-                        </span>
+                        <span className="status-live">Live</span>
                       </div>
 
                       <h3 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">
@@ -218,10 +200,7 @@ export default function HomePage() {
 
                       <div className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-indigo-700">
                         Open tool
-                        <ArrowRight
-                          size={16}
-                          className="transition group-hover:translate-x-1"
-                        />
+                        <ArrowRight size={16} className="transition group-hover:translate-x-1" />
                       </div>
                     </Link>
                   );
@@ -235,12 +214,10 @@ export default function HomePage() {
                   <div className="text-sm font-semibold uppercase tracking-wide text-amber-600">
                     Backend-ready roadmap
                   </div>
-                  <h2 className="mt-2 text-3xl font-semibold tracking-[-0.03em] text-slate-950">
-                    Premium tools coming later
-                  </h2>
+                  <h2 className="mt-2 section-title">Premium tools coming later</h2>
                 </div>
 
-                <p className="max-w-2xl text-sm font-medium leading-6 text-slate-500 lg:justify-self-end">
+                <p className="section-description max-w-2xl lg:justify-self-end">
                   These tools can be connected to Supabase, Cloudflare storage,
                   server-side processing, and payment gating later.
                 </p>
@@ -251,18 +228,13 @@ export default function HomePage() {
                   const Icon = tool.icon;
 
                   return (
-                    <div
-                      key={tool.title}
-                      className="rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm"
-                    >
+                    <div key={tool.title} className="premium-card">
                       <div className="mb-5 flex items-center justify-between">
                         <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-50 text-amber-700">
                           <Icon size={20} />
                         </div>
 
-                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                          Coming soon
-                        </span>
+                        <span className="status-soon">Coming soon</span>
                       </div>
 
                       <h3 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">
@@ -285,11 +257,11 @@ export default function HomePage() {
                   Product direction
                 </div>
 
-                <h2 className="mt-4 text-3xl font-semibold tracking-[-0.03em] text-slate-950">
+                <h2 className="mt-4 section-title">
                   Built for free tools now, premium tools later.
                 </h2>
 
-                <p className="mt-3 text-sm font-medium leading-7 text-slate-500">
+                <p className="section-description mt-3">
                   PDFMantra can start as a fast browser-side PDF tool and grow
                   into a complete document platform with backend processing,
                   storage, accounts, and payments.
