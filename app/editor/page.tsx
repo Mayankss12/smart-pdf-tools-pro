@@ -22,7 +22,6 @@ import {
   Trash2,
   Type,
   Upload,
-  Wand2,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
@@ -303,6 +302,10 @@ export default function EditorPage() {
   const [exportMode, setExportMode] = useState<ExportMode>("full");
   const [exportRange, setExportRange] = useState("1-3");
   const [showFreeLimitNote, setShowFreeLimitNote] = useState(true);
+  const [activeTool, setActiveTool] = useState<ActiveTool>("select");
+  const [textOverlay, setTextOverlay] = useState<
+    { text: string; left: number; top: number; width: number; height: number }[]
+  >([]);
 
   const [ocrText, setOcrText] = useState("");
   const [ocrRewriteText, setOcrRewriteText] = useState("");
@@ -790,6 +793,9 @@ useEffect(() => {
   ) {
     event.preventDefault();
     event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    document.body.style.touchAction = "none";
+    document.body.style.overscrollBehavior = "none";
 
     const target = event.target as HTMLElement;
     if (
@@ -828,6 +834,9 @@ useEffect(() => {
   ) {
     event.preventDefault();
     event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    document.body.style.touchAction = "none";
+    document.body.style.overscrollBehavior = "none";
 
     event.currentTarget.setPointerCapture(event.pointerId);
 
@@ -1436,6 +1445,37 @@ function addRewriteAsTextLayer() {
     );
   }
 
+  function handleTextSelectionHighlight() {
+    if (activeTool !== "highlight") return;
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+      setStatus("No selectable text found. OCR highlight will require premium/backend OCR later.");
+      return;
+    }
+    const canvasRect = canvasRef.current?.getBoundingClientRect();
+    if (!canvasRect) return;
+    const rects = Array.from(selection.getRangeAt(0).getClientRects());
+    const validRects = rects.filter((rect) => rect.width > 1 && rect.height > 1);
+    if (validRects.length === 0) {
+      setStatus("No selectable text found. OCR highlight will require premium/backend OCR later.");
+      selection.removeAllRanges();
+      return;
+    }
+    const newLayers: PdfLayer[] = validRects.map((rect) => ({
+      id: crypto.randomUUID(),
+      page: currentPage,
+      type: "highlight",
+      xPercent: clamp(((rect.left - canvasRect.left) / canvasRect.width) * 100, 0, 100),
+      yPercent: clamp((((rect.top - canvasRect.top) - 1) / canvasRect.height) * 100, 0, 100),
+      widthPercent: clamp((rect.width / canvasRect.width) * 100, 0.3, 100),
+      heightPercent: clamp(((rect.height + 2) / canvasRect.height) * 100, 0.3, 100),
+      opacity: 0.42,
+    }));
+    setLayers((prev) => [...prev, ...newLayers]);
+    setStatus(`Added ${newLayers.length} text highlight${newLayers.length > 1 ? "s" : ""}.`);
+    selection.removeAllRanges();
+  }
+
   return (
     <>
       <Header />
@@ -1791,6 +1831,26 @@ function addRewriteAsTextLayer() {
                     <FileText size={16} />
                     Pages
                   </div>
+
+                  {numPages > 0 && (
+                    <label className="mb-3 block lg:hidden">
+                      <span className="mb-1 block text-xs font-black text-slate-600">Jump to page</span>
+                      <select
+                        value={currentPage}
+                        onChange={(event) => {
+                          setCurrentPage(Number(event.target.value));
+                          setSelectedLayerId(null);
+                        }}
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700"
+                      >
+                        {Array.from({ length: numPages }).map((_, index) => (
+                          <option key={index + 1} value={index + 1}>
+                            Page {index + 1}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
 
                   {numPages === 0 ? (
                     <p className="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-sm text-slate-500">
