@@ -1177,7 +1177,6 @@ function renderResizeHandles(layer: PdfLayer) {
         {isSelected && (
           <div
             onPointerDown={(event) => startMove(event, layer)}
-            data-no-drag="true"
             className="absolute left-2 right-2 top-1 h-3 cursor-move rounded-full bg-indigo-500/25 transition hover:bg-indigo-500/40 sm:h-2"
             style={{ touchAction: "none" }}
             title="Drag layer"
