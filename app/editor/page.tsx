@@ -5,6 +5,7 @@ import { EditorToolbar } from "@/components/editor/EditorToolbar";
 import {
   Bold,
   Copy,
+  Download,
   FileText,
   Italic,
   Loader2,
