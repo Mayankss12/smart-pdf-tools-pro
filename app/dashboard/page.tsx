@@ -1,12 +1,160 @@
-import { Header } from "@/components/Header";
+"use client";
+
+import { useEffect, useState } from "react";
+import Header from "@/components/Header";
+import { createClient } from "@supabase/supabase-js";
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+type PdfTask = {
+  id: string;
+  tool_name: string;
+  input_file_name: string | null;
+  status: string;
+  created_at: string;
+};
 
 export default function DashboardPage() {
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [tasks, setTasks] = useState<PdfTask[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadDashboard() {
+      const { data: userData } = await supabase.auth.getUser();
+      const user = userData.user;
+
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      setUserEmail(user.email || null);
+
+      const { data: taskData } = await supabase
+        .from("pdf_tasks")
+        .select("id, tool_name, input_file_name, status, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(10);
+
+      setTasks(taskData || []);
+      setLoading(false);
+    }
+
+    loadDashboard();
+  }, []);
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    window.location.href = "/";
+  }
+
+  if (loading) {
+    return (
+      <>
+        <Header />
+        <main className="mx-auto max-w-7xl px-6 py-14">
+          <h1 className="text-4xl font-black">Dashboard</h1>
+          <p className="mt-3 text-slate-600">Loading your account...</p>
+        </main>
+      </>
+    );
+  }
+
+  if (!userEmail) {
+    return (
+      <>
+        <Header />
+        <main className="mx-auto max-w-7xl px-6 py-14">
+          <h1 className="text-4xl font-black">Dashboard</h1>
+          <p className="mt-3 text-slate-600">
+            Sign in to save your PDF history, usage, and account details.
+          </p>
+
+          <a
+            href="/login"
+            className="mt-8 inline-flex rounded-xl bg-blue-600 px-6 py-3 font-bold text-white shadow hover:bg-blue-700"
+          >
+            Login / Create Account
+          </a>
+        </main>
+      </>
+    );
+  }
+
   return (
     <>
       <Header />
       <main className="mx-auto max-w-7xl px-6 py-14">
-        <h1 className="text-4xl font-black">Dashboard</h1>
-        <p className="mt-3 text-slate-600">Login and recent files can be connected later with Supabase.</p>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="text-4xl font-black">Dashboard</h1>
+            <p className="mt-3 text-slate-600">Signed in as {userEmail}</p>
+          </div>
+
+          <button
+            onClick={handleLogout}
+            className="rounded-xl border border-slate-200 px-5 py-3 font-bold text-slate-700 hover:bg-slate-50"
+          >
+            Logout
+          </button>
+        </div>
+
+        <section className="mt-10 grid gap-5 md:grid-cols-3">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <p className="text-sm font-bold text-slate-500">Plan</p>
+            <h2 className="mt-2 text-2xl font-black">Free</h2>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <p className="text-sm font-bold text-slate-500">Recent Tasks</p>
+            <h2 className="mt-2 text-2xl font-black">{tasks.length}</h2>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <p className="text-sm font-bold text-slate-500">Workspace</p>
+            <h2 className="mt-2 text-2xl font-black">PDFMantra</h2>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-2xl font-black">Recent PDF Tasks</h2>
+
+          {tasks.length === 0 ? (
+            <p className="mt-4 text-slate-600">
+              No PDF tasks saved yet. Process a PDF while signed in to see your history here.
+            </p>
+          ) : (
+            <div className="mt-6 overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 text-slate-500">
+                    <th className="py-3 pr-4">Tool</th>
+                    <th className="py-3 pr-4">File</th>
+                    <th className="py-3 pr-4">Status</th>
+                    <th className="py-3 pr-4">Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tasks.map((task) => (
+                    <tr key={task.id} className="border-b border-slate-100">
+                      <td className="py-3 pr-4 font-semibold">{task.tool_name}</td>
+                      <td className="py-3 pr-4">{task.input_file_name || "-"}</td>
+                      <td className="py-3 pr-4">{task.status}</td>
+                      <td className="py-3 pr-4">
+                        {new Date(task.created_at).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
       </main>
     </>
   );
