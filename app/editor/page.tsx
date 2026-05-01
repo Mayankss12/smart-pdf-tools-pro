@@ -146,7 +146,7 @@ export default function EditorPage() {
   const [layers, setLayers] = useState<PdfLayer[]>([]);
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [activeTool, setActiveTool] = useState<ActiveTool>("select");
+  const [activeTool, setActiveTool] = useState<ActiveTool>("none");
   const [draftBox, setDraftBox] = useState<DraftBox | null>(null);
   const [textOverlay, setTextOverlay] = useState<TextOverlayItem[]>([]);
   const [exportMode, setExportMode] = useState<ExportMode>("full");
@@ -362,7 +362,7 @@ export default function EditorPage() {
       setCurrentPage(1);
       setLayers([]);
       setSelectedLayerId(null);
-      setActiveTool("select");
+      setActiveTool("none");
       setDraftBox(null);
       setTextOverlay([]);
       const thumbs: PageThumb[] = [];
@@ -371,7 +371,7 @@ export default function EditorPage() {
       }
       setPageThumbs(thumbs);
       await renderPage(1);
-      setStatus("PDF loaded. Use Edit, Text, Highlight, Image, or Sign.");
+      setStatus("PDF loaded. Choose a tool to start editing.");
     } catch (error) {
       console.error(error);
       setStatus("Unable to load PDF. Please try another file.");
@@ -383,10 +383,20 @@ export default function EditorPage() {
   function selectEditorTool(tool: ActiveTool) {
     if (tool === "select") {
       setActiveTool("select");
+      setSelectedLayerId(null);
       setDraftBox(null);
       drawStateRef.current = null;
       highlightDragRef.current = null;
-      setStatus("Select mode active. Move, resize, duplicate, or delete layers.");
+      setStatus("Select Text mode active. Select and copy text from the PDF.");
+      return;
+    }
+
+    if (tool === "object") {
+      setActiveTool("object");
+      setDraftBox(null);
+      drawStateRef.current = null;
+      highlightDragRef.current = null;
+      setStatus("Edit Object mode active. Select, move, resize, duplicate, or delete added objects.");
       return;
     }
 
@@ -406,7 +416,7 @@ export default function EditorPage() {
   }
 
   function activateEditTool() {
-        setActiveTool("edit");
+    setActiveTool("edit");
     setDraftBox(null);
     drawStateRef.current = null;
     setStatus("Edit mode active. Select an object or click selectable PDF text to edit it.");
@@ -451,8 +461,8 @@ export default function EditorPage() {
       };
       setLayers((prev) => [...prev, newLayer]);
       setSelectedLayerId(newLayer.id);
-      setActiveTool("select");
-      setStatus("Image layer added. Drag or resize it.");
+      setActiveTool("object");
+      setStatus("Image layer added. Edit Object mode active. Drag, resize, or delete it.");
     } catch (error) {
       console.error(error);
       setStatus("Unable to add image.");
@@ -478,8 +488,8 @@ export default function EditorPage() {
     };
     setLayers((prev) => [...prev, newLayer]);
     setSelectedLayerId(newLayer.id);
-    setActiveTool("select");
-    setStatus("Text signature added. Drag or resize it.");
+    setActiveTool("object");
+    setStatus("Text signature added. Edit Object mode active. Drag, resize, or delete it.");
   }
 
   async function addImageSignatureLayer(file?: File) {
@@ -506,8 +516,8 @@ export default function EditorPage() {
       };
       setLayers((prev) => [...prev, newLayer]);
       setSelectedLayerId(newLayer.id);
-      setActiveTool("select");
-      setStatus("Signature image added. Drag or resize it.");
+      setActiveTool("object");
+      setStatus("Signature image added. Edit Object mode active. Drag, resize, or delete it.");
     } catch (error) {
       console.error(error);
       setStatus("Unable to add signature image.");
@@ -539,29 +549,30 @@ export default function EditorPage() {
     };
     setLayers((prev) => [...prev, duplicateLayer]);
     setSelectedLayerId(duplicateLayer.id);
-    setActiveTool("select");
-    setStatus("Layer duplicated.");
+    setActiveTool("object");
+    setStatus("Layer duplicated. Edit Object mode active.");
   }
 
   function resetEditor() {
     setLayers([]);
     setSelectedLayerId(null);
-    setActiveTool("select");
+    setActiveTool("none");
     setDraftBox(null);
     drawStateRef.current = null;
-    setStatus("All edit layers cleared.");
+    setStatus("All edit layers cleared. Choose a tool to continue.");
   }
 
   function clearCurrentPageLayers() {
     setLayers((prev) => prev.filter((layer) => layer.page !== currentPage));
     setSelectedLayerId(null);
-    setActiveTool("select");
+    setActiveTool("none");
     setDraftBox(null);
     drawStateRef.current = null;
-    setStatus(`All layers on page ${currentPage} cleared.`);
+    setStatus(`All layers on page ${currentPage} cleared. Choose a tool to continue.`);
   }
 
   function startMove(event: React.PointerEvent<HTMLDivElement | HTMLButtonElement>, layer: PdfLayer) {
+    if (activeTool !== "object") return;
     const target = event.target as HTMLElement;
     if (target.closest("textarea") || target.closest("button") || target.closest("[data-no-drag='true']")) return;
     event.preventDefault();
@@ -585,6 +596,7 @@ export default function EditorPage() {
   }
 
   function startResize(event: React.PointerEvent<HTMLButtonElement>, layer: PdfLayer, handle: ResizeHandle) {
+    if (activeTool !== "object") return;
     event.preventDefault();
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -662,7 +674,7 @@ export default function EditorPage() {
     if (!fileBytesRef.current) return setStatus("Upload a PDF first.");
   
     if (activeTool !== "text") {
-      if (activeTool === "edit") setSelectedLayerId(null);
+      if (activeTool === "object") setSelectedLayerId(null);
       return;
     }
 
@@ -695,7 +707,7 @@ export default function EditorPage() {
     }
 
     if (activeTool !== "text") {
-      if (activeTool === "edit") setSelectedLayerId(null);
+      if (activeTool === "object") setSelectedLayerId(null);
       return;
     }
 
@@ -831,8 +843,8 @@ export default function EditorPage() {
     };
     setLayers((prev) => [...prev, newLayer]);
     setSelectedLayerId(newLayer.id);
-        setActiveTool("select");
-    setStatus("Text box created. Type directly or resize with dots.");
+    setActiveTool("object");
+    setStatus("Text box created. Edit Object mode active. Type, drag, resize, or delete it.");
   }
 
   function cancelDrawingState() {
@@ -994,8 +1006,8 @@ export default function EditorPage() {
 
     setLayers((prev) => [...prev, newLayer]);
     setSelectedLayerId(newLayer.id);
-    setActiveTool("select");
-    setStatus("Selected text replaced visually. You can drag, resize, or export it.");
+    setActiveTool("object");
+    setStatus("Selected text replaced visually. Edit Object mode active. You can drag, resize, delete, or export it.");
   }
 
   async function extractCurrentPageText() {
@@ -1046,8 +1058,8 @@ export default function EditorPage() {
     };
     setLayers((prev) => [...prev, newLayer]);
     setSelectedLayerId(newLayer.id);
-        setActiveTool("select");
-    setStatus("Rewritten text added as editable layer.");
+    setActiveTool("object");
+    setStatus("Rewritten text added as editable layer. Edit Object mode active.");
   }
 
   async function exportPdf() {
@@ -1151,6 +1163,7 @@ export default function EditorPage() {
 
   function renderLayer(layer: PdfLayer) {
     const isSelected = selectedLayerId === layer.id;
+    const canEditObject = activeTool === "object";
 
     if (layer.type === "highlight") {
       return (
@@ -1158,6 +1171,7 @@ export default function EditorPage() {
           key={layer.id}
           data-editor-layer="true"
           onClick={(event) => {
+            if (!canEditObject) return;
             event.stopPropagation();
             setSelectedLayerId(layer.id);
           }}
@@ -1167,6 +1181,7 @@ export default function EditorPage() {
           }`}
           style={{
             ...getLayerStyle(layer),
+            pointerEvents: canEditObject ? "auto" : "none",
             backgroundColor: `rgba(251, 191, 36, ${layer.opacity || 0.38})`,
             mixBlendMode: "multiply",
             touchAction: "none",
@@ -1185,12 +1200,13 @@ export default function EditorPage() {
           key={layer.id}
           data-editor-layer="true"
           onClick={(event) => {
+            if (!canEditObject) return;
             event.stopPropagation();
             setSelectedLayerId(layer.id);
           }}
           onPointerDown={(event) => startMove(event, layer)}
           className={`absolute overflow-hidden rounded-lg border bg-white/80 transition ${isSelected ? "border-indigo-400 ring-2 ring-indigo-100" : "border-transparent hover:border-indigo-200"}`}
-          style={{ ...getLayerStyle(layer), touchAction: "none", zIndex: 20 }}
+          style={{ ...getLayerStyle(layer), pointerEvents: canEditObject ? "auto" : "none", touchAction: "none", zIndex: 20 }}
         >
           {layer.imageUrl ? <img src={layer.imageUrl} alt="PDF layer" className="h-full w-full object-contain" draggable={false} /> : null}
           {renderResizeHandles(layer)}
@@ -1205,6 +1221,7 @@ export default function EditorPage() {
         key={layer.id}
         data-editor-layer="true"
         onClick={(event) => {
+          if (!canEditObject) return;
           event.stopPropagation();
           setSelectedLayerId(layer.id);
         }}
@@ -1212,7 +1229,7 @@ export default function EditorPage() {
         className={`absolute rounded-lg border text-slate-950 shadow-sm transition ${
           isSelected ? "border-indigo-400 bg-white/95 ring-2 ring-indigo-100" : layer.coverText ? "border-transparent bg-white/95 hover:border-indigo-200" : "border-transparent bg-white/80 hover:border-indigo-200"
         }`}
-        style={{ ...getLayerStyle(layer), touchAction: "none", zIndex: 25 }}
+        style={{ ...getLayerStyle(layer), pointerEvents: canEditObject ? "auto" : "none", touchAction: "none", zIndex: 25 }}
       >
         {layer.imageUrl ? (
           <img src={layer.imageUrl} alt={isSignature ? "Signature layer" : "PDF layer"} className="h-full w-full object-contain" draggable={false} />
@@ -1222,6 +1239,7 @@ export default function EditorPage() {
             data-no-drag="true"
             onPointerDown={(event) => event.stopPropagation()}
             onClick={(event) => {
+              if (!canEditObject) return;
               event.stopPropagation();
               setSelectedLayerId(layer.id);
             }}
@@ -1575,14 +1593,14 @@ export default function EditorPage() {
 
                 <section ref={pdfViewportRef} className="flex w-full items-start justify-start overflow-auto bg-[radial-gradient(circle_at_top,_#ddd6fe,_#f8fafc_42%,_#e2e8f0)] p-3 sm:justify-center sm:p-6">
                   <div
-                    className={`relative mx-auto rounded-xl bg-white shadow-2xl shadow-slate-500/20 ring-1 ring-slate-200 ${activeTool === "text" ? "cursor-crosshair" : activeTool === "highlight" ? "cursor-text" : "cursor-default"}`}
+                    className={`relative mx-auto rounded-xl bg-white shadow-2xl shadow-slate-500/20 ring-1 ring-slate-200 ${activeTool === "text" ? "cursor-crosshair" : activeTool === "highlight" || activeTool === "select" ? "cursor-text" : "cursor-default"}`}
                     style={{ width: canvasSize.width, minHeight: canvasSize.height, touchAction: activeTool === "text" || activeTool === "highlight" ? "none" : "auto" }}
                     onPointerDown={startPageDraw}
                     onPointerMove={updatePageDraw}
                     onPointerUp={endPageDraw}
                     onPointerCancel={() => cancelDrawingState()}
                     onClick={() => {
-                      if (activeTool === "edit") setSelectedLayerId(null);
+                      if (activeTool === "object") setSelectedLayerId(null);
                     }}
                   >
                     {busy && <div className="absolute inset-0 z-50 flex items-center justify-center rounded-xl bg-white/75 backdrop-blur-sm"><div className="flex items-center gap-2 rounded-2xl bg-white px-5 py-4 font-bold shadow-xl"><Loader2 className="animate-spin text-indigo-600" size={20} /> Processing</div></div>}
