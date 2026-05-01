@@ -1,4 +1,4 @@
-export type ActiveTool = "edit" | "text" | "highlight";
+export type ActiveTool = "select" | "edit" | "text" | "highlight";
 
 export type EditorTool = ActiveTool;
 
