@@ -313,8 +313,9 @@ export default function EditorPage() {
   
   const currentPageLayers = useMemo(() => layers.filter((layer) => layer.page === currentPage), [currentPage, layers]);
   const selectedLayer = useMemo(() => layers.find((layer) => layer.id === selectedLayerId), [layers, selectedLayerId]);
-  const showTextOverlay = activeTool === "highlight" || activeTool === "edit";
-
+  const showTextOverlay =
+    activeTool === "select" || activeTool === "highlight" || activeTool === "edit";
+  
   function updateLayer(id: string, updates: Partial<PdfLayer>) {
     setLayers((prev) => prev.map((layer) => (layer.id === id ? { ...layer, ...updates } : layer)));
   }
@@ -1186,12 +1187,15 @@ export default function EditorPage() {
 
     return (
       <div
-        className="absolute inset-0 z-40"
-        style={{
-          pointerEvents:
-            activeTool === "highlight" || activeTool === "edit" ? "auto" : "none",
-          userSelect: activeTool === "highlight" ? "text" : "none",
-        }}
+        className={`absolute inset-0 ${activeTool === "select" ? "z-10" : "z-40"}`}
+      style={{
+        pointerEvents:
+          activeTool === "select" || activeTool === "highlight" || activeTool === "edit"
+            ? "auto"
+            : "none",
+        userSelect:
+          activeTool === "select" || activeTool === "highlight" ? "text" : "none",
+      }}
       >
         {textOverlay.map((item) => {
           const isHovered = hoveredTextId === item.id;
@@ -1223,13 +1227,23 @@ export default function EditorPage() {
                 color: "transparent",
                 WebkitTextFillColor: "transparent",
                 caretColor: "transparent",
-                cursor: activeTool === "highlight" ? "text" : "pointer",
-                userSelect: activeTool === "highlight" ? "text" : "none",
+                cursor:
+                  activeTool === "select" || activeTool === "highlight" ? "text" : "pointer",
+                userSelect:
+                  activeTool === "select" || activeTool === "highlight" ? "text" : "none",
                 pointerEvents:
-                  activeTool === "highlight" || activeTool === "edit" ? "auto" : "none",
+                  activeTool === "select" || activeTool === "highlight" || activeTool === "edit"
+                    ? "auto"
+                    : "none",
               }}
-              title={activeTool === "edit" ? `Edit: ${item.text}` : item.text}
-            >
+                    title={
+                      activeTool === "edit"
+                        ? `Edit: ${item.text}`
+                        : activeTool === "select"
+                          ? "Select and copy text"
+                          : item.text
+                    }
+              >
               {item.text}
             </span>
           );
