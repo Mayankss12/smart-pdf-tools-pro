@@ -139,7 +139,7 @@ export default function EditorPage() {
   const [layers, setLayers] = useState<PdfLayer[]>([]);
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [activeTool, setActiveTool] = useState<ActiveTool>("edit");
+  const [activeTool, setActiveTool] = useState<ActiveTool>("select");
   const [draftBox, setDraftBox] = useState<DraftBox | null>(null);
   const [textOverlay, setTextOverlay] = useState<TextOverlayItem[]>([]);
   const [exportMode, setExportMode] = useState<ExportMode>("full");
@@ -353,7 +353,7 @@ export default function EditorPage() {
       setCurrentPage(1);
       setLayers([]);
       setSelectedLayerId(null);
-      setActiveTool("edit");
+      setActiveTool("select");
       setDraftBox(null);
       setTextOverlay([]);
       const thumbs: PageThumb[] = [];
@@ -372,6 +372,15 @@ export default function EditorPage() {
   }
 
   function selectEditorTool(tool: ActiveTool) {
+    if (tool === "select") {
+      setActiveTool("select");
+      setDraftBox(null);
+      drawStateRef.current = null;
+      highlightDragRef.current = null;
+      setStatus("Select mode active. Move, resize, duplicate, or delete layers.");
+      return;
+    }
+
     if (tool === "edit") {
       activateEditTool();
       return;
@@ -388,7 +397,7 @@ export default function EditorPage() {
   }
 
   function activateEditTool() {
-    setActiveTool("edit");
+        setActiveTool("edit");
     setDraftBox(null);
     drawStateRef.current = null;
     setStatus("Edit mode active. Select an object or click selectable PDF text to edit it.");
@@ -433,7 +442,7 @@ export default function EditorPage() {
       };
       setLayers((prev) => [...prev, newLayer]);
       setSelectedLayerId(newLayer.id);
-      setActiveTool("edit");
+      setActiveTool("select");
       setStatus("Image layer added. Drag or resize it.");
     } catch (error) {
       console.error(error);
@@ -460,7 +469,7 @@ export default function EditorPage() {
     };
     setLayers((prev) => [...prev, newLayer]);
     setSelectedLayerId(newLayer.id);
-    setActiveTool("edit");
+    setActiveTool("select");
     setStatus("Text signature added. Drag or resize it.");
   }
 
@@ -488,7 +497,7 @@ export default function EditorPage() {
       };
       setLayers((prev) => [...prev, newLayer]);
       setSelectedLayerId(newLayer.id);
-      setActiveTool("edit");
+      setActiveTool("select");
       setStatus("Signature image added. Drag or resize it.");
     } catch (error) {
       console.error(error);
@@ -521,14 +530,14 @@ export default function EditorPage() {
     };
     setLayers((prev) => [...prev, duplicateLayer]);
     setSelectedLayerId(duplicateLayer.id);
-    setActiveTool("edit");
+    setActiveTool("select");
     setStatus("Layer duplicated.");
   }
 
   function resetEditor() {
     setLayers([]);
     setSelectedLayerId(null);
-    setActiveTool("edit");
+    setActiveTool("select");
     setDraftBox(null);
     drawStateRef.current = null;
     setStatus("All edit layers cleared.");
@@ -537,7 +546,7 @@ export default function EditorPage() {
   function clearCurrentPageLayers() {
     setLayers((prev) => prev.filter((layer) => layer.page !== currentPage));
     setSelectedLayerId(null);
-    setActiveTool("edit");
+    setActiveTool("select");
     setDraftBox(null);
     drawStateRef.current = null;
     setStatus(`All layers on page ${currentPage} cleared.`);
@@ -813,7 +822,7 @@ export default function EditorPage() {
     };
     setLayers((prev) => [...prev, newLayer]);
     setSelectedLayerId(newLayer.id);
-    setActiveTool("edit");
+        setActiveTool("select");
     setStatus("Text box created. Type directly or resize with dots.");
   }
 
@@ -917,7 +926,7 @@ export default function EditorPage() {
     };
     setLayers((prev) => [...prev, newLayer]);
     setSelectedLayerId(newLayer.id);
-    setActiveTool("edit");
+        setActiveTool("select");
     setStatus("Rewritten text added as editable layer.");
   }
 
