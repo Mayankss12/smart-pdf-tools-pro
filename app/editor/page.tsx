@@ -1310,10 +1310,10 @@ function addRewriteAsTextLayer() {
     ));
   }
 
-  function renderLayer(layer: PdfLayer) {
+   function renderLayer(layer: PdfLayer) {
     const isSelected = selectedLayerId === layer.id;
 
-       if (layer.type === "highlight") {
+    if (layer.type === "highlight") {
       return (
         <div
           key={layer.id}
@@ -1428,19 +1428,6 @@ function addRewriteAsTextLayer() {
               fontStyle: layer.isItalic ? "italic" : "normal",
               letterSpacing: "-0.01em",
             }}
-          />
-        )}
-
-        {renderResizeHandles(layer)}
-      </div>
-    );
-
-        {isSelected && (
-          <div
-            onPointerDown={(event) => startMove(event, layer)}
-            className="absolute left-2 right-2 top-1 h-3 cursor-move rounded-full bg-indigo-500/25 transition hover:bg-indigo-500/40 sm:h-2"
-            style={{ touchAction: "none" }}
-            title="Drag layer"
           />
         )}
 
