@@ -673,8 +673,6 @@ export default function EditorPage() {
     }
 
     const target = event.target as HTMLElement;
-
-    const target = event.target as HTMLElement;
     if (
       target.closest("[data-editor-layer='true']") ||
       target.closest("textarea") ||
