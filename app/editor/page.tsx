@@ -116,6 +116,13 @@ function parsePageRange(input: string, totalPages: number) {
   return Array.from(new Set(pages)).sort((a, b) => a - b);
 }
 
+type SelectedTextRect = {
+  xPercent: number;
+  yPercent: number;
+  widthPercent: number;
+  heightPercent: number;
+};
+
 export default function EditorPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
@@ -147,6 +154,7 @@ export default function EditorPage() {
   const [showFreeLimitNote, setShowFreeLimitNote] = useState(true);
   const [ocrText, setOcrText] = useState("");
   const [ocrRewriteText, setOcrRewriteText] = useState("");
+  const [selectedTextRects, setSelectedTextRects] = useState<SelectedTextRect[]>([]);
   const [ocrBusy, setOcrBusy] = useState(false);
   const [hoveredTextId, setHoveredTextId] = useState<string | null>(null);
 
@@ -879,6 +887,117 @@ export default function EditorPage() {
     return "Signature selected";
   }
 
+  function getSelectedPdfTextForReplace() {
+    if (!fileBytesRef.current || !canvasRef.current) {
+      return setStatus("Upload a PDF first.");
+    }
+
+    const selection = window.getSelection();
+
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+      setOcrText("");
+      setSelectedTextRects([]);
+      return setStatus("Select PDF text first, then click Get Selected Text.");
+    }
+
+    const selectedText = selection.toString().replace(/\s+/g, " ").trim();
+
+    if (!selectedText) {
+      setOcrText("");
+      setSelectedTextRects([]);
+      return setStatus("No selected text found.");
+    }
+
+    const pageRect = canvasRef.current.getBoundingClientRect();
+    const rects: SelectedTextRect[] = [];
+
+    for (let index = 0; index < selection.rangeCount; index += 1) {
+      const range = selection.getRangeAt(index);
+
+      Array.from(range.getClientRects()).forEach((rect) => {
+        const isInsidePage =
+          rect.right > pageRect.left &&
+          rect.left < pageRect.right &&
+          rect.bottom > pageRect.top &&
+          rect.top < pageRect.bottom;
+
+        if (!isInsidePage || rect.width <= 1 || rect.height <= 1) return;
+
+        const left = clamp(rect.left - pageRect.left, 0, pageRect.width);
+        const top = clamp(rect.top - pageRect.top, 0, pageRect.height);
+        const width = clamp(rect.width, 1, pageRect.width - left);
+        const height = clamp(rect.height, 1, pageRect.height - top);
+
+        rects.push({
+          xPercent: (left / pageRect.width) * 100,
+          yPercent: (top / pageRect.height) * 100,
+          widthPercent: (width / pageRect.width) * 100,
+          heightPercent: (height / pageRect.height) * 100,
+        });
+      });
+    }
+
+    if (!rects.length) {
+      setOcrText("");
+      setSelectedTextRects([]);
+      return setStatus("Selected text area was not inside the current PDF page.");
+    }
+
+    setOcrText(selectedText);
+    setOcrRewriteText(selectedText);
+    setSelectedTextRects(rects);
+    setActiveTool("select");
+    setStatus("Selected text captured. Edit the replacement text, then click Replace Visually.");
+  }
+
+  function replaceSelectedTextVisually() {
+    if (!fileBytesRef.current) return setStatus("Upload a PDF first.");
+    if (!selectedTextRects.length) return setStatus("Select text and click Get Selected Text first.");
+    if (!ocrRewriteText.trim()) return setStatus("Enter replacement text first.");
+
+    const left = Math.min(...selectedTextRects.map((rect) => rect.xPercent));
+    const top = Math.min(...selectedTextRects.map((rect) => rect.yPercent));
+    const right = Math.max(
+      ...selectedTextRects.map((rect) => rect.xPercent + rect.widthPercent)
+    );
+    const bottom = Math.max(
+      ...selectedTextRects.map((rect) => rect.yPercent + rect.heightPercent)
+    );
+
+    const averageRectHeight =
+      selectedTextRects.reduce((sum, rect) => sum + rect.heightPercent, 0) /
+      selectedTextRects.length;
+
+    const estimatedFontSize = clamp(
+      Math.round(((averageRectHeight / 100) * canvasSize.height * 0.78) / Math.max(renderScale, 0.1)),
+      7,
+      48
+    );
+
+    const paddingX = 0.35;
+    const paddingY = 0.2;
+
+    const newLayer: PdfLayer = {
+      id: crypto.randomUUID(),
+      page: currentPage,
+      type: "text",
+      xPercent: clamp(left - paddingX, 0, 100),
+      yPercent: clamp(top - paddingY, 0, 100),
+      widthPercent: clamp(right - left + paddingX * 2, 3, 100 - left),
+      heightPercent: clamp(bottom - top + paddingY * 2, 2.5, 100 - top),
+      text: ocrRewriteText.trim(),
+      fontSize: estimatedFontSize,
+      isBold: false,
+      isItalic: false,
+      coverText: true,
+    };
+
+    setLayers((prev) => [...prev, newLayer]);
+    setSelectedLayerId(newLayer.id);
+    setActiveTool("select");
+    setStatus("Selected text replaced visually. You can drag, resize, or export it.");
+  }
+
   async function extractCurrentPageText() {
     if (!pdfDocRef.current) return setStatus("Upload a PDF first.");
     setOcrBusy(true);
@@ -1478,17 +1597,86 @@ export default function EditorPage() {
             </div>
 
             <div className="mx-3 mb-3 rounded-3xl border border-indigo-100 bg-indigo-50 p-4 sm:mx-5">
-              <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[1fr_1.4fr_auto] lg:items-end">
+              <div className="grid gap-4 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
                 <div>
-                  <div className="flex items-center gap-2 text-lg font-black text-indigo-950"><Wand2 size={18} /> OCR / Rewrite</div>
-                  <p className="mt-2 text-sm font-semibold leading-6 text-indigo-800">Extract selectable text from the current page, rewrite it, then add it back as an editable text layer.</p>
-                  <div className="mt-3 rounded-2xl border border-amber-100 bg-amber-50 p-3 text-xs font-bold leading-5 text-amber-900"><div className="mb-1 flex items-center gap-2 font-black"><Lock size={14} /> Premium OCR later</div>Scanned PDF OCR, automatic text replacement, and no-watermark full export will be premium/backend features later.</div>
+                  <div className="flex items-center gap-2 text-lg font-black text-indigo-950">
+                    <Wand2 size={18} /> Selected Text Replace
+                  </div>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-indigo-800">
+                    In Select mode, select text on the PDF, fetch it below, rewrite it, then replace it visually.
+                  </p>
+                  <div className="mt-3 rounded-2xl border border-amber-100 bg-amber-50 p-3 text-xs font-bold leading-5 text-amber-900">
+                    <div className="mb-1 flex items-center gap-2 font-black">
+                      <Lock size={14} /> Backend upgrade later
+                    </div>
+                    This covers the selected text with a white patch and adds replacement text above it. Exact same-font internal PDF text rewriting will be premium/backend later.
+                  </div>
                 </div>
-                <label className="block"><span className="text-sm font-black text-indigo-950">Extracted / rewritten text</span><textarea value={ocrRewriteText} onChange={(event) => setOcrRewriteText(event.target.value)} placeholder="Extracted text will appear here..." className="mt-2 h-32 w-full resize-none rounded-2xl border border-indigo-100 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100" /></label>
+
+                <div className="grid gap-3">
+                  <label className="block">
+                    <span className="text-sm font-black text-indigo-950">Selected text</span>
+                    <textarea
+                      value={ocrText}
+                      readOnly
+                      placeholder="Select PDF text, then click Get Selected Text..."
+                      className="mt-2 h-24 w-full resize-none rounded-2xl border border-indigo-100 bg-white/80 px-4 py-3 text-sm font-semibold text-slate-700 outline-none"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="text-sm font-black text-indigo-950">Replacement text</span>
+                    <textarea
+                      value={ocrRewriteText}
+                      onChange={(event) => setOcrRewriteText(event.target.value)}
+                      placeholder="Write replacement text here..."
+                      className="mt-2 h-24 w-full resize-none rounded-2xl border border-indigo-100 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                    />
+                  </label>
+                </div>
+
                 <div className="flex flex-col gap-2">
-                  <button type="button" onClick={extractCurrentPageText} disabled={ocrBusy || !fileName} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-indigo-700 px-5 py-3 text-sm font-black text-white transition hover:bg-indigo-800 disabled:cursor-not-allowed disabled:bg-slate-300">{ocrBusy ? <><Loader2 className="animate-spin" size={16} /> Reading</> : <><Wand2 size={16} /> Extract Text</>}</button>
-                  <button type="button" onClick={addRewriteAsTextLayer} disabled={!ocrRewriteText.trim()} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-indigo-100 bg-white px-5 py-3 text-sm font-black text-indigo-700 transition hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50"><Plus size={16} /> Add as Layer</button>
-                  {ocrText && <div className="rounded-2xl bg-white/75 px-3 py-2 text-xs font-bold text-slate-600">{ocrText.length} characters extracted from page {currentPage}.</div>}
+                  <button
+                    type="button"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={getSelectedPdfTextForReplace}
+                    disabled={!fileName}
+                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-indigo-700 px-5 py-3 text-sm font-black text-white transition hover:bg-indigo-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                  >
+                    <Wand2 size={16} /> Get Selected Text
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={replaceSelectedTextVisually}
+                    disabled={!selectedTextRects.length || !ocrRewriteText.trim()}
+                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-indigo-100 bg-white px-5 py-3 text-sm font-black text-indigo-700 transition hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Plus size={16} /> Replace Visually
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={extractCurrentPageText}
+                    disabled={ocrBusy || !fileName}
+                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white/70 px-5 py-3 text-xs font-black text-slate-700 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {ocrBusy ? (
+                      <>
+                        <Loader2 className="animate-spin" size={15} /> Reading
+                      </>
+                    ) : (
+                      <>
+                        <FileText size={15} /> Extract Full Page
+                      </>
+                    )}
+                  </button>
+
+                  {ocrText ? (
+                    <div className="rounded-2xl bg-white/75 px-3 py-2 text-xs font-bold text-slate-600">
+                      {ocrText.length} characters ready. {selectedTextRects.length ? `${selectedTextRects.length} selected area${selectedTextRects.length === 1 ? "" : "s"}.` : ""}
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </div>
