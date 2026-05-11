@@ -52,7 +52,7 @@ export const CATEGORY_LABELS: Record<ToolCategory, string> = {
 };
 
 export const tools: Tool[] = [
-  // ── Edit & Annotate ──────────────────────────────────────────
+  // Edit & Annotate
   {
     id: "pdf-editor",
     title: "PDF Editor",
@@ -106,7 +106,7 @@ export const tools: Tool[] = [
     isClientOnly: true,
   },
 
-  // ── Organize Pages ────────────────────────────────────────────
+  // Organize Pages
   {
     id: "merge-pdf",
     title: "Merge PDF",
@@ -169,7 +169,7 @@ export const tools: Tool[] = [
     isClientOnly: true,
   },
 
-  // ── Convert ───────────────────────────────────────────────────
+  // Convert
   {
     id: "images-to-pdf",
     title: "Images to PDF",
@@ -212,7 +212,7 @@ export const tools: Tool[] = [
     isClientOnly: false,
   },
 
-  // ── Security ──────────────────────────────────────────────────
+  // Security
   {
     id: "protect-pdf",
     title: "Protect PDF",
@@ -244,7 +244,7 @@ export const tools: Tool[] = [
     isClientOnly: false,
   },
 
-  // ── Optimize ──────────────────────────────────────────────────
+  // Optimize
   {
     id: "compress-pdf",
     title: "Compress PDF",
@@ -267,7 +267,7 @@ export const tools: Tool[] = [
   },
 ];
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// Helpers
 
 export function getToolsByStatus(status: ToolStatus): Tool[] {
   return tools.filter((t) => t.status === status);
@@ -285,7 +285,7 @@ export function getComingSoonTools(): Tool[] {
   return tools.filter((t) => t.status === "coming-soon");
 }
 
-export const STATUS_CONFIG: Record
+export const STATUS_CONFIG: Record<
   ToolStatus,
   { label: string; className: string }
 > = {
