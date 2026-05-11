@@ -1,82 +1,307 @@
 import {
-  Archive,
-  Edit3,
+  FileText,
+  PenLine,
+  Highlighter,
+  Image,
+  Combine,
+  Scissors,
+  RotateCw,
+  Trash2,
+  Copy,
+  ArrowUpDown,
   FileImage,
   Hash,
-  Image,
-  Merge,
-  PenLine,
-  RotateCw,
-  Scissors,
-  Stamp,
-  Trash2,
+  Droplets,
+  FileArchive,
+  Brain,
+  Wand2,
+  ShieldCheck,
+  ShieldOff,
+  Eye,
+  Layers,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
-export const tools = [
+export type ToolStatus = "working" | "beta" | "coming-soon";
+
+export interface Tool {
+  id: string;
+  title: string;
+  description: string;
+  category: ToolCategory;
+  href: string;
+  icon: LucideIcon;
+  status: ToolStatus;
+  isClientOnly: boolean;
+  maxFiles?: number;
+}
+
+export type ToolCategory =
+  | "edit"
+  | "organize"
+  | "convert"
+  | "security"
+  | "optimize";
+
+export const CATEGORY_LABELS: Record<ToolCategory, string> = {
+  edit: "Edit & Annotate",
+  organize: "Organize Pages",
+  convert: "Convert",
+  security: "Security",
+  optimize: "Optimize",
+};
+
+export const tools: Tool[] = [
+  // ── Edit & Annotate ──────────────────────────────────────────
   {
-    name: "PDF Editor",
+    id: "pdf-editor",
+    title: "PDF Editor",
+    description:
+      "Add text, images, highlights, whiteout, and signatures. Export the final PDF.",
+    category: "edit",
     href: "/editor",
-    icon: Edit3,
-    desc: "Add text, image, signature, highlight and edit layers.",
+    icon: FileText,
+    status: "beta",
+    isClientOnly: true,
   },
   {
-    name: "Merge PDF",
-    href: "/tools/merge",
-    icon: Merge,
-    desc: "Combine multiple PDF files.",
+    id: "sign-pdf",
+    title: "Sign PDF",
+    description:
+      "Draw, type, or upload a signature and place it on any PDF page.",
+    category: "edit",
+    href: "/editor",
+    icon: PenLine,
+    status: "beta",
+    isClientOnly: true,
   },
   {
-    name: "Split PDF",
-    href: "/tools/split",
-    icon: Scissors,
-    desc: "Split PDF by pages.",
+    id: "highlight-pdf",
+    title: "Highlight PDF",
+    description: "Apply marker-style highlights to selected text in your PDF.",
+    category: "edit",
+    href: "/editor",
+    icon: Highlighter,
+    status: "beta",
+    isClientOnly: true,
   },
   {
-    name: "Compress PDF",
-    href: "/tools/compress",
-    icon: Archive,
-    desc: "Reduce PDF size with browser-side optimization.",
-  },
-  {
-    name: "Rotate PDF",
-    href: "/tools/rotate",
-    icon: RotateCw,
-    desc: "Rotate all pages by 90, 180, or 270 degrees.",
-  },
-  {
-    name: "Delete PDF Pages",
-    href: "/tools/delete-pages",
-    icon: Trash2,
-    desc: "Select and remove unwanted pages from your PDF.",
-  },
-  {
-    name: "Images to PDF",
-    href: "/tools/images-to-pdf",
-    icon: FileImage,
-    desc: "Create PDF from images.",
-  },
-  {
-    name: "PDF to Images",
-    href: "/tools/pdf-to-images",
-    icon: Image,
-    desc: "Convert PDF pages to PNG images.",
-  },
-  {
-    name: "Watermark PDF",
+    id: "watermark-pdf",
+    title: "Add Watermark",
+    description: "Stamp text or image watermarks on every PDF page.",
+    category: "edit",
     href: "/tools/watermark",
-    icon: Stamp,
-    desc: "Add custom watermark text to PDF pages.",
+    icon: Droplets,
+    status: "coming-soon",
+    isClientOnly: true,
   },
   {
-    name: "Page Numbers",
+    id: "page-numbers",
+    title: "Add Page Numbers",
+    description: "Insert page numbers with custom position and style.",
+    category: "edit",
     href: "/tools/page-numbers",
     icon: Hash,
-    desc: "Add draggable page numbers to your PDF.",
+    status: "coming-soon",
+    isClientOnly: true,
+  },
+
+  // ── Organize Pages ────────────────────────────────────────────
+  {
+    id: "merge-pdf",
+    title: "Merge PDF",
+    description: "Combine multiple PDF files into one document instantly.",
+    category: "organize",
+    href: "/tools/merge",
+    icon: Combine,
+    status: "coming-soon",
+    isClientOnly: true,
+    maxFiles: 20,
   },
   {
-    name: "Fill & Sign",
-    href: "/tools/fill-sign",
-    icon: PenLine,
-    desc: "Add text or image signatures to any PDF page.",
+    id: "split-pdf",
+    title: "Split PDF",
+    description: "Extract pages or split a PDF into multiple files by range.",
+    category: "organize",
+    href: "/tools/split",
+    icon: Scissors,
+    status: "coming-soon",
+    isClientOnly: true,
+  },
+  {
+    id: "rotate-pdf",
+    title: "Rotate PDF",
+    description: "Rotate individual pages or the entire document.",
+    category: "organize",
+    href: "/tools/rotate",
+    icon: RotateCw,
+    status: "coming-soon",
+    isClientOnly: true,
+  },
+  {
+    id: "delete-pages",
+    title: "Delete Pages",
+    description: "Remove unwanted pages from your PDF visually.",
+    category: "organize",
+    href: "/tools/delete-pages",
+    icon: Trash2,
+    status: "coming-soon",
+    isClientOnly: true,
+  },
+  {
+    id: "extract-pages",
+    title: "Extract Pages",
+    description: "Pull out specific pages into a new PDF document.",
+    category: "organize",
+    href: "/tools/extract",
+    icon: Copy,
+    status: "coming-soon",
+    isClientOnly: true,
+  },
+  {
+    id: "reorder-pages",
+    title: "Reorder Pages",
+    description: "Drag and drop to rearrange PDF pages in any order.",
+    category: "organize",
+    href: "/tools/reorder",
+    icon: ArrowUpDown,
+    status: "coming-soon",
+    isClientOnly: true,
+  },
+
+  // ── Convert ───────────────────────────────────────────────────
+  {
+    id: "images-to-pdf",
+    title: "Images to PDF",
+    description: "Convert JPG, PNG, or WebP images into a single PDF.",
+    category: "convert",
+    href: "/tools/images-to-pdf",
+    icon: FileImage,
+    status: "coming-soon",
+    isClientOnly: true,
+    maxFiles: 30,
+  },
+  {
+    id: "pdf-to-images",
+    title: "PDF to Images",
+    description: "Export each PDF page as a high-quality JPG or PNG image.",
+    category: "convert",
+    href: "/tools/pdf-to-images",
+    icon: Image,
+    status: "coming-soon",
+    isClientOnly: true,
+  },
+  {
+    id: "pdf-to-word",
+    title: "PDF to Word",
+    description: "Convert PDFs into editable Word documents.",
+    category: "convert",
+    href: "/tools/pdf-to-word",
+    icon: Wand2,
+    status: "coming-soon",
+    isClientOnly: false,
+  },
+  {
+    id: "ocr-pdf",
+    title: "OCR PDF",
+    description: "Make scanned PDFs searchable and selectable with OCR.",
+    category: "convert",
+    href: "/tools/ocr",
+    icon: Brain,
+    status: "coming-soon",
+    isClientOnly: false,
+  },
+
+  // ── Security ──────────────────────────────────────────────────
+  {
+    id: "protect-pdf",
+    title: "Protect PDF",
+    description: "Add a password to prevent unauthorized access.",
+    category: "security",
+    href: "/tools/protect",
+    icon: ShieldCheck,
+    status: "coming-soon",
+    isClientOnly: false,
+  },
+  {
+    id: "unlock-pdf",
+    title: "Unlock PDF",
+    description: "Remove password protection from PDFs you own.",
+    category: "security",
+    href: "/tools/unlock",
+    icon: ShieldOff,
+    status: "coming-soon",
+    isClientOnly: false,
+  },
+  {
+    id: "redact-pdf",
+    title: "Redact PDF",
+    description: "Permanently black out sensitive text and images.",
+    category: "security",
+    href: "/tools/redact",
+    icon: Eye,
+    status: "coming-soon",
+    isClientOnly: false,
+  },
+
+  // ── Optimize ──────────────────────────────────────────────────
+  {
+    id: "compress-pdf",
+    title: "Compress PDF",
+    description: "Reduce file size while preserving visual quality.",
+    category: "optimize",
+    href: "/tools/compress",
+    icon: FileArchive,
+    status: "coming-soon",
+    isClientOnly: false,
+  },
+  {
+    id: "organize-pdf",
+    title: "Organize PDF",
+    description: "Visually manage, rotate, and arrange all pages.",
+    category: "organize",
+    href: "/tools/organize",
+    icon: Layers,
+    status: "coming-soon",
+    isClientOnly: true,
   },
 ];
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+export function getToolsByStatus(status: ToolStatus): Tool[] {
+  return tools.filter((t) => t.status === status);
+}
+
+export function getToolsByCategory(category: ToolCategory): Tool[] {
+  return tools.filter((t) => t.category === category);
+}
+
+export function getWorkingTools(): Tool[] {
+  return tools.filter((t) => t.status === "working" || t.status === "beta");
+}
+
+export function getComingSoonTools(): Tool[] {
+  return tools.filter((t) => t.status === "coming-soon");
+}
+
+export const STATUS_CONFIG: Record
+  ToolStatus,
+  { label: string; className: string }
+> = {
+  working: {
+    label: "Live",
+    className:
+      "rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700",
+  },
+  beta: {
+    label: "Beta",
+    className:
+      "rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700",
+  },
+  "coming-soon": {
+    label: "Coming Soon",
+    className:
+      "rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500",
+  },
+};
