@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { Header } from "@/components/Header";
-import { getWorkingTools, getComingSoonTools, STATUS_CONFIG } from "@/lib/tools";
+import {
+  getWorkingTools,
+  getComingSoonTools,
+  STATUS_CONFIG,
+} from "@/lib/tools";
 import {
   ArrowRight,
   BadgeCheck,
@@ -35,7 +39,7 @@ export default function HomePage() {
         <section className="page-container">
           <div className="surface overflow-hidden">
 
-            {/* ── Hero ── */}
+            {/* Hero */}
             <section className="relative overflow-hidden border-b border-slate-100 bg-gradient-to-br from-indigo-700 via-violet-700 to-purple-700 px-6 py-14 text-white sm:px-10 lg:px-14 lg:py-20">
               <div className="pointer-events-none absolute right-[-160px] top-[-160px] h-80 w-80 rounded-full bg-white/10 blur-3xl" />
               <div className="pointer-events-none absolute bottom-[-180px] left-[-140px] h-96 w-96 rounded-full bg-amber-300/10 blur-3xl" />
@@ -64,7 +68,7 @@ export default function HomePage() {
                       Open PDF Editor
                       <ArrowRight size={17} />
                     </Link>
-                    
+                    <a
                       href="#tools"
                       className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-white/12 px-6 py-3 text-sm font-semibold text-white ring-1 ring-white/25 transition hover:bg-white/20"
                     >
@@ -95,7 +99,10 @@ export default function HomePage() {
                           key={item}
                           className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700"
                         >
-                          <BadgeCheck size={16} className="shrink-0 text-emerald-600" />
+                          <BadgeCheck
+                            size={16}
+                            className="shrink-0 text-emerald-600"
+                          />
                           {item}
                         </div>
                       ))}
@@ -105,7 +112,7 @@ export default function HomePage() {
               </div>
             </section>
 
-            {/* ── Working / Beta Tools ── */}
+            {/* Working / Beta Tools */}
             <section id="tools" className="px-6 py-10 sm:px-10 lg:px-14">
               <div className="mb-8 grid gap-4 lg:grid-cols-[0.8fr_1fr] lg:items-end">
                 <div>
@@ -113,7 +120,8 @@ export default function HomePage() {
                   <h2 className="mt-2 section-title">PDF editing tools</h2>
                 </div>
                 <p className="section-description max-w-xl lg:justify-self-end">
-                  These tools run entirely in your browser. No upload, no account needed.
+                  These tools run entirely in your browser. No upload, no account
+                  needed.
                 </p>
               </div>
 
@@ -122,11 +130,7 @@ export default function HomePage() {
                   const Icon = tool.icon;
                   const badge = STATUS_CONFIG[tool.status];
                   return (
-                    <Link
-                      key={tool.id}
-                      href={tool.href}
-                      className="tool-card group"
-                    >
+                    <Link key={tool.id} href={tool.href} className="tool-card group">
                       <div className="mb-5 flex items-center justify-between">
                         <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-700 transition group-hover:bg-indigo-700 group-hover:text-white">
                           <Icon size={20} />
@@ -152,7 +156,7 @@ export default function HomePage() {
               </div>
             </section>
 
-            {/* ── Coming Soon Tools ── */}
+            {/* Coming Soon Tools */}
             <section className="border-t border-slate-100 bg-slate-50/70 px-6 py-10 sm:px-10 lg:px-14">
               <div className="mb-8 grid gap-4 lg:grid-cols-[0.8fr_1fr] lg:items-end">
                 <div>
@@ -162,7 +166,8 @@ export default function HomePage() {
                   <h2 className="mt-2 section-title">More tools coming soon</h2>
                 </div>
                 <p className="section-description max-w-xl lg:justify-self-end">
-                  Merge, split, compress, OCR, and more — rolling out progressively.
+                  Merge, split, compress, OCR, and more — rolling out
+                  progressively.
                 </p>
               </div>
 
@@ -194,7 +199,7 @@ export default function HomePage() {
               </div>
             </section>
 
-            {/* ── Trust / Benefits ── */}
+            {/* Trust / Benefits */}
             <section className="grid gap-8 border-t border-slate-100 px-6 py-10 sm:px-10 lg:grid-cols-[0.85fr_1.15fr] lg:items-center lg:px-14">
               <div>
                 <div className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-indigo-700">
