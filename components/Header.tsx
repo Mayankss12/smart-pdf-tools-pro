@@ -29,8 +29,26 @@ import {
 
 const TOOL_MENU_GROUPS = getToolMenuGroups();
 const POPULAR_TOOLS = getPopularTools(6);
-
 const DEFAULT_CATEGORY: ToolCategory = "edit";
+
+const PRIMARY_SHORTCUTS = [
+  {
+    label: "Edit PDF",
+    href: "/editor",
+  },
+  {
+    label: "Merge",
+    href: "/tools/merge",
+  },
+  {
+    label: "Compress",
+    href: "/tools/compress",
+  },
+  {
+    label: "Sign",
+    href: "/editor",
+  },
+] as const;
 
 function getToolStatusLabel(tool: Tool) {
   return STATUS_CONFIG[tool.status];
@@ -55,8 +73,8 @@ function ToolRow({
       className={[
         "group flex w-full items-start gap-3 rounded-2xl border border-transparent transition duration-200",
         compact
-          ? "px-3 py-3 hover:border-indigo-100 hover:bg-indigo-50/70"
-          : "px-4 py-4 hover:border-indigo-100 hover:bg-indigo-50/70",
+          ? "px-3 py-3 hover:border-indigo-100 hover:bg-indigo-50"
+          : "px-4 py-4 hover:border-indigo-100 hover:bg-indigo-50",
       ].join(" ")}
     >
       <div
@@ -109,7 +127,7 @@ function EmptySearchState({
   query: string;
 }) {
   return (
-    <div className="flex min-h-[240px] flex-col items-center justify-center rounded-[1.75rem] border border-dashed border-slate-200 bg-slate-50/80 px-6 text-center">
+    <div className="flex min-h-[240px] flex-col items-center justify-center rounded-[1.75rem] border border-dashed border-slate-200 bg-slate-50 px-6 text-center">
       <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 shadow-sm">
         <Search size={20} />
       </div>
@@ -121,7 +139,7 @@ function EmptySearchState({
       <p className="mt-2 max-w-sm text-sm leading-6 text-slate-600">
         We could not find a close match for{" "}
         <span className="font-semibold text-slate-900">“{query}”</span>.
-        Try terms like merge, sign, compress, OCR, protect, or images to PDF.
+        Try merge, sign, compress, OCR, protect, or images to PDF.
       </p>
     </div>
   );
@@ -243,10 +261,10 @@ export function Header() {
   }, [mobileMenuOpen]);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-white/70 bg-white/82 backdrop-blur-2xl">
-      <div className="relative mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/95 backdrop-blur-xl">
+      <div className="relative mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
         {/* Brand */}
-        <Link href="/" className="group flex items-center gap-3">
+        <Link href="/" className="group flex shrink-0 items-center gap-3">
           <div className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-600 via-indigo-700 to-slate-950 text-white shadow-lg shadow-indigo-200/70 transition duration-200 group-hover:-translate-y-0.5">
             <div className="absolute inset-0 bg-white/10 opacity-0 transition group-hover:opacity-100" />
             <FileText size={21} className="relative" />
@@ -263,21 +281,24 @@ export function Header() {
         </Link>
 
         {/* Desktop navigation */}
-        <nav className="hidden items-center gap-1 rounded-full border border-slate-200/90 bg-white/88 p-1.5 text-sm font-medium text-slate-600 shadow-sm lg:flex">
-          <div ref={desktopMenuRef} className="relative">
+        <nav className="hidden min-w-0 flex-1 items-center justify-center gap-1 xl:flex">
+          <div
+            ref={desktopMenuRef}
+            className="relative"
+          >
             <button
               type="button"
               onClick={toggleToolsMenu}
               aria-expanded={toolsMenuOpen}
               aria-haspopup="dialog"
               className={[
-                "inline-flex items-center gap-2 rounded-full px-4 py-2 transition duration-200",
+                "inline-flex min-h-11 items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition duration-200",
                 toolsMenuOpen
-                  ? "bg-indigo-50 text-indigo-700"
-                  : "hover:bg-indigo-50 hover:text-indigo-700",
+                  ? "border-indigo-200 bg-indigo-50 text-indigo-700"
+                  : "border-slate-200 bg-white text-slate-800 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700",
               ].join(" ")}
             >
-              Tools
+              All Tools
               <ChevronDown
                 size={15}
                 className={[
@@ -288,9 +309,9 @@ export function Header() {
             </button>
 
             {toolsMenuOpen ? (
-              <div className="absolute left-1/2 top-[calc(100%+1rem)] w-[min(1120px,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden rounded-[2rem] border border-slate-200/95 bg-white/96 shadow-[0_36px_100px_rgba(15,23,42,0.22)] backdrop-blur-2xl">
+              <div className="absolute left-1/2 top-[calc(100%+0.9rem)] w-[min(1120px,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_40px_120px_rgba(15,23,42,0.28)]">
                 {/* Search bar */}
-                <div className="border-b border-slate-200/90 bg-slate-50/70 px-6 py-5">
+                <div className="border-b border-slate-200 bg-slate-50 px-6 py-5">
                   <div className="flex items-center justify-between gap-6">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">
@@ -311,7 +332,7 @@ export function Header() {
                     </Link>
                   </div>
 
-                  <label className="mt-5 flex min-h-14 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 shadow-sm transition focus-within:border-indigo-300 focus-within:ring-4 focus-within:ring-indigo-100">
+                  <label className="mt-5 flex min-h-14 items-center gap-3 rounded-2xl border border-slate-300 bg-white px-4 shadow-sm transition focus-within:border-indigo-400 focus-within:ring-4 focus-within:ring-indigo-100">
                     <Search size={19} className="shrink-0 text-slate-400" />
                     <input
                       ref={searchInputRef}
@@ -336,9 +357,9 @@ export function Header() {
                 </div>
 
                 {normalizedQuery ? (
-                  <div className="grid min-h-[440px] grid-cols-[1fr_320px] gap-0">
+                  <div className="grid min-h-[440px] grid-cols-[1fr_320px] bg-white">
                     {/* Search results */}
-                    <div className="border-r border-slate-200/90 px-5 py-5">
+                    <div className="border-r border-slate-200 px-5 py-5">
                       <div className="mb-3 flex items-center justify-between px-2">
                         <p className="text-sm font-semibold text-slate-950">
                           Search results
@@ -365,7 +386,7 @@ export function Header() {
                     </div>
 
                     {/* Search guidance */}
-                    <aside className="bg-slate-50/75 px-5 py-5">
+                    <aside className="bg-slate-50 px-5 py-5">
                       <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
                         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-600">
                           Search Intelligence
@@ -402,9 +423,9 @@ export function Header() {
                     </aside>
                   </div>
                 ) : (
-                  <div className="grid min-h-[500px] grid-cols-[260px_1fr_320px]">
+                  <div className="grid min-h-[500px] grid-cols-[260px_1fr_320px] bg-white">
                     {/* Category rail */}
-                    <aside className="border-r border-slate-200/90 bg-slate-50/75 px-4 py-5">
+                    <aside className="border-r border-slate-200 bg-slate-50 px-4 py-5">
                       <p className="px-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                         Categories
                       </p>
@@ -456,7 +477,7 @@ export function Header() {
                     </section>
 
                     {/* Popular tools */}
-                    <aside className="border-l border-slate-200/90 bg-slate-50/75 px-5 py-5">
+                    <aside className="border-l border-slate-200 bg-slate-50 px-5 py-5">
                       <div className="flex items-center justify-between">
                         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-600">
                           Popular
@@ -491,25 +512,35 @@ export function Header() {
             ) : null}
           </div>
 
-          <Link
-            href="/editor"
-            className={[
-              "rounded-full px-4 py-2 transition duration-200",
-              pathname === "/editor"
-                ? "bg-indigo-50 text-indigo-700"
-                : "hover:bg-indigo-50 hover:text-indigo-700",
-            ].join(" ")}
-          >
-            PDF Editor
-          </Link>
+          {PRIMARY_SHORTCUTS.map((item) => {
+            const isActive = pathname === item.href;
 
+            return (
+              <Link
+                key={item.label}
+                href={item.href}
+                className={[
+                  "inline-flex min-h-11 items-center rounded-xl px-3.5 py-2 text-sm font-semibold transition duration-200",
+                  isActive
+                    ? "bg-indigo-50 text-indigo-700"
+                    : "text-slate-700 hover:bg-slate-100 hover:text-indigo-700",
+                ].join(" ")}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Right actions */}
+        <div className="hidden shrink-0 items-center gap-2 xl:flex">
           <Link
             href="/pricing"
             className={[
-              "rounded-full px-4 py-2 transition duration-200",
+              "inline-flex min-h-11 items-center rounded-xl px-3.5 py-2 text-sm font-semibold transition duration-200",
               pathname === "/pricing"
                 ? "bg-indigo-50 text-indigo-700"
-                : "hover:bg-indigo-50 hover:text-indigo-700",
+                : "text-slate-700 hover:bg-slate-100 hover:text-indigo-700",
             ].join(" ")}
           >
             Pricing
@@ -518,18 +549,17 @@ export function Header() {
           <Link
             href="/dashboard"
             className={[
-              "rounded-full px-4 py-2 transition duration-200",
+              "inline-flex min-h-11 items-center rounded-xl px-3.5 py-2 text-sm font-semibold transition duration-200",
               pathname === "/dashboard"
                 ? "bg-indigo-50 text-indigo-700"
-                : "hover:bg-indigo-50 hover:text-indigo-700",
+                : "text-slate-700 hover:bg-slate-100 hover:text-indigo-700",
             ].join(" ")}
           >
             Dashboard
           </Link>
-        </nav>
+        </div>
 
-        {/* Right actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <Link
             href="/editor"
             className="hidden min-h-11 items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-slate-300/80 transition duration-200 hover:-translate-y-0.5 hover:bg-indigo-700 sm:inline-flex"
@@ -546,7 +576,7 @@ export function Header() {
               setToolsMenuOpen(false);
               setSearchQuery("");
             }}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-sm transition hover:border-indigo-200 hover:text-indigo-700 lg:hidden"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-sm transition hover:border-indigo-200 hover:text-indigo-700 xl:hidden"
             aria-label="Toggle navigation menu"
             aria-expanded={mobileMenuOpen}
           >
@@ -555,18 +585,21 @@ export function Header() {
         </div>
       </div>
 
-      {/* Mobile menu */}
+      {/* Mobile / tablet menu */}
       {mobileMenuOpen ? (
-        <div className="fixed inset-x-0 top-[69px] z-40 h-[calc(100vh-69px)] overflow-y-auto border-t border-slate-200 bg-white/98 px-4 py-5 backdrop-blur-2xl lg:hidden">
+        <div className="fixed inset-x-0 top-[69px] z-40 h-[calc(100vh-69px)] overflow-y-auto border-t border-slate-200 bg-white px-4 py-5 xl:hidden">
           <div className="mx-auto max-w-3xl">
-            <div className="grid gap-3 sm:grid-cols-3">
-              <Link
-                href="/editor"
-                onClick={closeAllMenus}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-4 text-sm font-semibold text-slate-950 shadow-sm transition hover:border-indigo-200 hover:text-indigo-700"
-              >
-                PDF Editor
-              </Link>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {PRIMARY_SHORTCUTS.map((item) => (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  onClick={closeAllMenus}
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-4 text-sm font-semibold text-slate-950 shadow-sm transition hover:border-indigo-200 hover:text-indigo-700"
+                >
+                  {item.label}
+                </Link>
+              ))}
 
               <Link
                 href="/pricing"
@@ -585,7 +618,7 @@ export function Header() {
               </Link>
             </div>
 
-            <section className="mt-5 rounded-[2rem] border border-slate-200 bg-slate-50/75 p-4 shadow-sm">
+            <section className="mt-5 rounded-[2rem] border border-slate-200 bg-slate-50 p-4 shadow-sm">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-600">
                   Search PDF tools
@@ -595,7 +628,7 @@ export function Header() {
                 </h2>
               </div>
 
-              <label className="mt-4 flex min-h-14 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 shadow-sm focus-within:border-indigo-300 focus-within:ring-4 focus-within:ring-indigo-100">
+              <label className="mt-4 flex min-h-14 items-center gap-3 rounded-2xl border border-slate-300 bg-white px-4 shadow-sm focus-within:border-indigo-400 focus-within:ring-4 focus-within:ring-indigo-100">
                 <Search size={19} className="shrink-0 text-slate-400" />
                 <input
                   value={searchQuery}
