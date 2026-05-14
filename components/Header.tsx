@@ -20,12 +20,7 @@ import {
   type Tool,
   type ToolCategory,
 } from "@/lib/tools";
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const TOOL_MENU_GROUPS = getToolMenuGroups();
 const POPULAR_TOOLS = getPopularTools(6);
@@ -98,9 +93,7 @@ function ToolRow({
             </span>
           ) : null}
 
-          <span className={status.className}>
-            {status.label}
-          </span>
+          <span className={status.className}>{status.label}</span>
         </div>
 
         <p
@@ -121,11 +114,7 @@ function ToolRow({
   );
 }
 
-function EmptySearchState({
-  query,
-}: {
-  query: string;
-}) {
+function EmptySearchState({ query }: { query: string }) {
   return (
     <div className="flex min-h-[240px] flex-col items-center justify-center rounded-[1.75rem] border border-dashed border-slate-200 bg-slate-50 px-6 text-center">
       <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 shadow-sm">
@@ -138,8 +127,8 @@ function EmptySearchState({
 
       <p className="mt-2 max-w-sm text-sm leading-6 text-slate-600">
         We could not find a close match for{" "}
-        <span className="font-semibold text-slate-900">“{query}”</span>.
-        Try merge, sign, compress, OCR, protect, or images to PDF.
+        <span className="font-semibold text-slate-900">“{query}”</span>. Try
+        merge, sign, compress, OCR, protect, or images to PDF.
       </p>
     </div>
   );
@@ -282,10 +271,7 @@ export function Header() {
 
         {/* Desktop navigation */}
         <nav className="hidden min-w-0 flex-1 items-center justify-center gap-1 xl:flex">
-          <div
-            ref={desktopMenuRef}
-            className="relative"
-          >
+          <div ref={desktopMenuRef} className="relative">
             <button
               type="button"
               onClick={toggleToolsMenu}
@@ -309,9 +295,9 @@ export function Header() {
             </button>
 
             {toolsMenuOpen ? (
-              <div className="absolute left-1/2 top-[calc(100%+0.9rem)] w-[min(1120px,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_40px_120px_rgba(15,23,42,0.28)]">
-                {/* Search bar */}
-                <div className="border-b border-slate-200 bg-slate-50 px-6 py-5">
+              <div className="absolute left-1/2 top-[calc(100%+0.9rem)] flex max-h-[calc(100vh-6.25rem)] w-[min(1120px,calc(100vw-2rem))] -translate-x-1/2 flex-col overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_40px_120px_rgba(15,23,42,0.28)]">
+                {/* Fixed top search region */}
+                <div className="shrink-0 border-b border-slate-200 bg-slate-50 px-6 py-5">
                   <div className="flex items-center justify-between gap-6">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">
@@ -356,10 +342,11 @@ export function Header() {
                   </label>
                 </div>
 
+                {/* Scrollable menu body */}
                 {normalizedQuery ? (
-                  <div className="grid min-h-[440px] grid-cols-[1fr_320px] bg-white">
+                  <div className="grid min-h-0 flex-1 grid-cols-[1fr_320px] overflow-hidden bg-white">
                     {/* Search results */}
-                    <div className="border-r border-slate-200 px-5 py-5">
+                    <div className="min-h-0 overflow-y-auto border-r border-slate-200 px-5 py-5">
                       <div className="mb-3 flex items-center justify-between px-2">
                         <p className="text-sm font-semibold text-slate-950">
                           Search results
@@ -386,7 +373,7 @@ export function Header() {
                     </div>
 
                     {/* Search guidance */}
-                    <aside className="bg-slate-50 px-5 py-5">
+                    <aside className="min-h-0 overflow-y-auto bg-slate-50 px-5 py-5">
                       <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
                         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-600">
                           Search Intelligence
@@ -423,9 +410,9 @@ export function Header() {
                     </aside>
                   </div>
                 ) : (
-                  <div className="grid min-h-[500px] grid-cols-[260px_1fr_320px] bg-white">
+                  <div className="grid min-h-0 flex-1 grid-cols-[260px_1fr_320px] overflow-hidden bg-white">
                     {/* Category rail */}
-                    <aside className="border-r border-slate-200 bg-slate-50 px-4 py-5">
+                    <aside className="min-h-0 overflow-y-auto border-r border-slate-200 bg-slate-50 px-4 py-5">
                       <p className="px-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                         Categories
                       </p>
@@ -455,7 +442,7 @@ export function Header() {
                     </aside>
 
                     {/* Active category tools */}
-                    <section className="px-5 py-5">
+                    <section className="min-h-0 overflow-y-auto px-5 py-5">
                       <div className="mb-3 px-2">
                         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-600">
                           {activeGroup?.label}
@@ -477,7 +464,7 @@ export function Header() {
                     </section>
 
                     {/* Popular tools */}
-                    <aside className="border-l border-slate-200 bg-slate-50 px-5 py-5">
+                    <aside className="min-h-0 overflow-y-auto border-l border-slate-200 bg-slate-50 px-5 py-5">
                       <div className="flex items-center justify-between">
                         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-600">
                           Popular
@@ -532,7 +519,7 @@ export function Header() {
           })}
         </nav>
 
-        {/* Right actions */}
+        {/* Right secondary nav */}
         <div className="hidden shrink-0 items-center gap-2 xl:flex">
           <Link
             href="/pricing"
@@ -559,6 +546,7 @@ export function Header() {
           </Link>
         </div>
 
+        {/* Right actions */}
         <div className="flex shrink-0 items-center gap-2">
           <Link
             href="/editor"
@@ -632,9 +620,7 @@ export function Header() {
                 <Search size={19} className="shrink-0 text-slate-400" />
                 <input
                   value={searchQuery}
-                  onChange={(event) =>
-                    setSearchQuery(event.target.value)
-                  }
+                  onChange={(event) => setSearchQuery(event.target.value)}
                   placeholder="Search merge, sign, OCR..."
                   className="w-full bg-transparent text-sm font-medium text-slate-900 outline-none placeholder:text-slate-400"
                 />
