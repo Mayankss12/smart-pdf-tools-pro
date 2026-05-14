@@ -1,709 +1,646 @@
 import Link from "next/link";
 import { Header } from "@/components/Header";
 import {
-  getComingSoonTools,
+  getFeaturedTools,
+  getPopularTools,
+  getToolMenuGroups,
+  getToolsNeedingBackend,
   getWorkingTools,
+  STATUS_CONFIG,
+  type Tool,
 } from "@/lib/tools";
 import {
   ArrowRight,
   BadgeCheck,
-  BookOpen,
-  Combine,
-  Download,
+  CheckCircle2,
   FileText,
-  Highlighter,
-  Image,
   Layers,
-  Lock,
-  Monitor,
   MousePointer2,
-  PenLine,
-  RotateCw,
   ScanSearch,
-  Scissors,
+  Search,
   ShieldCheck,
   Sparkles,
-  Upload,
   Wand2,
   Zap,
 } from "lucide-react";
 
 const workingTools = getWorkingTools();
-const comingSoonTools = getComingSoonTools();
+const featuredTools = getFeaturedTools(8);
+const popularTools = getPopularTools(8);
+const menuGroups = getToolMenuGroups();
+const backendTools = getToolsNeedingBackend().slice(0, 6);
 
-const quickToolPills = [
+const trustPillars = [
+  "Clear tool discovery",
+  "Honest editor beta",
+  "Backend-grade roadmap",
+  "Web now, desktop later",
+];
+
+const experienceCards = [
   {
-    label: "PDF Editor",
-    href: "/editor",
-    badge: "Beta",
+    title: "Find the right tool fast",
+    description:
+      "PDFMantra should guide users by task, not make them decode technical categories.",
+    icon: Search,
   },
   {
-    label: "Highlight PDF",
-    href: "/editor",
-    badge: "Beta",
+    title: "Work visually where it matters",
+    description:
+      "Editing, signing, highlighting, and organizing should feel direct and understandable.",
+    icon: MousePointer2,
   },
   {
-    label: "Sign PDF",
-    href: "/editor",
-    badge: "Beta",
-  },
-  {
-    label: "Merge PDF",
-    badge: "Planned",
-  },
-  {
-    label: "Compress PDF",
-    badge: "Planned",
-  },
-  {
-    label: "OCR PDF",
-    badge: "Planned",
+    title: "Use serious processing when needed",
+    description:
+      "Compression, OCR, conversion, and security tools belong on reliable backend workflows.",
+    icon: Zap,
   },
 ];
 
-const categoryShowcase = [
+const ecosystemCards = [
   {
-    title: "Edit & Sign",
+    title: "Editor Workspace",
     description:
-      "Text, highlights, signatures, images, annotations, and visual PDF workspace tools.",
-    icon: PenLine,
-    tint: "from-indigo-500 to-violet-500",
-    tools: ["PDF Editor", "Highlight", "Sign PDF", "Watermark"],
+      "A browser-side visual editor for text overlays, highlights, images, signatures, and export.",
+    icon: FileText,
+    href: "/editor",
+    badge: "Beta",
   },
   {
     title: "Organize Pages",
     description:
-      "Merge, split, reorder, rotate, extract, and manage long PDF documents.",
+      "A future workspace for merging, splitting, rotating, extracting, and reordering PDFs visually.",
     icon: Layers,
-    tint: "from-cyan-500 to-blue-500",
-    tools: ["Merge", "Split", "Rotate", "Extract Pages"],
+    href: "/tools",
+    badge: "Next",
   },
   {
-    title: "Convert",
+    title: "Processing Engine",
     description:
-      "Move between PDF, Word, images, text, and document-ready formats.",
-    icon: Wand2,
-    tint: "from-fuchsia-500 to-pink-500",
-    tools: ["PDF to Word", "Images to PDF", "PDF to Images", "Text Export"],
-  },
-  {
-    title: "Optimize & OCR",
-    description:
-      "Compression, repair, searchable scans, flattening, and processing quality.",
+      "Backend-powered OCR, compression, Word conversion, protection, redaction, and repairs.",
     icon: ScanSearch,
-    tint: "from-amber-500 to-orange-500",
-    tools: ["Compress", "OCR PDF", "Repair", "Flatten"],
-  },
-  {
-    title: "Security",
-    description:
-      "Protect, unlock, redact, sanitize, and prepare sensitive PDFs responsibly.",
-    icon: ShieldCheck,
-    tint: "from-emerald-500 to-teal-500",
-    tools: ["Protect", "Unlock", "Redact", "Sanitize"],
-  },
-  {
-    title: "Inspect & Extract",
-    description:
-      "Metadata, page insight, extracted images, bookmarks, and document analysis.",
-    icon: BookOpen,
-    tint: "from-slate-700 to-slate-950",
-    tools: ["Extract Images", "PDF Info", "Bookmarks", "Metadata"],
+    href: "/tools",
+    badge: "Roadmap",
   },
 ];
 
-const workflowSteps = [
-  {
-    title: "Choose the right tool",
-    description:
-      "Browse by task, not by technical jargon. PDFMantra should make the next action obvious.",
-    icon: MousePointer2,
-  },
-  {
-    title: "Upload and work visually",
-    description:
-      "Editor tools stay interactive. Processing tools will use guided steps and clear settings.",
-    icon: Upload,
-  },
-  {
-    title: "Download a reliable result",
-    description:
-      "Every tool should end with a clean output flow, clear errors, and no confusing dead ends.",
-    icon: Download,
-  },
-];
+function StatusBadge({ tool }: { tool: Tool }) {
+  const status = STATUS_CONFIG[tool.status];
 
-const platformCards = [
-  {
-    title: "PDFMantra Web",
-    badge: "Now",
-    description:
-      "The current online workspace: editing beta, tool discovery, and a fast path to polished workflows.",
-    points: [
-      "Browser-side visual editor",
-      "Premium tools dashboard",
-      "Backend-ready processing roadmap",
-    ],
-    icon: Monitor,
-  },
-  {
-    title: "PDFMantra Desktop",
-    badge: "Vision",
-    description:
-      "A future app experience for offline-style productivity, deeper performance, and heavier PDF workflows.",
-    points: [
-      "Local-first feel",
-      "Power workflows for professionals",
-      "Same PDFMantra design language",
-    ],
-    icon: FileText,
-  },
-];
+  return <span className={status.className}>{status.label}</span>;
+}
 
-const roadmapIds = [
-  "merge-pdf",
-  "split-pdf",
-  "rotate-pdf",
-  "compress-pdf",
-  "ocr-pdf",
-  "pdf-to-word",
-  "protect-pdf",
-  "unlock-pdf",
-];
+function ToolCard({
+  tool,
+  compact = false,
+}: {
+  tool: Tool;
+  compact?: boolean;
+}) {
+  const Icon = tool.icon;
 
-const roadmapTools = comingSoonTools.filter((tool) =>
-  roadmapIds.includes(tool.id)
-);
+  return (
+    <Link
+      href={tool.href}
+      className={[
+        "group relative flex h-full flex-col overflow-hidden border border-slate-200 bg-white transition duration-200 hover:-translate-y-1 hover:border-indigo-200 hover:shadow-[0_24px_70px_rgba(30,41,59,0.14)]",
+        compact
+          ? "rounded-[1.5rem] p-4"
+          : "rounded-[1.75rem] p-5",
+      ].join(" ")}
+    >
+      <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-indigo-50/80 to-transparent opacity-0 transition duration-200 group-hover:opacity-100" />
+
+      <div className="relative flex items-start justify-between gap-3">
+        <div
+          className={[
+            "flex shrink-0 items-center justify-center rounded-2xl border border-indigo-100 bg-indigo-50 text-indigo-700 transition duration-200 group-hover:border-indigo-200 group-hover:bg-indigo-600 group-hover:text-white",
+            compact ? "h-11 w-11" : "h-12 w-12",
+          ].join(" ")}
+        >
+          <Icon size={compact ? 19 : 20} />
+        </div>
+
+        <StatusBadge tool={tool} />
+      </div>
+
+      <h3
+        className={[
+          "relative font-semibold tracking-[-0.03em] text-slate-950",
+          compact ? "mt-4 text-base" : "mt-5 text-lg",
+        ].join(" ")}
+      >
+        {tool.title}
+      </h3>
+
+      <p
+        className={[
+          "relative font-medium text-slate-600",
+          compact
+            ? "mt-2 line-clamp-3 text-sm leading-6"
+            : "mt-2 text-sm leading-6",
+        ].join(" ")}
+      >
+        {tool.description}
+      </p>
+
+      <div className="relative mt-auto flex items-center gap-2 pt-5 text-sm font-semibold text-indigo-700">
+        {tool.status === "coming-soon" ? "Preview tool" : "Open tool"}
+        <ArrowRight
+          size={15}
+          className="transition duration-200 group-hover:translate-x-1"
+        />
+      </div>
+    </Link>
+  );
+}
 
 export default function HomePage() {
   return (
     <>
       <Header />
 
-      <main className="page-shell">
-        <section className="page-container">
-          <div className="surface">
-            {/* HERO */}
-            <section className="hero-aurora hero-grid relative overflow-hidden px-5 py-6 text-white sm:px-8 sm:py-8 lg:px-10 lg:py-10">
-              <div className="grid gap-8 lg:grid-cols-[1.02fr_0.98fr] lg:items-center">
-                <div className="relative z-10">
-                  <div className="eyebrow-chip">
-                    <Sparkles size={14} />
-                    PDFMantra — Premium PDF Workspace
-                  </div>
+      <main className="min-h-screen bg-[#f7f9fe] text-slate-950">
+        {/* HERO */}
+        <section className="relative overflow-hidden border-b border-slate-200/80 bg-[#f7f9fe]">
+          <div className="pointer-events-none absolute inset-0">
+            <div className="absolute left-[-12rem] top-[-9rem] h-[32rem] w-[32rem] rounded-full bg-indigo-200/45 blur-3xl" />
+            <div className="absolute right-[-10rem] top-[-7rem] h-[30rem] w-[30rem] rounded-full bg-cyan-100/70 blur-3xl" />
+            <div className="absolute bottom-[-18rem] left-1/3 h-[34rem] w-[34rem] rounded-full bg-violet-100/60 blur-3xl" />
+          </div>
 
-                  <h1 className="mt-6 max-w-4xl text-4xl font-semibold leading-[1.02] tracking-[-0.055em] sm:text-5xl lg:text-[4.4rem]">
-                    A richer PDF platform,
-                    <span className="text-gradient"> designed to feel effortless.</span>
-                  </h1>
-
-                  <p className="mt-6 max-w-2xl text-base font-medium leading-8 text-indigo-100 sm:text-lg">
-                    PDFMantra is being built as a beautiful, clear, and powerful
-                    workspace for editing, organizing, converting, and securing PDFs —
-                    not a plain tool grid, and not a browser-hack experiment.
-                  </p>
-
-                  <div className="mt-8 flex flex-wrap gap-3">
-                    <Link href="/editor" className="btn-primary bg-amber-400 text-slate-950 shadow-amber-950/20 hover:bg-amber-300">
-                      Open PDF Editor
-                      <ArrowRight size={17} />
-                    </Link>
-
-                    <a href="#tools" className="btn-secondary">
-                      Explore the tool universe
-                    </a>
-                  </div>
-
-                  <div className="mt-8 flex flex-wrap gap-2.5">
-                    {quickToolPills.map((tool) =>
-                      tool.href ? (
-                        <Link
-                          key={tool.label}
-                          href={tool.href}
-                          className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3.5 py-2 text-sm font-medium text-white backdrop-blur transition hover:bg-white/20"
-                        >
-                          {tool.label}
-                          <span className="rounded-full bg-amber-300 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-950">
-                            {tool.badge}
-                          </span>
-                        </Link>
-                      ) : (
-                        <span
-                          key={tool.label}
-                          className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-medium text-indigo-50"
-                        >
-                          {tool.label}
-                          <span className="rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
-                            {tool.badge}
-                          </span>
-                        </span>
-                      )
-                    )}
-                  </div>
+          <div className="relative mx-auto max-w-7xl px-4 pb-16 pt-10 sm:px-6 sm:pb-20 lg:px-8 lg:pb-24 lg:pt-14">
+            <div className="grid gap-10 lg:grid-cols-[0.98fr_1.02fr] lg:items-center">
+              {/* Left Hero */}
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-white/90 px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-indigo-700 shadow-sm">
+                  <Sparkles size={14} />
+                  Premium Tool-Rich PDF Workspace
                 </div>
 
-                {/* Hero Workspace Visual */}
-                <div className="relative z-10">
-                  <div className="glass-surface p-3 shadow-[0_30px_90px_rgba(15,23,42,0.26)] sm:p-4">
-                    <div className="overflow-hidden rounded-[1.55rem] border border-white/15 bg-slate-950/80">
-                      <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="h-2.5 w-2.5 rounded-full bg-rose-400" />
-                          <div className="h-2.5 w-2.5 rounded-full bg-amber-400" />
-                          <div className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
-                        </div>
+                <h1 className="mt-6 max-w-4xl text-4xl font-semibold leading-[1.02] tracking-[-0.06em] text-slate-950 sm:text-5xl lg:text-[4.5rem]">
+                  PDF tools that feel
+                  <span className="block bg-gradient-to-r from-indigo-700 via-blue-700 to-slate-950 bg-clip-text text-transparent">
+                    powerful, clear, and effortless.
+                  </span>
+                </h1>
 
-                        <div className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white">
-                          Editor Beta
+                <p className="mt-6 max-w-2xl text-base font-medium leading-8 text-slate-600 sm:text-lg">
+                  PDFMantra is being built as a serious PDF platform for editing,
+                  signing, organizing, converting, and securing documents — with
+                  beautiful discovery, honest tool status, and reliable processing
+                  where it matters.
+                </p>
+
+                <div className="mt-8 flex flex-wrap gap-3">
+                  <Link
+                    href="/editor"
+                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white shadow-[0_18px_40px_rgba(15,23,42,0.22)] transition duration-200 hover:-translate-y-0.5 hover:bg-indigo-700"
+                  >
+                    Open PDF Editor
+                    <ArrowRight size={17} />
+                  </Link>
+
+                  <Link
+                    href="/tools"
+                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-900 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-indigo-200 hover:text-indigo-700 hover:shadow-lg"
+                  >
+                    Explore all tools
+                    <ArrowRight size={17} />
+                  </Link>
+                </div>
+
+                <div className="mt-7 flex flex-wrap gap-2.5">
+                  {trustPillars.map((pillar) => (
+                    <div
+                      key={pillar}
+                      className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/90 px-3.5 py-2 text-sm font-semibold text-slate-700 shadow-sm"
+                    >
+                      <CheckCircle2 size={15} className="text-emerald-600" />
+                      {pillar}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Right Hero Product Panel */}
+              <div className="relative">
+                <div className="overflow-hidden rounded-[2.3rem] border border-slate-200 bg-white p-4 shadow-[0_38px_120px_rgba(15,23,42,0.16)] sm:p-5">
+                  <div className="rounded-[1.9rem] border border-slate-200 bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 p-4 text-white sm:p-5">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-200">
+                          PDFMantra Workspace
+                        </div>
+                        <div className="mt-1 text-lg font-semibold tracking-[-0.03em] text-white">
+                          Start with the right tool
                         </div>
                       </div>
 
-                      <div className="grid min-h-[430px] grid-cols-[74px_1fr_92px] gap-3 p-3 sm:grid-cols-[88px_1fr_108px]">
-                        {/* Left Pages */}
-                        <div className="space-y-3">
-                          {[1, 2, 3].map((page) => (
-                            <div
-                              key={page}
-                              className={`rounded-2xl border p-2 ${
-                                page === 1
-                                  ? "border-indigo-300 bg-white/15"
-                                  : "border-white/10 bg-white/5"
-                              }`}
-                            >
-                              <div className="h-16 rounded-xl bg-white/90 sm:h-20" />
-                              <div className="mt-2 text-center text-[10px] font-semibold text-white/80">
-                                Page {page}
-                              </div>
-                            </div>
-                          ))}
+                      <div className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white">
+                        Live Beta + Roadmap
+                      </div>
+                    </div>
+
+                    <div className="mt-5 grid gap-4 lg:grid-cols-[0.88fr_1.12fr]">
+                      <div className="rounded-[1.45rem] border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-semibold text-white">
+                            Open now
+                          </span>
+                          <span className="rounded-full bg-emerald-300/15 px-2.5 py-1 text-[11px] font-semibold text-emerald-100">
+                            Editor Beta
+                          </span>
                         </div>
 
-                        {/* Main PDF Canvas */}
-                        <div className="workspace-grid relative overflow-hidden rounded-[1.35rem] border border-white/10 bg-slate-100 p-4">
-                          <div className="absolute inset-x-6 top-6 rounded-[1.1rem] border border-slate-200 bg-white p-4 shadow-[0_20px_45px_rgba(15,23,42,0.18)]">
-                            <div className="flex items-center justify-between">
-                              <div className="h-3 w-28 rounded-full bg-slate-900" />
-                              <div className="h-3 w-12 rounded-full bg-indigo-200" />
-                            </div>
-
-                            <div className="mt-5 space-y-2.5">
-                              <div className="h-2.5 w-full rounded-full bg-slate-200" />
-                              <div className="relative h-2.5 w-[92%] rounded-full bg-slate-200">
-                                <div className="absolute inset-y-[-4px] left-10 right-12 rounded-md bg-amber-300/70" />
-                              </div>
-                              <div className="h-2.5 w-[88%] rounded-full bg-slate-200" />
-                              <div className="h-2.5 w-[96%] rounded-full bg-slate-200" />
-                              <div className="h-2.5 w-[70%] rounded-full bg-slate-200" />
-                            </div>
-
-                            <div className="mt-6 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700">
-                              Add text, highlight, sign, and export
-                            </div>
-                          </div>
-
-                          <div className="absolute bottom-5 left-5 rounded-2xl border border-indigo-200 bg-white px-3 py-2 text-xs font-semibold text-indigo-700 shadow-lg">
-                            Text layer selected
-                          </div>
-
-                          <div className="absolute bottom-5 right-5 rounded-2xl border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-700 shadow-lg">
-                            Export ready
-                          </div>
-                        </div>
-
-                        {/* Right Toolbar */}
-                        <div className="space-y-3">
-                          {[
-                            { icon: PenLine, label: "Text" },
-                            { icon: Highlighter, label: "Mark" },
-                            { icon: Image, label: "Image" },
-                            { icon: Lock, label: "Sign" },
-                          ].map((item) => {
-                            const Icon = item.icon;
+                        <div className="mt-4 space-y-3">
+                          {workingTools.slice(0, 3).map((tool) => {
+                            const Icon = tool.icon;
 
                             return (
-                              <div
-                                key={item.label}
-                                className="rounded-2xl border border-white/10 bg-white/10 p-3 text-center backdrop-blur"
+                              <Link
+                                key={tool.id}
+                                href={tool.href}
+                                className="group flex items-center gap-3 rounded-2xl border border-white/10 bg-white/10 px-3 py-3 transition hover:border-white/20 hover:bg-white/15"
                               >
-                                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-white text-indigo-700">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-indigo-700">
                                   <Icon size={18} />
                                 </div>
-                                <div className="mt-2 text-[11px] font-semibold text-white/90">
-                                  {item.label}
+                                <div className="min-w-0">
+                                  <div className="truncate text-sm font-semibold text-white">
+                                    {tool.title}
+                                  </div>
+                                  <div className="mt-0.5 truncate text-xs font-medium text-indigo-100">
+                                    Ready inside the editor
+                                  </div>
                                 </div>
-                              </div>
+                              </Link>
                             );
                           })}
                         </div>
                       </div>
+
+                      <div className="relative overflow-hidden rounded-[1.45rem] border border-white/10 bg-white/95 p-4 text-slate-950">
+                        <div className="absolute right-[-2rem] top-[-2rem] h-24 w-24 rounded-full bg-indigo-100 blur-2xl" />
+
+                        <div className="relative">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-600">
+                                Popular discovery
+                              </div>
+                              <div className="mt-1 text-base font-semibold tracking-[-0.03em] text-slate-950">
+                                Tools users expect first
+                              </div>
+                            </div>
+
+                            <Search size={18} className="text-indigo-600" />
+                          </div>
+
+                          <div className="mt-4 grid gap-2">
+                            {popularTools.slice(0, 5).map((tool) => {
+                              const Icon = tool.icon;
+                              const status = STATUS_CONFIG[tool.status];
+
+                              return (
+                                <Link
+                                  key={tool.id}
+                                  href={tool.href}
+                                  className="group flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3 transition hover:border-indigo-200 hover:bg-indigo-50"
+                                >
+                                  <div className="flex min-w-0 items-center gap-3">
+                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-indigo-100 bg-indigo-50 text-indigo-700">
+                                      <Icon size={16} />
+                                    </div>
+
+                                    <div className="min-w-0">
+                                      <div className="truncate text-sm font-semibold text-slate-950">
+                                        {tool.title}
+                                      </div>
+                                      <div className="mt-0.5 text-xs font-medium text-slate-500">
+                                        {status.label}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <ArrowRight
+                                    size={15}
+                                    className="shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-indigo-600"
+                                  />
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </section>
 
-              <div className="relative z-10 mt-8 grid gap-4 md:grid-cols-3">
-                <div className="dark-card">
-                  <div className="text-3xl font-semibold text-white">Simple</div>
-                  <p className="mt-2 text-sm font-medium leading-6 text-indigo-100">
-                    Tools should be understandable at a glance, even for first-time users.
-                  </p>
-                </div>
-
-                <div className="dark-card">
-                  <div className="text-3xl font-semibold text-white">Powerful</div>
-                  <p className="mt-2 text-sm font-medium leading-6 text-indigo-100">
-                    Backend-grade roadmap for OCR, compression, conversion, and security.
-                  </p>
-                </div>
-
-                <div className="dark-card">
-                  <div className="text-3xl font-semibold text-white">Beautiful</div>
-                  <p className="mt-2 text-sm font-medium leading-6 text-indigo-100">
-                    A rich, premium UI system across homepage, tools, editor, and future desktop.
-                  </p>
-                </div>
-              </div>
-            </section>
-
-            {/* CURRENT WORKSPACE */}
-            <section
-              id="workspace"
-              className="border-b border-slate-100 bg-white px-5 py-12 sm:px-8 lg:px-10 lg:py-16"
-            >
-              <div className="grid gap-8 lg:grid-cols-[0.78fr_1.22fr] lg:items-end">
-                <div>
-                  <div className="section-eyebrow">Already taking shape</div>
-                  <h2 className="section-title mt-3">
-                    A workspace users can understand instantly
-                  </h2>
-                </div>
-
-                <p className="section-description max-w-2xl lg:justify-self-end">
-                  The editor remains a browser-side beta experience for visual PDF work,
-                  while PDFMantra’s larger platform is being designed around stability,
-                  clarity, and tools that genuinely deserve to be called “ready.”
+        {/* QUICK TOOL DISCOVERY */}
+        <section className="border-b border-slate-200/80 bg-white">
+          <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8 lg:py-18">
+            <div className="grid gap-6 lg:grid-cols-[0.78fr_1.22fr] lg:items-end">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.16em] text-indigo-600">
+                  Start with a tool
                 </p>
+                <h2 className="mt-3 text-3xl font-semibold tracking-[-0.05em] text-slate-950 sm:text-4xl">
+                  PDFMantra should feel useful in seconds
+                </h2>
               </div>
 
-              <div className="mt-8 grid gap-5 lg:grid-cols-[0.92fr_1.08fr]">
-                <div className="rich-card-static bg-gradient-to-br from-indigo-50 via-white to-cyan-50">
-                  <div className="flex items-center justify-between">
-                    <span className="status-beta">Editor Beta</span>
-                    <BadgeCheck size={18} className="text-emerald-600" />
+              <p className="max-w-2xl text-sm font-medium leading-7 text-slate-600 sm:text-base lg:justify-self-end">
+                The homepage should not force users to read a product essay.
+                It should help them find an action quickly, while still making the
+                full platform feel substantial.
+              </p>
+            </div>
+
+            <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+              {featuredTools.map((tool) => (
+                <ToolCard key={tool.id} tool={tool} />
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* PLATFORM CATEGORIES */}
+        <section className="border-b border-slate-200/80 bg-[#f7f9fe]">
+          <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8 lg:py-18">
+            <div className="grid gap-6 lg:grid-cols-[0.78fr_1.22fr] lg:items-end">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.16em] text-indigo-600">
+                  Tool universe
+                </p>
+                <h2 className="mt-3 text-3xl font-semibold tracking-[-0.05em] text-slate-950 sm:text-4xl">
+                  A real PDF platform, organized around tasks
+                </h2>
+              </div>
+
+              <p className="max-w-2xl text-sm font-medium leading-7 text-slate-600 sm:text-base lg:justify-self-end">
+                These categories should shape the header menu, the tools dashboard,
+                individual tool pages, and the future desktop experience.
+              </p>
+            </div>
+
+            <div className="mt-8 grid gap-5 lg:grid-cols-2">
+              {menuGroups.map((group) => (
+                <div
+                  key={group.category}
+                  className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm"
+                >
+                  <div className="border-b border-slate-200 bg-slate-50 px-5 py-5">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-600">
+                      {group.label}
+                    </p>
+                    <h3 className="mt-2 text-xl font-semibold tracking-[-0.04em] text-slate-950">
+                      {group.description}
+                    </h3>
                   </div>
 
-                  <h3 className="mt-5 text-2xl font-semibold tracking-[-0.04em] text-slate-950">
-                    Visual PDF editing, not fake text rewriting
-                  </h3>
+                  <div className="grid gap-0 divide-y divide-slate-100">
+                    {group.tools.slice(0, 4).map((tool) => {
+                      const Icon = tool.icon;
 
-                  <p className="mt-3 text-sm font-medium leading-7 text-slate-600">
-                    Add text boxes, highlights, images, and signatures on top of the PDF.
-                    The editor should feel clear, useful, and honest about what it does.
-                  </p>
+                      return (
+                        <Link
+                          key={tool.id}
+                          href={tool.href}
+                          className="group flex items-center justify-between gap-4 px-5 py-4 transition hover:bg-indigo-50/70"
+                        >
+                          <div className="flex min-w-0 items-center gap-3">
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-indigo-100 bg-indigo-50 text-indigo-700">
+                              <Icon size={18} />
+                            </div>
 
-                  <div className="mt-5 flex flex-wrap gap-2.5">
-                    {[
-                      "Text overlays",
-                      "Marker highlights",
-                      "Signature layers",
-                      "Image placement",
-                      "Export PDF",
-                    ].map((item) => (
-                      <span key={item} className="soft-pill">
-                        {item}
-                      </span>
-                    ))}
-                  </div>
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-sm font-semibold text-slate-950">
+                                  {tool.title}
+                                </span>
+                                <StatusBadge tool={tool} />
+                              </div>
 
-                  <Link href="/editor" className="btn-light mt-6">
-                    Launch Editor Beta
-                    <ArrowRight size={16} />
-                  </Link>
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {workingTools.map((tool) => {
-                    const Icon = tool.icon;
-
-                    return (
-                      <Link
-                        key={tool.id}
-                        href={tool.href}
-                        className="rich-card group"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-700 transition group-hover:bg-indigo-600 group-hover:text-white">
-                            <Icon size={20} />
+                              <p className="mt-1 line-clamp-1 text-sm font-medium text-slate-600">
+                                {tool.menuDescription}
+                              </p>
+                            </div>
                           </div>
-                          <span className="status-beta">Beta</span>
-                        </div>
 
-                        <h3 className="mt-5 text-lg font-semibold tracking-[-0.03em] text-slate-950">
-                          {tool.title}
-                        </h3>
-
-                        <p className="mt-2 text-sm font-medium leading-6 text-slate-600">
-                          {tool.description}
-                        </p>
-
-                        <div className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-indigo-700">
-                          Open workspace
                           <ArrowRight
-                            size={15}
-                            className="transition group-hover:translate-x-1"
+                            size={16}
+                            className="shrink-0 text-slate-300 transition group-hover:translate-x-1 group-hover:text-indigo-600"
                           />
-                        </div>
-                      </Link>
-                    );
-                  })}
+                        </Link>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            </section>
+              ))}
+            </div>
 
-            {/* TOOL UNIVERSE */}
-            <section
-              id="tools"
-              className="border-b border-slate-100 bg-slate-50/80 px-5 py-12 sm:px-8 lg:px-10 lg:py-16"
-            >
-              <div className="grid gap-8 lg:grid-cols-[0.82fr_1.18fr] lg:items-end">
-                <div>
-                  <div className="section-eyebrow">Tool universe</div>
-                  <h2 className="section-title mt-3">
-                    Rich tool discovery, not a boring list
-                  </h2>
-                </div>
+            <div className="mt-8 flex justify-center">
+              <Link
+                href="/tools"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-300/70 transition duration-200 hover:-translate-y-0.5 hover:bg-indigo-700"
+              >
+                View complete tools dashboard
+                <ArrowRight size={17} />
+              </Link>
+            </div>
+          </div>
+        </section>
 
-                <p className="section-description max-w-2xl lg:justify-self-end">
-                  The homepage should immediately communicate that PDFMantra is becoming
-                  a full PDF platform. These categories will guide the entire site,
-                  tools dashboard, and backend roadmap.
+        {/* WHY THE PRODUCT FEELS STRONGER */}
+        <section className="border-b border-slate-200/80 bg-white">
+          <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8 lg:py-18">
+            <div className="grid gap-6 lg:grid-cols-[0.78fr_1.22fr] lg:items-end">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.16em] text-indigo-600">
+                  Experience standard
                 </p>
+                <h2 className="mt-3 text-3xl font-semibold tracking-[-0.05em] text-slate-950 sm:text-4xl">
+                  Beautiful design only matters when the product becomes easier
+                </h2>
               </div>
 
-              <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-                {categoryShowcase.map((category) => {
-                  const Icon = category.icon;
+              <p className="max-w-2xl text-sm font-medium leading-7 text-slate-600 sm:text-base lg:justify-self-end">
+                PDFMantra should not become flashy UI around weak workflows.
+                Every major design decision should improve tool understanding,
+                task completion, or confidence.
+              </p>
+            </div>
 
-                  return (
-                    <div key={category.title} className="rich-card-static relative overflow-hidden">
-                      <div
-                        className={`absolute right-[-30px] top-[-30px] h-28 w-28 rounded-full bg-gradient-to-br ${category.tint} opacity-15 blur-2xl`}
-                      />
+            <div className="mt-8 grid gap-5 lg:grid-cols-3">
+              {experienceCards.map((card, index) => {
+                const Icon = card.icon;
 
-                      <div className={`relative flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br ${category.tint} text-white shadow-lg`}>
+                return (
+                  <div
+                    key={card.title}
+                    className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-950 text-white">
+                        <Icon size={22} />
+                      </div>
+
+                      <span className="text-sm font-semibold tracking-[0.18em] text-slate-400">
+                        0{index + 1}
+                      </span>
+                    </div>
+
+                    <h3 className="mt-6 text-xl font-semibold tracking-[-0.04em] text-slate-950">
+                      {card.title}
+                    </h3>
+
+                    <p className="mt-3 text-sm font-medium leading-7 text-slate-600">
+                      {card.description}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* ECOSYSTEM */}
+        <section className="border-b border-slate-200/80 bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-950 text-white">
+          <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8 lg:py-18">
+            <div className="grid gap-6 lg:grid-cols-[0.82fr_1.18fr] lg:items-end">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.16em] text-indigo-200">
+                  PDFMantra ecosystem
+                </p>
+                <h2 className="mt-3 text-3xl font-semibold tracking-[-0.05em] text-white sm:text-4xl">
+                  Web now. Processing engine next. Desktop later.
+                </h2>
+              </div>
+
+              <p className="max-w-2xl text-sm font-medium leading-7 text-indigo-100 sm:text-base lg:justify-self-end">
+                The product should feel like one coherent PDF workspace — not a
+                disconnected set of pages built at different quality levels.
+              </p>
+            </div>
+
+            <div className="mt-8 grid gap-5 lg:grid-cols-3">
+              {ecosystemCards.map((card) => {
+                const Icon = card.icon;
+
+                return (
+                  <Link
+                    key={card.title}
+                    href={card.href}
+                    className="group rounded-[2rem] border border-white/10 bg-white/10 p-6 backdrop-blur-sm transition duration-200 hover:-translate-y-1 hover:border-white/20 hover:bg-white/15"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-indigo-700">
                         <Icon size={23} />
                       </div>
 
-                      <h3 className="relative mt-5 text-xl font-semibold tracking-[-0.04em] text-slate-950">
-                        {category.title}
-                      </h3>
-
-                      <p className="relative mt-3 text-sm font-medium leading-7 text-slate-600">
-                        {category.description}
-                      </p>
-
-                      <div className="relative mt-5 flex flex-wrap gap-2">
-                        {category.tools.map((tool) => (
-                          <span
-                            key={tool}
-                            className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600"
-                          >
-                            {tool}
-                          </span>
-                        ))}
-                      </div>
+                      <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white">
+                        {card.badge}
+                      </span>
                     </div>
-                  );
-                })}
-              </div>
-            </section>
 
-            {/* PROCESS FLOW */}
-            <section className="border-b border-slate-100 bg-white px-5 py-12 sm:px-8 lg:px-10 lg:py-16">
-              <div className="grid gap-8 lg:grid-cols-[0.82fr_1.18fr] lg:items-end">
-                <div>
-                  <div className="section-eyebrow">Experience principle</div>
-                  <h2 className="section-title mt-3">
-                    Every tool should feel easy in three moments
-                  </h2>
-                </div>
+                    <h3 className="mt-6 text-2xl font-semibold tracking-[-0.04em] text-white">
+                      {card.title}
+                    </h3>
 
-                <p className="section-description max-w-2xl lg:justify-self-end">
-                  PDFMantra’s UI should make the next step self-evident. Rich design
-                  matters, but only when it makes the product easier to use.
+                    <p className="mt-3 text-sm font-medium leading-7 text-indigo-100">
+                      {card.description}
+                    </p>
+
+                    <div className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-white">
+                      Learn more
+                      <ArrowRight
+                        size={16}
+                        className="transition group-hover:translate-x-1"
+                      />
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* BACKEND ROADMAP */}
+        <section className="border-b border-slate-200/80 bg-[#f7f9fe]">
+          <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8 lg:py-18">
+            <div className="grid gap-6 lg:grid-cols-[0.78fr_1.22fr] lg:items-end">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.16em] text-indigo-600">
+                  Backend roadmap
                 </p>
+                <h2 className="mt-3 text-3xl font-semibold tracking-[-0.05em] text-slate-950 sm:text-4xl">
+                  Heavy PDF tools deserve serious architecture
+                </h2>
               </div>
 
-              <div className="mt-8 grid gap-5 lg:grid-cols-3">
-                {workflowSteps.map((step, index) => {
-                  const Icon = step.icon;
+              <p className="max-w-2xl text-sm font-medium leading-7 text-slate-600 sm:text-base lg:justify-self-end">
+                OCR, compression, true conversion, password tools, and redaction
+                should be built through PDFMantra’s own backend processing flow —
+                not fragile browser-only shortcuts.
+              </p>
+            </div>
 
-                  return (
-                    <div key={step.title} className="rich-card-static">
-                      <div className="flex items-center justify-between">
-                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-950 text-white">
-                          <Icon size={22} />
-                        </div>
+            <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+              {backendTools.map((tool) => (
+                <ToolCard key={tool.id} tool={tool} compact />
+              ))}
+            </div>
+          </div>
+        </section>
 
-                        <span className="text-sm font-semibold tracking-[0.18em] text-slate-400">
-                          0{index + 1}
-                        </span>
-                      </div>
-
-                      <h3 className="mt-5 text-xl font-semibold tracking-[-0.04em] text-slate-950">
-                        {step.title}
-                      </h3>
-
-                      <p className="mt-3 text-sm font-medium leading-7 text-slate-600">
-                        {step.description}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-
-            {/* PLATFORM WEB + DESKTOP */}
-            <section
-              id="platform"
-              className="border-b border-slate-100 bg-gradient-to-br from-slate-950 via-indigo-950 to-violet-950 px-5 py-12 text-white sm:px-8 lg:px-10 lg:py-16"
-            >
-              <div className="grid gap-8 lg:grid-cols-[0.82fr_1.18fr] lg:items-end">
+        {/* FINAL CTA */}
+        <footer className="bg-white">
+          <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8 lg:py-18">
+            <div className="overflow-hidden rounded-[2.4rem] border border-slate-200 bg-slate-950 px-6 py-8 text-white shadow-[0_30px_100px_rgba(15,23,42,0.22)] sm:px-8 lg:px-10 lg:py-10">
+              <div className="grid gap-8 lg:grid-cols-[1.16fr_0.84fr] lg:items-center">
                 <div>
-                  <div className="text-sm font-semibold uppercase tracking-[0.16em] text-cyan-200">
-                    Product ecosystem
-                  </div>
-                  <h2 className="mt-3 text-3xl font-semibold leading-tight tracking-[-0.045em] text-white sm:text-4xl lg:text-5xl">
-                    Web now. Desktop later. One PDFMantra experience.
-                  </h2>
-                </div>
-
-                <p className="max-w-2xl text-sm font-medium leading-7 text-indigo-100 sm:text-base lg:justify-self-end">
-                  Like the best mature PDF platforms, PDFMantra should feel bigger than
-                  a one-page web utility. The visual system starts here and carries into
-                  tools, workspaces, and future desktop experiences.
-                </p>
-              </div>
-
-              <div className="mt-8 grid gap-5 lg:grid-cols-2">
-                {platformCards.map((card) => {
-                  const Icon = card.icon;
-
-                  return (
-                    <div key={card.title} className="dark-card p-6">
-                      <div className="flex items-center justify-between">
-                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-indigo-700">
-                          <Icon size={23} />
-                        </div>
-
-                        <span className="rounded-full bg-white/12 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white">
-                          {card.badge}
-                        </span>
-                      </div>
-
-                      <h3 className="mt-6 text-2xl font-semibold tracking-[-0.04em] text-white">
-                        {card.title}
-                      </h3>
-
-                      <p className="mt-3 text-sm font-medium leading-7 text-indigo-100">
-                        {card.description}
-                      </p>
-
-                      <div className="mt-5 space-y-3">
-                        {card.points.map((point) => (
-                          <div
-                            key={point}
-                            className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-white"
-                          >
-                            <BadgeCheck size={16} className="shrink-0 text-emerald-300" />
-                            {point}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-
-            {/* ROADMAP */}
-            <section
-              id="roadmap"
-              className="border-b border-slate-100 bg-white px-5 py-12 sm:px-8 lg:px-10 lg:py-16"
-            >
-              <div className="grid gap-8 lg:grid-cols-[0.82fr_1.18fr] lg:items-end">
-                <div>
-                  <div className="section-eyebrow">Backend roadmap</div>
-                  <h2 className="section-title mt-3">
-                    Serious PDF tools deserve serious processing
-                  </h2>
-                </div>
-
-                <p className="section-description max-w-2xl lg:justify-self-end">
-                  These tools will be built through PDFMantra’s own backend architecture,
-                  not forced into unstable browser-only experiments.
-                </p>
-              </div>
-
-              <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-                {roadmapTools.map((tool) => {
-                  const Icon = tool.icon;
-
-                  return (
-                    <div key={tool.id} className="rich-card-static bg-gradient-to-br from-white to-slate-50">
-                      <div className="flex items-center justify-between">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-white">
-                          <Icon size={20} />
-                        </div>
-
-                        <span className="status-soon">Coming Soon</span>
-                      </div>
-
-                      <h3 className="mt-5 text-lg font-semibold tracking-[-0.03em] text-slate-950">
-                        {tool.title}
-                      </h3>
-
-                      <p className="mt-2 text-sm font-medium leading-6 text-slate-600">
-                        {tool.description}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-
-            {/* FOOTER CTA */}
-            <footer className="bg-slate-950 px-5 py-10 text-white sm:px-8 lg:px-10">
-              <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
-                <div>
-                  <div className="text-sm font-semibold uppercase tracking-[0.16em] text-amber-300">
-                    PDFMantra direction locked
+                  <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-indigo-100">
+                    <BadgeCheck size={14} />
+                    PDFMantra direction
                   </div>
 
-                  <h2 className="mt-3 text-3xl font-semibold tracking-[-0.045em] text-white sm:text-4xl">
-                    Beautiful, understandable, and built to become powerful.
+                  <h2 className="mt-5 text-3xl font-semibold tracking-[-0.05em] text-white sm:text-4xl">
+                    Build the PDF platform people understand instantly.
                   </h2>
 
                   <p className="mt-4 max-w-2xl text-sm font-medium leading-7 text-slate-300 sm:text-base">
-                    This visual direction will guide the homepage, tools dashboard,
-                    editor redesign, backend tool pages, and future desktop product.
+                    The editor, tools dashboard, backend processing pages, and future
+                    desktop app should all carry one premium, discoverable, trustworthy
+                    product system.
                   </p>
                 </div>
 
                 <div className="flex flex-col gap-3 sm:flex-row lg:justify-end">
-                  <Link href="/editor" className="btn-primary bg-amber-400 text-slate-950 shadow-none hover:bg-amber-300">
+                  <Link
+                    href="/editor"
+                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-amber-400 px-6 py-3 text-sm font-semibold text-slate-950 transition duration-200 hover:-translate-y-0.5 hover:bg-amber-300"
+                  >
                     Open Editor Beta
                     <ArrowRight size={17} />
                   </Link>
 
-                  <a href="#tools" className="btn-secondary">
-                    Explore categories
-                  </a>
+                  <Link
+                    href="/tools"
+                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-6 py-3 text-sm font-semibold text-white backdrop-blur transition duration-200 hover:-translate-y-0.5 hover:bg-white/20"
+                  >
+                    Explore tools
+                  </Link>
                 </div>
               </div>
-            </footer>
+            </div>
           </div>
-        </section>
+        </footer>
       </main>
     </>
   );
