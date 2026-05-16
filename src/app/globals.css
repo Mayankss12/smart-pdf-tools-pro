@@ -58,8 +58,8 @@ body {
     linear-gradient(180deg, #fffaff 0%, #faf8ff 46%, #f4efff 100%);
   color: var(--pm-ink);
   font-family:
-    var(--font-inter),
-    Inter,
+    var(--font-body),
+    Lato,
     -apple-system,
     BlinkMacSystemFont,
     "Segoe UI",
@@ -93,18 +93,16 @@ a {
   h1,
   h2,
   .display-font {
-    font-family: var(--font-display), "Newsreader", Georgia, serif;
-    font-weight: 600;
+    font-family: var(--font-display), Poppins, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-weight: 500;
     letter-spacing: -0.045em;
   }
 
   h3,
   h4 {
+    font-family: var(--font-display), Poppins, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-weight: 500;
     letter-spacing: -0.03em;
-  }
-
-  h3 {
-    @apply font-semibold;
   }
 
   p {
@@ -169,7 +167,7 @@ a {
   }
 
   .section-title {
-    @apply text-4xl leading-[0.98] sm:text-5xl lg:text-6xl;
+    @apply text-4xl leading-[1.02] sm:text-5xl lg:text-6xl;
     color: var(--pm-ink);
   }
 
