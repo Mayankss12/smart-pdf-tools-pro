@@ -9,7 +9,6 @@ import {
   Images,
   Layers3,
   PenLine,
-  Search,
   ShieldCheck,
   Sparkles,
   Wand2,
@@ -269,9 +268,8 @@ export default function HomePage() {
                 </h2>
               </div>
               <p className="max-w-2xl text-sm font-medium leading-7 text-slate-600 sm:text-base lg:justify-self-end">
-                I reviewed the usual PDF-tool homepage pattern — direct task entry,
-                visible utility, clear CTAs — and rebuilt this around PDFMantra’s own
-                cleaner grid system rather than copying anyone’s layout. citeturn2search0turn2search1turn2search2turn2search3
+                PDFMantra now uses a cleaner task-first grid so the homepage feels
+                lighter, easier to scan, and quicker to act on.
               </p>
             </div>
 
