@@ -81,7 +81,10 @@ function getRectArea(rect: PercentRect) {
   return Math.max(0, rect.widthPercent) * Math.max(0, rect.heightPercent);
 }
 
-function getIntersectionRect(a: PercentRect, b: PercentRect): PercentRect | null {
+function getIntersectionRect(
+  a: PercentRect,
+  b: PercentRect
+): PercentRect | null {
   const left = Math.max(a.xPercent, b.xPercent);
   const top = Math.max(a.yPercent, b.yPercent);
   const right = Math.min(getRectRight(a), getRectRight(b));
@@ -161,6 +164,7 @@ function buildTextLineGroups(items: TextOverlayItem[]): TextLineGroup[] {
           const groupedRect = getTextItemRect(groupedItem);
           return sum + getRectCenterY(groupedRect);
         }, 0) / existingGroup.items.length;
+
       existingGroup.maxHeight = Math.max(existingGroup.maxHeight, itemHeight);
       continue;
     }
@@ -204,7 +208,7 @@ function createHighlightLayer({
     highlightColorR: color.r,
     highlightColorG: color.g,
     highlightColorB: color.b,
-  } as PdfLayer;
+  };
 }
 
 function createLineHighlightRect(line: TextLineGroup): PercentRect {
