@@ -17,7 +17,6 @@ import {
   Image,
   Layers,
   Lock,
-  Maximize2,
   Minimize2,
   MousePointer2,
   PenLine,
@@ -163,13 +162,13 @@ function SpotlightToolCell({ tool }: { tool: SpotlightTool }) {
   return (
     <Link
       href={tool.href}
-      className="group flex min-h-[122px] items-center justify-between gap-4 border-b border-r border-violet-100 bg-white/68 px-4 py-4 transition duration-200 hover:bg-white sm:px-5"
+      className="group flex min-h-[108px] items-center justify-between gap-4 border-b border-r border-violet-100 bg-white/68 px-4 py-4 transition duration-200 hover:bg-white sm:px-5"
     >
       <div className="flex min-w-0 items-center gap-4">
         <ToolGlyph icon={tool.icon} tone={tool.tone} size="md" />
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-base font-semibold tracking-[-0.03em] text-slate-950 transition group-hover:text-violet-700">
+            <span className="text-[15px] font-semibold tracking-[-0.02em] text-slate-950 transition group-hover:text-violet-700">
               {tool.title}
             </span>
             {tool.badge ? (
@@ -180,7 +179,7 @@ function SpotlightToolCell({ tool }: { tool: SpotlightTool }) {
           </div>
         </div>
       </div>
-      <ArrowRight size={17} className="shrink-0 text-violet-300 transition group-hover:translate-x-1 group-hover:text-violet-700" />
+      <ArrowRight size={16} className="shrink-0 text-violet-300 transition group-hover:translate-x-1 group-hover:text-violet-700" />
     </Link>
   );
 }
@@ -189,11 +188,11 @@ function CompactToolLink({ tool }: { tool: SpotlightTool }) {
   return (
     <Link
       href={tool.href}
-      className="group flex min-h-[72px] items-center justify-between gap-3 border-b border-r border-violet-100 bg-white/58 px-3.5 py-3 transition duration-200 hover:bg-white sm:px-4"
+      className="group flex min-h-[68px] items-center justify-between gap-3 border-b border-r border-violet-100 bg-white/58 px-3.5 py-3 transition duration-200 hover:bg-white sm:px-4"
     >
       <div className="flex min-w-0 items-center gap-3">
         <ToolGlyph icon={tool.icon} tone={tool.tone} size="sm" />
-        <span className="truncate text-sm font-semibold tracking-[-0.02em] text-slate-800 transition group-hover:text-violet-700">
+        <span className="truncate text-[13px] font-semibold tracking-[-0.01em] text-slate-800 transition group-hover:text-violet-700">
           {tool.title}
         </span>
       </div>
@@ -215,45 +214,45 @@ export default function HomePage() {
             <div className="absolute bottom-[-20rem] left-1/2 h-[42rem] w-[42rem] -translate-x-1/2 rounded-full bg-fuchsia-100/80 blur-3xl" />
           </div>
 
-          <div className="relative mx-auto max-w-7xl px-4 pb-14 pt-12 text-center sm:px-6 lg:px-8 lg:pb-18 lg:pt-18">
-            <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-violet-100 bg-white/86 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-violet-700 shadow-sm backdrop-blur">
-              <Sparkles size={14} />
+          <div className="relative mx-auto max-w-7xl px-4 pb-12 pt-11 text-center sm:px-6 lg:px-8 lg:pb-16 lg:pt-14">
+            <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-violet-100 bg-white/86 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-violet-700 shadow-sm backdrop-blur">
+              <Sparkles size={13} />
               PDFMantra Smart PDF Workspace
             </div>
 
-            <h1 className="display-font mx-auto mt-6 max-w-6xl text-5xl font-semibold leading-[0.94] tracking-[-0.06em] text-slate-950 sm:text-6xl lg:text-[5.85rem]">
+            <h1 className="display-font mx-auto mt-6 max-w-5xl text-[2.8rem] font-medium leading-[1.04] tracking-[-0.05em] text-slate-950 sm:text-[3.7rem] lg:text-[4.6rem]">
               Every PDF task,
               <span className="block bg-gradient-to-r from-violet-700 via-violet-600 to-rose-500 bg-clip-text text-transparent">
                 one cleaner workspace.
               </span>
             </h1>
 
-            <p className="mx-auto mt-6 max-w-3xl text-base font-medium leading-8 text-slate-600 sm:text-lg">
+            <p className="mx-auto mt-5 max-w-3xl text-[15px] font-medium leading-7 text-slate-600 sm:text-base">
               Edit, merge, split, compress, annotate, watermark, and protect PDFs
               through a layout that stays simple on the surface and serious underneath.
             </p>
 
-            <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link
                 href="/editor"
-                className="inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-violet-600 via-violet-600 to-rose-500 px-7 py-3 text-sm font-semibold text-white shadow-[0_20px_48px_rgba(91,63,193,0.24)] transition hover:-translate-y-0.5 hover:shadow-[0_24px_54px_rgba(91,63,193,0.32)]"
+                className="inline-flex min-h-13 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-violet-600 via-violet-600 to-rose-500 px-6 py-3 text-sm font-semibold text-white shadow-[0_20px_48px_rgba(91,63,193,0.24)] transition hover:-translate-y-0.5 hover:shadow-[0_24px_54px_rgba(91,63,193,0.32)]"
               >
                 Start Editing
-                <ArrowRight size={17} />
+                <ArrowRight size={16} />
               </Link>
               <Link
                 href="/tools"
-                className="inline-flex min-h-14 items-center justify-center gap-2 rounded-full border border-violet-200 bg-white/92 px-7 py-3 text-sm font-semibold text-violet-700 shadow-sm backdrop-blur transition hover:-translate-y-0.5 hover:border-violet-300 hover:bg-white"
+                className="inline-flex min-h-13 items-center justify-center gap-2 rounded-full border border-violet-200 bg-white/92 px-6 py-3 text-sm font-semibold text-violet-700 shadow-sm backdrop-blur transition hover:-translate-y-0.5 hover:border-violet-300 hover:bg-white"
               >
                 Browse Tool Grid
-                <ArrowRight size={17} />
+                <ArrowRight size={16} />
               </Link>
             </div>
 
-            <div className="mx-auto mt-8 grid max-w-4xl gap-3 border-t border-violet-100 pt-5 text-left sm:grid-cols-3">
+            <div className="mx-auto mt-7 grid max-w-4xl gap-3 border-t border-violet-100 pt-5 text-left sm:grid-cols-3">
               {["Fast task entry", "Category-led tools", "Backend-ready roadmap"].map((item) => (
-                <div key={item} className="flex items-start gap-2.5 text-sm font-semibold leading-6 text-slate-600">
-                  <BadgeCheck size={16} className="mt-1 shrink-0 text-emerald-500" />
+                <div key={item} className="flex items-start gap-2.5 text-[13px] font-semibold leading-6 text-slate-600">
+                  <BadgeCheck size={15} className="mt-1 shrink-0 text-emerald-500" />
                   <span>{item}</span>
                 </div>
               ))}
@@ -262,13 +261,13 @@ export default function HomePage() {
         </section>
 
         <section className="border-b border-violet-100 bg-white/78">
-          <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
+          <div className="mx-auto max-w-7xl px-4 py-11 sm:px-6 lg:px-8 lg:py-14">
             <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
               <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-violet-600">
+                <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-violet-600">
                   Start here
                 </p>
-                <h2 className="display-font mt-3 text-4xl font-semibold leading-[0.98] tracking-[-0.055em] text-slate-950 sm:text-5xl">
+                <h2 className="display-font mt-3 text-[2rem] font-medium leading-[1.08] tracking-[-0.045em] text-slate-950 sm:text-[2.55rem]">
                   Most-used PDF workflows
                 </h2>
               </div>
@@ -278,7 +277,7 @@ export default function HomePage() {
               </Link>
             </div>
 
-            <div className="mt-8 overflow-hidden rounded-[2rem] border border-violet-100 bg-white/72 shadow-[0_18px_50px_rgba(91,63,193,0.08)]">
+            <div className="mt-7 overflow-hidden rounded-[2rem] border border-violet-100 bg-white/72 shadow-[0_18px_50px_rgba(91,63,193,0.08)]">
               <div className="grid border-l border-t border-violet-100 md:grid-cols-2 xl:grid-cols-4">
                 {spotlightTools.map((tool) => (
                   <SpotlightToolCell key={tool.title} tool={tool} />
@@ -289,23 +288,23 @@ export default function HomePage() {
         </section>
 
         <section className="border-b border-violet-100 bg-[#faf8ff]">
-          <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
+          <div className="mx-auto max-w-7xl px-4 py-11 sm:px-6 lg:px-8 lg:py-14">
             <div className="grid gap-6 lg:grid-cols-[0.78fr_1.22fr] lg:items-end">
               <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-violet-600">
+                <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-violet-600">
                   40+ tools by category
                 </p>
-                <h2 className="display-font mt-3 text-4xl font-semibold leading-[0.98] tracking-[-0.055em] text-slate-950 sm:text-5xl">
+                <h2 className="display-font mt-3 text-[2rem] font-medium leading-[1.08] tracking-[-0.045em] text-slate-950 sm:text-[2.55rem]">
                   Short labels. Clear categories.
                 </h2>
               </div>
-              <p className="max-w-2xl text-sm font-medium leading-7 text-slate-600 sm:text-base lg:justify-self-end">
+              <p className="max-w-2xl text-sm font-medium leading-7 text-slate-600 sm:text-[15px] lg:justify-self-end">
                 The homepage now shows the breadth of PDFMantra without explaining every tool twice.
                 Details belong on each tool page, not in the discovery grid.
               </p>
             </div>
 
-            <div className="mt-8 grid gap-6 lg:grid-cols-2">
+            <div className="mt-7 grid gap-6 lg:grid-cols-2">
               {toolCategories.map((category) => (
                 <section
                   key={category.eyebrow}
@@ -313,14 +312,14 @@ export default function HomePage() {
                 >
                   <div className="flex items-end justify-between gap-4 border-b border-violet-100 bg-gradient-to-r from-violet-50/90 via-white to-rose-50/70 px-5 py-5 sm:px-6">
                     <div>
-                      <p className="text-xs font-bold uppercase tracking-[0.2em] text-violet-600">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-violet-600">
                         {category.eyebrow}
                       </p>
-                      <h3 className="display-font mt-2 text-3xl font-semibold tracking-[-0.045em] text-slate-950">
+                      <h3 className="display-font mt-2 text-[1.7rem] font-medium tracking-[-0.035em] text-slate-950">
                         {category.title}
                       </h3>
                     </div>
-                    <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-rose-500 shadow-sm">
+                    <span className="rounded-full bg-white/90 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-rose-500 shadow-sm">
                       {category.items.length} tools
                     </span>
                   </div>
@@ -337,15 +336,15 @@ export default function HomePage() {
         </section>
 
         <section className="border-b border-violet-100 bg-white/82">
-          <div className="mx-auto grid max-w-7xl gap-8 px-4 py-12 sm:px-6 lg:grid-cols-[0.8fr_1.2fr] lg:px-8 lg:py-16">
+          <div className="mx-auto grid max-w-7xl gap-8 px-4 py-11 sm:px-6 lg:grid-cols-[0.8fr_1.2fr] lg:px-8 lg:py-14">
             <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-violet-600">
+              <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-violet-600">
                 Editing depth target
               </p>
-              <h2 className="display-font mt-3 text-4xl font-semibold leading-[0.98] tracking-[-0.055em] text-slate-950 sm:text-5xl">
+              <h2 className="display-font mt-3 text-[2rem] font-medium leading-[1.08] tracking-[-0.045em] text-slate-950 sm:text-[2.55rem]">
                 Annotation should feel rich, not basic.
               </h2>
-              <p className="mt-4 max-w-xl text-sm font-medium leading-7 text-slate-600 sm:text-base">
+              <p className="mt-4 max-w-xl text-sm font-medium leading-7 text-slate-600 sm:text-[15px]">
                 The next editor phase will treat annotation as a proper tool family:
                 marker tools, text review tools, drawing, shapes, toggles, and color control.
               </p>
@@ -356,12 +355,12 @@ export default function HomePage() {
                 {annotationDepth.map((item, index) => (
                   <div
                     key={item}
-                    className="min-h-[112px] border-b border-r border-violet-100 px-4 py-4"
+                    className="min-h-[104px] border-b border-r border-violet-100 px-4 py-4"
                   >
-                    <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-rose-500">
+                    <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-rose-500">
                       0{index + 1}
                     </div>
-                    <div className="mt-4 text-base font-semibold tracking-[-0.03em] text-slate-950">
+                    <div className="mt-4 text-[15px] font-semibold tracking-[-0.02em] text-slate-950">
                       {item}
                     </div>
                   </div>
@@ -377,16 +376,16 @@ export default function HomePage() {
             <div className="absolute right-[-12rem] bottom-[-10rem] h-[34rem] w-[34rem] rounded-full bg-white/10 blur-3xl" />
           </div>
 
-          <div className="relative mx-auto grid max-w-7xl gap-8 px-4 py-14 sm:px-6 lg:grid-cols-[1fr_auto] lg:items-center lg:px-8 lg:py-20">
+          <div className="relative mx-auto grid max-w-7xl gap-8 px-4 py-13 sm:px-6 lg:grid-cols-[1fr_auto] lg:items-center lg:px-8 lg:py-16">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/15 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-white backdrop-blur">
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/15 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-white backdrop-blur">
                 <ShieldCheck size={14} />
                 PDFMantra direction
               </div>
-              <h2 className="display-font mt-5 max-w-4xl text-4xl font-semibold leading-[0.98] tracking-[-0.055em] text-white sm:text-5xl lg:text-6xl">
+              <h2 className="display-font mt-5 max-w-4xl text-[2.15rem] font-medium leading-[1.08] tracking-[-0.045em] text-white sm:text-[2.7rem] lg:text-[3.3rem]">
                 Friendly first. Powerful next.
               </h2>
-              <p className="mt-4 max-w-3xl text-base font-medium leading-8 text-violet-50">
+              <p className="mt-4 max-w-3xl text-[15px] font-medium leading-8 text-violet-50">
                 The site now shifts toward cleaner tool discovery, richer editor depth,
                 and backend-ready PDF processing — without becoming visually noisy.
               </p>
@@ -395,17 +394,17 @@ export default function HomePage() {
             <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
               <Link
                 href="/editor"
-                className="inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-white px-7 py-3 text-sm font-semibold text-violet-700 shadow-[0_18px_44px_rgba(43,25,122,0.22)] transition hover:-translate-y-0.5 hover:bg-violet-50"
+                className="inline-flex min-h-13 items-center justify-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-semibold text-violet-700 shadow-[0_18px_44px_rgba(43,25,122,0.22)] transition hover:-translate-y-0.5 hover:bg-violet-50"
               >
                 Open Editor
-                <ArrowRight size={17} />
+                <ArrowRight size={16} />
               </Link>
               <Link
                 href="/tools"
-                className="inline-flex min-h-14 items-center justify-center gap-2 rounded-full border border-white/25 bg-white/12 px-7 py-3 text-sm font-semibold text-white backdrop-blur transition hover:-translate-y-0.5 hover:bg-white/20"
+                className="inline-flex min-h-13 items-center justify-center gap-2 rounded-full border border-white/25 bg-white/12 px-6 py-3 text-sm font-semibold text-white backdrop-blur transition hover:-translate-y-0.5 hover:bg-white/20"
               >
                 Explore Tools
-                <ArrowRight size={17} />
+                <ArrowRight size={16} />
               </Link>
             </div>
           </div>
