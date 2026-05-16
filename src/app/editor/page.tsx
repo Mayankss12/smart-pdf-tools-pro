@@ -13,6 +13,9 @@ import {
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  buildHighlightLayersFromDrag,
+} from "@/lib/editor/highlight-selection";
 import type {
   ActiveTool,
   DragState,
@@ -529,24 +532,6 @@ export default function EditorPage() {
     };
   }, [canvasSize.height, canvasSize.width]);
 
-  useEffect(() => {
-    if (activeTool !== "highlight") {
-      return;
-    }
-
-    function handleGlobalMouseUp() {
-      window.setTimeout(() => {
-        createHighlightFromSelection();
-      }, 0);
-    }
-
-    document.addEventListener("mouseup", handleGlobalMouseUp);
-
-    return () => {
-      document.removeEventListener("mouseup", handleGlobalMouseUp);
-    };
-  }, [activeTool, currentPage, textOverlay, activeHighlightColor]);
-
   const currentPageLayers = useMemo(
     () => layers.filter((layer) => layer.page === currentPage),
     [currentPage, layers]
@@ -558,9 +543,7 @@ export default function EditorPage() {
   );
 
   const showTextOverlay =
-    activeTool === "select" ||
-    activeTool === "highlight" ||
-    activeTool === "edit";
+    activeTool === "select" || activeTool === "edit";
 
   function updateLayer(id: string, updates: Partial<PdfLayer>) {
     setLayers((previousLayers) =>
@@ -707,6 +690,8 @@ export default function EditorPage() {
 
     setActiveTool("text");
     setSelectedLayerId(null);
+    setDraftBox(null);
+    drawStateRef.current = null;
     setStatus("Drag on the PDF to create a text box.");
   }
 
@@ -719,11 +704,12 @@ export default function EditorPage() {
     setActiveTool("highlight");
     setSelectedLayerId(null);
     setDraftBox(null);
+    drawStateRef.current = null;
 
     setStatus(
-      textOverlay.length === 0
-        ? "No selectable text found on this page."
-        : "Drag across PDF text to highlight it."
+      textOverlay.length > 0
+        ? "Drag over text to create real marker-style highlight bands."
+        : "Drag on the page to highlight scanned or image-based content."
     );
   }
 
@@ -1050,16 +1036,12 @@ export default function EditorPage() {
   }
 
   function startPageDraw(event: React.PointerEvent<HTMLDivElement>) {
-    if (activeTool === "highlight") {
-      return;
-    }
-
     if (!fileBytesRef.current) {
       setStatus("Upload a PDF first.");
       return;
     }
 
-    if (activeTool !== "text") {
+    if (activeTool !== "text" && activeTool !== "highlight") {
       if (activeTool === "object") {
         setSelectedLayerId(null);
       }
@@ -1094,8 +1076,10 @@ export default function EditorPage() {
 
     event.currentTarget.setPointerCapture(event.pointerId);
 
+    document.body.style.userSelect = "none";
     document.body.style.touchAction = "none";
     document.body.style.overscrollBehavior = "none";
+    document.documentElement.style.userSelect = "none";
     document.documentElement.style.touchAction = "none";
     document.documentElement.style.overscrollBehavior = "none";
   }
@@ -1137,10 +1121,46 @@ export default function EditorPage() {
     drawStateRef.current = null;
     setDraftBox(null);
 
+    document.body.style.userSelect = "";
     document.body.style.touchAction = "";
     document.body.style.overscrollBehavior = "";
+    document.documentElement.style.userSelect = "";
     document.documentElement.style.touchAction = "";
     document.documentElement.style.overscrollBehavior = "";
+
+    if (activeTool === "highlight") {
+      if (finalBox.widthPercent < 0.75 || finalBox.heightPercent < 0.35) {
+        setStatus("Drag across the page to apply a visible highlight.");
+        return;
+      }
+
+      const color = HIGHLIGHT_COLORS[activeHighlightColor];
+      const result = buildHighlightLayersFromDrag({
+        page: currentPage,
+        dragBox: finalBox,
+        textOverlay,
+        color,
+        colorIndex: activeHighlightColor,
+        opacity: 0.5,
+      });
+
+      setLayers((previousLayers) => [...previousLayers, ...result.layers]);
+      setSelectedLayerId(null);
+
+      if (result.mode === "text-lines") {
+        setStatus(
+          `Marker highlight added across ${result.layers.length} text line${
+            result.layers.length === 1 ? "" : "s"
+          }.`
+        );
+      } else {
+        setStatus(
+          "Area highlight added. This also works on scanned and image-based PDFs."
+        );
+      }
+
+      return;
+    }
 
     if (finalBox.widthPercent < 5 || finalBox.heightPercent < 3) {
       setStatus("Drag a larger area to create the text box.");
@@ -1174,6 +1194,7 @@ export default function EditorPage() {
     document.body.style.userSelect = "";
     document.body.style.touchAction = "";
     document.body.style.overscrollBehavior = "";
+    document.documentElement.style.userSelect = "";
     document.documentElement.style.touchAction = "";
     document.documentElement.style.overscrollBehavior = "";
   }
@@ -1205,77 +1226,6 @@ export default function EditorPage() {
     setLayers((previousLayers) => [...previousLayers, newLayer]);
     setSelectedLayerId(newLayer.id);
     setStatus("Text converted into editable visual layer.");
-  }
-
-  function createHighlightFromSelection() {
-    if (activeTool !== "highlight") {
-      return;
-    }
-
-    const selection = window.getSelection();
-
-    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
-      return;
-    }
-
-    const canvasElement = canvasRef.current;
-
-    if (!canvasElement) {
-      selection.removeAllRanges();
-      return;
-    }
-
-    const pageRect = canvasElement.getBoundingClientRect();
-    const range = selection.getRangeAt(0);
-
-    const selectedRects = Array.from(range.getClientRects()).filter((rect) => {
-      const isInsidePage =
-        rect.right > pageRect.left &&
-        rect.left < pageRect.right &&
-        rect.bottom > pageRect.top &&
-        rect.top < pageRect.bottom;
-
-      return rect.width > 2 && rect.height > 2 && isInsidePage;
-    });
-
-    if (selectedRects.length === 0) {
-      selection.removeAllRanges();
-      setStatus("No selectable text found in that area.");
-      return;
-    }
-
-    const color = HIGHLIGHT_COLORS[activeHighlightColor];
-
-    const newHighlights: PdfLayer[] = selectedRects.map((rect) => {
-      const rawLeft = clamp(rect.left - pageRect.left, 0, pageRect.width);
-      const rawTop = clamp(rect.top - pageRect.top, 0, pageRect.height);
-      const rawWidth = clamp(rect.width, 2, pageRect.width - rawLeft);
-      const rawHeight = clamp(rect.height, 2, pageRect.height - rawTop);
-      const insetVertical = rawHeight * 0.1;
-      const finalTop = rawTop + insetVertical;
-      const finalHeight = rawHeight - insetVertical * 2;
-
-      return {
-        id: crypto.randomUUID(),
-        page: currentPage,
-        type: "highlight",
-        xPercent: (rawLeft / pageRect.width) * 100,
-        yPercent: (finalTop / pageRect.height) * 100,
-        widthPercent: (rawWidth / pageRect.width) * 100,
-        heightPercent: (finalHeight / pageRect.height) * 100,
-        opacity: 0.5,
-        highlightColorIndex: activeHighlightColor,
-        highlightColorCss: color.css,
-        highlightColorR: color.r,
-        highlightColorG: color.g,
-        highlightColorB: color.b,
-      } as any;
-    });
-
-    setLayers((previousLayers) => [...previousLayers, ...newHighlights]);
-    setSelectedLayerId(null);
-    setStatus("Highlight added.");
-    selection.removeAllRanges();
   }
 
   function getSelectedPdfTextForReplace() {
@@ -1660,8 +1610,10 @@ export default function EditorPage() {
     const canEditObject = activeTool === "object";
 
     if (layer.type === "highlight") {
-      const colorCss =
-        (layer as any).highlightColorCss ?? HIGHLIGHT_COLORS[0].css;
+      const r = (layer as any).highlightColorR ?? HIGHLIGHT_COLORS[0].r;
+      const g = (layer as any).highlightColorG ?? HIGHLIGHT_COLORS[0].g;
+      const b = (layer as any).highlightColorB ?? HIGHLIGHT_COLORS[0].b;
+      const alpha = layer.opacity ?? 0.5;
 
       return (
         <div
@@ -1681,7 +1633,9 @@ export default function EditorPage() {
           }`}
           style={{
             ...getLayerStyle(layer),
-            backgroundColor: colorCss,
+            backgroundColor: `rgba(${Math.round(r * 255)}, ${Math.round(
+              g * 255
+            )}, ${Math.round(b * 255)}, ${alpha})`,
             borderRadius: "2px",
             pointerEvents: canEditObject ? "auto" : "none",
             touchAction: "none",
@@ -1818,15 +1772,10 @@ export default function EditorPage() {
         }`}
         style={{
           pointerEvents:
-            activeTool === "select" ||
-            activeTool === "highlight" ||
-            activeTool === "edit"
+            activeTool === "select" || activeTool === "edit"
               ? "auto"
               : "none",
-          userSelect:
-            activeTool === "select" || activeTool === "highlight"
-              ? "text"
-              : "none",
+          userSelect: activeTool === "select" ? "text" : "none",
         }}
       >
         {textOverlay.map((item) => {
@@ -1861,18 +1810,10 @@ export default function EditorPage() {
                 color: "transparent",
                 WebkitTextFillColor: "transparent",
                 caretColor: "transparent",
-                cursor:
-                  activeTool === "select" || activeTool === "highlight"
-                    ? "text"
-                    : "pointer",
-                userSelect:
-                  activeTool === "select" || activeTool === "highlight"
-                    ? "text"
-                    : "none",
+                cursor: activeTool === "select" ? "text" : "pointer",
+                userSelect: activeTool === "select" ? "text" : "none",
                 pointerEvents:
-                  activeTool === "select" ||
-                  activeTool === "highlight" ||
-                  activeTool === "edit"
+                  activeTool === "select" || activeTool === "edit"
                     ? "auto"
                     : "none",
               }}
@@ -2086,17 +2027,19 @@ export default function EditorPage() {
               >
                 <div
                   className={`relative mx-auto rounded-xl bg-white shadow-[0_28px_90px_rgba(15,23,42,0.26)] ring-1 ring-slate-300/80 ${
-                    activeTool === "text"
+                    activeTool === "text" || activeTool === "highlight"
                       ? "cursor-crosshair"
-                      : activeTool === "highlight" ||
-                          activeTool === "select"
+                      : activeTool === "select"
                         ? "cursor-text"
                         : "cursor-default"
                   }`}
                   style={{
                     width: canvasSize.width,
                     minHeight: canvasSize.height,
-                    touchAction: activeTool === "text" ? "none" : "auto",
+                    touchAction:
+                      activeTool === "text" || activeTool === "highlight"
+                        ? "none"
+                        : "auto",
                   }}
                   onPointerDown={startPageDraw}
                   onPointerMove={updatePageDraw}
@@ -2124,9 +2067,15 @@ export default function EditorPage() {
 
                   {currentPageLayers.map((layer) => renderLayer(layer))}
 
-                  {draftBox && activeTool === "text" ? (
+                  {draftBox &&
+                  (activeTool === "text" || activeTool === "highlight") ? (
                     <div
-                      className="pointer-events-none absolute z-30 rounded-md border-2 border-dashed border-[#3157d5] bg-indigo-100/35"
+                      className={[
+                        "pointer-events-none absolute z-30 rounded-md border-2 border-dashed",
+                        activeTool === "highlight"
+                          ? "border-amber-500 bg-amber-200/35"
+                          : "border-[#3157d5] bg-indigo-100/35",
+                      ].join(" ")}
                       style={{
                         left: `${draftBox.xPercent}%`,
                         top: `${draftBox.yPercent}%`,
