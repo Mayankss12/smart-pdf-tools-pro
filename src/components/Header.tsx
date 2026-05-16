@@ -115,69 +115,84 @@ function StatusDot({ status }: { status?: HeaderNavItem["status"] }) {
   return <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${dotClassName}`} />;
 }
 
-function DesktopNavGroup({
+function DesktopNavButton({
   group,
   activeLabel,
   onOpen,
-  onClose,
+  onToggle,
 }: {
   group: HeaderNavGroup;
   activeLabel: string | null;
   onOpen: (label: string) => void;
-  onClose: () => void;
+  onToggle: (label: string) => void;
 }) {
   const pathname = usePathname();
   const isOpen = activeLabel === group.label;
   const isActive = pathname === group.href || group.items.some((item) => pathname === item.href);
 
   return (
-    <div
-      className="relative"
+    <button
+      type="button"
       onMouseEnter={() => onOpen(group.label)}
-      onMouseLeave={onClose}
+      onFocus={() => onOpen(group.label)}
+      onClick={() => onToggle(group.label)}
+      className={[
+        "inline-flex min-h-11 items-center gap-1 border-b-2 px-0.5 text-[13px] font-semibold tracking-[-0.01em] transition duration-200",
+        isActive || isOpen
+          ? "border-violet-600 text-violet-700"
+          : "border-transparent text-slate-600 hover:border-violet-300 hover:text-violet-700",
+      ].join(" ")}
+      aria-expanded={isOpen}
+      aria-haspopup="true"
     >
-      <button
-        type="button"
-        onClick={() => (isOpen ? onClose() : onOpen(group.label))}
-        className={[
-          "inline-flex min-h-11 items-center gap-1 border-b-2 px-0.5 text-[13px] font-semibold tracking-[-0.01em] transition duration-200",
-          isActive || isOpen
-            ? "border-violet-600 text-violet-700"
-            : "border-transparent text-slate-600 hover:border-violet-300 hover:text-violet-700",
-        ].join(" ")}
-        aria-expanded={isOpen}
-      >
-        {group.label}
-        <ChevronDown size={13} className={`transition duration-200 ${isOpen ? "rotate-180" : ""}`} />
-      </button>
+      {group.label}
+      <ChevronDown size={13} className={`transition duration-200 ${isOpen ? "rotate-180" : ""}`} />
+    </button>
+  );
+}
 
-      {isOpen ? (
-        <div className="absolute left-1/2 top-[calc(100%+0.72rem)] z-50 w-[276px] -translate-x-1/2 overflow-hidden rounded-[1.45rem] border border-violet-100 bg-white/98 p-2 shadow-[0_30px_80px_rgba(76,47,209,0.18)] backdrop-blur-xl">
+function DesktopCategoryTray({
+  group,
+}: {
+  group: HeaderNavGroup;
+}) {
+  return (
+    <div className="hidden border-t border-violet-100 bg-white/96 shadow-[0_18px_42px_rgba(76,47,209,0.08)] backdrop-blur-xl xl:block">
+      <div className="mx-auto max-w-[1480px] px-4 sm:px-6 lg:px-8">
+        <div className="grid min-h-[88px] grid-cols-[220px_1fr] items-stretch">
           <Link
             href={group.href}
-            className="flex items-center justify-between rounded-[1rem] bg-gradient-to-r from-violet-50 to-rose-50 px-3.5 py-3 text-sm font-semibold text-violet-800 transition hover:from-violet-100 hover:to-rose-100"
+            className="group flex flex-col justify-center border-r border-violet-100 pr-6 transition"
           >
-            <span>Open {group.label}</span>
-            <ArrowRight size={15} />
+            <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-rose-500">
+              {group.label} tools
+            </span>
+            <span className="mt-1.5 inline-flex items-center gap-2 text-[15px] font-semibold text-violet-800 transition group-hover:text-violet-950">
+              Open {group.label}
+              <ArrowRight size={15} />
+            </span>
           </Link>
 
-          <div className="mt-2 divide-y divide-violet-100">
+          <div
+            className="grid items-stretch"
+            style={{ gridTemplateColumns: `repeat(${group.items.length}, minmax(0, 1fr))` }}
+          >
             {group.items.map((item) => (
               <Link
-                key={`${group.label}-${item.label}`}
+                key={`${group.label}-tray-${item.label}`}
                 href={item.href}
-                className="flex items-center justify-between gap-3 px-3.5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-violet-50 hover:text-violet-700"
+                className="group flex min-h-[88px] items-center justify-between gap-3 border-r border-violet-100 px-5 text-sm font-semibold text-slate-700 transition last:border-r-0 hover:bg-violet-50/70 hover:text-violet-700"
               >
                 <span className="flex items-center gap-2">
                   <StatusDot status={item.status} />
                   {item.label}
                 </span>
-                <ArrowRight size={14} className="text-violet-300" />
+                <ArrowRight size={14} className="shrink-0 text-violet-200 transition group-hover:translate-x-0.5 group-hover:text-violet-600" />
               </Link>
             ))}
           </div>
         </div>
-      ) : null}
+      </div>
     </div>
   );
 }
@@ -193,6 +208,11 @@ export function Header() {
     [pathname],
   );
 
+  const activeDesktopGroup = useMemo(
+    () => CATEGORY_NAV.find((group) => group.label === activeGroup) ?? null,
+    [activeGroup],
+  );
+
   useEffect(() => {
     setActiveGroup(null);
     setMobileMenuOpen(false);
@@ -206,8 +226,15 @@ export function Header() {
     };
   }, [mobileMenuOpen]);
 
+  function toggleDesktopGroup(label: string) {
+    setActiveGroup((current) => (current === label ? null : label));
+  }
+
   return (
-    <header className="sticky top-0 z-50 border-b border-violet-100 bg-white/92 backdrop-blur-xl">
+    <header
+      className="sticky top-0 z-50 border-b border-violet-100 bg-white/92 backdrop-blur-xl"
+      onMouseLeave={() => setActiveGroup(null)}
+    >
       <div className="mx-auto max-w-[1480px] px-4 sm:px-6 lg:px-8">
         <div className="flex min-h-[78px] items-center justify-between gap-4">
           <Link href="/" className="group flex shrink-0 items-center gap-3">
@@ -225,12 +252,12 @@ export function Header() {
 
           <nav className="hidden min-w-0 flex-1 items-center justify-center gap-4 2xl:gap-5 xl:flex">
             {CATEGORY_NAV.map((group) => (
-              <DesktopNavGroup
+              <DesktopNavButton
                 key={group.label}
                 group={group}
                 activeLabel={activeGroup}
                 onOpen={setActiveGroup}
-                onClose={() => setActiveGroup(null)}
+                onToggle={toggleDesktopGroup}
               />
             ))}
           </nav>
@@ -269,6 +296,8 @@ export function Header() {
           </button>
         </div>
       </div>
+
+      {activeDesktopGroup ? <DesktopCategoryTray group={activeDesktopGroup} /> : null}
 
       {mobileMenuOpen ? (
         <div className="fixed inset-x-0 top-[79px] z-40 h-[calc(100vh-79px)] overflow-y-auto border-t border-violet-100 bg-white px-4 py-5 xl:hidden">
