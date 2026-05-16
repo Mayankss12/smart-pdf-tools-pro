@@ -71,6 +71,17 @@ export type PdfLayer = {
   imageBytes?: Uint8Array;
   imageKind?: "png" | "jpg";
   coverText?: boolean;
+
+  /**
+   * Highlight metadata.
+   * These are used by the editor preview, inspector controls,
+   * and final PDF export.
+   */
+  highlightColorIndex?: number;
+  highlightColorCss?: string;
+  highlightColorR?: number;
+  highlightColorG?: number;
+  highlightColorB?: number;
 };
 
 export type PageThumb = {
