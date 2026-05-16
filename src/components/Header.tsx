@@ -165,7 +165,7 @@ function DesktopCategoryTray({
   group: HeaderNavGroup;
 }) {
   return (
-    <div className="hidden border-t border-violet-100 bg-white/96 shadow-[0_18px_42px_rgba(76,47,209,0.08)] backdrop-blur-xl xl:block">
+    <div className="hidden border-t border-violet-100 bg-[#fffdf8]/96 shadow-[0_18px_42px_rgba(76,47,209,0.08)] backdrop-blur-xl xl:block">
       <div className="mx-auto max-w-[1480px] px-4 sm:px-6 lg:px-8">
         <div className="grid min-h-[88px] grid-cols-[220px_1fr] items-stretch">
           <Link
@@ -189,7 +189,7 @@ function DesktopCategoryTray({
               <Link
                 key={`${group.label}-tray-${item.label}`}
                 href={item.href}
-                className="group flex min-h-[88px] items-center justify-between gap-3 border-r border-violet-100 px-5 text-sm font-semibold text-slate-700 transition last:border-r-0 hover:bg-violet-50/70 hover:text-violet-700"
+                className="group flex min-h-[88px] items-center justify-between gap-3 border-r border-violet-100 px-5 text-sm font-semibold text-slate-700 transition last:border-r-0 hover:bg-violet-50/55 hover:text-violet-700"
               >
                 <span className="flex items-center gap-2">
                   <StatusDot status={item.status} />
@@ -240,7 +240,7 @@ export function Header() {
 
   return (
     <header
-      className="sticky top-0 z-50 border-b border-violet-100 bg-white/92 backdrop-blur-xl"
+      className="sticky top-0 z-50 border-b border-violet-100 bg-[#fffaf2]/92 backdrop-blur-xl"
       onMouseLeave={() => setActiveGroup(null)}
     >
       <div className="mx-auto max-w-[1480px] px-4 sm:px-6 lg:px-8">
@@ -296,7 +296,7 @@ export function Header() {
           <button
             type="button"
             onClick={() => setMobileMenuOpen((current) => !current)}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-violet-100 bg-white text-slate-950 transition hover:border-violet-200 hover:text-violet-700 xl:hidden"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-violet-100 bg-[#fffdf8] text-slate-950 transition hover:border-violet-200 hover:text-violet-700 xl:hidden"
             aria-label="Toggle navigation menu"
             aria-expanded={mobileMenuOpen}
           >
@@ -308,9 +308,9 @@ export function Header() {
       {activeDesktopGroup ? <DesktopCategoryTray group={activeDesktopGroup} /> : null}
 
       {mobileMenuOpen ? (
-        <div className="fixed inset-x-0 top-[79px] z-40 h-[calc(100vh-79px)] overflow-y-auto border-t border-violet-100 bg-white px-4 py-5 xl:hidden">
+        <div className="fixed inset-x-0 top-[79px] z-40 h-[calc(100vh-79px)] overflow-y-auto border-t border-violet-100 bg-[#fffaf2] px-4 py-5 xl:hidden">
           <div className="mx-auto max-w-3xl">
-            <div className="grid gap-0 overflow-hidden rounded-[1.8rem] border border-violet-100 bg-white">
+            <div className="grid gap-0 overflow-hidden rounded-[1.8rem] border border-violet-100 bg-[#fffdf8]">
               {CATEGORY_NAV.map((group) => {
                 const expanded = expandedMobileGroup === group.label;
 
@@ -326,7 +326,7 @@ export function Header() {
                     </button>
 
                     {expanded ? (
-                      <div className="border-t border-violet-100 bg-violet-50/45 px-3 py-2">
+                      <div className="border-t border-violet-100 bg-violet-50/38 px-3 py-2">
                         <Link href={group.href} className="flex items-center justify-between rounded-xl px-3 py-3 text-sm font-semibold text-violet-800">
                           Open {group.label}
                           <ArrowRight size={15} />
@@ -335,7 +335,7 @@ export function Header() {
                           <Link
                             key={`${group.label}-mobile-${item.label}`}
                             href={item.href}
-                            className="flex items-center justify-between rounded-xl px-3 py-3 text-sm font-semibold text-slate-700 transition hover:bg-white hover:text-violet-700"
+                            className="flex items-center justify-between rounded-xl px-3 py-3 text-sm font-semibold text-slate-700 transition hover:bg-[#fffdf8] hover:text-violet-700"
                           >
                             <span className="flex items-center gap-2">
                               <StatusDot status={item.status} />
@@ -351,14 +351,14 @@ export function Header() {
               })}
             </div>
 
-            <div className="mt-5 grid gap-0 overflow-hidden rounded-[1.8rem] border border-violet-100 bg-white sm:grid-cols-3">
-              <Link href="/pricing" className="border-b border-violet-100 px-4 py-4 text-sm font-semibold text-slate-700 transition hover:bg-violet-50 hover:text-violet-700 sm:border-b-0 sm:border-r">
+            <div className="mt-5 grid gap-0 overflow-hidden rounded-[1.8rem] border border-violet-100 bg-[#fffdf8] sm:grid-cols-3">
+              <Link href="/pricing" className="border-b border-violet-100 px-4 py-4 text-sm font-semibold text-slate-700 transition hover:bg-violet-50/42 hover:text-violet-700 sm:border-b-0 sm:border-r">
                 Pricing
               </Link>
-              <Link href="/desktop" className="border-b border-violet-100 px-4 py-4 text-sm font-semibold text-slate-700 transition hover:bg-violet-50 hover:text-violet-700 sm:border-b-0 sm:border-r">
+              <Link href="/desktop" className="border-b border-violet-100 px-4 py-4 text-sm font-semibold text-slate-700 transition hover:bg-violet-50/42 hover:text-violet-700 sm:border-b-0 sm:border-r">
                 Desktop App · Soon
               </Link>
-              <Link href="/dashboard" className="px-4 py-4 text-sm font-semibold text-slate-700 transition hover:bg-violet-50 hover:text-violet-700">
+              <Link href="/dashboard" className="px-4 py-4 text-sm font-semibold text-slate-700 transition hover:bg-violet-50/42 hover:text-violet-700">
                 Login / My Account
               </Link>
             </div>
