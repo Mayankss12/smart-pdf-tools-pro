@@ -13,9 +13,7 @@ import {
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  buildHighlightLayersFromDrag,
-} from "@/lib/editor/highlight-selection";
+import { buildHighlightLayersFromDrag } from "@/lib/editor/highlight-selection";
 import type {
   ActiveTool,
   DragState,
@@ -690,8 +688,6 @@ export default function EditorPage() {
 
     setActiveTool("text");
     setSelectedLayerId(null);
-    setDraftBox(null);
-    drawStateRef.current = null;
     setStatus("Drag on the PDF to create a text box.");
   }
 
@@ -704,12 +700,11 @@ export default function EditorPage() {
     setActiveTool("highlight");
     setSelectedLayerId(null);
     setDraftBox(null);
-    drawStateRef.current = null;
 
     setStatus(
-      textOverlay.length > 0
-        ? "Drag over text to create real marker-style highlight bands."
-        : "Drag on the page to highlight scanned or image-based content."
+      textOverlay.length === 0
+        ? "Drag on the page to highlight scanned or image-based content."
+        : "Drag across the PDF to apply marker-style highlights."
     );
   }
 
@@ -1076,10 +1071,8 @@ export default function EditorPage() {
 
     event.currentTarget.setPointerCapture(event.pointerId);
 
-    document.body.style.userSelect = "none";
     document.body.style.touchAction = "none";
     document.body.style.overscrollBehavior = "none";
-    document.documentElement.style.userSelect = "none";
     document.documentElement.style.touchAction = "none";
     document.documentElement.style.overscrollBehavior = "none";
   }
@@ -1121,21 +1114,20 @@ export default function EditorPage() {
     drawStateRef.current = null;
     setDraftBox(null);
 
-    document.body.style.userSelect = "";
     document.body.style.touchAction = "";
     document.body.style.overscrollBehavior = "";
-    document.documentElement.style.userSelect = "";
     document.documentElement.style.touchAction = "";
     document.documentElement.style.overscrollBehavior = "";
 
     if (activeTool === "highlight") {
       if (finalBox.widthPercent < 0.75 || finalBox.heightPercent < 0.35) {
-        setStatus("Drag across the page to apply a visible highlight.");
+        setStatus("Drag a larger area to apply the highlight.");
         return;
       }
 
       const color = HIGHLIGHT_COLORS[activeHighlightColor];
-      const result = buildHighlightLayersFromDrag({
+
+      const highlightResult = buildHighlightLayersFromDrag({
         page: currentPage,
         dragBox: finalBox,
         textOverlay,
@@ -1144,18 +1136,21 @@ export default function EditorPage() {
         opacity: 0.5,
       });
 
-      setLayers((previousLayers) => [...previousLayers, ...result.layers]);
+      setLayers((previousLayers) => [
+        ...previousLayers,
+        ...highlightResult.layers,
+      ]);
       setSelectedLayerId(null);
 
-      if (result.mode === "text-lines") {
+      if (highlightResult.mode === "text-lines") {
         setStatus(
-          `Marker highlight added across ${result.layers.length} text line${
-            result.layers.length === 1 ? "" : "s"
+          `Marker highlight added across ${highlightResult.layers.length} text line${
+            highlightResult.layers.length === 1 ? "" : "s"
           }.`
         );
       } else {
         setStatus(
-          "Area highlight added. This also works on scanned and image-based PDFs."
+          "Area highlight added. This works on scanned and image-based PDFs too."
         );
       }
 
@@ -1194,7 +1189,6 @@ export default function EditorPage() {
     document.body.style.userSelect = "";
     document.body.style.touchAction = "";
     document.body.style.overscrollBehavior = "";
-    document.documentElement.style.userSelect = "";
     document.documentElement.style.touchAction = "";
     document.documentElement.style.overscrollBehavior = "";
   }
@@ -1451,9 +1445,9 @@ export default function EditorPage() {
         const pdfHeight = (layer.heightPercent / 100) * height;
 
         if (layer.type === "highlight") {
-          const r = (layer as any).highlightColorR ?? 0.99;
-          const g = (layer as any).highlightColorG ?? 0.88;
-          const b = (layer as any).highlightColorB ?? 0.28;
+          const r = layer.highlightColorR ?? 0.99;
+          const g = layer.highlightColorG ?? 0.88;
+          const b = layer.highlightColorB ?? 0.28;
 
           page.drawRectangle({
             x: pdfX,
@@ -1610,10 +1604,9 @@ export default function EditorPage() {
     const canEditObject = activeTool === "object";
 
     if (layer.type === "highlight") {
-      const r = (layer as any).highlightColorR ?? HIGHLIGHT_COLORS[0].r;
-      const g = (layer as any).highlightColorG ?? HIGHLIGHT_COLORS[0].g;
-      const b = (layer as any).highlightColorB ?? HIGHLIGHT_COLORS[0].b;
-      const alpha = layer.opacity ?? 0.5;
+      const r = Math.round((layer.highlightColorR ?? 0.99) * 255);
+      const g = Math.round((layer.highlightColorG ?? 0.88) * 255);
+      const b = Math.round((layer.highlightColorB ?? 0.28) * 255);
 
       return (
         <div
@@ -1633,9 +1626,7 @@ export default function EditorPage() {
           }`}
           style={{
             ...getLayerStyle(layer),
-            backgroundColor: `rgba(${Math.round(r * 255)}, ${Math.round(
-              g * 255
-            )}, ${Math.round(b * 255)}, ${alpha})`,
+            backgroundColor: `rgba(${r}, ${g}, ${b}, ${layer.opacity ?? 0.5})`,
             borderRadius: "2px",
             pointerEvents: canEditObject ? "auto" : "none",
             touchAction: "none",
