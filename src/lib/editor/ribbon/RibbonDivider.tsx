@@ -11,17 +11,14 @@ export function RibbonDivider({
   compact = false,
   className = "",
 }: RibbonDividerProps) {
-  const baseClasses =
-    "shrink-0 rounded-full bg-slate-200/90";
+  const baseClasses = "shrink-0 rounded-full bg-slate-200/90";
 
   const orientationClasses =
     orientation === "vertical"
       ? compact
         ? "hidden h-6 w-px md:block"
         : "hidden h-8 w-px md:block"
-      : compact
-        ? "h-px w-full"
-        : "h-px w-full";
+      : "h-px w-full";
 
   return (
     <span
