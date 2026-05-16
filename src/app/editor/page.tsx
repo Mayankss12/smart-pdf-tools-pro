@@ -2034,11 +2034,6 @@ export default function EditorPage() {
               onSelectTool={selectEditorTool}
               onImageClick={() => imageInputRef.current?.click()}
               onSignatureClick={addTextSignatureLayer}
-              onSignatureImageClick={() =>
-                signatureImageInputRef.current?.click()
-              }
-              onClearPage={clearCurrentPageLayers}
-              onReset={resetEditor}
             />
 
             <div className="grid min-h-[calc(100vh-184px)] grid-cols-1 lg:grid-cols-[210px_minmax(0,1fr)] xl:grid-cols-[210px_minmax(0,1fr)_340px]">
@@ -2172,6 +2167,11 @@ export default function EditorPage() {
                 onExportModeChange={setExportMode}
                 onExportRangeChange={setExportRange}
                 onExportPdf={exportPdf}
+                onSignatureImageClick={() =>
+                  signatureImageInputRef.current?.click()
+                }
+                onClearPage={clearCurrentPageLayers}
+                onResetEditor={resetEditor}
               />
             </div>
           </div>
