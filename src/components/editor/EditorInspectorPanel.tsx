@@ -4,14 +4,17 @@ import {
   Bold,
   Copy,
   Download,
+  FileImage,
   FileText,
   Highlighter,
   Italic,
+  Layers,
   Loader2,
   Minus,
   MousePointer2,
   Move,
   Plus,
+  RotateCcw,
   Trash2,
   Type,
   Wand2,
@@ -58,6 +61,9 @@ type EditorInspectorPanelProps = {
   onExportModeChange: (mode: ExportMode) => void;
   onExportRangeChange: (value: string) => void;
   onExportPdf: () => void;
+  onSignatureImageClick: () => void;
+  onClearPage: () => void;
+  onResetEditor: () => void;
 };
 
 function ToolHint({
@@ -157,6 +163,20 @@ function MiniStat({
   );
 }
 
+function PanelHeader({
+  title,
+}: {
+  title: string;
+}) {
+  return (
+    <div className="border-b border-[#e0e7f0] bg-[#f8fafd] px-4 py-3">
+      <div className="text-sm font-semibold text-slate-900">
+        {title}
+      </div>
+    </div>
+  );
+}
+
 export function EditorInspectorPanel({
   className = "",
   activeTool,
@@ -185,6 +205,9 @@ export function EditorInspectorPanel({
   onExportModeChange,
   onExportRangeChange,
   onExportPdf,
+  onSignatureImageClick,
+  onClearPage,
+  onResetEditor,
 }: EditorInspectorPanelProps) {
   return (
     <aside
@@ -197,11 +220,7 @@ export function EditorInspectorPanel({
     >
       <div className="space-y-3 xl:max-h-[calc(100vh-205px)] xl:overflow-y-auto xl:pr-1">
         <section className="overflow-hidden rounded-2xl border border-[#d4deeb] bg-white shadow-sm">
-          <div className="border-b border-[#e0e7f0] bg-[#f8fafd] px-4 py-3">
-            <div className="text-sm font-semibold text-slate-900">
-              Properties
-            </div>
-          </div>
+          <PanelHeader title="Properties" />
 
           <div className="space-y-3 p-4">
             {selectedLayer ? (
@@ -400,6 +419,39 @@ export function EditorInspectorPanel({
                 ) : null}
               </>
             )}
+          </div>
+        </section>
+
+        <section className="overflow-hidden rounded-2xl border border-[#d4deeb] bg-white shadow-sm">
+          <PanelHeader title="Quick Actions" />
+
+          <div className="grid gap-2 p-4">
+            <button
+              type="button"
+              onClick={onSignatureImageClick}
+              className="inline-flex h-11 items-center justify-start gap-2 rounded-xl border border-[#d8e2ef] bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-[#bfcde1] hover:bg-slate-50"
+            >
+              <FileImage size={16} />
+              Signature Image
+            </button>
+
+            <button
+              type="button"
+              onClick={onClearPage}
+              className="inline-flex h-11 items-center justify-start gap-2 rounded-xl border border-[#d8e2ef] bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-[#bfcde1] hover:bg-slate-50"
+            >
+              <Layers size={16} />
+              Clear Current Page
+            </button>
+
+            <button
+              type="button"
+              onClick={onResetEditor}
+              className="inline-flex h-11 items-center justify-start gap-2 rounded-xl border border-rose-200 bg-white px-3 text-sm font-semibold text-rose-600 transition hover:bg-rose-50"
+            >
+              <RotateCcw size={16} />
+              Reset All Edits
+            </button>
           </div>
         </section>
 
