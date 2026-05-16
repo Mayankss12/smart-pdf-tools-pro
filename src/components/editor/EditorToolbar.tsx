@@ -1,15 +1,11 @@
 "use client";
 
 import {
-  ChevronDown,
-  FileImage,
   Highlighter,
   ImagePlus,
-  Layers,
   MousePointer2,
   Move,
   PenLine,
-  RotateCcw,
   Type,
   Wand2,
 } from "lucide-react";
@@ -21,9 +17,6 @@ type EditorToolbarProps = {
   onSelectTool: (tool: ActiveTool) => void;
   onImageClick: () => void;
   onSignatureClick: () => void;
-  onSignatureImageClick: () => void;
-  onClearPage: () => void;
-  onReset: () => void;
 };
 
 type ToolbarButtonProps = {
@@ -66,9 +59,6 @@ export function EditorToolbar({
   onSelectTool,
   onImageClick,
   onSignatureClick,
-  onSignatureImageClick,
-  onClearPage,
-  onReset,
 }: EditorToolbarProps) {
   return (
     <div className="border-b border-[#cfd9e7] bg-[#eaf0f7] px-3 py-2.5 sm:px-4">
@@ -123,44 +113,6 @@ export function EditorToolbar({
           icon={PenLine}
           onClick={onSignatureClick}
         />
-
-        <div className="ml-auto">
-          <details className="relative">
-            <summary className="inline-flex h-10 cursor-pointer list-none items-center gap-2 rounded-lg border border-transparent px-3 text-sm font-medium text-slate-700 transition hover:border-[#d3deee] hover:bg-white hover:text-slate-950">
-              More
-              <ChevronDown size={15} />
-            </summary>
-
-            <div className="absolute right-0 top-12 z-50 w-56 rounded-2xl border border-[#d3deee] bg-white p-2 shadow-[0_22px_70px_rgba(15,23,42,0.18)]">
-              <button
-                type="button"
-                onClick={onSignatureImageClick}
-                className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-              >
-                <FileImage size={16} />
-                Signature Image
-              </button>
-
-              <button
-                type="button"
-                onClick={onClearPage}
-                className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-              >
-                <Layers size={16} />
-                Clear Current Page
-              </button>
-
-              <button
-                type="button"
-                onClick={onReset}
-                className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-rose-600 transition hover:bg-rose-50"
-              >
-                <RotateCcw size={16} />
-                Reset All Edits
-              </button>
-            </div>
-          </details>
-        </div>
       </div>
     </div>
   );
