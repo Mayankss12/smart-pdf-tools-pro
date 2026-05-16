@@ -384,7 +384,7 @@ export const tools: Tool[] = [
       experience: "workspace",
       launchTier: "available-now",
       needsBackendProcessing: false,
-      recommendedEntry: "editor",
+      recommendedEntry: "tool-page",
     },
   },
   {
@@ -394,7 +394,7 @@ export const tools: Tool[] = [
     menuDescription:
       "Mark important text with clean textbook-style highlighting.",
     category: "edit",
-    href: "/editor",
+    href: "/tools/highlight-pdf",
     icon: Highlighter,
     status: "beta",
     isClientOnly: true,
