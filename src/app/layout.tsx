@@ -1,14 +1,15 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Newsreader } from "next/font/google";
+import { Lato, Poppins } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({
+const body = Lato({
   subsets: ["latin"],
+  weight: ["400", "700", "900"],
   display: "swap",
-  variable: "--font-inter",
+  variable: "--font-body",
 });
 
-const display = Newsreader({
+const display = Poppins({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   display: "swap",
@@ -65,7 +66,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${display.variable}`}>
+    <html lang="en" className={`${body.variable} ${display.variable}`}>
       <body className="min-h-screen bg-[var(--pm-bg)] font-sans text-[var(--pm-ink)] antialiased">
         {children}
       </body>
