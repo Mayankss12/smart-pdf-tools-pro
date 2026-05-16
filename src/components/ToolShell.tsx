@@ -14,16 +14,16 @@ export function ToolShell({
     <>
       <Header />
 
-      <main className="min-h-screen bg-[#faf8ff] text-slate-950">
+      <main className="min-h-screen bg-[var(--pm-bg)] text-slate-950">
         <section className="relative overflow-hidden border-b border-violet-100/90">
           <div className="pointer-events-none absolute inset-0">
-            <div className="absolute left-[-15rem] top-[-13rem] h-[34rem] w-[34rem] rounded-full bg-violet-200/60 blur-3xl" />
-            <div className="absolute right-[-16rem] top-[-10rem] h-[34rem] w-[34rem] rounded-full bg-rose-200/55 blur-3xl" />
+            <div className="absolute left-[-15rem] top-[-13rem] h-[34rem] w-[34rem] rounded-full bg-violet-200/45 blur-3xl" />
+            <div className="absolute right-[-16rem] top-[-10rem] h-[34rem] w-[34rem] rounded-full bg-rose-200/42 blur-3xl" />
           </div>
 
           <div className="relative mx-auto max-w-7xl px-4 py-9 sm:px-6 lg:px-8 lg:py-11">
             <div className="max-w-4xl">
-              <div className="inline-flex items-center gap-2 rounded-full border border-violet-100 bg-white/88 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-violet-700 shadow-sm backdrop-blur">
+              <div className="inline-flex items-center gap-2 rounded-full border border-violet-100 bg-[#fffdf8]/90 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-violet-700 shadow-sm backdrop-blur">
                 PDFMantra Tool Workspace
               </div>
 
@@ -39,7 +39,7 @@ export function ToolShell({
         </section>
 
         <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
-          <div className="overflow-hidden rounded-[2rem] border border-violet-100 bg-white/82 p-5 shadow-[0_18px_50px_rgba(91,63,193,0.08)] backdrop-blur sm:p-6 lg:p-7">
+          <div className="overflow-hidden rounded-[2rem] border border-violet-100 bg-[#fffdf8]/84 p-5 shadow-[0_18px_50px_rgba(91,63,193,0.08)] backdrop-blur sm:p-6 lg:p-7">
             {children}
           </div>
         </section>
