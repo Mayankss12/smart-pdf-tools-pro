@@ -140,7 +140,7 @@ function DesktopNavGroup({
         type="button"
         onClick={() => (isOpen ? onClose() : onOpen(group.label))}
         className={[
-          "inline-flex min-h-12 items-center gap-1.5 border-b-2 px-0.5 text-sm font-semibold transition duration-200",
+          "inline-flex min-h-11 items-center gap-1 border-b-2 px-0.5 text-[13px] font-semibold tracking-[-0.01em] transition duration-200",
           isActive || isOpen
             ? "border-violet-600 text-violet-700"
             : "border-transparent text-slate-600 hover:border-violet-300 hover:text-violet-700",
@@ -148,7 +148,7 @@ function DesktopNavGroup({
         aria-expanded={isOpen}
       >
         {group.label}
-        <ChevronDown size={14} className={`transition duration-200 ${isOpen ? "rotate-180" : ""}`} />
+        <ChevronDown size={13} className={`transition duration-200 ${isOpen ? "rotate-180" : ""}`} />
       </button>
 
       {isOpen ? (
@@ -208,22 +208,22 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-violet-100 bg-white/92 backdrop-blur-xl">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex min-h-[82px] items-center justify-between gap-6">
+      <div className="mx-auto max-w-[1480px] px-4 sm:px-6 lg:px-8">
+        <div className="flex min-h-[78px] items-center justify-between gap-4">
           <Link href="/" className="group flex shrink-0 items-center gap-3">
-            <BrandMark className="h-12 w-12 shrink-0 transition duration-200 group-hover:-translate-y-0.5" />
-            <div>
-              <div className="display-font text-[2rem] font-semibold leading-none tracking-[-0.05em] text-slate-950 transition duration-200 group-hover:text-violet-700">
+            <BrandMark className="h-11 w-11 shrink-0 transition duration-200 group-hover:-translate-y-0.5" />
+            <div className="min-w-[194px]">
+              <div className="display-font text-[1.72rem] font-medium leading-none tracking-[-0.045em] text-slate-950 transition duration-200 group-hover:text-violet-700">
                 PDFMantra
               </div>
-              <div className="mt-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+              <div className="mt-1 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">
                 <span className="h-px w-5 bg-gradient-to-r from-violet-500 to-rose-400" />
                 Smart PDF Workspace
               </div>
             </div>
           </Link>
 
-          <nav className="hidden min-w-0 flex-1 items-center justify-center gap-5 xl:flex">
+          <nav className="hidden min-w-0 flex-1 items-center justify-center gap-4 2xl:gap-5 xl:flex">
             {CATEGORY_NAV.map((group) => (
               <DesktopNavGroup
                 key={group.label}
@@ -235,26 +235,26 @@ export function Header() {
             ))}
           </nav>
 
-          <div className="hidden shrink-0 items-center gap-5 xl:flex">
-            <Link href="/pricing" className="text-sm font-semibold text-slate-600 transition hover:text-violet-700">
+          <div className="hidden shrink-0 items-center gap-4 xl:flex">
+            <Link href="/pricing" className="text-[13px] font-semibold text-slate-600 transition hover:text-violet-700">
               Pricing
             </Link>
-            <Link href="/desktop" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 transition hover:text-violet-700">
+            <Link href="/desktop" className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-slate-600 transition hover:text-violet-700">
               Desktop
-              <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-rose-500">
+              <span className="rounded-full bg-rose-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-rose-500">
                 Soon
               </span>
             </Link>
-            <Link href="/dashboard" className="text-sm font-semibold text-slate-600 transition hover:text-violet-700">
+            <Link href="/dashboard" className="text-[13px] font-semibold text-slate-600 transition hover:text-violet-700">
               {accountLabel}
             </Link>
             <Link
               href="/editor"
-              className="inline-flex min-h-12 items-center gap-2 rounded-full bg-gradient-to-r from-violet-600 via-violet-600 to-rose-500 px-5 text-sm font-semibold text-white shadow-[0_16px_38px_rgba(91,63,193,0.24)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_22px_48px_rgba(91,63,193,0.32)]"
+              className="inline-flex min-h-11 items-center gap-2 rounded-full bg-gradient-to-r from-violet-600 via-violet-600 to-rose-500 px-4 text-[13px] font-semibold text-white shadow-[0_16px_38px_rgba(91,63,193,0.24)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_22px_48px_rgba(91,63,193,0.32)]"
             >
-              <Sparkles size={15} />
+              <Sparkles size={14} />
               Start Editing
-              <ArrowRight size={15} />
+              <ArrowRight size={14} />
             </Link>
           </div>
 
@@ -271,7 +271,7 @@ export function Header() {
       </div>
 
       {mobileMenuOpen ? (
-        <div className="fixed inset-x-0 top-[83px] z-40 h-[calc(100vh-83px)] overflow-y-auto border-t border-violet-100 bg-white px-4 py-5 xl:hidden">
+        <div className="fixed inset-x-0 top-[79px] z-40 h-[calc(100vh-79px)] overflow-y-auto border-t border-violet-100 bg-white px-4 py-5 xl:hidden">
           <div className="mx-auto max-w-3xl">
             <div className="grid gap-0 overflow-hidden rounded-[1.8rem] border border-violet-100 bg-white">
               {CATEGORY_NAV.map((group) => {
