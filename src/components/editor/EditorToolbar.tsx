@@ -7,6 +7,7 @@ import {
   RotateCcw,
   Trash2,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 import { CommandRibbon } from "@/components/editor/ribbon/CommandRibbon";
 import type {
@@ -30,7 +31,7 @@ type EditorToolbarProps = {
 
 type UtilityActionProps = {
   label: string;
-  icon: typeof Copy;
+  icon: LucideIcon;
   disabled?: boolean;
   tone?: "default" | "danger";
   onClick: () => void;
