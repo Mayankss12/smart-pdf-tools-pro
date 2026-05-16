@@ -246,335 +246,330 @@ export default function MergePage() {
     <>
       <Header />
 
-      <main className="page-shell">
-        <section className="page-container">
-          <div className="surface overflow-hidden">
-            <section className="relative overflow-hidden border-b border-slate-100 bg-gradient-to-br from-indigo-700 via-violet-700 to-purple-700 px-6 py-12 text-white sm:px-10 lg:px-14">
-              <div className="absolute right-[-140px] top-[-140px] h-80 w-80 rounded-full bg-white/10 blur-3xl" />
-              <div className="absolute bottom-[-160px] left-[-120px] h-96 w-96 rounded-full bg-amber-300/10 blur-3xl" />
+      <main className="min-h-screen bg-[#faf8ff] text-slate-950">
+        <section className="relative overflow-hidden border-b border-violet-100/90">
+          <div className="pointer-events-none absolute inset-0">
+            <div className="absolute left-[-15rem] top-[-13rem] h-[34rem] w-[34rem] rounded-full bg-violet-200/60 blur-3xl" />
+            <div className="absolute right-[-16rem] top-[-10rem] h-[34rem] w-[34rem] rounded-full bg-rose-200/55 blur-3xl" />
+          </div>
 
-              <div className="relative grid gap-8 lg:grid-cols-[1fr_360px] lg:items-center">
-                <div>
-                  <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white ring-1 ring-white/20">
-                    <Merge size={14} />
-                    PDFMantra Merge Tool
-                  </div>
-
-                  <h1 className="max-w-3xl text-4xl font-semibold leading-[1.08] tracking-[-0.04em] text-white sm:text-5xl">
-                    Merge PDFs in a clean visual sequence.
-                  </h1>
-
-                  <p className="mt-5 max-w-2xl text-base font-medium leading-8 text-indigo-50/95">
-                    Upload multiple PDFs, preview the first page, arrange the exact order,
-                    then merge everything into one polished document.
-                  </p>
+          <div className="relative mx-auto max-w-7xl px-4 py-9 sm:px-6 lg:px-8 lg:py-11">
+            <div className="grid gap-7 lg:grid-cols-[1fr_360px] lg:items-center">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-violet-100 bg-white/88 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-violet-700 shadow-sm backdrop-blur">
+                  <Merge size={13} />
+                  PDFMantra Merge Tool
                 </div>
 
-                <div className="rounded-[1.5rem] border border-white/15 bg-white/10 p-4 backdrop-blur">
-                  <div className="grid grid-cols-3 gap-3 text-center">
-                    <div className="rounded-2xl bg-white/12 p-4 ring-1 ring-white/15">
-                      <div className="text-2xl font-semibold">{files.length}</div>
-                      <div className="mt-1 text-xs font-medium text-indigo-50">
-                        Files
-                      </div>
-                    </div>
+                <h1 className="display-font mt-5 max-w-4xl text-[2.35rem] font-medium leading-[1.08] tracking-[-0.045em] text-slate-950 sm:text-[2.9rem] lg:text-[3.35rem]">
+                  Merge PDFs in a
+                  <span className="block bg-gradient-to-r from-violet-700 via-violet-600 to-rose-500 bg-clip-text text-transparent">
+                    clean visual sequence.
+                  </span>
+                </h1>
 
-                    <div className="rounded-2xl bg-white/12 p-4 ring-1 ring-white/15">
-                      <div className="text-2xl font-semibold">
-                        {totalPages || "-"}
-                      </div>
-                      <div className="mt-1 text-xs font-medium text-indigo-50">
-                        Pages
-                      </div>
-                    </div>
+                <p className="mt-4 max-w-2xl text-[15px] font-medium leading-7 text-slate-600 sm:text-base">
+                  Upload multiple PDFs, preview the first page, arrange the exact order, then merge everything into one polished document.
+                </p>
+              </div>
 
-                    <div className="rounded-2xl bg-white/12 p-4 ring-1 ring-white/15">
-                      <div className="text-2xl font-semibold">
-                        {files.length ? formatFileSize(totalSize) : "-"}
-                      </div>
-                      <div className="mt-1 text-xs font-medium text-indigo-50">
-                        Size
-                      </div>
+              <div className="overflow-hidden rounded-[2rem] border border-violet-100 bg-white/84 p-4 shadow-[0_24px_70px_rgba(91,63,193,0.11)] backdrop-blur">
+                <div className="grid grid-cols-3 divide-x divide-violet-100 text-center">
+                  <div className="px-3 py-4">
+                    <div className="text-[1.45rem] font-bold tracking-[-0.03em] text-slate-950">{files.length}</div>
+                    <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                      Files
+                    </div>
+                  </div>
+
+                  <div className="px-3 py-4">
+                    <div className="text-[1.45rem] font-bold tracking-[-0.03em] text-slate-950">
+                      {totalPages || "-"}
+                    </div>
+                    <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                      Pages
+                    </div>
+                  </div>
+
+                  <div className="px-3 py-4">
+                    <div className="text-[1.45rem] font-bold tracking-[-0.03em] text-slate-950">
+                      {files.length ? formatFileSize(totalSize) : "-"}
+                    </div>
+                    <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                      Size
                     </div>
                   </div>
                 </div>
+              </div>
 
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="application/pdf"
-                  multiple
-                  className="hidden"
-                  onChange={(event) => addFiles(event.target.files || undefined)}
-                />
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="application/pdf"
+                multiple
+                className="hidden"
+                onChange={(event) => addFiles(event.target.files || undefined)}
+              />
+            </div>
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+          <div className="grid overflow-hidden rounded-[2rem] border border-violet-100 bg-white/82 shadow-[0_18px_50px_rgba(91,63,193,0.08)] lg:grid-cols-[1fr_380px]">
+            <section className="min-h-[700px] border-r border-violet-100 bg-[#fcfbff] p-5 sm:p-6">
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  addFiles(event.dataTransfer.files);
+                }}
+                onDragOver={(event) => event.preventDefault()}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    fileInputRef.current?.click();
+                  }
+                }}
+                className="cursor-pointer rounded-[1.8rem] border-2 border-dashed border-violet-200 bg-gradient-to-br from-white via-violet-50/55 to-rose-50/45 p-6 text-center transition hover:border-violet-400 hover:bg-white"
+              >
+                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-[1.15rem] bg-gradient-to-r from-violet-600 to-rose-500 text-white shadow-[0_18px_42px_rgba(91,63,193,0.22)]">
+                  <FileStack size={22} />
+                </div>
+
+                <div className="text-[15px] font-semibold tracking-[-0.02em] text-slate-950">
+                  Drop PDFs here
+                </div>
+
+                <div className="mt-1 text-sm font-medium text-slate-600">
+                  Upload two or more PDFs. The final document follows the sequence below.
+                </div>
+
+                <div className="mt-4 inline-flex items-center justify-center gap-2 rounded-full border border-violet-100 bg-white px-4 py-2 text-sm font-semibold text-violet-700 shadow-sm">
+                  <Upload size={17} />
+                  Choose PDFs
+                </div>
+              </div>
+
+              <div className="mt-5 rounded-[1.8rem] border border-violet-100 bg-white/92 p-5 shadow-[0_14px_36px_rgba(91,63,193,0.06)]">
+                <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
+                  <div>
+                    <h2 className="display-font text-[1.75rem] font-medium tracking-[-0.035em] text-slate-950">
+                      Smart Merge Queue
+                    </h2>
+                    <p className="mt-1 text-sm font-medium text-slate-600">
+                      Reorder files before merging. Top file becomes the first part of the final PDF.
+                    </p>
+                  </div>
+
+                  {files.length > 0 && (
+                    <button
+                      onClick={clearFiles}
+                      className="inline-flex items-center justify-center gap-2 rounded-full border border-rose-100 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-600 transition hover:bg-rose-100"
+                    >
+                      <X size={15} />
+                      Clear all
+                    </button>
+                  )}
+                </div>
+
+                {busy && files.length === 0 ? (
+                  <div className="mt-5 flex min-h-80 items-center justify-center rounded-[1.5rem] bg-violet-50/55">
+                    <div className="flex items-center gap-2 rounded-full bg-white px-4 py-3 text-sm font-semibold text-violet-700 shadow-sm">
+                      <Loader2 className="animate-spin" size={18} />
+                      Preparing PDFs
+                    </div>
+                  </div>
+                ) : files.length === 0 ? (
+                  <div className="mt-5 flex min-h-80 items-center justify-center rounded-[1.5rem] border border-dashed border-violet-100 bg-violet-50/40 text-center">
+                    <div>
+                      <FileText className="mx-auto text-violet-300" size={38} />
+                      <div className="mt-3 text-[15px] font-semibold text-slate-950">
+                        No PDFs in queue
+                      </div>
+                      <p className="mt-1 text-sm font-medium text-slate-600">
+                        Add multiple PDFs to build your merge sequence.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-5 space-y-3">
+                    {files.map((item, index) => (
+                      <div
+                        key={item.id}
+                        className="group grid gap-4 rounded-[1.5rem] border border-violet-100 bg-white p-4 shadow-[0_12px_28px_rgba(91,63,193,0.06)] transition hover:border-violet-200 hover:shadow-[0_18px_38px_rgba(91,63,193,0.10)] md:grid-cols-[54px_84px_1fr_auto]"
+                      >
+                        <div className="flex items-start gap-3 md:block">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-violet-50 text-sm font-semibold text-violet-700">
+                            {index + 1}
+                          </div>
+                        </div>
+
+                        <div className="overflow-hidden rounded-2xl border border-violet-100 bg-violet-50/40">
+                          {item.thumbUrl ? (
+                            <img
+                              src={item.thumbUrl}
+                              alt={`Preview of ${item.file.name}`}
+                              className="h-28 w-full object-contain"
+                            />
+                          ) : (
+                            <div className="flex h-28 items-center justify-center">
+                              <FileText size={26} className="text-violet-300" />
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="min-w-0">
+                          <div className="flex items-start gap-2">
+                            <GripVertical size={18} className="mt-0.5 shrink-0 text-violet-200" />
+                            <div className="min-w-0">
+                              <div className="truncate text-[15px] font-semibold tracking-[-0.02em] text-slate-950">
+                                {item.file.name}
+                              </div>
+
+                              <div className="mt-2 flex flex-wrap gap-2 text-xs font-medium">
+                                <span className="rounded-full bg-violet-50 px-3 py-1 text-violet-700">
+                                  {formatFileSize(item.file.size)}
+                                </span>
+
+                                <span className="rounded-full bg-rose-50 px-3 py-1 text-rose-600">
+                                  {item.pageCount
+                                    ? `${item.pageCount} page${item.pageCount > 1 ? "s" : ""}`
+                                    : "Pages loading"}
+                                </span>
+
+                                <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700">
+                                  Position {index + 1}
+                                </span>
+                              </div>
+
+                              <p className="mt-3 text-sm font-medium leading-6 text-slate-600">
+                                This PDF will be placed{" "}
+                                <span className="font-semibold text-slate-900">
+                                  {index === 0
+                                    ? "at the beginning"
+                                    : index === files.length - 1
+                                      ? "at the end"
+                                      : `after file ${index}`}
+                                </span>{" "}
+                                in the merged document.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 md:flex-col">
+                          <button
+                            onClick={() => moveFile(index, "up")}
+                            disabled={index === 0}
+                            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-violet-100 bg-white text-slate-700 transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40"
+                            title="Move up"
+                          >
+                            <ArrowUp size={17} />
+                          </button>
+
+                          <button
+                            onClick={() => moveFile(index, "down")}
+                            disabled={index === files.length - 1}
+                            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-violet-100 bg-white text-slate-700 transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40"
+                            title="Move down"
+                          >
+                            <ArrowDown size={17} />
+                          </button>
+
+                          <button
+                            onClick={() => removeFile(item.id)}
+                            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-rose-100 bg-rose-50 text-rose-600 transition hover:bg-rose-100"
+                            title="Remove"
+                          >
+                            <Trash2 size={17} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </section>
 
-            <div className="grid lg:grid-cols-[1fr_380px]">
-              <section className="min-h-[700px] border-r border-slate-200 bg-slate-50/70 p-5 sm:p-6">
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    addFiles(event.dataTransfer.files);
-                  }}
-                  onDragOver={(event) => event.preventDefault()}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      fileInputRef.current?.click();
-                    }
-                  }}
-                  className="cursor-pointer rounded-[1.75rem] border-2 border-dashed border-indigo-200 bg-white p-6 text-center shadow-sm transition hover:border-indigo-400 hover:bg-indigo-50/40"
+            <aside className="bg-white/86 p-5 sm:p-6">
+              <div className="rounded-[1.8rem] border border-violet-100 bg-gradient-to-br from-violet-50/80 via-white to-rose-50/60 p-5 shadow-[0_14px_36px_rgba(91,63,193,0.06)]">
+                <h2 className="display-font text-[1.75rem] font-medium tracking-[-0.035em] text-slate-950">
+                  Merge Summary
+                </h2>
+
+                <div className="mt-4 space-y-3">
+                  <div className="rounded-[1.35rem] border border-violet-100 bg-white p-4">
+                    <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                      Files selected
+                    </div>
+                    <div className="mt-1 text-[1.9rem] font-semibold tracking-[-0.04em] text-slate-950">
+                      {files.length}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[1.35rem] border border-violet-100 bg-white p-4">
+                    <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                      Total pages
+                    </div>
+                    <div className="mt-1 text-[1.9rem] font-semibold tracking-[-0.04em] text-slate-950">
+                      {totalPages || "-"}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[1.35rem] border border-violet-100 bg-white p-4">
+                    <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                      Total size
+                    </div>
+                    <div className="mt-1 text-[1.9rem] font-semibold tracking-[-0.04em] text-slate-950">
+                      {files.length > 0 ? formatFileSize(totalSize) : "-"}
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleMerge}
+                  disabled={!canMerge}
+                  className="btn-primary mt-5 w-full"
                 >
-                  <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-sm shadow-indigo-200">
-                    <FileStack size={22} />
-                  </div>
-
-                  <div className="font-semibold tracking-[-0.02em] text-slate-950">
-                    Drop PDFs here
-                  </div>
-
-                  <div className="mt-1 text-sm font-medium text-slate-500">
-                    Upload two or more PDFs. The final document follows the sequence below.
-                  </div>
-
-                  <div className="mt-4 inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700">
-                    <Upload size={17} />
-                    Choose PDFs
-                  </div>
-                </div>
-
-                <div className="mt-5 rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
-                  <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
-                    <div>
-                      <h2 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">
-                        Smart Merge Queue
-                      </h2>
-                      <p className="mt-1 text-sm font-medium text-slate-500">
-                        Reorder files before merging. Top file becomes the first part of the final PDF.
-                      </p>
-                    </div>
-
-                    {files.length > 0 && (
-                      <button
-                        onClick={clearFiles}
-                        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100"
-                      >
-                        <X size={15} />
-                        Clear all
-                      </button>
-                    )}
-                  </div>
-
-                  {busy && files.length === 0 ? (
-                    <div className="mt-5 flex min-h-80 items-center justify-center rounded-[1.5rem] bg-slate-50">
-                      <div className="flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold shadow-sm">
-                        <Loader2
-                          className="animate-spin text-indigo-600"
-                          size={18}
-                        />
-                        Preparing PDFs
-                      </div>
-                    </div>
-                  ) : files.length === 0 ? (
-                    <div className="mt-5 flex min-h-80 items-center justify-center rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50 text-center">
-                      <div>
-                        <FileText className="mx-auto text-slate-400" size={38} />
-                        <div className="mt-3 font-semibold text-slate-900">
-                          No PDFs in queue
-                        </div>
-                        <p className="mt-1 text-sm font-medium text-slate-500">
-                          Add multiple PDFs to build your merge sequence.
-                        </p>
-                      </div>
-                    </div>
+                  {busy ? (
+                    <>
+                      <Loader2 className="animate-spin" size={18} />
+                      Merging
+                    </>
                   ) : (
-                    <div className="mt-5 space-y-3">
-                      {files.map((item, index) => (
-                        <div
-                          key={item.id}
-                          className="group grid gap-4 rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm transition hover:border-indigo-200 hover:shadow-md md:grid-cols-[54px_84px_1fr_auto]"
-                        >
-                          <div className="flex items-start gap-3 md:block">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-sm font-semibold text-indigo-700">
-                              {index + 1}
-                            </div>
-                          </div>
-
-                          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
-                            {item.thumbUrl ? (
-                              <img
-                                src={item.thumbUrl}
-                                alt={`Preview of ${item.file.name}`}
-                                className="h-28 w-full object-contain"
-                              />
-                            ) : (
-                              <div className="flex h-28 items-center justify-center">
-                                <FileText size={26} className="text-slate-400" />
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="min-w-0">
-                            <div className="flex items-start gap-2">
-                              <GripVertical
-                                size={18}
-                                className="mt-0.5 shrink-0 text-slate-300"
-                              />
-                              <div className="min-w-0">
-                                <div className="truncate text-base font-semibold tracking-[-0.02em] text-slate-950">
-                                  {item.file.name}
-                                </div>
-
-                                <div className="mt-2 flex flex-wrap gap-2 text-xs font-medium">
-                                  <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">
-                                    {formatFileSize(item.file.size)}
-                                  </span>
-
-                                  <span className="rounded-full bg-indigo-50 px-3 py-1 text-indigo-700">
-                                    {item.pageCount
-                                      ? `${item.pageCount} page${
-                                          item.pageCount > 1 ? "s" : ""
-                                        }`
-                                      : "Pages loading"}
-                                  </span>
-
-                                  <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700">
-                                    Position {index + 1}
-                                  </span>
-                                </div>
-
-                                <p className="mt-3 text-sm font-medium leading-6 text-slate-500">
-                                  This PDF will be placed{" "}
-                                  <span className="font-semibold text-slate-800">
-                                    {index === 0
-                                      ? "at the beginning"
-                                      : index === files.length - 1
-                                        ? "at the end"
-                                        : `after file ${index}`}
-                                  </span>{" "}
-                                  in the merged document.
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2 md:flex-col">
-                            <button
-                              onClick={() => moveFile(index, "up")}
-                              disabled={index === 0}
-                              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                              title="Move up"
-                            >
-                              <ArrowUp size={17} />
-                            </button>
-
-                            <button
-                              onClick={() => moveFile(index, "down")}
-                              disabled={index === files.length - 1}
-                              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                              title="Move down"
-                            >
-                              <ArrowDown size={17} />
-                            </button>
-
-                            <button
-                              onClick={() => removeFile(item.id)}
-                              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-red-100 bg-red-50 text-red-700 transition hover:bg-red-100"
-                              title="Remove"
-                            >
-                              <Trash2 size={17} />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    <>
+                      <Download size={18} />
+                      Merge & Download
+                    </>
                   )}
-                </div>
-              </section>
+                </button>
 
-              <aside className="bg-white p-5 sm:p-6">
-                <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5">
-                  <h2 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">
-                    Merge Summary
-                  </h2>
-
-                  <div className="mt-4 space-y-3">
-                    <div className="rounded-2xl bg-white p-4">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Files selected
-                      </div>
-                      <div className="mt-1 text-3xl font-semibold tracking-[-0.04em] text-slate-950">
-                        {files.length}
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl bg-white p-4">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Total pages
-                      </div>
-                      <div className="mt-1 text-3xl font-semibold tracking-[-0.04em] text-slate-950">
-                        {totalPages || "-"}
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl bg-white p-4">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Total size
-                      </div>
-                      <div className="mt-1 text-3xl font-semibold tracking-[-0.04em] text-slate-950">
-                        {files.length > 0 ? formatFileSize(totalSize) : "-"}
-                      </div>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={handleMerge}
-                    disabled={!canMerge}
-                    className="btn-primary mt-5 w-full"
-                  >
-                    {busy ? (
-                      <>
-                        <Loader2 className="animate-spin" size={18} />
-                        Merging
-                      </>
-                    ) : (
-                      <>
-                        <Download size={18} />
-                        Merge & Download
-                      </>
-                    )}
-                  </button>
-
-                  <div className="mt-4 rounded-2xl border border-indigo-100 bg-indigo-50 p-4 text-sm font-medium leading-6 text-indigo-800">
-                    <div className="mb-1 flex items-center gap-2 font-semibold">
-                      <CheckCircle2 size={16} />
-                      Smart order
-                    </div>
-                    The final PDF follows the exact order shown in the merge queue.
-                  </div>
-                </div>
-
-                <div className="mt-5 rounded-[1.5rem] border border-slate-200 bg-white p-4 text-sm font-medium leading-6 text-slate-600">
-                  <div className="mb-1 flex items-center gap-2 font-semibold text-slate-900">
-                    <ArrowRight size={16} />
-                    Workflow
-                  </div>
-                  Add PDFs, review the sequence, adjust order, then merge into
-                  one document.
-                </div>
-
-                <div className="mt-5 rounded-[1.5rem] border border-indigo-100 bg-indigo-50 p-4 text-sm font-medium leading-6 text-indigo-800">
+                <div className="mt-4 rounded-[1.35rem] border border-emerald-100 bg-emerald-50 p-4 text-sm font-medium leading-6 text-emerald-800">
                   <div className="mb-1 flex items-center gap-2 font-semibold">
                     <CheckCircle2 size={16} />
-                    Status
+                    Smart order
                   </div>
-                  {status}
+                  The final PDF follows the exact order shown in the merge queue.
                 </div>
-              </aside>
-            </div>
+              </div>
+
+              <div className="mt-5 rounded-[1.5rem] border border-violet-100 bg-white p-4 text-sm font-medium leading-6 text-slate-600">
+                <div className="mb-1 flex items-center gap-2 font-semibold text-slate-900">
+                  <ArrowRight size={16} />
+                  Workflow
+                </div>
+                Add PDFs, review the sequence, adjust order, then merge into one document.
+              </div>
+
+              <div className="mt-5 rounded-[1.5rem] border border-violet-100 bg-violet-50/75 p-4 text-sm font-medium leading-6 text-violet-800">
+                <div className="mb-1 flex items-center gap-2 font-semibold">
+                  <CheckCircle2 size={16} />
+                  Status
+                </div>
+                {status}
+              </div>
+            </aside>
           </div>
         </section>
       </main>
