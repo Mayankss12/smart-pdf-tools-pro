@@ -78,7 +78,7 @@ export function normalizePdfJsRotation(rotation?: number): PageRotation {
     );
   }
 
-  return normalized;
+  return normalized as PageRotation;
 }
 
 /**
