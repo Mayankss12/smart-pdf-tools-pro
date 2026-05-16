@@ -2,18 +2,11 @@
 
 import { Header } from "@/components/Header";
 import { EditorToolbar } from "@/components/editor/EditorToolbar";
+import { EditorInspectorPanel } from "@/components/editor/EditorInspectorPanel";
 import { UploadLandingPanel } from "@/components/editor/UploadLandingPanel";
 import {
-  Bold,
-  Copy,
   Download,
-  FileText,
-  Italic,
   Loader2,
-  Minus,
-  Plus,
-  Trash2,
-  Wand2,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
@@ -1652,7 +1645,7 @@ export default function EditorPage() {
         type="button"
         data-no-drag="true"
         onPointerDown={(event) => startResize(event, layer, handle.id)}
-        className={`absolute z-30 h-5 w-5 rounded-full border-2 border-white bg-indigo-500 shadow-md transition hover:scale-110 sm:h-4 sm:w-4 ${handle.className}`}
+        className={`absolute z-30 h-5 w-5 rounded-full border-2 border-white bg-[#3157d5] shadow-md transition hover:scale-110 sm:h-4 sm:w-4 ${handle.className}`}
         style={{
           cursor: handle.cursor,
           touchAction: "none",
@@ -1717,7 +1710,7 @@ export default function EditorPage() {
           onPointerDown={(event) => startMove(event, layer)}
           className={`absolute overflow-hidden rounded-lg border bg-white/80 transition ${
             isSelected
-              ? "border-indigo-400 ring-2 ring-indigo-100"
+              ? "border-[#3157d5] ring-2 ring-indigo-100"
               : "border-transparent hover:border-indigo-200"
           }`}
           style={{
@@ -1758,7 +1751,7 @@ export default function EditorPage() {
         onPointerDown={(event) => startMove(event, layer)}
         className={`absolute rounded-lg border text-slate-950 shadow-sm transition ${
           isSelected
-            ? "border-indigo-400 bg-white/95 ring-2 ring-indigo-100"
+            ? "border-[#3157d5] bg-white/95 ring-2 ring-indigo-100"
             : layer.coverText
               ? "border-transparent bg-white/95 hover:border-indigo-200"
               : "border-transparent bg-white/80 hover:border-indigo-200"
@@ -1898,7 +1891,7 @@ export default function EditorPage() {
     }
 
     if (selectedLayer.type === "text") {
-      return selectedLayer.coverText ? "Editable PDF text" : "Text";
+      return selectedLayer.coverText ? "Editable PDF Text" : "Text Layer";
     }
 
     if (selectedLayer.type === "highlight") {
@@ -1965,10 +1958,10 @@ export default function EditorPage() {
         }
       />
 
-      <main className="min-h-screen bg-[#eef3f8]">
-        <section className="mx-auto max-w-[1600px] px-3 py-3 sm:px-4 sm:py-4">
-          <div className="overflow-hidden rounded-[1.5rem] border border-[#d9e2ee] bg-white/95 shadow-[0_24px_80px_rgba(15,23,42,0.08)]">
-            <div className="flex flex-col gap-3 border-b border-[#dce5ef] bg-[#fbfcfe] px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+      <main className="min-h-screen bg-[#dfe7f1]">
+        <section className="mx-auto max-w-[1820px] px-3 py-3 sm:px-4 sm:py-4">
+          <div className="overflow-hidden rounded-[1.75rem] border border-[#c8d4e5] bg-[#f8fafc] shadow-[0_28px_90px_rgba(15,23,42,0.14)]">
+            <div className="flex flex-col gap-3 border-b border-[#cfd9e7] bg-[#f4f7fb] px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
               <div className="min-w-0">
                 <div className="truncate text-sm font-semibold text-slate-950">
                   {fileName}
@@ -1979,7 +1972,7 @@ export default function EditorPage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <label className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#dbe4ef] bg-white px-3 text-sm font-medium text-slate-700">
+                <label className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#d4deeb] bg-white px-3 text-sm font-medium text-slate-700">
                   <span>Page</span>
                   <select
                     value={currentPage}
@@ -1999,19 +1992,19 @@ export default function EditorPage() {
                 <button
                   type="button"
                   onClick={zoomOut}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[#dbe4ef] bg-white text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[#d4deeb] bg-white text-slate-700 transition hover:bg-slate-50"
                 >
                   <ZoomOut size={16} />
                 </button>
 
-                <div className="inline-flex h-10 min-w-[72px] items-center justify-center rounded-xl border border-[#dbe4ef] bg-white px-3 text-sm font-semibold text-slate-700">
+                <div className="inline-flex h-10 min-w-[72px] items-center justify-center rounded-xl border border-[#d4deeb] bg-white px-3 text-sm font-semibold text-slate-800">
                   {Math.round(zoomLevel * 100)}%
                 </div>
 
                 <button
                   type="button"
                   onClick={zoomIn}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[#dbe4ef] bg-white text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[#d4deeb] bg-white text-slate-700 transition hover:bg-slate-50"
                 >
                   <ZoomIn size={16} />
                 </button>
@@ -2019,7 +2012,7 @@ export default function EditorPage() {
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="inline-flex min-h-10 items-center justify-center rounded-xl border border-[#dbe4ef] bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
+                  className="inline-flex h-10 items-center justify-center rounded-xl border border-[#d4deeb] bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-[#b8c8df] hover:bg-slate-50"
                 >
                   Replace PDF
                 </button>
@@ -2028,7 +2021,7 @@ export default function EditorPage() {
                   type="button"
                   onClick={exportPdf}
                   disabled={busy}
-                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#3157d5] px-4 text-sm font-semibold text-white transition hover:bg-[#2748b3] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Download size={16} />
                   Export
@@ -2048,176 +2041,15 @@ export default function EditorPage() {
               onReset={resetEditor}
             />
 
-            {activeTool === "highlight" ? (
-              <div className="flex flex-wrap items-center gap-2 border-b border-[#dce5ef] bg-[#f7faff] px-3 py-2.5 sm:px-4">
-                <span className="text-xs font-semibold text-slate-600">
-                  Highlight color
-                </span>
-
-                {HIGHLIGHT_COLORS.map((color, index) => (
-                  <button
-                    key={color.label}
-                    type="button"
-                    title={color.label}
-                    onClick={() => setActiveHighlightColor(index)}
-                    className={`h-6 w-6 rounded-full border-2 transition ${
-                      activeHighlightColor === index
-                        ? "border-slate-800 ring-2 ring-slate-200"
-                        : "border-white"
-                    }`}
-                    style={{
-                      backgroundColor: color.css,
-                    }}
-                  />
-                ))}
-              </div>
-            ) : null}
-
-            {selectedLayer ? (
-              <div className="flex flex-wrap items-center gap-2 border-b border-[#dce5ef] bg-[#fbfdff] px-3 py-2.5 sm:px-4">
-                <span className="mr-1 rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                  {getSelectedToolbarLabel()}
-                </span>
-
-                {(selectedLayer.type === "text" ||
-                  selectedLayer.type === "signature") &&
-                !selectedLayer.imageUrl ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        updateLayer(selectedLayer.id, {
-                          isBold: !selectedLayer.isBold,
-                        })
-                      }
-                      className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border transition ${
-                        selectedLayer.isBold
-                          ? "border-indigo-200 bg-indigo-50 text-indigo-700"
-                          : "border-[#dbe4ef] bg-white text-slate-700 hover:bg-slate-50"
-                      }`}
-                    >
-                      <Bold size={16} />
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        updateLayer(selectedLayer.id, {
-                          isItalic: !selectedLayer.isItalic,
-                        })
-                      }
-                      className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border transition ${
-                        selectedLayer.isItalic
-                          ? "border-indigo-200 bg-indigo-50 text-indigo-700"
-                          : "border-[#dbe4ef] bg-white text-slate-700 hover:bg-slate-50"
-                      }`}
-                    >
-                      <Italic size={16} />
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        updateLayer(selectedLayer.id, {
-                          fontSize: Math.max(
-                            8,
-                            (selectedLayer.fontSize || 15) - 1
-                          ),
-                        })
-                      }
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#dbe4ef] bg-white text-slate-700 transition hover:bg-slate-50"
-                    >
-                      <Minus size={15} />
-                    </button>
-
-                    <div className="min-w-[36px] text-center text-sm font-semibold text-slate-800">
-                      {selectedLayer.fontSize || 15}
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        updateLayer(selectedLayer.id, {
-                          fontSize: Math.min(
-                            72,
-                            (selectedLayer.fontSize || 15) + 1
-                          ),
-                        })
-                      }
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#dbe4ef] bg-white text-slate-700 transition hover:bg-slate-50"
-                    >
-                      <Plus size={15} />
-                    </button>
-                  </>
-                ) : null}
-
-                {selectedLayer.type === "highlight" ? (
-                  <>
-                    <select
-                      value={selectedLayer.opacity ?? 0.5}
-                      onChange={(event) =>
-                        updateLayer(selectedLayer.id, {
-                          opacity: Number(event.target.value),
-                        })
-                      }
-                      className="h-9 rounded-lg border border-[#dbe4ef] bg-white px-2 text-sm font-medium text-slate-700 outline-none"
-                    >
-                      <option value={0.25}>Light</option>
-                      <option value={0.4}>Medium</option>
-                      <option value={0.55}>Strong</option>
-                      <option value={0.7}>Dark</option>
-                    </select>
-
-                    {HIGHLIGHT_COLORS.map((color, index) => (
-                      <button
-                        key={color.label}
-                        type="button"
-                        title={color.label}
-                        onClick={() =>
-                          updateLayer(
-                            selectedLayer.id,
-                            {
-                              highlightColorIndex: index,
-                              highlightColorCss: color.css,
-                              highlightColorR: color.r,
-                              highlightColorG: color.g,
-                              highlightColorB: color.b,
-                            } as any
-                          )
-                        }
-                        className="h-5 w-5 rounded-full border border-white shadow-sm"
-                        style={{
-                          backgroundColor: color.css,
-                        }}
-                      />
-                    ))}
-                  </>
-                ) : null}
-
-                <button
-                  type="button"
-                  onClick={duplicateSelectedLayer}
-                  className="ml-auto inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[#dbe4ef] bg-white px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                >
-                  <Copy size={15} />
-                  Duplicate
-                </button>
-
-                <button
-                  type="button"
-                  onClick={deleteSelectedLayer}
-                  className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-rose-200 bg-white px-3 text-sm font-medium text-rose-600 transition hover:bg-rose-50"
-                >
-                  <Trash2 size={15} />
-                  Delete
-                </button>
-              </div>
-            ) : null}
-
-            <div className="grid min-h-[calc(100vh-210px)] grid-cols-1 lg:grid-cols-[180px_minmax(0,1fr)]">
-              <aside className="border-b border-[#dce5ef] bg-[#f7fafe] p-3 lg:border-b-0 lg:border-r">
-                <div className="mb-3 text-sm font-semibold text-slate-800">
-                  Pages
+            <div className="grid min-h-[calc(100vh-184px)] grid-cols-1 lg:grid-cols-[210px_minmax(0,1fr)] xl:grid-cols-[210px_minmax(0,1fr)_340px]">
+              <aside className="border-b border-[#cfd9e7] bg-[#edf3fa] p-3 lg:max-h-[calc(100vh-184px)] lg:overflow-y-auto lg:border-b-0 lg:border-r">
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="text-sm font-semibold text-slate-900">
+                    Pages
+                  </div>
+                  <div className="rounded-lg bg-white px-2 py-1 text-xs font-semibold text-slate-600 ring-1 ring-[#d4deeb]">
+                    {numPages}
+                  </div>
                 </div>
 
                 <div className="flex gap-2 overflow-x-auto pb-2 lg:block lg:overflow-visible lg:pb-0">
@@ -2232,10 +2064,10 @@ export default function EditorPage() {
                         key={pageNumber}
                         type="button"
                         onClick={() => selectPage(pageNumber)}
-                        className={`min-w-[86px] rounded-xl border p-2 text-left text-xs transition lg:mb-2 lg:w-full lg:min-w-0 ${
+                        className={`min-w-[92px] rounded-xl border p-2 text-left text-xs transition lg:mb-2 lg:w-full lg:min-w-0 ${
                           currentPage === pageNumber
-                            ? "border-indigo-600 bg-indigo-50 font-semibold text-indigo-700"
-                            : "border-[#dbe4ef] bg-white text-slate-700 hover:border-indigo-200 hover:bg-indigo-50"
+                            ? "border-[#3157d5] bg-white font-semibold text-[#2143a7] shadow-sm"
+                            : "border-[#d4deeb] bg-white/85 text-slate-700 hover:border-[#b9cae2] hover:bg-white"
                         }`}
                       >
                         {thumbnail?.url ? (
@@ -2255,10 +2087,10 @@ export default function EditorPage() {
 
               <section
                 ref={pdfViewportRef}
-                className="flex w-full items-start justify-start overflow-auto bg-[linear-gradient(180deg,_#f6f9fc_0%,_#eaf0f6_100%)] p-3 sm:justify-center sm:p-6"
+                className="flex min-w-0 items-start justify-start overflow-auto bg-[radial-gradient(circle_at_top,_#f4f8fd_0%,_#dfe8f2_54%,_#d5e0ec_100%)] p-4 sm:justify-center sm:p-7"
               >
                 <div
-                  className={`relative mx-auto rounded-xl bg-white shadow-[0_22px_60px_rgba(15,23,42,0.18)] ring-1 ring-slate-200 ${
+                  className={`relative mx-auto rounded-xl bg-white shadow-[0_28px_90px_rgba(15,23,42,0.26)] ring-1 ring-slate-300/80 ${
                     activeTool === "text"
                       ? "cursor-crosshair"
                       : activeTool === "highlight" ||
@@ -2285,7 +2117,7 @@ export default function EditorPage() {
                     <div className="absolute inset-0 z-50 flex items-center justify-center rounded-xl bg-white/80 backdrop-blur-sm">
                       <div className="flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-lg">
                         <Loader2
-                          className="animate-spin text-indigo-600"
+                          className="animate-spin text-[#3157d5]"
                           size={18}
                         />
                         Processing
@@ -2299,7 +2131,7 @@ export default function EditorPage() {
 
                   {draftBox && activeTool === "text" ? (
                     <div
-                      className="pointer-events-none absolute z-30 rounded-md border-2 border-dashed border-indigo-500 bg-indigo-100/35"
+                      className="pointer-events-none absolute z-30 rounded-md border-2 border-dashed border-[#3157d5] bg-indigo-100/35"
                       style={{
                         left: `${draftBox.xPercent}%`,
                         top: `${draftBox.yPercent}%`,
@@ -2312,112 +2144,36 @@ export default function EditorPage() {
                   {renderTextOverlay()}
                 </div>
               </section>
+
+              <EditorInspectorPanel
+                activeTool={activeTool}
+                selectedLayer={selectedLayer}
+                selectedLayerLabel={getSelectedToolbarLabel()}
+                highlightColors={HIGHLIGHT_COLORS}
+                activeHighlightColor={activeHighlightColor}
+                totalPages={numPages}
+                currentPage={currentPage}
+                layerCount={layers.length}
+                exportMode={exportMode}
+                exportRange={exportRange}
+                ocrText={ocrText}
+                ocrRewriteText={ocrRewriteText}
+                selectedTextRectsCount={selectedTextRects.length}
+                ocrBusy={ocrBusy}
+                busy={busy}
+                onSetActiveHighlightColor={setActiveHighlightColor}
+                onUpdateLayer={updateLayer}
+                onDuplicateSelectedLayer={duplicateSelectedLayer}
+                onDeleteSelectedLayer={deleteSelectedLayer}
+                onGetSelectedPdfTextForReplace={getSelectedPdfTextForReplace}
+                onReplaceSelectedTextVisually={replaceSelectedTextVisually}
+                onExtractCurrentPageText={extractCurrentPageText}
+                onOcrRewriteTextChange={setOcrRewriteText}
+                onExportModeChange={setExportMode}
+                onExportRangeChange={setExportRange}
+                onExportPdf={exportPdf}
+              />
             </div>
-          </div>
-
-          <div className="mt-3 grid gap-3 lg:grid-cols-2">
-            <details className="rounded-2xl border border-[#d9e2ee] bg-white/95 shadow-sm">
-              <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-slate-800">
-                Selected Text Replace
-              </summary>
-
-              <div className="border-t border-[#dce5ef] p-4">
-                <div className="grid gap-3">
-                  <textarea
-                    value={ocrText}
-                    readOnly
-                    placeholder="Selected text will appear here."
-                    className="h-24 w-full resize-none rounded-xl border border-[#dbe4ef] bg-slate-50 px-3 py-3 text-sm text-slate-700 outline-none"
-                  />
-
-                  <textarea
-                    value={ocrRewriteText}
-                    onChange={(event) =>
-                      setOcrRewriteText(event.target.value)
-                    }
-                    placeholder="Type replacement text here."
-                    className="h-24 w-full resize-none rounded-xl border border-[#dbe4ef] bg-white px-3 py-3 text-sm text-slate-900 outline-none focus:border-indigo-400"
-                  />
-
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onMouseDown={(event) => event.preventDefault()}
-                      onClick={getSelectedPdfTextForReplace}
-                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700"
-                    >
-                      <Wand2 size={15} />
-                      Get Selected Text
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={replaceSelectedTextVisually}
-                      disabled={
-                        !selectedTextRects.length || !ocrRewriteText.trim()
-                      }
-                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#dbe4ef] bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <Plus size={15} />
-                      Replace Visually
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={extractCurrentPageText}
-                      disabled={ocrBusy}
-                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#dbe4ef] bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {ocrBusy ? (
-                        <>
-                          <Loader2 className="animate-spin" size={15} />
-                          Reading
-                        </>
-                      ) : (
-                        <>
-                          <FileText size={15} />
-                          Extract Page Text
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </details>
-
-            <details className="rounded-2xl border border-[#d9e2ee] bg-white/95 shadow-sm">
-              <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-slate-800">
-                Export Options
-              </summary>
-
-              <div className="grid gap-3 border-t border-[#dce5ef] p-4 sm:grid-cols-2">
-                <label className="text-sm font-medium text-slate-700">
-                  Export mode
-                  <select
-                    value={exportMode}
-                    onChange={(event) =>
-                      setExportMode(event.target.value as ExportMode)
-                    }
-                    className="mt-2 h-11 w-full rounded-xl border border-[#dbe4ef] bg-white px-3 text-sm outline-none"
-                  >
-                    <option value="full">Full edited PDF</option>
-                    <option value="current">Current page only</option>
-                    <option value="range">Page range</option>
-                  </select>
-                </label>
-
-                <label className="text-sm font-medium text-slate-700">
-                  Page range
-                  <input
-                    value={exportRange}
-                    onChange={(event) => setExportRange(event.target.value)}
-                    disabled={exportMode !== "range"}
-                    placeholder="1-3,5"
-                    className="mt-2 h-11 w-full rounded-xl border border-[#dbe4ef] bg-white px-3 text-sm outline-none disabled:bg-slate-100 disabled:text-slate-400"
-                  />
-                </label>
-              </div>
-            </details>
           </div>
         </section>
       </main>
