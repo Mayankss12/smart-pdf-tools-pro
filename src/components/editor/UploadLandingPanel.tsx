@@ -4,24 +4,31 @@ import { FileText, Upload } from "lucide-react";
 
 type UploadLandingPanelProps = {
   busy?: boolean;
+  status?: string;
   onBrowseClick: () => void;
   onFileDrop: (file?: File) => void;
 };
 
 export function UploadLandingPanel({
   busy = false,
+  status,
   onBrowseClick,
   onFileDrop,
 }: UploadLandingPanelProps) {
+  const showStatus =
+    status &&
+    status !== "Upload a PDF to start editing." &&
+    status !== "PDF loaded. Choose a tool to start editing.";
+
   return (
-    <section className="flex min-h-[calc(100vh-72px)] items-center justify-center bg-slate-50 px-4 py-8">
-      <div className="w-full max-w-xl text-center">
-        <h1 className="text-4xl font-semibold tracking-[-0.05em] text-slate-950 sm:text-5xl">
+    <main className="flex min-h-[calc(100vh-74px)] items-center justify-center bg-slate-50 px-4 py-8">
+      <section className="w-full max-w-xl text-center">
+        <h1 className="text-4xl font-semibold tracking-[-0.055em] text-slate-950 sm:text-5xl">
           Edit your PDF
         </h1>
 
         <p className="mt-3 text-sm font-medium text-slate-500 sm:text-base">
-          Upload a PDF to start editing.
+          Upload a PDF to get started.
         </p>
 
         <div
@@ -51,10 +58,16 @@ export function UploadLandingPanel({
             className="mt-6 inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Upload size={17} />
-            {busy ? "Opening..." : "Upload PDF"}
+            {busy ? "Loading..." : "Upload PDF"}
           </button>
+
+          {showStatus ? (
+            <p className="mt-4 text-sm font-medium text-rose-600">
+              {status}
+            </p>
+          ) : null}
         </div>
-      </div>
-    </section>
+      </section>
+    </main>
   );
 }
