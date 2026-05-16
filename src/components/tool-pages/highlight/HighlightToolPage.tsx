@@ -157,6 +157,18 @@ export function HighlightToolPage() {
     );
   }
 
+  function selectLayer(layerId: string) {
+    const layer = layers.find((candidate) => candidate.id === layerId);
+
+    if (!layer) {
+      return;
+    }
+
+    setSelectedLayerId(layer.id);
+    setSelectedColor(layer.style.color);
+    setSelectedOpacity(layer.style.opacity);
+  }
+
   function clearDocumentState() {
     setFile(null);
     setBytes(null);
@@ -259,6 +271,8 @@ export function HighlightToolPage() {
     }
 
     commitLayers([...layers, result.layer], result.layer.id);
+    setSelectedColor(result.layer.style.color);
+    setSelectedOpacity(result.layer.style.opacity);
 
     if (result.status === "created-from-text-snap") {
       updateStatus(
@@ -523,7 +537,7 @@ export function HighlightToolPage() {
                       layers={layers}
                       selectedLayerId={selectedLayerId}
                       onDragComplete={handleDragComplete}
-                      onSelectLayer={(layerId) => setSelectedLayerId(layerId)}
+                      onSelectLayer={selectLayer}
                     />
                   ) : (
                     <div className="flex min-h-[540px] items-center justify-center rounded-[2rem] border border-dashed border-slate-200 bg-white/80 text-center shadow-sm">
@@ -689,7 +703,7 @@ export function HighlightToolPage() {
                           >
                             <button
                               type="button"
-                              onClick={() => setSelectedLayerId(layer.id)}
+                              onClick={() => selectLayer(layer.id)}
                               className="block w-full text-left"
                             >
                               <div className="flex items-center justify-between gap-3">
