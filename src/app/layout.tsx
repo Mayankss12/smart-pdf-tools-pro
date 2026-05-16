@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Cormorant_Garamond, Inter } from "next/font/google";
+import { Inter, Newsreader } from "next/font/google";
 import "./globals.css";
 
 const inter = Inter({
@@ -8,7 +8,7 @@ const inter = Inter({
   variable: "--font-inter",
 });
 
-const display = Cormorant_Garamond({
+const display = Newsreader({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   display: "swap",
