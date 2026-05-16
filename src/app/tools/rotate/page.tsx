@@ -8,6 +8,7 @@ import {
   Loader2,
   RotateCcw,
   RotateCw,
+  Sparkles,
   Upload,
   X,
 } from "lucide-react";
@@ -246,292 +247,300 @@ export default function RotatePage() {
     <>
       <Header />
 
-      <main className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-amber-50">
-        <section className="mx-auto max-w-7xl px-5 py-8">
-          <div className="overflow-hidden rounded-[2rem] border border-indigo-100 bg-white shadow-xl shadow-indigo-100/50">
-            <div className="border-b border-slate-100 bg-gradient-to-r from-indigo-700 via-violet-700 to-fuchsia-700 p-6 text-white">
-              <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
-                <div>
-                  <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-bold ring-1 ring-white/20">
-                    <RotateCw size={14} />
-                    PDFMantra Rotate Tool
-                  </div>
+      <main className="min-h-screen bg-[var(--pm-bg)] text-slate-950">
+        <section className="relative overflow-hidden border-b border-violet-100/90">
+          <div className="pointer-events-none absolute inset-0">
+            <div className="absolute left-[-15rem] top-[-13rem] h-[34rem] w-[34rem] rounded-full bg-violet-200/45 blur-3xl" />
+            <div className="absolute right-[-16rem] top-[-10rem] h-[34rem] w-[34rem] rounded-full bg-rose-200/42 blur-3xl" />
+          </div>
 
-                  <h1 className="text-4xl font-black tracking-[-0.03em] md:text-5xl">
-                    Rotate PDF
-                  </h1>
-
-                  <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-indigo-50 md:text-base">
-                    Preview pages, rotate individual pages or all pages, then
-                    export a clean rotated PDF.
-                  </p>
+          <div className="relative mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-12">
+            <div className="grid gap-7 lg:grid-cols-[1fr_360px] lg:items-center">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-violet-100 bg-[#fffdf8]/90 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-violet-700 shadow-sm backdrop-blur">
+                  <RotateCw size={13} />
+                  PDFMantra Rotate Tool
                 </div>
 
-                <div className="hidden rounded-2xl bg-white/15 px-4 py-3 text-sm font-bold text-white ring-1 ring-white/20 lg:block">
-                  Click the drop zone below to upload PDF
-                </div>
+                <h1 className="display-font mt-5 max-w-4xl text-[2.35rem] font-medium leading-[1.08] tracking-[-0.045em] text-slate-950 sm:text-[2.9rem] lg:text-[3.35rem]">
+                  Rotate pages with
+                  <span className="block bg-gradient-to-r from-violet-700 via-violet-600 to-rose-500 bg-clip-text text-transparent">
+                    a cleaner visual flow.
+                  </span>
+                </h1>
 
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="application/pdf"
-                  className="hidden"
-                  onChange={(event) => handleFile(event.target.files?.[0])}
-                />
+                <p className="mt-4 max-w-2xl text-[15px] font-medium leading-7 text-slate-600 sm:text-base">
+                  Preview pages, rotate individual sheets or all pages together, then export a polished rotated PDF.
+                </p>
               </div>
-            </div>
 
-            <div className="grid lg:grid-cols-[1fr_360px]">
-              <section className="min-h-[720px] border-r border-slate-200 bg-slate-50/70 p-5">
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    handleFile(event.dataTransfer.files?.[0]);
-                  }}
-                  onDragOver={(event) => event.preventDefault()}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      fileInputRef.current?.click();
-                    }
-                  }}
-                  className="cursor-pointer rounded-3xl border-2 border-dashed border-indigo-200 bg-white p-6 text-center shadow-sm transition hover:border-indigo-400 hover:bg-indigo-50/40"
-                >
-                  <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-700 text-white shadow-lg shadow-indigo-200">
-                    <FileText size={23} />
+              <div className="overflow-hidden rounded-[2rem] border border-violet-100 bg-[#fffdf8]/84 p-4 shadow-[0_24px_70px_rgba(91,63,193,0.11)] backdrop-blur">
+                <div className="grid grid-cols-2 divide-x divide-violet-100 text-center">
+                  <div className="px-3 py-4">
+                    <div className="text-[1.45rem] font-bold tracking-[-0.03em] text-slate-950">
+                      {pageCount || "-"}
+                    </div>
+                    <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                      Pages
+                    </div>
                   </div>
 
-                  <div className="font-black text-slate-950">
-                    {file ? file.name : "Drop PDF here"}
-                  </div>
-
-                  <div className="mt-1 text-sm font-semibold text-slate-500">
-                    {file
-                      ? `${pageCount} page${pageCount > 1 ? "s" : ""} loaded`
-                      : "Click here or drag a PDF to begin."}
-                  </div>
-
-                  <div className="mt-4 inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-50 px-4 py-2 text-sm font-black text-indigo-700">
-                    <Upload size={17} />
-                    Click here to choose PDF
+                  <div className="px-3 py-4">
+                    <div className="text-[1.45rem] font-bold tracking-[-0.03em] text-slate-950">
+                      {changedPages || "-"}
+                    </div>
+                    <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                      Changed
+                    </div>
                   </div>
                 </div>
+              </div>
 
-                <div className="mt-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
-                    <div>
-                      <h2 className="text-xl font-black text-slate-950">
-                        Page Preview & Rotation
-                      </h2>
-                      <p className="mt-1 text-sm font-semibold text-slate-500">
-                        Click rotate controls under each page preview.
-                      </p>
-                    </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="application/pdf"
+                className="hidden"
+                onChange={(event) => handleFile(event.target.files?.[0])}
+              />
+            </div>
+          </div>
+        </section>
 
-                    {file && (
-                      <button
-                        onClick={clearFile}
-                        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-2 text-sm font-bold text-red-700 transition hover:bg-red-100"
-                      >
-                        <X size={15} />
-                        Remove PDF
-                      </button>
-                    )}
+        <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+          <div className="grid overflow-hidden rounded-[2rem] border border-violet-100 bg-[#fffdf8]/82 shadow-[0_18px_50px_rgba(91,63,193,0.08)] lg:grid-cols-[1fr_360px]">
+            <section className="min-h-[720px] border-r border-violet-100 bg-[#fffaf4]/72 p-5 sm:p-6">
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  handleFile(event.dataTransfer.files?.[0]);
+                }}
+                onDragOver={(event) => event.preventDefault()}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    fileInputRef.current?.click();
+                  }
+                }}
+                className="cursor-pointer rounded-[1.8rem] border-2 border-dashed border-violet-200 bg-gradient-to-br from-[#fffdf8] via-violet-50/52 to-rose-50/42 p-6 text-center transition hover:border-violet-400 hover:bg-white"
+              >
+                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-[1.15rem] bg-gradient-to-r from-violet-600 to-rose-500 text-white shadow-[0_18px_42px_rgba(91,63,193,0.22)]">
+                  <FileText size={22} />
+                </div>
+
+                <div className="text-[15px] font-semibold tracking-[-0.02em] text-slate-950">
+                  {file ? file.name : "Drop PDF here"}
+                </div>
+
+                <div className="mt-1 text-sm font-medium text-slate-600">
+                  {file
+                    ? `${pageCount} page${pageCount > 1 ? "s" : ""} loaded`
+                    : "Click here or drag a PDF to begin."}
+                </div>
+
+                <div className="mt-4 inline-flex items-center justify-center gap-2 rounded-full border border-violet-100 bg-[#fffdf8] px-4 py-2 text-sm font-semibold text-violet-700 shadow-sm">
+                  <Upload size={17} />
+                  Choose PDF
+                </div>
+              </div>
+
+              <div className="mt-5 rounded-[1.8rem] border border-violet-100 bg-[#fffdf8]/92 p-5 shadow-[0_14px_36px_rgba(91,63,193,0.06)]">
+                <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
+                  <div>
+                    <h2 className="display-font text-[1.75rem] font-medium tracking-[-0.035em] text-slate-950">
+                      Page Preview & Rotation
+                    </h2>
+                    <p className="mt-1 text-sm font-medium text-slate-600">
+                      Use the controls beneath each page or apply a bulk rotation from the settings panel.
+                    </p>
                   </div>
 
-                  {busy && thumbs.length === 0 ? (
-                    <div className="mt-5 flex min-h-80 items-center justify-center rounded-3xl bg-slate-50">
-                      <div className="flex items-center gap-2 rounded-2xl bg-white px-4 py-3 font-bold shadow-sm">
-                        <Loader2
-                          className="animate-spin text-indigo-600"
-                          size={18}
-                        />
-                        Rendering preview
-                      </div>
-                    </div>
-                  ) : thumbs.length === 0 ? (
-                    <div className="mt-5 flex min-h-80 items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50 text-center">
-                      <div>
-                        <FileText className="mx-auto text-slate-400" size={38} />
-                        <div className="mt-3 font-black text-slate-900">
-                          No PDF selected
-                        </div>
-                        <p className="mt-1 text-sm text-slate-500">
-                          Upload a PDF to see page previews.
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                      {thumbs.map((thumb) => {
-                        const rotation = rotationMap[thumb.pageNumber] || 0;
-
-                        return (
-                          <div
-                            key={thumb.pageNumber}
-                            className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"
-                          >
-                            <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3">
-                              <div className="text-sm font-black text-slate-800">
-                                Page {thumb.pageNumber}
-                              </div>
-                              <div className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-black text-indigo-700">
-                                {rotation}°
-                              </div>
-                            </div>
-
-                            <div className="flex min-h-56 items-center justify-center overflow-hidden bg-slate-100 p-4">
-                              <img
-                                src={thumb.url}
-                                alt={`Page ${thumb.pageNumber}`}
-                                className="max-h-64 rounded border border-slate-200 bg-white shadow-sm transition-transform"
-                                style={{
-                                  transform: `rotate(${rotation}deg)`,
-                                }}
-                              />
-                            </div>
-
-                            <div className="grid grid-cols-3 gap-2 border-t border-slate-200 bg-white p-3">
-                              <button
-                                onClick={() => rotatePage(thumb.pageNumber, "left")}
-                                className="inline-flex items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 transition hover:bg-slate-50"
-                              >
-                                <RotateCcw size={15} />
-                                Left
-                              </button>
-
-                              <button
-                                onClick={() => resetPage(thumb.pageNumber)}
-                                className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-slate-700 transition hover:bg-slate-100"
-                              >
-                                Reset
-                              </button>
-
-                              <button
-                                onClick={() =>
-                                  rotatePage(thumb.pageNumber, "right")
-                                }
-                                className="inline-flex items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 transition hover:bg-slate-50"
-                              >
-                                Right
-                                <RotateCw size={15} />
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                  {file && (
+                    <button
+                      onClick={clearFile}
+                      className="inline-flex items-center justify-center gap-2 rounded-full border border-rose-100 bg-rose-50/90 px-4 py-2 text-sm font-semibold text-rose-600 transition hover:bg-rose-100"
+                    >
+                      <X size={15} />
+                      Remove PDF
+                    </button>
                   )}
                 </div>
-              </section>
 
-              <aside className="bg-white p-5">
-                <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-                  <h2 className="text-xl font-black text-slate-950">
-                    Rotate Settings
-                  </h2>
-
-                  <div className="mt-4 grid grid-cols-3 gap-2">
-                    <button
-                      onClick={() => rotateAll(90)}
-                      disabled={!file}
-                      className="rounded-2xl bg-indigo-700 px-3 py-3 text-sm font-black text-white transition hover:bg-indigo-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-                    >
-                      All 90°
-                    </button>
-
-                    <button
-                      onClick={() => rotateAll(180)}
-                      disabled={!file}
-                      className="rounded-2xl bg-indigo-700 px-3 py-3 text-sm font-black text-white transition hover:bg-indigo-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-                    >
-                      All 180°
-                    </button>
-
-                    <button
-                      onClick={() => rotateAll(270)}
-                      disabled={!file}
-                      className="rounded-2xl bg-indigo-700 px-3 py-3 text-sm font-black text-white transition hover:bg-indigo-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-                    >
-                      All 270°
-                    </button>
-                  </div>
-
-                  <button
-                    onClick={resetAll}
-                    disabled={!file}
-                    className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <RotateCcw size={17} />
-                    Reset All
-                  </button>
-
-                  <div className="mt-5 space-y-3">
-                    <div className="rounded-2xl bg-white p-4">
-                      <div className="text-xs font-black uppercase tracking-wide text-slate-500">
-                        Pages
-                      </div>
-                      <div className="mt-1 text-3xl font-black text-slate-950">
-                        {pageCount || "-"}
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl bg-white p-4">
-                      <div className="text-xs font-black uppercase tracking-wide text-slate-500">
-                        Changed pages
-                      </div>
-                      <div className="mt-1 text-3xl font-black text-slate-950">
-                        {changedPages || "-"}
-                      </div>
+                {busy && thumbs.length === 0 ? (
+                  <div className="mt-5 flex min-h-80 items-center justify-center rounded-[1.5rem] bg-violet-50/45">
+                    <div className="flex items-center gap-2 rounded-full bg-[#fffdf8] px-4 py-3 text-sm font-semibold text-violet-700 shadow-sm">
+                      <Loader2 className="animate-spin" size={18} />
+                      Rendering preview
                     </div>
                   </div>
+                ) : thumbs.length === 0 ? (
+                  <div className="mt-5 flex min-h-80 items-center justify-center rounded-[1.5rem] border border-dashed border-violet-100 bg-violet-50/30 text-center">
+                    <div>
+                      <FileText className="mx-auto text-violet-300" size={38} />
+                      <div className="mt-3 text-[15px] font-semibold text-slate-950">
+                        No PDF selected
+                      </div>
+                      <p className="mt-1 text-sm font-medium text-slate-600">
+                        Upload a PDF to see page previews.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    {thumbs.map((thumb) => {
+                      const rotation = rotationMap[thumb.pageNumber] || 0;
 
-                  <button
-                    onClick={handleExport}
-                    disabled={busy || !file}
-                    className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-700 px-5 py-4 text-sm font-black text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-                  >
-                    {busy ? (
-                      <>
-                        <Loader2 className="animate-spin" size={18} />
-                        Processing
-                      </>
-                    ) : (
-                      <>
-                        <Download size={18} />
-                        Export Rotated PDF
-                      </>
-                    )}
-                  </button>
+                      return (
+                        <div
+                          key={thumb.pageNumber}
+                          className="overflow-hidden rounded-[1.5rem] border border-violet-100 bg-[#fffdf8] shadow-[0_12px_28px_rgba(91,63,193,0.06)]"
+                        >
+                          <div className="flex items-center justify-between border-b border-violet-100 bg-[#fffaf4] px-4 py-3">
+                            <div className="text-sm font-semibold text-slate-800">
+                              Page {thumb.pageNumber}
+                            </div>
+                            <div className="rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700">
+                              {rotation}°
+                            </div>
+                          </div>
+
+                          <div className="flex min-h-56 items-center justify-center overflow-hidden bg-[#fffaf4] p-4">
+                            <img
+                              src={thumb.url}
+                              alt={`Page ${thumb.pageNumber}`}
+                              className="max-h-64 rounded border border-violet-100 bg-white shadow-sm transition-transform"
+                              style={{
+                                transform: `rotate(${rotation}deg)`,
+                              }}
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-2 border-t border-violet-100 bg-[#fffdf8] p-3">
+                            <button
+                              onClick={() => rotatePage(thumb.pageNumber, "left")}
+                              className="inline-flex items-center justify-center gap-1 rounded-xl border border-violet-100 bg-[#fffdf8] px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-violet-50/70"
+                            >
+                              <RotateCcw size={15} />
+                              Left
+                            </button>
+
+                            <button
+                              onClick={() => resetPage(thumb.pageNumber)}
+                              className="inline-flex items-center justify-center rounded-xl border border-violet-100 bg-violet-50/62 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-violet-100/70"
+                            >
+                              Reset
+                            </button>
+
+                            <button
+                              onClick={() =>
+                                rotatePage(thumb.pageNumber, "right")
+                              }
+                              className="inline-flex items-center justify-center gap-1 rounded-xl border border-violet-100 bg-[#fffdf8] px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-violet-50/70"
+                            >
+                              Right
+                              <RotateCw size={15} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <aside className="bg-[#fffdf8]/86 p-5 sm:p-6">
+              <div className="rounded-[1.8rem] border border-violet-100 bg-gradient-to-br from-violet-50/72 via-[#fffdf8] to-rose-50/58 p-5 shadow-[0_14px_36px_rgba(91,63,193,0.06)]">
+                <h2 className="display-font text-[1.75rem] font-medium tracking-[-0.035em] text-slate-950">
+                  Rotate Settings
+                </h2>
+
+                <div className="mt-4 grid grid-cols-3 gap-2">
+                  {[90, 180, 270].map((degree) => (
+                    <button
+                      key={degree}
+                      onClick={() => rotateAll(degree as 90 | 180 | 270)}
+                      disabled={!file}
+                      className="rounded-2xl bg-gradient-to-r from-violet-600 to-rose-500 px-3 py-3 text-sm font-semibold text-white transition hover:brightness-105 disabled:cursor-not-allowed disabled:from-slate-300 disabled:to-slate-300"
+                    >
+                      All {degree}°
+                    </button>
+                  ))}
                 </div>
 
-                <div
-                  className={`mt-5 rounded-3xl border p-4 text-sm font-bold leading-6 ${
-                    status.toLowerCase().includes("failed") ||
-                    status.toLowerCase().includes("valid")
-                      ? "border-red-100 bg-red-50 text-red-700"
-                      : "border-amber-100 bg-amber-50 text-amber-900"
-                  }`}
+                <button
+                  onClick={resetAll}
+                  disabled={!file}
+                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-violet-100 bg-[#fffdf8] px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-violet-50/70 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <div className="mb-1 flex items-center gap-2 font-black">
-                    <CheckCircle2 size={16} />
-                    Status
+                  <RotateCcw size={17} />
+                  Reset All
+                </button>
+
+                <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                  <div className="rounded-[1.35rem] border border-violet-100 bg-[#fffdf8] p-4">
+                    <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                      Pages
+                    </div>
+                    <div className="mt-1 text-[1.9rem] font-semibold tracking-[-0.04em] text-slate-950">
+                      {pageCount || "-"}
+                    </div>
                   </div>
-                  {status}
+
+                  <div className="rounded-[1.35rem] border border-violet-100 bg-[#fffdf8] p-4">
+                    <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                      Changed pages
+                    </div>
+                    <div className="mt-1 text-[1.9rem] font-semibold tracking-[-0.04em] text-slate-950">
+                      {changedPages || "-"}
+                    </div>
+                  </div>
                 </div>
 
-                <div className="mt-5 rounded-3xl border border-indigo-100 bg-indigo-50 p-4 text-sm font-semibold leading-6 text-indigo-800">
-                  <div className="font-black">How it works</div>
-                  <p className="mt-2">
-                    Rotate individual pages from the preview cards or apply one
-                    rotation to all pages. Export applies your selected rotation
-                    values to the final PDF.
-                  </p>
+                <button
+                  onClick={handleExport}
+                  disabled={busy || !file}
+                  className="btn-primary mt-5 w-full"
+                >
+                  {busy ? (
+                    <>
+                      <Loader2 className="animate-spin" size={18} />
+                      Processing
+                    </>
+                  ) : (
+                    <>
+                      <Download size={18} />
+                      Export Rotated PDF
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <div
+                className={`mt-5 rounded-[1.5rem] border p-4 text-sm font-medium leading-6 shadow-[0_12px_28px_rgba(91,63,193,0.05)] ${
+                  status.toLowerCase().includes("failed") ||
+                  status.toLowerCase().includes("valid")
+                    ? "border-rose-100 bg-rose-50/90 text-rose-700"
+                    : "border-violet-100 bg-violet-50/72 text-violet-800"
+                }`}
+              >
+                <div className="mb-1 flex items-center gap-2 font-semibold">
+                  <CheckCircle2 size={16} />
+                  Status
                 </div>
-              </aside>
-            </div>
+                {status}
+              </div>
+
+              <div className="mt-5 rounded-[1.5rem] border border-violet-100 bg-[#fffdf8] p-4 text-sm font-medium leading-6 text-slate-600 shadow-[0_12px_28px_rgba(91,63,193,0.05)]">
+                <div className="mb-1 flex items-center gap-2 font-semibold text-slate-900">
+                  <Sparkles size={16} />
+                  How it works
+                </div>
+                Rotate individual pages from the preview grid or apply a bulk rotation to every page before export.
+              </div>
+            </aside>
           </div>
         </section>
       </main>
