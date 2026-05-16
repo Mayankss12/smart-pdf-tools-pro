@@ -256,53 +256,58 @@ export default function ToolsPage() {
       <main className="min-h-screen bg-[#faf8ff] text-slate-950">
         <section className="relative overflow-hidden border-b border-violet-100/90">
           <div className="pointer-events-none absolute inset-0">
-            <div className="absolute left-[-14rem] top-[-12rem] h-[38rem] w-[38rem] rounded-full bg-violet-200/72 blur-3xl" />
-            <div className="absolute right-[-15rem] top-[-8rem] h-[38rem] w-[38rem] rounded-full bg-rose-200/68 blur-3xl" />
-            <div className="absolute bottom-[-20rem] left-1/2 h-[42rem] w-[42rem] -translate-x-1/2 rounded-full bg-fuchsia-100/80 blur-3xl" />
+            <div className="absolute left-[-15rem] top-[-13rem] h-[34rem] w-[34rem] rounded-full bg-violet-200/60 blur-3xl" />
+            <div className="absolute right-[-16rem] top-[-10rem] h-[34rem] w-[34rem] rounded-full bg-rose-200/55 blur-3xl" />
           </div>
 
-          <div className="relative mx-auto max-w-7xl px-4 pb-12 pt-11 sm:px-6 lg:px-8 lg:pb-16 lg:pt-14">
-            <div className="mx-auto max-w-5xl text-center">
-              <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-violet-100 bg-white/88 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-violet-700 shadow-sm backdrop-blur">
-                <Sparkles size={13} />
-                PDFMantra Tool Directory
+          <div className="relative mx-auto max-w-7xl px-4 py-9 sm:px-6 lg:px-8 lg:py-11">
+            <div className="grid gap-6 lg:grid-cols-[0.82fr_1.18fr] lg:items-center">
+              <div className="max-w-xl">
+                <div className="inline-flex items-center gap-2 rounded-full border border-violet-100 bg-white/88 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-violet-700 shadow-sm backdrop-blur">
+                  <Sparkles size={13} />
+                  PDFMantra Tools
+                </div>
+
+                <h1 className="display-font mt-5 text-[2.35rem] font-medium leading-[1.08] tracking-[-0.045em] text-slate-950 sm:text-[2.9rem] lg:text-[3.35rem]">
+                  All PDF tools,
+                  <span className="block bg-gradient-to-r from-violet-700 via-violet-600 to-rose-500 bg-clip-text text-transparent">
+                    ready to open.
+                  </span>
+                </h1>
+
+                <p className="mt-4 max-w-lg text-[15px] font-medium leading-7 text-slate-600">
+                  Pick a tool below or search by task. PDF upload starts inside the tool you choose.
+                </p>
+
+                <div className="mt-5 flex flex-wrap gap-2.5 text-[12px] font-semibold text-slate-600">
+                  <span className="rounded-full border border-violet-100 bg-white/88 px-3 py-2">{tools.length} tools</span>
+                  <span className="rounded-full border border-violet-100 bg-white/88 px-3 py-2">{WORKING_TOOLS.length} live</span>
+                  <span className="rounded-full border border-violet-100 bg-white/88 px-3 py-2">{BACKEND_TOOLS.length} backend-ready</span>
+                </div>
               </div>
 
-              <h1 className="display-font mx-auto mt-6 max-w-5xl text-[2.8rem] font-medium leading-[1.04] tracking-[-0.05em] text-slate-950 sm:text-[3.7rem] lg:text-[4.6rem]">
-                Choose the PDF task,
-                <span className="block bg-gradient-to-r from-violet-700 via-violet-600 to-rose-500 bg-clip-text text-transparent">
-                  start in one click.
-                </span>
-              </h1>
+              <div className="overflow-hidden rounded-[2rem] border border-violet-100 bg-white/86 shadow-[0_24px_70px_rgba(91,63,193,0.11)] backdrop-blur">
+                <label className="flex min-h-[72px] items-center gap-4 border-b border-violet-100 px-5 sm:px-6">
+                  <Search size={20} className="shrink-0 text-violet-500" />
+                  <input
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Search merge, split, OCR, redact, sign, protect..."
+                    className="w-full bg-transparent text-[15px] font-semibold text-slate-950 outline-none placeholder:text-slate-400"
+                  />
+                  {normalizedQuery ? (
+                    <button
+                      type="button"
+                      onClick={() => setQuery("")}
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-50 text-slate-500 transition hover:text-violet-700"
+                      aria-label="Clear tools search"
+                    >
+                      <X size={16} />
+                    </button>
+                  ) : null}
+                </label>
 
-              <p className="mx-auto mt-5 max-w-3xl text-[15px] font-medium leading-7 text-slate-600 sm:text-base">
-                Search by intent, scan categories quickly, and move directly into the workflow you need.
-              </p>
-            </div>
-
-            <div className="mx-auto mt-8 max-w-5xl overflow-hidden rounded-[2rem] border border-violet-100 bg-white/84 shadow-[0_24px_70px_rgba(91,63,193,0.11)] backdrop-blur">
-              <label className="flex min-h-[72px] items-center gap-4 border-b border-violet-100 px-5 sm:px-6">
-                <Search size={20} className="shrink-0 text-violet-500" />
-                <input
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search merge, split, OCR, redact, sign, protect..."
-                  className="w-full bg-transparent text-[15px] font-semibold text-slate-950 outline-none placeholder:text-slate-400"
-                />
-                {normalizedQuery ? (
-                  <button
-                    type="button"
-                    onClick={() => setQuery("")}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-50 text-slate-500 transition hover:text-violet-700"
-                    aria-label="Clear tools search"
-                  >
-                    <X size={16} />
-                  </button>
-                ) : null}
-              </label>
-
-              <div className="grid gap-0 sm:grid-cols-[1fr_auto]">
-                <div className="flex flex-wrap gap-2 border-b border-violet-100 px-5 py-4 sm:border-b-0 sm:border-r sm:px-6">
+                <div className="flex flex-wrap gap-2 px-5 py-4 sm:px-6">
                   {QUICK_SEARCHES.map((item) => (
                     <button
                       key={item}
@@ -313,21 +318,6 @@ export default function ToolsPage() {
                       {item}
                     </button>
                   ))}
-                </div>
-
-                <div className="grid grid-cols-3 items-center divide-x divide-violet-100 text-center">
-                  <div className="px-4 py-4">
-                    <div className="text-[1.35rem] font-bold tracking-[-0.03em] text-slate-950">{tools.length}</div>
-                    <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Tools</div>
-                  </div>
-                  <div className="px-4 py-4">
-                    <div className="text-[1.35rem] font-bold tracking-[-0.03em] text-slate-950">{WORKING_TOOLS.length}</div>
-                    <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Live</div>
-                  </div>
-                  <div className="px-4 py-4">
-                    <div className="text-[1.35rem] font-bold tracking-[-0.03em] text-slate-950">{BACKEND_TOOLS.length}</div>
-                    <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Backend</div>
-                  </div>
                 </div>
               </div>
             </div>
