@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback } from "react";
 import {
   Copy,
   FileImage,
@@ -10,6 +11,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 
 import { CommandRibbon } from "@/components/editor/ribbon/CommandRibbon";
+import { useEditorRibbonShortcuts } from "@/components/editor/ribbon/useEditorRibbonShortcuts";
 import type {
   ActiveTool,
   EditorCommandId,
@@ -76,6 +78,7 @@ function getRibbonActiveCommand(activeTool: ActiveTool): EditorCommandId | null 
     case "text":
     case "highlight":
       return activeTool;
+
     default:
       return null;
   }
@@ -96,32 +99,45 @@ export function EditorToolbar({
 }: EditorToolbarProps) {
   const activeCommandId = getRibbonActiveCommand(activeTool);
 
-  function handleRibbonCommand(commandId: EditorCommandId) {
-    switch (commandId) {
-      case "select":
-      case "object":
-      case "edit":
-      case "text":
-      case "highlight":
-        onSelectTool(commandId);
-        return;
+  const handleRibbonCommand = useCallback(
+    (commandId: EditorCommandId) => {
+      switch (commandId) {
+        case "select":
+        case "object":
+        case "edit":
+        case "text":
+        case "highlight":
+          onSelectTool(commandId);
+          return;
 
-      case "image":
-        onImageClick();
-        return;
+        case "image":
+          onImageClick();
+          return;
 
-      case "signature":
-        onSignatureClick();
-        return;
+        case "signature":
+          onSignatureClick();
+          return;
 
-      case "export":
-        onExport();
-        return;
+        case "export":
+          onExport();
+          return;
 
-      default:
-        return;
-    }
-  }
+        default:
+          return;
+      }
+    },
+    [
+      onExport,
+      onImageClick,
+      onSelectTool,
+      onSignatureClick,
+    ],
+  );
+
+  useEditorRibbonShortcuts({
+    enabled: true,
+    onCommand: handleRibbonCommand,
+  });
 
   return (
     <div className="space-y-3">
