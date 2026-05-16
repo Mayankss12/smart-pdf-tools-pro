@@ -1,28 +1,56 @@
-import type { DraftBox, TextOverlayItem } from "@/lib/editor/types";
+import type { DraftBox, PdfLayer, TextOverlayItem } from "@/lib/editor/types";
 
-export type HighlightBuildMode = "text" | "area" | "none";
-
-export type HighlightBuildResult = {
-  mode: HighlightBuildMode;
-  rects: DraftBox[];
-  matchedItemCount: number;
+export type HighlightColorDefinition = {
+  label: string;
+  css: string;
+  r: number;
+  g: number;
+  b: number;
 };
 
-type LineGroup = {
-  centerY: number;
-  averageHeight: number;
+export type HighlightSelectionMode = "text-lines" | "freeform-area";
+
+export type HighlightSelectionResult = {
+  mode: HighlightSelectionMode;
+  layers: PdfLayer[];
+  matchedTextItems: number;
+};
+
+type PercentRect = {
+  xPercent: number;
+  yPercent: number;
+  widthPercent: number;
+  heightPercent: number;
+};
+
+type HighlightSelectionInput = {
+  page: number;
+  dragBox: DraftBox;
+  textOverlay: TextOverlayItem[];
+  color: HighlightColorDefinition;
+  colorIndex: number;
+  opacity?: number;
+};
+
+type TextLineGroup = {
   items: TextOverlayItem[];
+  centerY: number;
+  maxHeight: number;
 };
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
-function normalizeBox(box: DraftBox): DraftBox {
-  const xPercent = clamp(box.xPercent, 0, 100);
-  const yPercent = clamp(box.yPercent, 0, 100);
-  const widthPercent = clamp(box.widthPercent, 0, 100 - xPercent);
-  const heightPercent = clamp(box.heightPercent, 0, 100 - yPercent);
+function roundPercent(value: number) {
+  return Number(value.toFixed(4));
+}
+
+function normalizeRect(rect: PercentRect): PercentRect {
+  const xPercent = clamp(rect.xPercent, 0, 100);
+  const yPercent = clamp(rect.yPercent, 0, 100);
+  const widthPercent = clamp(rect.widthPercent, 0, 100 - xPercent);
+  const heightPercent = clamp(rect.heightPercent, 0, 100 - yPercent);
 
   return {
     xPercent,
@@ -32,195 +60,247 @@ function normalizeBox(box: DraftBox): DraftBox {
   };
 }
 
-function getRight(box: DraftBox) {
-  return box.xPercent + box.widthPercent;
-}
-
-function getBottom(box: DraftBox) {
-  return box.yPercent + box.heightPercent;
-}
-
-function textItemToBox(item: TextOverlayItem): DraftBox {
-  return {
+function getTextItemRect(item: TextOverlayItem): PercentRect {
+  return normalizeRect({
     xPercent: item.leftPercent,
     yPercent: item.topPercent,
     widthPercent: item.widthPercent,
     heightPercent: item.heightPercent,
+  });
+}
+
+function getRectRight(rect: PercentRect) {
+  return rect.xPercent + rect.widthPercent;
+}
+
+function getRectBottom(rect: PercentRect) {
+  return rect.yPercent + rect.heightPercent;
+}
+
+function getRectArea(rect: PercentRect) {
+  return Math.max(0, rect.widthPercent) * Math.max(0, rect.heightPercent);
+}
+
+function getIntersectionRect(a: PercentRect, b: PercentRect): PercentRect | null {
+  const left = Math.max(a.xPercent, b.xPercent);
+  const top = Math.max(a.yPercent, b.yPercent);
+  const right = Math.min(getRectRight(a), getRectRight(b));
+  const bottom = Math.min(getRectBottom(a), getRectBottom(b));
+
+  if (right <= left || bottom <= top) {
+    return null;
+  }
+
+  return {
+    xPercent: left,
+    yPercent: top,
+    widthPercent: right - left,
+    heightPercent: bottom - top,
   };
 }
 
-function boxesIntersect(a: DraftBox, b: DraftBox) {
-  return (
-    a.xPercent < getRight(b) &&
-    getRight(a) > b.xPercent &&
-    a.yPercent < getBottom(b) &&
-    getBottom(a) > b.yPercent
-  );
+function getRectCenterY(rect: PercentRect) {
+  return rect.yPercent + rect.heightPercent / 2;
 }
 
-function getCenterY(item: TextOverlayItem) {
-  return item.topPercent + item.heightPercent / 2;
+function dragLikelyTargetsText(
+  dragRect: PercentRect,
+  textRect: PercentRect
+) {
+  const intersection = getIntersectionRect(dragRect, textRect);
+
+  if (!intersection) {
+    return false;
+  }
+
+  const intersectionArea = getRectArea(intersection);
+  const textArea = Math.max(getRectArea(textRect), 0.0001);
+  const overlapRatio = intersectionArea / textArea;
+
+  const textCenterX = textRect.xPercent + textRect.widthPercent / 2;
+  const textCenterY = textRect.yPercent + textRect.heightPercent / 2;
+
+  const centerIsInsideDrag =
+    textCenterX >= dragRect.xPercent &&
+    textCenterX <= getRectRight(dragRect) &&
+    textCenterY >= dragRect.yPercent &&
+    textCenterY <= getRectBottom(dragRect);
+
+  return centerIsInsideDrag || overlapRatio >= 0.12;
 }
 
-function createLineGroups(items: TextOverlayItem[]) {
-  const sorted = [...items].sort((a, b) => {
-    const centerDelta = getCenterY(a) - getCenterY(b);
-
-    if (Math.abs(centerDelta) > 0.15) {
-      return centerDelta;
+function buildTextLineGroups(items: TextOverlayItem[]): TextLineGroup[] {
+  const sortedItems = [...items].sort((a, b) => {
+    if (Math.abs(a.topPercent - b.topPercent) > 0.15) {
+      return a.topPercent - b.topPercent;
     }
 
     return a.leftPercent - b.leftPercent;
   });
 
-  const lines: LineGroup[] = [];
+  const groups: TextLineGroup[] = [];
 
-  for (const item of sorted) {
-    const centerY = getCenterY(item);
-    const height = item.heightPercent;
+  for (const item of sortedItems) {
+    const itemRect = getTextItemRect(item);
+    const itemCenterY = getRectCenterY(itemRect);
+    const itemHeight = Math.max(item.heightPercent, 0.25);
 
-    const matchingLine = lines.find((line) => {
-      const tolerance = Math.max(
-        0.45,
-        Math.max(line.averageHeight, height) * 0.72
+    const existingGroup = groups.find((group) => {
+      const verticalTolerance = Math.max(
+        0.55,
+        Math.min(2.2, Math.max(group.maxHeight, itemHeight) * 0.65)
       );
 
-      return Math.abs(line.centerY - centerY) <= tolerance;
+      return Math.abs(group.centerY - itemCenterY) <= verticalTolerance;
     });
 
-    if (!matchingLine) {
-      lines.push({
-        centerY,
-        averageHeight: height,
-        items: [item],
-      });
-
+    if (existingGroup) {
+      existingGroup.items.push(item);
+      existingGroup.centerY =
+        existingGroup.items.reduce((sum, groupedItem) => {
+          const groupedRect = getTextItemRect(groupedItem);
+          return sum + getRectCenterY(groupedRect);
+        }, 0) / existingGroup.items.length;
+      existingGroup.maxHeight = Math.max(existingGroup.maxHeight, itemHeight);
       continue;
     }
 
-    const nextCount = matchingLine.items.length + 1;
-
-    matchingLine.centerY =
-      (matchingLine.centerY * matchingLine.items.length + centerY) /
-      nextCount;
-
-    matchingLine.averageHeight =
-      (matchingLine.averageHeight * matchingLine.items.length + height) /
-      nextCount;
-
-    matchingLine.items.push(item);
+    groups.push({
+      items: [item],
+      centerY: itemCenterY,
+      maxHeight: itemHeight,
+    });
   }
 
-  return lines;
+  return groups;
 }
 
-function splitLineIntoSegments(items: TextOverlayItem[]) {
-  const sorted = [...items].sort((a, b) => a.leftPercent - b.leftPercent);
-  const segments: TextOverlayItem[][] = [];
-
-  for (const item of sorted) {
-    const lastSegment = segments[segments.length - 1];
-
-    if (!lastSegment) {
-      segments.push([item]);
-      continue;
-    }
-
-    const previousItem = lastSegment[lastSegment.length - 1];
-    const previousRight =
-      previousItem.leftPercent + previousItem.widthPercent;
-
-    const gap = item.leftPercent - previousRight;
-
-    const gapTolerance = Math.max(
-      0.7,
-      Math.max(previousItem.heightPercent, item.heightPercent) * 1.75
-    );
-
-    if (gap <= gapTolerance) {
-      lastSegment.push(item);
-    } else {
-      segments.push([item]);
-    }
-  }
-
-  return segments;
-}
-
-function segmentToHighlightRect(items: TextOverlayItem[]): DraftBox {
-  const left = Math.min(...items.map((item) => item.leftPercent));
-  const top = Math.min(...items.map((item) => item.topPercent));
-  const right = Math.max(
-    ...items.map((item) => item.leftPercent + item.widthPercent)
-  );
-  const bottom = Math.max(
-    ...items.map((item) => item.topPercent + item.heightPercent)
-  );
-
-  const rawHeight = Math.max(0.4, bottom - top);
-  const verticalInset = rawHeight * 0.14;
-  const horizontalPadding = Math.max(0.08, rawHeight * 0.12);
-
-  const nextLeft = clamp(left - horizontalPadding, 0, 100);
-  const nextTop = clamp(top + verticalInset, 0, 100);
-  const nextWidth = clamp(
-    right - left + horizontalPadding * 2,
-    0.4,
-    100 - nextLeft
-  );
-  const nextHeight = clamp(
-    rawHeight - verticalInset * 2,
-    0.25,
-    100 - nextTop
-  );
+function createHighlightLayer({
+  page,
+  rect,
+  color,
+  colorIndex,
+  opacity,
+}: {
+  page: number;
+  rect: PercentRect;
+  color: HighlightColorDefinition;
+  colorIndex: number;
+  opacity: number;
+}): PdfLayer {
+  const safeRect = normalizeRect(rect);
 
   return {
-    xPercent: nextLeft,
-    yPercent: nextTop,
-    widthPercent: nextWidth,
-    heightPercent: nextHeight,
-  };
+    id: crypto.randomUUID(),
+    page,
+    type: "highlight",
+    xPercent: roundPercent(safeRect.xPercent),
+    yPercent: roundPercent(safeRect.yPercent),
+    widthPercent: roundPercent(safeRect.widthPercent),
+    heightPercent: roundPercent(safeRect.heightPercent),
+    opacity,
+    highlightColorIndex: colorIndex,
+    highlightColorCss: color.css,
+    highlightColorR: color.r,
+    highlightColorG: color.g,
+    highlightColorB: color.b,
+  } as PdfLayer;
 }
 
-export function buildHighlightRectsFromDragBox(
-  textItems: TextOverlayItem[],
-  draftBox: DraftBox
-): HighlightBuildResult {
-  const normalizedBox = normalizeBox(draftBox);
+function createLineHighlightRect(line: TextLineGroup): PercentRect {
+  const rects = line.items.map(getTextItemRect);
 
-  const matchedItems = textItems.filter((item) =>
-    boxesIntersect(textItemToBox(item), normalizedBox)
+  const left = Math.min(...rects.map((rect) => rect.xPercent));
+  const top = Math.min(...rects.map((rect) => rect.yPercent));
+  const right = Math.max(...rects.map((rect) => getRectRight(rect)));
+  const bottom = Math.max(...rects.map((rect) => getRectBottom(rect)));
+
+  const rawHeight = Math.max(bottom - top, line.maxHeight, 0.45);
+  const horizontalPadding = clamp(rawHeight * 0.11, 0.08, 0.38);
+  const verticalInset = clamp(rawHeight * 0.14, 0.05, rawHeight * 0.22);
+
+  return normalizeRect({
+    xPercent: left - horizontalPadding,
+    yPercent: top + verticalInset,
+    widthPercent: right - left + horizontalPadding * 2,
+    heightPercent: Math.max(rawHeight - verticalInset * 2, 0.35),
+  });
+}
+
+function createFreeformHighlightRect(dragBox: DraftBox): PercentRect {
+  const rawRect = normalizeRect({
+    xPercent: dragBox.xPercent,
+    yPercent: dragBox.yPercent,
+    widthPercent: dragBox.widthPercent,
+    heightPercent: dragBox.heightPercent,
+  });
+
+  return normalizeRect({
+    xPercent: rawRect.xPercent,
+    yPercent: rawRect.yPercent,
+    widthPercent: rawRect.widthPercent,
+    heightPercent: Math.max(rawRect.heightPercent, 0.45),
+  });
+}
+
+export function buildHighlightLayersFromDrag({
+  page,
+  dragBox,
+  textOverlay,
+  color,
+  colorIndex,
+  opacity = 0.5,
+}: HighlightSelectionInput): HighlightSelectionResult {
+  const dragRect = normalizeRect({
+    xPercent: dragBox.xPercent,
+    yPercent: dragBox.yPercent,
+    widthPercent: dragBox.widthPercent,
+    heightPercent: dragBox.heightPercent,
+  });
+
+  const matchedTextItems = textOverlay.filter((item) =>
+    dragLikelyTargetsText(dragRect, getTextItemRect(item))
   );
 
-  if (matchedItems.length > 0) {
-    const lines = createLineGroups(matchedItems);
+  if (matchedTextItems.length > 0) {
+    const lineGroups = buildTextLineGroups(matchedTextItems);
 
-    const rects = lines.flatMap((line) =>
-      splitLineIntoSegments(line.items).map(segmentToHighlightRect)
-    );
+    const layers = lineGroups
+      .map((line) =>
+        createHighlightLayer({
+          page,
+          rect: createLineHighlightRect(line),
+          color,
+          colorIndex,
+          opacity,
+        })
+      )
+      .filter(
+        (layer) =>
+          layer.widthPercent > 0.15 &&
+          layer.heightPercent > 0.15
+      );
 
-    return {
-      mode: "text",
-      rects,
-      matchedItemCount: matchedItems.length,
-    };
+    if (layers.length > 0) {
+      return {
+        mode: "text-lines",
+        layers,
+        matchedTextItems: matchedTextItems.length,
+      };
+    }
   }
 
-  const isLargeEnoughForAreaHighlight =
-    normalizedBox.widthPercent >= 1.2 &&
-    normalizedBox.heightPercent >= 0.8;
-
-  if (isLargeEnoughForAreaHighlight) {
-    return {
-      mode: "area",
-      rects: [normalizedBox],
-      matchedItemCount: 0,
-    };
-  }
+  const fallbackLayer = createHighlightLayer({
+    page,
+    rect: createFreeformHighlightRect(dragBox),
+    color,
+    colorIndex,
+    opacity,
+  });
 
   return {
-    mode: "none",
-    rects: [],
-    matchedItemCount: 0,
+    mode: "freeform-area",
+    layers: [fallbackLayer],
+    matchedTextItems: 0,
   };
 }
