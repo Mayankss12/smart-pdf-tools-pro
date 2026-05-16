@@ -10,6 +10,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
+import { BrandMark } from "@/components/BrandMark";
 import {
   CATEGORY_MENU_LABELS,
   STATUS_CONFIG,
@@ -272,13 +273,16 @@ export function Header() {
     <header className="sticky top-0 z-50 border-b border-violet-100 bg-white/90 backdrop-blur-xl">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex min-h-[76px] items-center justify-between gap-6">
-          <Link href="/" className="group shrink-0">
-            <div className="font-[family-name:var(--font-display)] text-[2rem] font-semibold leading-none tracking-[-0.055em] text-slate-950 transition duration-200 group-hover:text-violet-700">
-              PDFMantra
-            </div>
-            <div className="mt-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
-              <span className="h-px w-5 bg-violet-500" />
-              Smart PDF Workspace
+          <Link href="/" className="group flex shrink-0 items-center gap-3">
+            <BrandMark className="h-12 w-12 shrink-0 transition duration-200 group-hover:-translate-y-0.5" />
+            <div>
+              <div className="font-[family-name:var(--font-display)] text-[2rem] font-semibold leading-none tracking-[-0.055em] text-slate-950 transition duration-200 group-hover:text-violet-700">
+                PDFMantra
+              </div>
+              <div className="mt-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                <span className="h-px w-5 bg-violet-500" />
+                Smart PDF Workspace
+              </div>
             </div>
           </Link>
 
