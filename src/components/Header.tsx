@@ -128,7 +128,15 @@ function DesktopNavButton({
 }) {
   const pathname = usePathname();
   const isOpen = activeLabel === group.label;
-  const isActive = pathname === group.href || group.items.some((item) => pathname === item.href);
+  const isGroupLanding = pathname === group.href;
+  const isDistinctToolRoute = group.items.some(
+    (item) =>
+      item.href !== group.href &&
+      item.href !== "/tools" &&
+      item.href.startsWith("/tools/") &&
+      pathname === item.href,
+  );
+  const isActive = isGroupLanding || isDistinctToolRoute;
 
   return (
     <button
