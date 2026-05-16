@@ -106,14 +106,14 @@ export function HighlightPageSurface({
       </div>
 
       <div className="overflow-auto rounded-[1.75rem] border border-slate-200 bg-slate-100 p-4">
-        <div className="mx-auto w-fit rounded-2xl bg-white p-3 shadow-xl shadow-slate-300/35">
+        <div className="mx-auto w-fit max-w-full rounded-2xl bg-white p-3 shadow-xl shadow-slate-300/35">
           <div
             ref={surfaceRef}
             className="relative select-none overflow-hidden rounded-xl bg-white touch-none"
             style={{
               width: `${page.geometry.viewportSize.width}px`,
-              height: `${page.geometry.viewportSize.height}px`,
               maxWidth: "100%",
+              aspectRatio: `${page.geometry.viewportSize.width} / ${page.geometry.viewportSize.height}`,
             }}
             onPointerDown={(event) => {
               if (event.button !== 0) {
