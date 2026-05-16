@@ -18,6 +18,10 @@ import { useMemo, useRef, useState } from "react";
 
 import { Header } from "@/components/Header";
 import type { NormalizedRect } from "@/engines/shared/types";
+import {
+  clampNormalizedRect,
+  rectsIntersect,
+} from "@/engines/shared/coordinateUtils";
 import type { HighlightLayer } from "@/engines/highlight/types";
 import { createSmartHighlightFromDrag } from "@/engines/highlight/highlightOrchestrator";
 import { updateHighlightLayerStyle } from "@/engines/highlight/highlightEngine";
@@ -111,6 +115,17 @@ function getPageLayerCount(
   pageIndex: number,
 ): number {
   return layers.filter((layer) => layer.pageIndex === pageIndex).length;
+}
+
+function dragIntersectsDetectedText(
+  dragBounds: NormalizedRect,
+  textUnits: HighlightPageSnapshot["textUnits"],
+): boolean {
+  const safeDragBounds = clampNormalizedRect(dragBounds);
+
+  return textUnits.some((unit) =>
+    rectsIntersect(safeDragBounds, clampNormalizedRect(unit.bounds)),
+  );
 }
 
 export function HighlightToolPage() {
@@ -265,6 +280,18 @@ export function HighlightToolPage() {
     if (!result.layer) {
       updateStatus(
         "That drag was too small or did not produce a reliable highlight region. Try a slightly clearer selection.",
+        "info",
+      );
+      return;
+    }
+
+    if (
+      result.status === "created-from-freeform-fallback" &&
+      activePage.textUnits.length > 0 &&
+      dragIntersectsDetectedText(dragBounds, activePage.textUnits)
+    ) {
+      updateStatus(
+        "Text was detected in this area, but the drag did not snap confidently. Drag slightly wider across the intended text line.",
         "info",
       );
       return;
