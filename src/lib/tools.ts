@@ -384,7 +384,7 @@ export const tools: Tool[] = [
       experience: "workspace",
       launchTier: "available-now",
       needsBackendProcessing: false,
-      recommendedEntry: "tool-page",
+      recommendedEntry: "editor",
     },
   },
   {
