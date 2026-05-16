@@ -3,40 +3,43 @@
 @tailwind utilities;
 
 :root {
-  --pm-bg: #faf8ff;
-  --pm-bg-soft: #f3efff;
-  --pm-surface: #fefcff;
+  --pm-bg: #fffaf2;
+  --pm-bg-soft: #fff5e9;
+  --pm-surface: #fffdf8;
   --pm-surface-strong: #ffffff;
-  --pm-ink: #190f35;
-  --pm-ink-soft: #34225f;
-  --pm-muted: #65557e;
-  --pm-border: #e6defe;
-  --pm-border-strong: #d3c6fc;
+  --pm-ink: #21143c;
+  --pm-ink-soft: #39265f;
+  --pm-muted: #6b5b7f;
+  --pm-border: #eadff2;
+  --pm-border-strong: #d9caec;
 
-  --pm-brand: #7657ff;
-  --pm-brand-dark: #5d3fe8;
-  --pm-brand-deep: #4726c8;
-  --pm-brand-soft: #ece5ff;
-  --pm-brand-wash: #f5f1ff;
+  --pm-brand: #8b73ff;
+  --pm-brand-dark: #6b52ee;
+  --pm-brand-deep: #5234d7;
+  --pm-brand-soft: #f1ecff;
+  --pm-brand-wash: #fbf7ff;
 
-  --pm-blush: #ff7896;
-  --pm-blush-dark: #ee5e82;
-  --pm-blush-soft: #ffe9ee;
-  --pm-blush-wash: #fff4f7;
+  --pm-blush: #ff91a8;
+  --pm-blush-dark: #ee6d8d;
+  --pm-blush-soft: #ffe9ef;
+  --pm-blush-wash: #fff5f7;
 
-  --pm-accent: #a35dff;
-  --pm-accent-dark: #8645e8;
-  --pm-accent-soft: #f1e8ff;
+  --pm-accent: #b88cff;
+  --pm-accent-dark: #8b62ed;
+  --pm-accent-soft: #f4edff;
 
-  --pm-gold-soft: #fff4d8;
+  --pm-cream: #fffaf2;
+  --pm-cream-soft: #fff5e9;
+  --pm-cream-deep: #f7ecdd;
+  --pm-gold-soft: #fff2d8;
   --pm-green: #25a881;
   --pm-green-soft: #def9f0;
   --pm-red: #e15f79;
   --pm-red-soft: #ffe5eb;
 
-  --pm-shadow-soft: 0 26px 80px rgba(85, 60, 188, 0.12);
-  --pm-shadow-card: 0 18px 48px rgba(85, 60, 188, 0.1);
-  --pm-shadow-strong: 0 36px 110px rgba(61, 38, 143, 0.22);
+  --pm-shadow-soft: 0 26px 80px rgba(93, 67, 190, 0.1);
+  --pm-shadow-card: 0 18px 48px rgba(93, 67, 190, 0.08);
+  --pm-shadow-strong: 0 36px 110px rgba(61, 38, 143, 0.18);
 }
 
 * {
@@ -52,10 +55,10 @@ html {
 body {
   min-height: 100vh;
   background:
-    radial-gradient(circle at 9% 10%, rgba(118, 87, 255, 0.16), transparent 30rem),
-    radial-gradient(circle at 92% 8%, rgba(255, 120, 150, 0.18), transparent 32rem),
-    radial-gradient(circle at 68% 94%, rgba(163, 93, 255, 0.12), transparent 36rem),
-    linear-gradient(180deg, #fffaff 0%, #faf8ff 46%, #f4efff 100%);
+    radial-gradient(circle at 8% 10%, rgba(139, 115, 255, 0.12), transparent 30rem),
+    radial-gradient(circle at 92% 8%, rgba(255, 145, 168, 0.14), transparent 32rem),
+    radial-gradient(circle at 70% 94%, rgba(184, 140, 255, 0.08), transparent 36rem),
+    linear-gradient(180deg, #fffaf4 0%, #fff8ef 50%, #fbf6ff 100%);
   color: var(--pm-ink);
   font-family:
     var(--font-body),
@@ -73,7 +76,7 @@ body {
 }
 
 ::selection {
-  background: rgba(118, 87, 255, 0.22);
+  background: rgba(139, 115, 255, 0.2);
   color: var(--pm-ink);
 }
 
@@ -113,6 +116,10 @@ a {
 @layer components {
   .page-shell {
     @apply min-h-screen;
+    background:
+      radial-gradient(circle at 9% 6%, rgba(139, 115, 255, 0.1), transparent 28rem),
+      radial-gradient(circle at 90% 8%, rgba(255, 145, 168, 0.12), transparent 30rem),
+      linear-gradient(180deg, #fffaf4 0%, #fff8ef 52%, #fbf6ff 100%);
     color: var(--pm-ink);
   }
 
@@ -123,42 +130,43 @@ a {
   .btn-primary {
     @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-semibold text-white transition duration-200 hover:-translate-y-0.5 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0;
     background: linear-gradient(135deg, var(--pm-brand-dark), var(--pm-brand), var(--pm-blush-dark));
-    box-shadow: 0 18px 42px rgba(93, 63, 232, 0.24);
+    box-shadow: 0 18px 42px rgba(93, 63, 232, 0.21);
   }
 
   .btn-primary:hover {
-    box-shadow: 0 24px 54px rgba(93, 63, 232, 0.32);
+    box-shadow: 0 24px 54px rgba(93, 63, 232, 0.28);
   }
 
   .btn-secondary {
-    @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-full border px-6 py-3 text-sm font-semibold text-white backdrop-blur transition duration-200 hover:-translate-y-0.5 focus:outline-none;
-    border-color: rgba(255, 255, 255, 0.28);
-    background: rgba(255, 255, 255, 0.16);
+    @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-full border px-6 py-3 text-sm font-semibold backdrop-blur transition duration-200 hover:-translate-y-0.5 focus:outline-none;
+    border-color: rgba(139, 115, 255, 0.2);
+    background: rgba(255, 253, 248, 0.84);
+    color: var(--pm-brand-dark);
   }
 
   .btn-secondary:hover {
-    background: rgba(255, 255, 255, 0.24);
+    background: rgba(255, 255, 255, 0.92);
   }
 
   .btn-light {
     @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-full border px-6 py-3 text-sm font-semibold transition duration-200 hover:-translate-y-0.5 focus:outline-none;
     border-color: var(--pm-border);
-    background: rgba(255, 255, 255, 0.94);
+    background: rgba(255, 253, 248, 0.96);
     color: var(--pm-ink);
-    box-shadow: 0 12px 30px rgba(85, 60, 188, 0.08);
+    box-shadow: 0 12px 30px rgba(85, 60, 188, 0.07);
   }
 
   .btn-light:hover {
     border-color: var(--pm-border-strong);
     color: var(--pm-brand-dark);
-    box-shadow: 0 18px 42px rgba(85, 60, 188, 0.14);
+    box-shadow: 0 18px 42px rgba(85, 60, 188, 0.12);
   }
 
   .eyebrow-chip {
     @apply inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] backdrop-blur;
-    border-color: rgba(255, 255, 255, 0.24);
-    background: rgba(255, 255, 255, 0.15);
-    color: #ffffff;
+    border-color: rgba(139, 115, 255, 0.18);
+    background: rgba(255, 253, 248, 0.82);
+    color: var(--pm-brand-dark);
   }
 
   .section-eyebrow {
@@ -178,24 +186,24 @@ a {
 
   .surface {
     @apply overflow-hidden rounded-[2rem] border;
-    border-color: rgba(230, 222, 254, 0.92);
-    background: rgba(254, 252, 255, 0.96);
+    border-color: rgba(234, 223, 242, 0.94);
+    background: rgba(255, 253, 248, 0.96);
     box-shadow: var(--pm-shadow-soft);
   }
 
   .glass-surface {
     @apply rounded-[2rem] border backdrop-blur-xl;
-    border-color: rgba(255, 255, 255, 0.2);
-    background: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.28);
+    background: rgba(255, 253, 248, 0.22);
   }
 
   .rich-card,
   .rich-card-static,
   .premium-card {
     @apply rounded-[1.8rem] border p-5;
-    border-color: rgba(230, 222, 254, 0.95);
-    background: rgba(254, 252, 255, 0.96);
-    box-shadow: 0 14px 36px rgba(85, 60, 188, 0.08);
+    border-color: rgba(234, 223, 242, 0.95);
+    background: rgba(255, 253, 248, 0.96);
+    box-shadow: 0 14px 36px rgba(85, 60, 188, 0.07);
   }
 
   .rich-card {
@@ -204,25 +212,25 @@ a {
 
   .rich-card:hover {
     border-color: var(--pm-border-strong);
-    box-shadow: 0 24px 56px rgba(85, 60, 188, 0.14);
+    box-shadow: 0 24px 56px rgba(85, 60, 188, 0.12);
   }
 
   .dark-card {
     @apply rounded-[1.8rem] border p-5 backdrop-blur-sm;
-    border-color: rgba(255, 255, 255, 0.16);
-    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 253, 248, 0.14);
   }
 
   .status-beta {
     @apply rounded-full px-3 py-1 text-xs font-semibold;
-    background: #eee7ff;
-    color: #6746d8;
+    background: #f1ecff;
+    color: #6b52ee;
   }
 
   .status-soon {
     @apply rounded-full px-3 py-1 text-xs font-semibold;
-    background: #f4efff;
-    color: #75699a;
+    background: #fff1f4;
+    color: #b85672;
   }
 
   .status-live {
@@ -233,56 +241,152 @@ a {
 
   .soft-pill {
     @apply inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-medium;
-    border-color: rgba(118, 87, 255, 0.18);
-    background: var(--pm-brand-wash);
+    border-color: rgba(139, 115, 255, 0.18);
+    background: rgba(255, 253, 248, 0.96);
     color: var(--pm-brand-dark);
   }
 
   .input-premium {
     @apply w-full rounded-[1.3rem] border px-4 py-3 text-sm font-medium outline-none transition disabled:cursor-not-allowed;
     border-color: var(--pm-border);
-    background: rgba(254, 252, 255, 0.96);
+    background: rgba(255, 253, 248, 0.96);
     color: var(--pm-ink);
   }
 
   .input-premium:focus {
     border-color: var(--pm-brand);
-    box-shadow: 0 0 0 4px rgba(118, 87, 255, 0.12);
+    box-shadow: 0 0 0 4px rgba(139, 115, 255, 0.12);
   }
 }
 
 .hero-aurora {
   background:
-    radial-gradient(circle at 12% 22%, rgba(255, 255, 255, 0.2), transparent 18rem),
-    radial-gradient(circle at 82% 12%, rgba(255, 120, 150, 0.24), transparent 22rem),
-    radial-gradient(circle at 85% 82%, rgba(163, 93, 255, 0.18), transparent 20rem),
-    linear-gradient(135deg, #6f53ef 0%, #7657ff 38%, #9157ff 72%, #ef6d91 100%);
+    radial-gradient(circle at 12% 22%, rgba(255, 255, 255, 0.24), transparent 18rem),
+    radial-gradient(circle at 82% 12%, rgba(255, 145, 168, 0.2), transparent 22rem),
+    radial-gradient(circle at 85% 82%, rgba(184, 140, 255, 0.14), transparent 20rem),
+    linear-gradient(135deg, #7d67f4 0%, #8b73ff 40%, #a986ff 72%, #ef7894 100%);
 }
 
 .hero-grid {
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+    linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
   background-size: 34px 34px;
 }
 
 .workspace-grid {
   background-image:
-    linear-gradient(rgba(118, 87, 255, 0.1) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(118, 87, 255, 0.1) 1px, transparent 1px);
+    linear-gradient(rgba(139, 115, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(139, 115, 255, 0.08) 1px, transparent 1px);
   background-size: 24px 24px;
 }
 
 .text-gradient {
-  background: linear-gradient(135deg, #ffffff 0%, #f3efff 44%, #ffe6ee 100%);
+  background: linear-gradient(135deg, #ffffff 0%, #f7f1ff 44%, #ffe9ef 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
 .brand-gradient-text {
-  background: linear-gradient(135deg, #4c2fd1 0%, #7657ff 48%, #ef6d91 100%);
+  background: linear-gradient(135deg, #5234d7 0%, #8b73ff 48%, #ef7894 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+
+/* Final interface harmonizer: this softly re-themes older pages while each page is refactored. */
+.bg-slate-50,
+.bg-slate-50\/70,
+.bg-\[\#faf8ff\],
+.bg-\[\#fcfbff\] {
+  background-color: rgba(255, 250, 242, 0.82) !important;
+}
+
+.bg-white,
+.bg-white\/72,
+.bg-white\/78,
+.bg-white\/82,
+.bg-white\/84,
+.bg-white\/86,
+.bg-white\/88,
+.bg-white\/90,
+.bg-white\/92,
+.bg-white\/96,
+.bg-white\/98 {
+  background-color: rgba(255, 253, 248, 0.92) !important;
+}
+
+.bg-indigo-50,
+.bg-violet-50,
+.bg-purple-50 {
+  background-color: rgba(247, 242, 255, 0.9) !important;
+}
+
+.bg-rose-50,
+.bg-red-50 {
+  background-color: rgba(255, 245, 247, 0.92) !important;
+}
+
+.border-slate-100,
+.border-slate-200,
+.border-indigo-100,
+.border-indigo-200,
+.border-violet-100,
+.border-violet-200,
+.border-purple-100,
+.border-rose-100,
+.border-red-100 {
+  border-color: rgba(234, 223, 242, 0.92) !important;
+}
+
+.text-slate-950,
+.text-slate-900 {
+  color: var(--pm-ink) !important;
+}
+
+.text-slate-800,
+.text-slate-700,
+.text-slate-600,
+.text-slate-500 {
+  color: var(--pm-muted) !important;
+}
+
+.text-indigo-700,
+.text-indigo-800,
+.text-violet-700,
+.text-violet-800,
+.text-purple-700 {
+  color: var(--pm-brand-dark) !important;
+}
+
+.text-rose-500,
+.text-rose-600,
+.text-red-600,
+.text-red-700 {
+  color: var(--pm-blush-dark) !important;
+}
+
+.from-indigo-700,
+.from-violet-600,
+.from-violet-700 {
+  --tw-gradient-from: #7d67f4 var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: rgb(125 103 244 / 0) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+
+.via-violet-600,
+.via-violet-700,
+.via-purple-700 {
+  --tw-gradient-to: rgb(139 115 255 / 0) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), #8b73ff var(--tw-gradient-via-position), var(--tw-gradient-to) !important;
+}
+
+.to-purple-700,
+.to-rose-500,
+.to-rose-50,
+.to-rose-50\/60,
+.to-rose-50\/65,
+.to-rose-50\/70 {
+  --tw-gradient-to: #ff91a8 var(--tw-gradient-to-position) !important;
 }
