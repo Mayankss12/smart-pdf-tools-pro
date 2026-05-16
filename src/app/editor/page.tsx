@@ -1965,10 +1965,10 @@ export default function EditorPage() {
         }
       />
 
-      <main className="min-h-screen bg-slate-100">
+      <main className="min-h-screen bg-[#eef3f8]">
         <section className="mx-auto max-w-[1600px] px-3 py-3 sm:px-4 sm:py-4">
-          <div className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm">
-            <div className="flex flex-col gap-3 border-b border-slate-200 bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+          <div className="overflow-hidden rounded-[1.5rem] border border-[#d9e2ee] bg-white/95 shadow-[0_24px_80px_rgba(15,23,42,0.08)]">
+            <div className="flex flex-col gap-3 border-b border-[#dce5ef] bg-[#fbfcfe] px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
               <div className="min-w-0">
                 <div className="truncate text-sm font-semibold text-slate-950">
                   {fileName}
@@ -1979,7 +1979,7 @@ export default function EditorPage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <label className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700">
+                <label className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#dbe4ef] bg-white px-3 text-sm font-medium text-slate-700">
                   <span>Page</span>
                   <select
                     value={currentPage}
@@ -1999,19 +1999,19 @@ export default function EditorPage() {
                 <button
                   type="button"
                   onClick={zoomOut}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[#dbe4ef] bg-white text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50"
                 >
                   <ZoomOut size={16} />
                 </button>
 
-                <div className="inline-flex h-10 min-w-[72px] items-center justify-center rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700">
+                <div className="inline-flex h-10 min-w-[72px] items-center justify-center rounded-xl border border-[#dbe4ef] bg-white px-3 text-sm font-semibold text-slate-700">
                   {Math.round(zoomLevel * 100)}%
                 </div>
 
                 <button
                   type="button"
                   onClick={zoomIn}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[#dbe4ef] bg-white text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50"
                 >
                   <ZoomIn size={16} />
                 </button>
@@ -2019,7 +2019,7 @@ export default function EditorPage() {
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
+                  className="inline-flex min-h-10 items-center justify-center rounded-xl border border-[#dbe4ef] bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
                 >
                   Replace PDF
                 </button>
@@ -2049,7 +2049,7 @@ export default function EditorPage() {
             />
 
             {activeTool === "highlight" ? (
-              <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2.5 sm:px-4">
+              <div className="flex flex-wrap items-center gap-2 border-b border-[#dce5ef] bg-[#f7faff] px-3 py-2.5 sm:px-4">
                 <span className="text-xs font-semibold text-slate-600">
                   Highlight color
                 </span>
@@ -2074,7 +2074,7 @@ export default function EditorPage() {
             ) : null}
 
             {selectedLayer ? (
-              <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-3 py-2.5 sm:px-4">
+              <div className="flex flex-wrap items-center gap-2 border-b border-[#dce5ef] bg-[#fbfdff] px-3 py-2.5 sm:px-4">
                 <span className="mr-1 rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
                   {getSelectedToolbarLabel()}
                 </span>
@@ -2093,7 +2093,7 @@ export default function EditorPage() {
                       className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border transition ${
                         selectedLayer.isBold
                           ? "border-indigo-200 bg-indigo-50 text-indigo-700"
-                          : "border-slate-200 text-slate-700 hover:bg-slate-50"
+                          : "border-[#dbe4ef] bg-white text-slate-700 hover:bg-slate-50"
                       }`}
                     >
                       <Bold size={16} />
@@ -2109,7 +2109,7 @@ export default function EditorPage() {
                       className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border transition ${
                         selectedLayer.isItalic
                           ? "border-indigo-200 bg-indigo-50 text-indigo-700"
-                          : "border-slate-200 text-slate-700 hover:bg-slate-50"
+                          : "border-[#dbe4ef] bg-white text-slate-700 hover:bg-slate-50"
                       }`}
                     >
                       <Italic size={16} />
@@ -2125,7 +2125,7 @@ export default function EditorPage() {
                           ),
                         })
                       }
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-700 transition hover:bg-slate-50"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#dbe4ef] bg-white text-slate-700 transition hover:bg-slate-50"
                     >
                       <Minus size={15} />
                     </button>
@@ -2144,7 +2144,7 @@ export default function EditorPage() {
                           ),
                         })
                       }
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-700 transition hover:bg-slate-50"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#dbe4ef] bg-white text-slate-700 transition hover:bg-slate-50"
                     >
                       <Plus size={15} />
                     </button>
@@ -2160,7 +2160,7 @@ export default function EditorPage() {
                           opacity: Number(event.target.value),
                         })
                       }
-                      className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm font-medium text-slate-700 outline-none"
+                      className="h-9 rounded-lg border border-[#dbe4ef] bg-white px-2 text-sm font-medium text-slate-700 outline-none"
                     >
                       <option value={0.25}>Light</option>
                       <option value={0.4}>Medium</option>
@@ -2197,7 +2197,7 @@ export default function EditorPage() {
                 <button
                   type="button"
                   onClick={duplicateSelectedLayer}
-                  className="ml-auto inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                  className="ml-auto inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[#dbe4ef] bg-white px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                 >
                   <Copy size={15} />
                   Duplicate
@@ -2206,7 +2206,7 @@ export default function EditorPage() {
                 <button
                   type="button"
                   onClick={deleteSelectedLayer}
-                  className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-rose-200 px-3 text-sm font-medium text-rose-600 transition hover:bg-rose-50"
+                  className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-rose-200 bg-white px-3 text-sm font-medium text-rose-600 transition hover:bg-rose-50"
                 >
                   <Trash2 size={15} />
                   Delete
@@ -2215,7 +2215,7 @@ export default function EditorPage() {
             ) : null}
 
             <div className="grid min-h-[calc(100vh-210px)] grid-cols-1 lg:grid-cols-[180px_minmax(0,1fr)]">
-              <aside className="border-b border-slate-200 bg-slate-50 p-3 lg:border-b-0 lg:border-r">
+              <aside className="border-b border-[#dce5ef] bg-[#f7fafe] p-3 lg:border-b-0 lg:border-r">
                 <div className="mb-3 text-sm font-semibold text-slate-800">
                   Pages
                 </div>
@@ -2235,7 +2235,7 @@ export default function EditorPage() {
                         className={`min-w-[86px] rounded-xl border p-2 text-left text-xs transition lg:mb-2 lg:w-full lg:min-w-0 ${
                           currentPage === pageNumber
                             ? "border-indigo-600 bg-indigo-50 font-semibold text-indigo-700"
-                            : "border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:bg-indigo-50"
+                            : "border-[#dbe4ef] bg-white text-slate-700 hover:border-indigo-200 hover:bg-indigo-50"
                         }`}
                       >
                         {thumbnail?.url ? (
@@ -2255,10 +2255,10 @@ export default function EditorPage() {
 
               <section
                 ref={pdfViewportRef}
-                className="flex w-full items-start justify-start overflow-auto bg-slate-100 p-3 sm:justify-center sm:p-6"
+                className="flex w-full items-start justify-start overflow-auto bg-[linear-gradient(180deg,_#f6f9fc_0%,_#eaf0f6_100%)] p-3 sm:justify-center sm:p-6"
               >
                 <div
-                  className={`relative mx-auto rounded-xl bg-white shadow-xl ring-1 ring-slate-200 ${
+                  className={`relative mx-auto rounded-xl bg-white shadow-[0_22px_60px_rgba(15,23,42,0.18)] ring-1 ring-slate-200 ${
                     activeTool === "text"
                       ? "cursor-crosshair"
                       : activeTool === "highlight" ||
@@ -2284,7 +2284,10 @@ export default function EditorPage() {
                   {busy ? (
                     <div className="absolute inset-0 z-50 flex items-center justify-center rounded-xl bg-white/80 backdrop-blur-sm">
                       <div className="flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-lg">
-                        <Loader2 className="animate-spin text-indigo-600" size={18} />
+                        <Loader2
+                          className="animate-spin text-indigo-600"
+                          size={18}
+                        />
                         Processing
                       </div>
                     </div>
@@ -2313,18 +2316,18 @@ export default function EditorPage() {
           </div>
 
           <div className="mt-3 grid gap-3 lg:grid-cols-2">
-            <details className="rounded-2xl border border-slate-200 bg-white">
+            <details className="rounded-2xl border border-[#d9e2ee] bg-white/95 shadow-sm">
               <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-slate-800">
                 Selected Text Replace
               </summary>
 
-              <div className="border-t border-slate-200 p-4">
+              <div className="border-t border-[#dce5ef] p-4">
                 <div className="grid gap-3">
                   <textarea
                     value={ocrText}
                     readOnly
                     placeholder="Selected text will appear here."
-                    className="h-24 w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700 outline-none"
+                    className="h-24 w-full resize-none rounded-xl border border-[#dbe4ef] bg-slate-50 px-3 py-3 text-sm text-slate-700 outline-none"
                   />
 
                   <textarea
@@ -2333,7 +2336,7 @@ export default function EditorPage() {
                       setOcrRewriteText(event.target.value)
                     }
                     placeholder="Type replacement text here."
-                    className="h-24 w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-900 outline-none focus:border-indigo-400"
+                    className="h-24 w-full resize-none rounded-xl border border-[#dbe4ef] bg-white px-3 py-3 text-sm text-slate-900 outline-none focus:border-indigo-400"
                   />
 
                   <div className="flex flex-wrap gap-2">
@@ -2353,7 +2356,7 @@ export default function EditorPage() {
                       disabled={
                         !selectedTextRects.length || !ocrRewriteText.trim()
                       }
-                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#dbe4ef] bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <Plus size={15} />
                       Replace Visually
@@ -2363,7 +2366,7 @@ export default function EditorPage() {
                       type="button"
                       onClick={extractCurrentPageText}
                       disabled={ocrBusy}
-                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#dbe4ef] bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {ocrBusy ? (
                         <>
@@ -2382,12 +2385,12 @@ export default function EditorPage() {
               </div>
             </details>
 
-            <details className="rounded-2xl border border-slate-200 bg-white">
+            <details className="rounded-2xl border border-[#d9e2ee] bg-white/95 shadow-sm">
               <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-slate-800">
                 Export Options
               </summary>
 
-              <div className="grid gap-3 border-t border-slate-200 p-4 sm:grid-cols-2">
+              <div className="grid gap-3 border-t border-[#dce5ef] p-4 sm:grid-cols-2">
                 <label className="text-sm font-medium text-slate-700">
                   Export mode
                   <select
@@ -2395,7 +2398,7 @@ export default function EditorPage() {
                     onChange={(event) =>
                       setExportMode(event.target.value as ExportMode)
                     }
-                    className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none"
+                    className="mt-2 h-11 w-full rounded-xl border border-[#dbe4ef] bg-white px-3 text-sm outline-none"
                   >
                     <option value="full">Full edited PDF</option>
                     <option value="current">Current page only</option>
@@ -2410,7 +2413,7 @@ export default function EditorPage() {
                     onChange={(event) => setExportRange(event.target.value)}
                     disabled={exportMode !== "range"}
                     placeholder="1-3,5"
-                    className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none disabled:bg-slate-100 disabled:text-slate-400"
+                    className="mt-2 h-11 w-full rounded-xl border border-[#dbe4ef] bg-white px-3 text-sm outline-none disabled:bg-slate-100 disabled:text-slate-400"
                   />
                 </label>
               </div>
