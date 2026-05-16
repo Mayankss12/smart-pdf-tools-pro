@@ -1,191 +1,150 @@
 "use client";
 
-import { useCallback } from "react";
 import {
-  Copy,
+  ChevronDown,
   FileImage,
-  Layers,
+  Highlighter,
+  ImagePlus,
+  MousePointer2,
+  Move,
+  PenLine,
   RotateCcw,
-  Trash2,
+  Type,
+  Wand2,
+  Layers,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-
-import { CommandRibbon } from "@/components/editor/ribbon/CommandRibbon";
-import { useEditorRibbonShortcuts } from "@/components/editor/ribbon/useEditorRibbonShortcuts";
-import type {
-  ActiveTool,
-  EditorCommandId,
-} from "@/lib/editor/types";
+import type { ActiveTool } from "@/lib/editor/types";
 
 type EditorToolbarProps = {
   activeTool: ActiveTool;
-  hasSelectedLayer: boolean;
   onSelectTool: (tool: ActiveTool) => void;
   onImageClick: () => void;
   onSignatureClick: () => void;
   onSignatureImageClick: () => void;
-  onDelete: () => void;
-  onDuplicate: () => void;
   onClearPage: () => void;
   onReset: () => void;
-  onExport: () => void;
 };
 
-type UtilityActionProps = {
+type ToolbarButtonProps = {
   label: string;
   icon: LucideIcon;
-  disabled?: boolean;
-  tone?: "default" | "danger";
+  active?: boolean;
   onClick: () => void;
 };
 
-function UtilityAction({
+function ToolbarButton({
   label,
   icon: Icon,
-  disabled = false,
-  tone = "default",
+  active = false,
   onClick,
-}: UtilityActionProps) {
-  const toneClasses = disabled
-    ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
-    : tone === "danger"
-      ? "border-rose-200 bg-white text-rose-700 hover:border-rose-300 hover:bg-rose-50"
-      : "border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700";
-
+}: ToolbarButtonProps) {
   return (
     <button
       type="button"
+      title={label}
       onClick={onClick}
-      disabled={disabled}
       className={[
-        "inline-flex min-h-10 items-center gap-2 rounded-2xl border px-3.5 py-2 text-xs font-semibold transition duration-200",
-        "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100",
-        disabled ? "" : "hover:-translate-y-0.5 hover:shadow-sm",
-        toneClasses,
+        "inline-flex min-h-10 items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition",
+        active
+          ? "border-indigo-600 bg-indigo-600 text-white shadow-sm"
+          : "border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700",
       ].join(" ")}
     >
-      <Icon size={15} strokeWidth={2.2} />
-      <span>{label}</span>
+      <Icon size={16} />
+      <span className="hidden sm:inline">{label}</span>
     </button>
   );
 }
 
-function getRibbonActiveCommand(activeTool: ActiveTool): EditorCommandId | null {
-  switch (activeTool) {
-    case "select":
-    case "object":
-    case "edit":
-    case "text":
-    case "highlight":
-      return activeTool;
-
-    default:
-      return null;
-  }
-}
-
 export function EditorToolbar({
   activeTool,
-  hasSelectedLayer,
   onSelectTool,
   onImageClick,
   onSignatureClick,
   onSignatureImageClick,
-  onDelete,
-  onDuplicate,
   onClearPage,
   onReset,
-  onExport,
 }: EditorToolbarProps) {
-  const activeCommandId = getRibbonActiveCommand(activeTool);
-
-  const handleRibbonCommand = useCallback(
-    (commandId: EditorCommandId) => {
-      switch (commandId) {
-        case "select":
-        case "object":
-        case "edit":
-        case "text":
-        case "highlight":
-          onSelectTool(commandId);
-          return;
-
-        case "image":
-          onImageClick();
-          return;
-
-        case "signature":
-          onSignatureClick();
-          return;
-
-        case "export":
-          onExport();
-          return;
-
-        default:
-          return;
-      }
-    },
-    [
-      onExport,
-      onImageClick,
-      onSelectTool,
-      onSignatureClick,
-    ],
-  );
-
-  useEditorRibbonShortcuts({
-    enabled: true,
-    onCommand: handleRibbonCommand,
-  });
-
   return (
-    <div className="space-y-3">
-      <CommandRibbon
-        activeCommandId={activeCommandId}
-        hasDocument
-        canUndo={false}
-        canRedo={false}
-        onCommandActivate={handleRibbonCommand}
+    <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-3 py-2.5 sm:px-4">
+      <ToolbarButton
+        label="Select"
+        icon={MousePointer2}
+        active={activeTool === "select"}
+        onClick={() => onSelectTool("select")}
       />
 
-      <div className="flex flex-col gap-3 rounded-[1.45rem] border border-slate-200/90 bg-white/90 p-3 shadow-sm backdrop-blur sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap gap-2">
-          <UtilityAction
-            label="Sign Image"
-            icon={FileImage}
-            onClick={onSignatureImageClick}
-          />
+      <ToolbarButton
+        label="Object"
+        icon={Move}
+        active={activeTool === "object"}
+        onClick={() => onSelectTool("object")}
+      />
 
-          <UtilityAction
-            label="Duplicate"
-            icon={Copy}
-            disabled={!hasSelectedLayer}
-            onClick={onDuplicate}
-          />
+      <ToolbarButton
+        label="Edit Text"
+        icon={Wand2}
+        active={activeTool === "edit"}
+        onClick={() => onSelectTool("edit")}
+      />
 
-          <UtilityAction
-            label="Delete"
-            icon={Trash2}
-            disabled={!hasSelectedLayer}
-            tone="danger"
-            onClick={onDelete}
-          />
-        </div>
+      <span className="mx-1 hidden h-7 w-px bg-slate-200 sm:block" />
 
-        <div className="flex flex-wrap gap-2">
-          <UtilityAction
-            label="Clear Page"
-            icon={Layers}
-            onClick={onClearPage}
-          />
+      <ToolbarButton
+        label="Text"
+        icon={Type}
+        active={activeTool === "text"}
+        onClick={() => onSelectTool("text")}
+      />
 
-          <UtilityAction
-            label="Reset All"
-            icon={RotateCcw}
-            onClick={onReset}
-          />
-        </div>
+      <ToolbarButton
+        label="Highlight"
+        icon={Highlighter}
+        active={activeTool === "highlight"}
+        onClick={() => onSelectTool("highlight")}
+      />
+
+      <ToolbarButton label="Image" icon={ImagePlus} onClick={onImageClick} />
+
+      <ToolbarButton label="Sign" icon={PenLine} onClick={onSignatureClick} />
+
+      <div className="ml-auto">
+        <details className="relative">
+          <summary className="inline-flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700">
+            More
+            <ChevronDown size={15} />
+          </summary>
+
+          <div className="absolute right-0 top-12 z-50 w-52 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+            <button
+              type="button"
+              onClick={onSignatureImageClick}
+              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+            >
+              <FileImage size={16} />
+              Signature Image
+            </button>
+
+            <button
+              type="button"
+              onClick={onClearPage}
+              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+            >
+              <Layers size={16} />
+              Clear Current Page
+            </button>
+
+            <button
+              type="button"
+              onClick={onReset}
+              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-rose-600 transition hover:bg-rose-50"
+            >
+              <RotateCcw size={16} />
+              Reset All Edits
+            </button>
+          </div>
+        </details>
       </div>
     </div>
   );
