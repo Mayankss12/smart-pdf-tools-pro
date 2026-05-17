@@ -9,7 +9,7 @@
   --pm-surface-strong: #ffffff;
   --pm-ink: #21143c;
   --pm-ink-soft: #39265f;
-  --pm-muted: #6b5b7f;
+  --pm-muted: #5f506f;
   --pm-border: #eadff2;
   --pm-border-strong: #d9caec;
 
@@ -19,10 +19,10 @@
   --pm-brand-soft: #f1ecff;
   --pm-brand-wash: #fbf7ff;
 
-  --pm-blush: #ff91a8;
-  --pm-blush-dark: #ee6d8d;
-  --pm-blush-soft: #ffe9ef;
-  --pm-blush-wash: #fff5f7;
+  --pm-blush: #f5a8ba;
+  --pm-blush-dark: #d86f8a;
+  --pm-blush-soft: #fff0f3;
+  --pm-blush-wash: #fff9fa;
 
   --pm-accent: #b88cff;
   --pm-accent-dark: #8b62ed;
@@ -56,9 +56,9 @@ body {
   min-height: 100vh;
   background:
     radial-gradient(circle at 8% 10%, rgba(139, 115, 255, 0.12), transparent 30rem),
-    radial-gradient(circle at 92% 8%, rgba(255, 145, 168, 0.14), transparent 32rem),
+    radial-gradient(circle at 92% 8%, rgba(245, 168, 186, 0.08), transparent 32rem),
     radial-gradient(circle at 70% 94%, rgba(184, 140, 255, 0.08), transparent 36rem),
-    linear-gradient(180deg, #fffaf4 0%, #fff8ef 50%, #fbf6ff 100%);
+    linear-gradient(180deg, #fffaf4 0%, #fff8ef 54%, #fbf6ff 100%);
   color: var(--pm-ink);
   font-family:
     var(--font-body),
@@ -118,8 +118,8 @@ a {
     @apply min-h-screen;
     background:
       radial-gradient(circle at 9% 6%, rgba(139, 115, 255, 0.1), transparent 28rem),
-      radial-gradient(circle at 90% 8%, rgba(255, 145, 168, 0.12), transparent 30rem),
-      linear-gradient(180deg, #fffaf4 0%, #fff8ef 52%, #fbf6ff 100%);
+      radial-gradient(circle at 90% 8%, rgba(245, 168, 186, 0.08), transparent 30rem),
+      linear-gradient(180deg, #fffaf4 0%, #fff8ef 56%, #fbf6ff 100%);
     color: var(--pm-ink);
   }
 
@@ -229,8 +229,8 @@ a {
 
   .status-soon {
     @apply rounded-full px-3 py-1 text-xs font-semibold;
-    background: #fff1f4;
-    color: #b85672;
+    background: #fff4f6;
+    color: #a75a70;
   }
 
   .status-live {
@@ -261,10 +261,10 @@ a {
 
 .hero-aurora {
   background:
-    radial-gradient(circle at 12% 22%, rgba(255, 255, 255, 0.24), transparent 18rem),
-    radial-gradient(circle at 82% 12%, rgba(255, 145, 168, 0.2), transparent 22rem),
-    radial-gradient(circle at 85% 82%, rgba(184, 140, 255, 0.14), transparent 20rem),
-    linear-gradient(135deg, #7d67f4 0%, #8b73ff 40%, #a986ff 72%, #ef7894 100%);
+    radial-gradient(circle at 12% 22%, rgba(255, 255, 255, 0.28), transparent 18rem),
+    radial-gradient(circle at 82% 12%, rgba(245, 168, 186, 0.12), transparent 22rem),
+    radial-gradient(circle at 85% 82%, rgba(184, 140, 255, 0.12), transparent 20rem),
+    linear-gradient(135deg, #7d67f4 0%, #8b73ff 44%, #a986ff 78%, #e89ab0 100%);
 }
 
 .hero-grid {
@@ -282,14 +282,14 @@ a {
 }
 
 .text-gradient {
-  background: linear-gradient(135deg, #ffffff 0%, #f7f1ff 44%, #ffe9ef 100%);
+  background: linear-gradient(135deg, #ffffff 0%, #f7f1ff 44%, #fff0f4 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
 .brand-gradient-text {
-  background: linear-gradient(135deg, #5234d7 0%, #8b73ff 48%, #ef7894 100%);
+  background: linear-gradient(135deg, #5234d7 0%, #8b73ff 60%, #d97994 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -300,7 +300,7 @@ a {
 .bg-slate-50\/70,
 .bg-\[\#faf8ff\],
 .bg-\[\#fcfbff\] {
-  background-color: rgba(255, 250, 242, 0.82) !important;
+  background-color: rgba(255, 250, 242, 0.84) !important;
 }
 
 .bg-white,
@@ -314,18 +314,18 @@ a {
 .bg-white\/92,
 .bg-white\/96,
 .bg-white\/98 {
-  background-color: rgba(255, 253, 248, 0.92) !important;
+  background-color: rgba(255, 253, 248, 0.94) !important;
 }
 
 .bg-indigo-50,
 .bg-violet-50,
 .bg-purple-50 {
-  background-color: rgba(247, 242, 255, 0.9) !important;
+  background-color: rgba(247, 242, 255, 0.86) !important;
 }
 
 .bg-rose-50,
 .bg-red-50 {
-  background-color: rgba(255, 245, 247, 0.92) !important;
+  background-color: rgba(255, 248, 250, 0.92) !important;
 }
 
 .border-slate-100,
@@ -345,7 +345,10 @@ a {
   color: var(--pm-ink) !important;
 }
 
-.text-slate-800,
+.text-slate-800 {
+  color: var(--pm-ink-soft) !important;
+}
+
 .text-slate-700,
 .text-slate-600,
 .text-slate-500 {
@@ -388,5 +391,5 @@ a {
 .to-rose-50\/60,
 .to-rose-50\/65,
 .to-rose-50\/70 {
-  --tw-gradient-to: #ff91a8 var(--tw-gradient-to-position) !important;
+  --tw-gradient-to: #e89ab0 var(--tw-gradient-to-position) !important;
 }
