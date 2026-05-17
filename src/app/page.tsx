@@ -3,7 +3,6 @@ import { Header } from "@/components/Header";
 import { ToolGlyph, type ToolGlyphTone } from "@/components/ToolGlyph";
 import {
   ArrowRight,
-  BadgeCheck,
   BookOpenCheck,
   Combine,
   Copy,
@@ -19,6 +18,7 @@ import {
   Lock,
   Minimize2,
   MousePointer2,
+  MoveUpRight,
   PenLine,
   PencilRuler,
   RotateCw,
@@ -148,7 +148,7 @@ const toolCategories: readonly ToolCategoryGroup[] = [
       { title: "PDF Editor", description: "", href: "/editor", icon: FileText, tone: "violet" },
       { title: "Add Text", description: "", href: "/editor", icon: PenLine, tone: "violet" },
       { title: "Add Images", description: "", href: "/editor", icon: Image, tone: "violet" },
-      { title: "Sign PDF", description: "", href: "/editor", icon: BadgeCheck, tone: "violet" },
+      { title: "Sign PDF", description: "", href: "/editor", icon: ShieldCheck, tone: "violet" },
       { title: "Fill Form", description: "", href: "/editor", icon: BookOpenCheck, tone: "violet" },
       { title: "Whiteout", description: "", href: "/editor", icon: XCircle, tone: "violet" },
       { title: "Crop PDF", description: "", href: "/tools", icon: Crop, tone: "violet" },
@@ -258,7 +258,12 @@ function PrimaryToolCard({ tool }: { tool: HomeToolCard }) {
       href={tool.href}
       className="group relative flex min-h-[216px] flex-col rounded-[1.35rem] border border-[var(--border-light)] bg-[var(--bg-card)] p-5 shadow-[var(--shadow-soft)] transition duration-200 hover:-translate-y-1 hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] hover:shadow-[var(--shadow-card-hover)]"
     >
-      <ToolGlyph icon={tool.icon} tone={tool.tone} size="lg" />
+      <div className="flex items-start justify-between gap-4">
+        <ToolGlyph icon={tool.icon} tone={tool.tone} size="lg" />
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--violet-border)] bg-[var(--violet-50)] text-[var(--violet-600)] transition duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:border-[var(--border-focus)] group-hover:bg-[var(--violet-600)] group-hover:text-white">
+          <MoveUpRight size={18} />
+        </span>
+      </div>
 
       <h3 className="display-font mt-5 text-[1.28rem] font-bold tracking-[-0.02em] text-[var(--text-primary)] transition group-hover:text-[var(--violet-600)]">
         {tool.title}
@@ -267,11 +272,6 @@ function PrimaryToolCard({ tool }: { tool: HomeToolCard }) {
       <p className="mt-2 max-w-[16rem] text-sm font-normal leading-6 text-[var(--text-secondary)]">
         {tool.description}
       </p>
-
-      <div className="mt-auto flex items-center gap-2 pt-5 text-sm font-semibold text-[var(--violet-600)]">
-        Open tool
-        <ArrowRight size={16} className="transition group-hover:translate-x-1" />
-      </div>
     </Link>
   );
 }
@@ -288,7 +288,9 @@ function CompactToolLink({ tool }: { tool: HomeToolCard }) {
           {tool.title}
         </span>
       </div>
-      <ArrowRight size={14} className="shrink-0 text-[var(--text-caption)] transition group-hover:translate-x-0.5 group-hover:text-[var(--violet-600)]" />
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[var(--violet-border)] bg-[var(--violet-50)] text-[var(--violet-600)] transition group-hover:border-[var(--border-focus)] group-hover:bg-[var(--violet-600)] group-hover:text-white">
+        <MoveUpRight size={13} />
+      </span>
     </Link>
   );
 }
@@ -348,19 +350,6 @@ export default function HomePage() {
             <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
               {primaryToolCards.map((tool) => (
                 <PrimaryToolCard key={tool.title} tool={tool} />
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="border-b border-[var(--border-light)] bg-[var(--bg-card)]">
-          <div className="mx-auto max-w-7xl px-4 py-9 sm:px-6 lg:px-8 lg:py-11">
-            <div className="grid gap-3 border-y border-[var(--border-light)] py-5 sm:grid-cols-3 sm:divide-x sm:divide-[var(--border-light)]">
-              {["Fast task entry", "Clear tool discovery", "Focused document workflows"].map((item) => (
-                <div key={item} className="flex items-start gap-2.5 px-1 text-[13px] font-semibold leading-6 text-[var(--text-secondary)] sm:px-5">
-                  <BadgeCheck size={16} className="mt-1 shrink-0 text-[var(--violet-600)]" />
-                  <span>{item}</span>
-                </div>
               ))}
             </div>
           </div>
