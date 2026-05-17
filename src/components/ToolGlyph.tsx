@@ -8,24 +8,24 @@ const toneStyles: Record<ToolGlyphTone, {
   icon: string;
 }> = {
   violet: {
-    shell: "border-violet-200 bg-violet-50/90",
-    fold: "border-l-violet-200 border-t-white",
-    icon: "text-violet-700",
+    shell: "border-[var(--violet-border)] bg-[var(--violet-50)]",
+    fold: "border-l-[var(--violet-border)] border-t-[var(--cream-base)]",
+    icon: "text-[var(--violet-600)]",
   },
   blush: {
-    shell: "border-rose-200 bg-rose-50/90",
-    fold: "border-l-rose-200 border-t-white",
-    icon: "text-rose-600",
+    shell: "border-[var(--violet-border)] bg-[var(--cream-base)]",
+    fold: "border-l-[var(--violet-border)] border-t-[var(--cream-secondary)]",
+    icon: "text-[var(--violet-600)]",
   },
   indigo: {
-    shell: "border-indigo-200 bg-indigo-50/90",
-    fold: "border-l-indigo-200 border-t-white",
-    icon: "text-indigo-700",
+    shell: "border-[var(--cream-border)] bg-[var(--cream-secondary)]",
+    fold: "border-l-[var(--cream-border)] border-t-[var(--cream-base)]",
+    icon: "text-[var(--violet-600)]",
   },
   mint: {
-    shell: "border-emerald-200 bg-emerald-50/90",
-    fold: "border-l-emerald-200 border-t-white",
-    icon: "text-emerald-700",
+    shell: "border-[var(--violet-border)] bg-[var(--violet-100)]",
+    fold: "border-l-[var(--violet-border)] border-t-[var(--cream-base)]",
+    icon: "text-[var(--violet-600)]",
   },
 };
 
@@ -39,13 +39,22 @@ export function ToolGlyph({
   size?: "sm" | "md" | "lg";
 }) {
   const styles = toneStyles[tone];
-  const shellSize = size === "sm" ? "h-10 w-10 rounded-2xl" : size === "lg" ? "h-14 w-14 rounded-[1.25rem]" : "h-12 w-12 rounded-[1.15rem]";
+  const shellSize =
+    size === "sm"
+      ? "h-10 w-10 rounded-xl"
+      : size === "lg"
+        ? "h-14 w-14 rounded-2xl"
+        : "h-12 w-12 rounded-xl";
   const iconSize = size === "sm" ? 17 : size === "lg" ? 24 : 20;
 
   return (
-    <span className={`relative inline-flex shrink-0 items-center justify-center overflow-hidden border ${shellSize} ${styles.shell}`}>
-      <span className={`absolute right-0 top-0 h-0 w-0 border-l-[13px] border-t-[13px] border-l-transparent ${styles.fold}`} />
-      <Icon size={iconSize} className={styles.icon} strokeWidth={2.2} />
+    <span
+      className={`relative inline-flex shrink-0 items-center justify-center overflow-hidden border shadow-[var(--shadow-soft)] ${shellSize} ${styles.shell}`}
+    >
+      <span
+        className={`absolute right-0 top-0 h-0 w-0 border-l-[13px] border-t-[13px] border-l-transparent ${styles.fold}`}
+      />
+      <Icon size={iconSize} className={styles.icon} strokeWidth={2.1} />
     </span>
   );
 }
