@@ -262,6 +262,10 @@ export default function EditorPage() {
     width: 360,
     height: 520,
   });
+  const [pagePointSize, setPagePointSize] = useState({
+    width: 360,
+    height: 520,
+  });
   const [renderScale, setRenderScale] = useState(1);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [pageThumbs, setPageThumbs] = useState<PageThumb[]>([]);
@@ -383,6 +387,10 @@ export default function EditorPage() {
       setCanvasSize({
         width: viewport.width,
         height: viewport.height,
+      });
+      setPagePointSize({
+        width: unscaledViewport.width,
+        height: unscaledViewport.height,
       });
 
       setRenderScale(finalScale);
@@ -991,11 +999,19 @@ export default function EditorPage() {
   }
 
   function getLayerStyle(layer: PdfLayer) {
+    const pageWidthPt = Math.max(pagePointSize.width, 1);
+    const pageHeightPt = Math.max(pagePointSize.height, 1);
+
+    const xPt = (layer.xPercent / 100) * pageWidthPt;
+    const yPt = (layer.yPercent / 100) * pageHeightPt;
+    const widthPt = (layer.widthPercent / 100) * pageWidthPt;
+    const heightPt = (layer.heightPercent / 100) * pageHeightPt;
+
     return {
-      left: `${layer.xPercent}%`,
-      top: `${layer.yPercent}%`,
-      width: `${layer.widthPercent}%`,
-      height: `${layer.heightPercent}%`,
+      left: `${xPt * renderScale}px`,
+      top: `${yPt * renderScale}px`,
+      width: `${widthPt * renderScale}px`,
+      height: `${heightPt * renderScale}px`,
     };
   }
 
