@@ -1,31 +1,43 @@
 :root {
-  --cream-base: #f7f4ee;
-  --cream-secondary: #efe9dc;
-  --cream-border: #e4ddd0;
-  --cream-hover: #eae4d8;
+  --bg-base: #f7f6fc;
+  --bg-card: #ffffff;
+  --bg-panel: #f0eeff;
+  --bg-soft: #f5f2ff;
 
-  --violet-600: #5b4ecc;
-  --violet-500: #7265d9;
-  --violet-100: #ede9ff;
-  --violet-50: #f4f2ff;
-  --violet-border: #d4ceee;
+  --violet-600: #6550e8;
+  --violet-500: #8070f0;
+  --violet-400: #a294f5;
+  --violet-100: #eee9ff;
+  --violet-50: #f5f2ff;
+  --violet-border: #e4dfff;
 
-  --text-primary: #1a1730;
-  --text-secondary: #4a4668;
-  --text-muted: #7b7899;
+  --border-light: #e4dfff;
+  --border-focus: #8070f0;
+
+  --text-primary: #18152e;
+  --text-secondary: #5a567a;
+  --text-muted: #9895b5;
   --text-on-violet: #ffffff;
   --text-caption: #9895b5;
 
-  --success-bg: #edfaf3;
-  --success-text: #1a7a4a;
+  --cta-gradient: linear-gradient(135deg, #6550e8, #8870f4);
+  --cta-gradient-hover: linear-gradient(135deg, #6d58eb, #9580f7);
+  --hero-gradient: linear-gradient(135deg, #6550e8, #9b7ff8);
+
+  --success-bg: #ecfdf5;
+  --success-text: #065f46;
   --error-bg: #fef2f2;
-  --error-text: #b91c1c;
-  --warning-bg: #fffbeb;
+  --error-text: #dc2626;
+  --warning-bg: #fef3c7;
   --warning-text: #92400e;
-  --beta-bg: #fef3c7;
-  --beta-text: #92400e;
-  --soon-bg: #f1f0f5;
-  --soon-text: #6b6888;
+  --beta-bg: #eee9ff;
+  --beta-text: #6550e8;
+  --soon-bg: #f3f4f6;
+  --soon-text: #6b7280;
+  --backend-bg: #fef3c7;
+  --backend-text: #92400e;
+  --browser-bg: #ecfdf5;
+  --browser-text: #065f46;
 
   --radius-sm: 0.25rem;
   --radius-md: 0.5rem;
@@ -33,20 +45,27 @@
   --radius-xl: 1rem;
   --radius-2xl: 1.25rem;
 
-  --shadow-soft: 0 1px 3px rgba(26, 23, 48, 0.06);
-  --shadow-card: 0 10px 28px rgba(26, 23, 48, 0.08);
-  --shadow-focus: 0 0 0 4px rgba(91, 78, 204, 0.14);
+  --shadow-soft: 0 1px 3px rgba(24, 21, 46, 0.06);
+  --shadow-card: 0 4px 18px rgba(101, 80, 232, 0.08);
+  --shadow-card-hover: 0 10px 28px rgba(101, 80, 232, 0.12);
+  --shadow-focus: 0 0 0 4px rgba(101, 80, 232, 0.14);
 
   --font-size-caption: 0.75rem;
   --font-size-body: 0.9375rem;
   --font-size-tool: 0.9375rem;
-  --font-size-section: 1.5rem;
-  --font-size-page: 2.25rem;
+  --font-size-section: 2.25rem;
+  --font-size-page: 2.5rem;
   --font-size-hero: 3.5rem;
 
   --line-caption: 1.45;
-  --line-body: 1.7;
-  --line-section: 1.3;
-  --line-page: 1.2;
+  --line-body: 1.65;
+  --line-section: 1.2;
+  --line-page: 1.15;
   --line-hero: 1.15;
+
+  /* Compatibility aliases while older pages are refactored. */
+  --cream-base: var(--bg-base);
+  --cream-secondary: var(--bg-panel);
+  --cream-border: var(--border-light);
+  --cream-hover: var(--violet-50);
 }
