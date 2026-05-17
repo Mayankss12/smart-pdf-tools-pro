@@ -98,18 +98,29 @@ a {
     @apply mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8;
   }
 
-  .btn-primary {
+  .btn-primary,
+  .header-cta {
     @apply inline-flex min-h-12 items-center justify-center gap-2 px-6 py-3 text-sm font-semibold transition duration-200 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50;
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
     border-radius: 999px;
     background: var(--cta-gradient);
     color: var(--text-on-violet);
     box-shadow: 0 18px 42px rgba(101, 80, 232, 0.2);
   }
 
-  .btn-primary:hover {
+  .btn-primary:hover,
+  .header-cta:hover {
     background: var(--cta-gradient-hover);
     box-shadow: 0 22px 48px rgba(101, 80, 232, 0.25);
     transform: translateY(-1px);
+  }
+
+  .btn-primary > *,
+  .header-cta > * {
+    position: relative;
+    z-index: 1;
   }
 
   .btn-secondary {
@@ -418,15 +429,22 @@ a {
 
 .from-indigo-700,
 .from-violet-600,
-.from-violet-700,
-.via-violet-600,
-.via-violet-700,
-.via-purple-700,
-.to-purple-700,
-.to-rose-500 {
+.from-violet-700 {
   --tw-gradient-from: #6550e8 var(--tw-gradient-from-position) !important;
   --tw-gradient-to: rgb(101 80 232 / 0) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+
+.via-violet-600,
+.via-violet-700,
+.via-purple-700 {
+  --tw-gradient-to: rgb(136 112 244 / 0) var(--tw-gradient-to-position) !important;
   --tw-gradient-stops: var(--tw-gradient-from), #8870f4 var(--tw-gradient-via-position), var(--tw-gradient-to) !important;
+}
+
+.to-purple-700,
+.to-rose-500 {
+  --tw-gradient-to: #8870f4 var(--tw-gradient-to-position) !important;
 }
 
 .to-rose-50,
