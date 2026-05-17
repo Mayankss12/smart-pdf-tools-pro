@@ -17,6 +17,7 @@ import {
 import { useMemo, useRef, useState } from "react";
 
 import { Header } from "@/components/Header";
+import { ToolPageHeader } from "@/components/ToolPageHeader";
 import type { NormalizedRect } from "@/engines/shared/types";
 import {
   clampNormalizedRect,
@@ -40,26 +41,6 @@ import {
   validatePdfFile,
 } from "./highlightToolRuntime";
 
-/**
- * PDFMantra Standalone Smart Highlight Tool
- * --------------------------------------------
- * This page is intentionally isolated from the old monolithic editor.
- * It consumes the new engines/adapters stack only:
- * - engines/highlight/*
- * - engines/shared/*
- * - adapters/pdfjs/*
- *
- * Phase delivered here:
- * - PDF upload and validation
- * - PDF.js page preview extraction
- * - PDF.js text-to-TextSnapUnit adapter consumption
- * - smart drag-to-highlight orchestration
- * - freeform fallback when text snapping cannot create a region
- * - same-page highlight selection, style editing, delete
- * - undo/redo
- * - export highlighted PDF through the export plan pipeline
- */
-
 const RENDER_SCALE = 1.08;
 const DEFAULT_HIGHLIGHT_COLOR = HIGHLIGHT_COLOR_PRESETS[0].value;
 const DEFAULT_HIGHLIGHT_OPACITY = 0.38;
@@ -78,7 +59,7 @@ function createStatusClassName(tone: "info" | "success" | "error"): string {
     return "border-red-100 bg-red-50 text-red-700";
   }
 
-  return "border-indigo-100 bg-indigo-50 text-indigo-800";
+  return "border-[var(--violet-border)] bg-[var(--violet-50)] text-[var(--violet-600)]";
 }
 
 function cloneLayerArray(layers: readonly HighlightLayer[]): readonly HighlightLayer[] {
@@ -446,332 +427,333 @@ export function HighlightToolPage() {
     <>
       <Header />
 
-      <main className="page-shell">
-        <section className="page-container">
-          <div className="surface overflow-hidden">
-            <section className="relative overflow-hidden border-b border-slate-100 bg-gradient-to-br from-indigo-700 via-violet-700 to-purple-700 px-6 py-12 text-white sm:px-10 lg:px-14">
-              <div className="absolute right-[-120px] top-[-120px] h-80 w-80 rounded-full bg-white/10 blur-3xl" />
-              <div className="absolute bottom-[-180px] left-[-100px] h-96 w-96 rounded-full bg-amber-300/10 blur-3xl" />
-
-              <div className="relative max-w-5xl">
-                <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white ring-1 ring-white/20">
-                  <Highlighter size={14} />
-                  PDFMantra Standalone Smart Highlight Engine
+      <main className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)]">
+        <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+          <ToolPageHeader
+            icon={Highlighter}
+            eyebrow="PDFMantra Smart Highlight"
+            title="Highlight PDF with smart text snapping and clean export."
+            description="Drag over a PDF page. Text-based pages snap to intended content, while scanned or image-only areas use a freeform fallback. Same-color overlaps are composed before export so highlights stay clean."
+            meta={
+              <div className="grid min-w-[220px] grid-cols-3 divide-x divide-[var(--border-light)] text-center">
+                <div className="px-3">
+                  <div className="text-[1.35rem] font-bold tracking-[-0.03em] text-[var(--text-primary)]">{summary?.pageCount ?? "-"}</div>
+                  <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">Pages</div>
                 </div>
-
-                <h1 className="max-w-4xl text-4xl font-semibold leading-[1.08] tracking-[-0.04em] text-white sm:text-5xl">
-                  Highlight PDF with smart text snapping and clean export.
-                </h1>
-
-                <p className="mt-5 max-w-3xl text-base font-medium leading-8 text-indigo-50/95">
-                  Drag over a PDF page. Text-based pages snap to intended content, while scanned or image-only areas use a clean freeform fallback. Same-color overlaps are composed before export so highlights do not darken accidentally.
-                </p>
-
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="application/pdf,.pdf"
-                  className="hidden"
-                  onChange={(event) => handleFile(event.target.files?.[0])}
-                />
+                <div className="px-3">
+                  <div className="text-[1.35rem] font-bold tracking-[-0.03em] text-[var(--text-primary)]">{layers.length || "-"}</div>
+                  <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">Marks</div>
+                </div>
+                <div className="px-3">
+                  <div className="text-[1.35rem] font-bold tracking-[-0.03em] text-[var(--text-primary)]">{selectedPageLayers.length || "-"}</div>
+                  <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">Page</div>
+                </div>
               </div>
-            </section>
+            }
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/pdf,.pdf"
+              className="hidden"
+              onChange={(event) => handleFile(event.target.files?.[0])}
+            />
+          </ToolPageHeader>
 
-            <div className="grid xl:grid-cols-[1fr_390px]">
-              <section className="min-h-[820px] border-r border-slate-200 bg-slate-50/70 p-5 sm:p-6">
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    handleFile(event.dataTransfer.files?.[0]);
-                  }}
-                  onDragOver={(event) => event.preventDefault()}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      fileInputRef.current?.click();
-                    }
-                  }}
-                  className="cursor-pointer rounded-[1.75rem] border-2 border-dashed border-indigo-200 bg-white p-6 text-center shadow-sm transition hover:border-indigo-400 hover:bg-indigo-50/40"
-                >
-                  <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-sm shadow-indigo-200">
-                    <FileText size={22} />
-                  </div>
-
-                  <div className="font-semibold tracking-[-0.02em] text-slate-950">
-                    {summary?.fileName ?? "Drop PDF here"}
-                  </div>
-
-                  <div className="mt-1 text-sm font-medium text-slate-500">
-                    {summary
-                      ? `${summary.pageCount} page${summary.pageCount === 1 ? "" : "s"} · ${formatFileSize(summary.fileSize)}`
-                      : "Click here or drag a PDF to open the Smart Highlight workspace."}
-                  </div>
-
-                  <div className="mt-4 inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700">
-                    <Upload size={17} />
-                    Choose PDF
-                  </div>
+          <div className="mt-6 grid overflow-hidden rounded-[1.75rem] border border-[var(--border-light)] bg-[var(--bg-card)] shadow-[var(--shadow-card)] xl:grid-cols-[1fr_390px]">
+            <section className="min-h-[820px] border-r border-[var(--border-light)] bg-[var(--bg-base)] p-5 sm:p-6">
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  handleFile(event.dataTransfer.files?.[0]);
+                }}
+                onDragOver={(event) => event.preventDefault()}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    fileInputRef.current?.click();
+                  }
+                }}
+                className="cursor-pointer rounded-[1.5rem] border-2 border-dashed border-[var(--violet-border)] bg-[var(--bg-card)] p-6 text-center shadow-[var(--shadow-soft)] transition hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)]"
+              >
+                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--violet-600)] text-white shadow-[0_16px_36px_rgba(101,80,232,0.20)]">
+                  <FileText size={22} />
                 </div>
 
-                {pages.length > 0 && activePage && (
-                  <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm">
-                    <div>
-                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Page navigation
-                      </div>
-                      <div className="mt-1 text-lg font-semibold tracking-[-0.03em] text-slate-950">
-                        {activePage.pageLabel} of {pages.length}
-                      </div>
+                <div className="font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
+                  {summary?.fileName ?? "Drop PDF here"}
+                </div>
+
+                <div className="mt-1 text-sm font-medium text-[var(--text-secondary)]">
+                  {summary
+                    ? `${summary.pageCount} page${summary.pageCount === 1 ? "" : "s"} · ${formatFileSize(summary.fileSize)}`
+                    : "Click here or drag a PDF to open the Smart Highlight workspace."}
+                </div>
+
+                <div className="mt-4 inline-flex items-center justify-center gap-2 rounded-full border border-[var(--violet-border)] bg-[var(--violet-50)] px-4 py-2 text-sm font-semibold text-[var(--violet-600)]">
+                  <Upload size={17} />
+                  Choose PDF
+                </div>
+              </div>
+
+              {pages.length > 0 && activePage && (
+                <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-[1.35rem] border border-[var(--border-light)] bg-[var(--bg-card)] p-4 shadow-[var(--shadow-soft)]">
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                      Page navigation
                     </div>
+                    <div className="mt-1 text-lg font-bold tracking-[-0.02em] text-[var(--text-primary)]">
+                      {activePage.pageLabel} of {pages.length}
+                    </div>
+                  </div>
 
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={goToPreviousPage}
-                        disabled={activePageIndex === 0}
-                        className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800 transition hover:border-indigo-200 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <ArrowLeft size={16} />
-                        Prev
-                      </button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={goToPreviousPage}
+                      disabled={activePageIndex === 0}
+                      className="inline-flex items-center gap-2 rounded-full border border-[var(--border-light)] bg-[var(--bg-card)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <ArrowLeft size={16} />
+                      Prev
+                    </button>
 
-                      <button
-                        type="button"
-                        onClick={goToNextPage}
-                        disabled={activePageIndex >= pages.length - 1}
-                        className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800 transition hover:border-indigo-200 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        Next
-                        <ArrowRight size={16} />
-                      </button>
+                    <button
+                      type="button"
+                      onClick={goToNextPage}
+                      disabled={activePageIndex >= pages.length - 1}
+                      className="inline-flex items-center gap-2 rounded-full border border-[var(--border-light)] bg-[var(--bg-card)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Next
+                      <ArrowRight size={16} />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-5">
+                {busy ? (
+                  <div className="flex min-h-[540px] items-center justify-center rounded-[1.75rem] border border-[var(--border-light)] bg-[var(--bg-card)] shadow-[var(--shadow-soft)]">
+                    <div className="flex items-center gap-3 rounded-full border border-[var(--violet-border)] bg-[var(--violet-50)] px-5 py-4 text-sm font-semibold text-[var(--violet-600)]">
+                      <Loader2 className="animate-spin" size={18} />
+                      Preparing Smart Highlight workspace
+                    </div>
+                  </div>
+                ) : activePage ? (
+                  <HighlightPageSurface
+                    page={activePage}
+                    layers={layers}
+                    selectedLayerId={selectedLayerId}
+                    onDragComplete={handleDragComplete}
+                    onSelectLayer={selectLayer}
+                  />
+                ) : (
+                  <div className="flex min-h-[540px] items-center justify-center rounded-[1.75rem] border border-dashed border-[var(--violet-border)] bg-[var(--bg-card)] text-center shadow-[var(--shadow-soft)]">
+                    <div className="max-w-md px-6">
+                      <Highlighter className="mx-auto text-[var(--violet-400)]" size={42} />
+                      <h2 className="display-font mt-4 text-2xl font-bold tracking-[-0.02em] text-[var(--text-primary)]">
+                        Upload a PDF to begin
+                      </h2>
+                      <p className="mt-2 text-sm font-normal leading-6 text-[var(--text-secondary)]">
+                        This standalone tool uses the Smart Highlight engine only. No old editor code is involved.
+                      </p>
                     </div>
                   </div>
                 )}
+              </div>
+            </section>
 
-                <div className="mt-5">
-                  {busy ? (
-                    <div className="flex min-h-[540px] items-center justify-center rounded-[2rem] border border-slate-200 bg-white shadow-sm">
-                      <div className="flex items-center gap-3 rounded-2xl bg-slate-50 px-5 py-4 text-sm font-semibold text-slate-800">
-                        <Loader2 className="animate-spin text-indigo-600" size={18} />
-                        Preparing Smart Highlight workspace
-                      </div>
-                    </div>
-                  ) : activePage ? (
-                    <HighlightPageSurface
-                      page={activePage}
-                      layers={layers}
-                      selectedLayerId={selectedLayerId}
-                      onDragComplete={handleDragComplete}
-                      onSelectLayer={selectLayer}
-                    />
-                  ) : (
-                    <div className="flex min-h-[540px] items-center justify-center rounded-[2rem] border border-dashed border-slate-200 bg-white/80 text-center shadow-sm">
-                      <div className="max-w-md px-6">
-                        <Highlighter className="mx-auto text-slate-400" size={42} />
-                        <h2 className="mt-4 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
-                          Upload a PDF to begin
-                        </h2>
-                        <p className="mt-2 text-sm font-medium leading-6 text-slate-500">
-                          This standalone tool uses the new Smart Highlight engine only. No old editor code is involved.
-                        </p>
-                      </div>
-                    </div>
+            <aside className="bg-[var(--bg-card)] p-5 sm:p-6">
+              <div className="rounded-[1.5rem] border border-[var(--border-light)] bg-[var(--bg-panel)] p-5 shadow-[var(--shadow-soft)]">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h2 className="display-font text-xl font-bold tracking-[-0.02em] text-[var(--text-primary)]">
+                      Highlight Controls
+                    </h2>
+                    <p className="mt-1 text-sm font-normal leading-6 text-[var(--text-secondary)]">
+                      Defaults apply to new drags. Selecting an existing highlight lets you restyle it directly.
+                    </p>
+                  </div>
+                  {file && (
+                    <button
+                      type="button"
+                      onClick={clearDocumentState}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-red-100 bg-red-50 text-red-700 transition hover:bg-red-100"
+                      aria-label="Remove PDF"
+                    >
+                      <X size={17} />
+                    </button>
                   )}
                 </div>
-              </section>
 
-              <aside className="bg-white p-5 sm:p-6">
-                <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h2 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">
-                        Highlight Controls
-                      </h2>
-                      <p className="mt-1 text-sm font-medium leading-6 text-slate-500">
-                        Defaults apply to new drags. Selecting an existing highlight lets you restyle it directly.
-                      </p>
-                    </div>
-                    {file && (
+                <div className="mt-5">
+                  <div className="text-sm font-semibold text-[var(--text-primary)]">Color</div>
+                  <div className="mt-3 grid grid-cols-5 gap-2">
+                    {HIGHLIGHT_COLOR_PRESETS.map((preset) => (
                       <button
+                        key={preset.value}
                         type="button"
-                        onClick={clearDocumentState}
-                        className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-red-100 bg-red-50 text-red-700 transition hover:bg-red-100"
-                        aria-label="Remove PDF"
-                      >
-                        <X size={17} />
-                      </button>
-                    )}
+                        onClick={() => handleSelectedColorChange(preset.value)}
+                        className={`h-11 rounded-2xl border transition ${
+                          selectedColor === preset.value
+                            ? "border-[var(--text-primary)] ring-2 ring-[rgba(24,21,46,0.12)]"
+                            : "border-[var(--border-light)] hover:border-[var(--border-focus)]"
+                        }`}
+                        style={{ backgroundColor: preset.value }}
+                        aria-label={`Use ${preset.label} highlight`}
+                        title={preset.label}
+                      />
+                    ))}
                   </div>
+                </div>
 
-                  <div className="mt-5">
-                    <div className="text-sm font-semibold text-slate-800">Color</div>
-                    <div className="mt-3 grid grid-cols-5 gap-2">
-                      {HIGHLIGHT_COLOR_PRESETS.map((preset) => (
-                        <button
-                          key={preset.value}
-                          type="button"
-                          onClick={() => handleSelectedColorChange(preset.value)}
-                          className={`h-11 rounded-2xl border transition ${
-                            selectedColor === preset.value
-                              ? "border-slate-950 ring-2 ring-slate-950/15"
-                              : "border-slate-200 hover:border-slate-400"
-                          }`}
-                          style={{ backgroundColor: preset.value }}
-                          aria-label={`Use ${preset.label} highlight`}
-                          title={preset.label}
-                        />
-                      ))}
-                    </div>
+                <label className="mt-5 block">
+                  <div className="flex items-center justify-between gap-3 text-sm font-semibold text-[var(--text-primary)]">
+                    <span>Opacity</span>
+                    <span className="rounded-full border border-[var(--border-light)] bg-white px-3 py-1 text-xs text-[var(--text-secondary)]">
+                      {Math.round(selectedOpacity * 100)}%
+                    </span>
                   </div>
+                  <input
+                    type="range"
+                    min={0.15}
+                    max={0.75}
+                    step={0.01}
+                    value={selectedOpacity}
+                    onChange={(event) => handleSelectedOpacityChange(Number(event.target.value))}
+                    className="mt-3 w-full"
+                  />
+                </label>
 
-                  <label className="mt-5 block">
-                    <div className="flex items-center justify-between gap-3 text-sm font-semibold text-slate-800">
-                      <span>Opacity</span>
-                      <span className="rounded-full bg-white px-3 py-1 text-xs text-slate-600">
-                        {Math.round(selectedOpacity * 100)}%
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min={0.15}
-                      max={0.75}
-                      step={0.01}
-                      value={selectedOpacity}
-                      onChange={(event) => handleSelectedOpacityChange(Number(event.target.value))}
-                      className="mt-3 w-full"
-                    />
-                  </label>
+                <div className="mt-5 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={handleUndo}
+                    disabled={history.undo.length === 0}
+                    className="inline-flex items-center justify-center gap-2 rounded-full border border-[var(--border-light)] bg-white px-4 py-3 text-sm font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Undo2 size={16} />
+                    Undo
+                  </button>
 
-                  <div className="mt-5 grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={handleUndo}
-                      disabled={history.undo.length === 0}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 transition hover:border-indigo-200 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <Undo2 size={16} />
-                      Undo
-                    </button>
+                  <button
+                    type="button"
+                    onClick={handleRedo}
+                    disabled={history.redo.length === 0}
+                    className="inline-flex items-center justify-center gap-2 rounded-full border border-[var(--border-light)] bg-white px-4 py-3 text-sm font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <RotateCcw size={16} />
+                    Redo
+                  </button>
+                </div>
 
-                    <button
-                      type="button"
-                      onClick={handleRedo}
-                      disabled={history.redo.length === 0}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 transition hover:border-indigo-200 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <RotateCcw size={16} />
-                      Redo
-                    </button>
+                <button
+                  type="button"
+                  onClick={handleExport}
+                  disabled={exporting || !bytes || layers.length === 0}
+                  className="btn-primary mt-5 w-full"
+                >
+                  {exporting ? (
+                    <>
+                      <Loader2 className="animate-spin" size={18} />
+                      <span>Exporting</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download size={18} />
+                      <span>Export Highlighted PDF</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <div className="mt-5 rounded-[1.5rem] border border-[var(--border-light)] bg-[var(--bg-card)] p-5 shadow-[var(--shadow-soft)]">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="display-font text-lg font-bold tracking-[-0.02em] text-[var(--text-primary)]">
+                      {activePage ? `${activePage.pageLabel} Highlights` : "Highlights"}
+                    </h3>
+                    <p className="mt-1 text-sm font-normal text-[var(--text-secondary)]">
+                      {activePage
+                        ? `${getPageLayerCount(layers, activePage.pageIndex)} highlight${getPageLayerCount(layers, activePage.pageIndex) === 1 ? "" : "s"} on this page`
+                        : "Upload a PDF first."}
+                    </p>
                   </div>
 
                   <button
                     type="button"
-                    onClick={handleExport}
-                    disabled={exporting || !bytes || layers.length === 0}
-                    className="btn-primary mt-5 w-full"
+                    onClick={handleClearPageHighlights}
+                    disabled={!activePage || selectedPageLayers.length === 0}
+                    className="inline-flex items-center gap-2 rounded-full border border-red-100 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {exporting ? (
-                      <>
-                        <Loader2 className="animate-spin" size={18} />
-                        Exporting
-                      </>
-                    ) : (
-                      <>
-                        <Download size={18} />
-                        Export Highlighted PDF
-                      </>
-                    )}
+                    <Trash2 size={14} />
+                    Clear Page
                   </button>
                 </div>
 
-                <div className="mt-5 rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <h3 className="text-lg font-semibold tracking-[-0.03em] text-slate-950">
-                        {activePage ? `${activePage.pageLabel} Highlights` : "Highlights"}
-                      </h3>
-                      <p className="mt-1 text-sm font-medium text-slate-500">
-                        {activePage
-                          ? `${getPageLayerCount(layers, activePage.pageIndex)} highlight${getPageLayerCount(layers, activePage.pageIndex) === 1 ? "" : "s"} on this page`
-                          : "Upload a PDF first."}
-                      </p>
+                <div className="mt-4 space-y-3">
+                  {selectedPageLayers.length === 0 ? (
+                    <div className="rounded-[1.25rem] border border-[var(--border-light)] bg-[var(--violet-50)] p-4 text-sm font-medium leading-6 text-[var(--text-secondary)]">
+                      Drag across the page preview to create your first highlight.
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={handleClearPageHighlights}
-                      disabled={!activePage || selectedPageLayers.length === 0}
-                      className="inline-flex items-center gap-2 rounded-2xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <Trash2 size={14} />
-                      Clear Page
-                    </button>
-                  </div>
-
-                  <div className="mt-4 space-y-3">
-                    {selectedPageLayers.length === 0 ? (
-                      <div className="rounded-2xl bg-slate-50 p-4 text-sm font-medium leading-6 text-slate-500">
-                        Drag across the page preview to create your first highlight.
-                      </div>
-                    ) : (
-                      selectedPageLayers
-                        .slice()
-                        .reverse()
-                        .map((layer) => (
-                          <div
-                            key={layer.id}
-                            className={`rounded-2xl border p-4 transition ${
-                              layer.id === selectedLayerId
-                                ? "border-indigo-300 bg-indigo-50"
-                                : "border-slate-200 bg-white hover:border-indigo-200"
-                            }`}
+                  ) : (
+                    selectedPageLayers
+                      .slice()
+                      .reverse()
+                      .map((layer) => (
+                        <div
+                          key={layer.id}
+                          className={`rounded-[1.25rem] border p-4 transition ${
+                            layer.id === selectedLayerId
+                              ? "border-[var(--border-focus)] bg-[var(--violet-50)]"
+                              : "border-[var(--border-light)] bg-[var(--bg-card)] hover:border-[var(--violet-border)] hover:bg-[var(--violet-50)]"
+                          }`}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => selectLayer(layer.id)}
+                            className="block w-full text-left"
                           >
-                            <button
-                              type="button"
-                              onClick={() => selectLayer(layer.id)}
-                              className="block w-full text-left"
-                            >
-                              <div className="flex items-center justify-between gap-3">
-                                <div className="text-sm font-semibold text-slate-950">
-                                  {layer.creationSource === "text-drag-snap"
-                                    ? "Smart text highlight"
-                                    : "Freeform fallback highlight"}
-                                </div>
-                                <div className="h-5 w-5 rounded-full border border-white shadow-sm" style={{ backgroundColor: layer.style.color }} />
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="text-sm font-semibold text-[var(--text-primary)]">
+                                {layer.creationSource === "text-drag-snap"
+                                  ? "Smart text highlight"
+                                  : "Freeform fallback highlight"}
                               </div>
-                              <p className="mt-2 text-sm font-medium leading-6 text-slate-600">
-                                {getLayerPreviewText(layer)}
-                              </p>
-                              <div className="mt-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                {getLayerRegionCount(layer)} region{getLayerRegionCount(layer) === 1 ? "" : "s"} · {Math.round(layer.style.opacity * 100)}% opacity
-                              </div>
-                            </button>
+                              <div className="h-5 w-5 rounded-full border border-white shadow-sm" style={{ backgroundColor: layer.style.color }} />
+                            </div>
+                            <p className="mt-2 text-sm font-medium leading-6 text-[var(--text-secondary)]">
+                              {getLayerPreviewText(layer)}
+                            </p>
+                            <div className="mt-2 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                              {getLayerRegionCount(layer)} region{getLayerRegionCount(layer) === 1 ? "" : "s"} · {Math.round(layer.style.opacity * 100)}% opacity
+                            </div>
+                          </button>
 
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteLayer(layer.id)}
-                              className="mt-3 inline-flex items-center gap-2 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100"
-                            >
-                              <Trash2 size={14} />
-                              Delete
-                            </button>
-                          </div>
-                        ))
-                    )}
-                  </div>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteLayer(layer.id)}
+                            className="mt-3 inline-flex items-center gap-2 rounded-full border border-red-100 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100"
+                          >
+                            <Trash2 size={14} />
+                            Delete
+                          </button>
+                        </div>
+                      ))
+                  )}
                 </div>
+              </div>
 
-                <div className={`mt-5 rounded-[1.5rem] border p-4 text-sm font-medium leading-6 ${createStatusClassName(statusTone)}`}>
-                  <div className="mb-1 flex items-center gap-2 font-semibold">
-                    <CheckCircle2 size={16} />
-                    Status
-                  </div>
-                  {status}
+              <div className={`mt-5 rounded-[1.5rem] border p-4 text-sm font-medium leading-6 ${createStatusClassName(statusTone)}`}>
+                <div className="mb-1 flex items-center gap-2 font-semibold">
+                  <CheckCircle2 size={16} />
+                  Status
                 </div>
-              </aside>
-            </div>
+                {status}
+              </div>
+            </aside>
           </div>
         </section>
       </main>
