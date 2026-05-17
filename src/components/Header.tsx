@@ -4,15 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   ArrowRight,
-  ChevronDown,
-  Grid3X3,
-  Menu,
-  Sparkles,
-  X,
   BadgeDollarSign,
-  ShieldCheck,
-  Shapes,
+  ChevronDown,
   Info,
+  Menu,
+  Shapes,
+  ShieldCheck,
+  X,
 } from "lucide-react";
 import { BrandMark } from "@/components/BrandMark";
 import { TOOL_CATEGORIES, tools, type Tool } from "@/lib/tools";
@@ -21,34 +19,34 @@ import { useEffect, useMemo, useState } from "react";
 type HeaderTray = "convert" | "tools" | "utility" | null;
 
 const PRIMARY_NAV = [
-  { label: "Merge PDF", href: "/tools/merge" },
-  { label: "Split PDF", href: "/tools/split" },
-  { label: "Compress PDF", href: "/tools/compress" },
+  { label: "MERGE PDF", href: "/tools/merge" },
+  { label: "SPLIT PDF", href: "/tools/split" },
+  { label: "COMPRESS PDF", href: "/tools/compress" },
 ] as const;
 
 const UTILITY_LINKS = [
   {
     label: "Pricing",
     href: "/pricing",
-    description: "Plans and product access",
+    description: "Simple plans and product access",
     icon: BadgeDollarSign,
   },
   {
     label: "Security",
     href: "/security",
-    description: "Trust and document protection",
+    description: "Document privacy and file safety",
     icon: ShieldCheck,
   },
   {
     label: "Features",
     href: "/features",
-    description: "What PDFMantra helps you do",
+    description: "PDFMantra tools and workspace flow",
     icon: Shapes,
   },
   {
     label: "About us",
     href: "/about",
-    description: "The product story and direction",
+    description: "Why PDFMantra exists",
     icon: Info,
   },
 ] as const;
@@ -60,6 +58,16 @@ function isConvertToPdf(tool: Tool): boolean {
 
 function isConvertFromPdf(tool: Tool): boolean {
   return tool.title.toLowerCase().startsWith("pdf to");
+}
+
+function DotGridIcon() {
+  return (
+    <span className="grid h-5 w-5 grid-cols-3 gap-1" aria-hidden="true">
+      {Array.from({ length: 9 }).map((_, index) => (
+        <span key={index} className="h-1.5 w-1.5 rounded-full bg-current" />
+      ))}
+    </span>
+  );
 }
 
 function TrayLink({ tool }: { readonly tool: Tool }) {
@@ -80,16 +88,16 @@ function TrayLink({ tool }: { readonly tool: Tool }) {
 
 function ConvertTray({ toPdfTools, fromPdfTools }: { readonly toPdfTools: readonly Tool[]; readonly fromPdfTools: readonly Tool[] }) {
   return (
-    <div className="hidden border-t border-violet-100 bg-white/96 shadow-[0_20px_48px_rgba(76,47,209,0.08)] backdrop-blur-xl xl:block">
+    <div className="hidden border-t border-violet-100 bg-white shadow-[0_20px_48px_rgba(76,47,209,0.08)] xl:block">
       <div className="mx-auto max-w-[1480px] px-4 py-4 sm:px-6 lg:px-8">
-        <div className="w-fit min-w-[640px] rounded-[1.5rem] border border-violet-100 bg-white p-4 shadow-[0_16px_48px_rgba(76,47,209,0.08)]">
+        <div className="w-fit min-w-[640px] rounded-b-[1.5rem] rounded-t-[0.8rem] border border-violet-100 bg-white p-4 shadow-[0_16px_48px_rgba(76,47,209,0.08)]">
           <div className="grid gap-5 md:grid-cols-2">
             <div>
               <div className="px-3 pb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
                 Convert to PDF
               </div>
               <div className="space-y-0.5">
-                {toPdfTools.length > 0 ? toPdfTools.map((tool) => <TrayLink key={tool.id} tool={tool} />) : null}
+                {toPdfTools.map((tool) => <TrayLink key={tool.id} tool={tool} />)}
               </div>
             </div>
 
@@ -98,7 +106,7 @@ function ConvertTray({ toPdfTools, fromPdfTools }: { readonly toPdfTools: readon
                 Convert from PDF
               </div>
               <div className="space-y-0.5">
-                {fromPdfTools.length > 0 ? fromPdfTools.map((tool) => <TrayLink key={tool.id} tool={tool} />) : null}
+                {fromPdfTools.map((tool) => <TrayLink key={tool.id} tool={tool} />)}
               </div>
             </div>
           </div>
@@ -110,9 +118,9 @@ function ConvertTray({ toPdfTools, fromPdfTools }: { readonly toPdfTools: readon
 
 function AllToolsTray({ groupedTools }: { readonly groupedTools: readonly { label: string; tools: Tool[] }[] }) {
   return (
-    <div className="hidden border-t border-violet-100 bg-white/96 shadow-[0_20px_48px_rgba(76,47,209,0.08)] backdrop-blur-xl xl:block">
+    <div className="hidden border-t border-violet-100 bg-white shadow-[0_20px_48px_rgba(76,47,209,0.08)] xl:block">
       <div className="mx-auto max-w-[1480px] px-4 py-4 sm:px-6 lg:px-8">
-        <div className="rounded-[1.75rem] border border-violet-100 bg-white p-5 shadow-[0_18px_56px_rgba(76,47,209,0.09)]">
+        <div className="rounded-b-[1.75rem] rounded-t-[0.8rem] border border-violet-100 bg-white p-5 shadow-[0_18px_56px_rgba(76,47,209,0.09)]">
           <div className="grid gap-5 xl:grid-cols-5">
             {groupedTools.map((group) => (
               <div key={group.label} className="min-w-0">
@@ -135,9 +143,9 @@ function AllToolsTray({ groupedTools }: { readonly groupedTools: readonly { labe
 
 function UtilityTray() {
   return (
-    <div className="hidden border-t border-violet-100 bg-white/96 shadow-[0_20px_48px_rgba(76,47,209,0.08)] backdrop-blur-xl xl:block">
+    <div className="hidden border-t border-violet-100 bg-white shadow-[0_20px_48px_rgba(76,47,209,0.08)] xl:block">
       <div className="mx-auto flex max-w-[1480px] justify-end px-4 py-4 sm:px-6 lg:px-8">
-        <div className="w-[520px] rounded-[1.6rem] border border-violet-100 bg-white p-4 shadow-[0_18px_56px_rgba(76,47,209,0.1)]">
+        <div className="w-[560px] rounded-b-[1.6rem] rounded-t-[0.8rem] border border-violet-100 bg-white p-4 shadow-[0_18px_56px_rgba(76,47,209,0.1)]">
           <div className="grid gap-3 sm:grid-cols-2">
             {UTILITY_LINKS.map((item) => {
               const Icon = item.icon;
@@ -189,10 +197,10 @@ function DesktopTrayButton({
       onFocus={() => onOpen(tray)}
       onClick={() => onToggle(tray)}
       className={[
-        "inline-flex min-h-11 items-center gap-1 border-b-2 px-0.5 text-[13px] font-bold tracking-[-0.01em] transition duration-200",
+        "inline-flex min-h-11 items-center gap-1 border-b-2 px-0.5 text-[13px] font-bold uppercase tracking-[-0.01em] transition duration-200",
         isOpen
           ? "border-violet-600 text-violet-700"
-          : "border-transparent text-slate-700 hover:border-violet-300 hover:text-violet-700",
+          : "border-transparent text-slate-800 hover:border-violet-300 hover:text-violet-700",
       ].join(" ")}
       aria-expanded={isOpen}
       aria-haspopup="true"
@@ -212,7 +220,7 @@ export function Header() {
   const [mobileUtilityOpen, setMobileUtilityOpen] = useState(false);
 
   const accountLabel = useMemo(
-    () => (pathname === "/dashboard" ? "My Account" : "Login / My Account"),
+    () => (pathname === "/dashboard" ? "My Account" : "Login"),
     [pathname],
   );
 
@@ -261,18 +269,18 @@ export function Header() {
 
   return (
     <header
-      className="sticky top-0 z-50 border-b border-violet-100 bg-[var(--bg-base)]/94 backdrop-blur-xl"
+      className="sticky top-0 z-50 border-b border-violet-100 bg-white/96 backdrop-blur-xl"
       onMouseLeave={() => setActiveTray(null)}
     >
       <div className="mx-auto max-w-[1480px] px-4 sm:px-6 lg:px-8">
-        <div className="flex min-h-[78px] items-center justify-between gap-4">
+        <div className="flex min-h-[72px] items-center justify-between gap-4">
           <Link href="/" className="group flex shrink-0 items-center gap-3">
-            <BrandMark className="h-11 w-11 shrink-0 transition duration-200 group-hover:-translate-y-0.5" />
-            <div className="min-w-[194px]">
-              <div className="display-font text-[1.72rem] font-semibold leading-none tracking-[-0.035em] text-slate-950 transition duration-200 group-hover:text-violet-700">
+            <BrandMark className="h-10 w-10 shrink-0 transition duration-200 group-hover:-translate-y-0.5" />
+            <div className="min-w-[184px]">
+              <div className="display-font text-[1.58rem] font-semibold leading-none tracking-[-0.035em] text-slate-950 transition duration-200 group-hover:text-violet-700">
                 PDFMantra
               </div>
-              <div className="mt-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+              <div className="mt-1 flex items-center gap-2 text-[9px] font-semibold uppercase tracking-[0.22em] text-slate-500">
                 <span className="h-px w-5 bg-gradient-to-r from-violet-500 via-violet-400 to-violet-200" />
                 Smart PDF Workspace
               </div>
@@ -284,7 +292,7 @@ export function Header() {
               <Link
                 key={item.label}
                 href={item.href}
-                className="inline-flex min-h-11 items-center border-b-2 border-transparent px-0.5 text-[13px] font-bold tracking-[-0.01em] text-slate-700 transition duration-200 hover:border-violet-300 hover:text-violet-700"
+                className="inline-flex min-h-11 items-center border-b-2 border-transparent px-0.5 text-[13px] font-bold uppercase tracking-[-0.01em] text-slate-800 transition duration-200 hover:border-violet-300 hover:text-violet-700"
               >
                 {item.label}
               </Link>
@@ -307,14 +315,12 @@ export function Header() {
             />
           </nav>
 
-          <div className="hidden shrink-0 items-center gap-4 xl:flex">
-            <Link href="/dashboard" className="text-[13px] font-bold text-slate-700 transition hover:text-violet-700">
+          <div className="hidden shrink-0 items-center gap-3 xl:flex">
+            <Link href="/dashboard" className="text-[13px] font-bold text-slate-800 transition hover:text-violet-700">
               {accountLabel}
             </Link>
-            <Link href="/editor" className="header-cta min-h-11 px-4 text-[13px]">
-              <Sparkles size={14} />
-              <span>Start Editing</span>
-              <ArrowRight size={14} />
+            <Link href="/dashboard" className="header-cta min-h-10 px-4 text-[13px]">
+              <span>Sign up</span>
             </Link>
             <button
               type="button"
@@ -325,12 +331,12 @@ export function Header() {
                 "inline-flex h-11 w-11 items-center justify-center rounded-full border transition",
                 activeTray === "utility"
                   ? "border-violet-300 bg-violet-50 text-violet-700"
-                  : "border-violet-100 bg-white text-slate-700 hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700",
+                  : "border-transparent bg-transparent text-slate-800 hover:border-violet-100 hover:bg-violet-50 hover:text-violet-700",
               ].join(" ")}
-              aria-label="Open quick links"
+              aria-label="Open PDFMantra quick links"
               aria-expanded={activeTray === "utility"}
             >
-              <Grid3X3 size={19} />
+              <DotGridIcon />
             </button>
           </div>
 
@@ -351,7 +357,7 @@ export function Header() {
       {activeTray === "utility" ? <UtilityTray /> : null}
 
       {mobileMenuOpen ? (
-        <div className="fixed inset-x-0 top-[79px] z-40 h-[calc(100vh-79px)] overflow-y-auto border-t border-violet-100 bg-[var(--bg-base)] px-4 py-5 xl:hidden">
+        <div className="fixed inset-x-0 top-[73px] z-40 h-[calc(100vh-73px)] overflow-y-auto border-t border-violet-100 bg-[var(--bg-base)] px-4 py-5 xl:hidden">
           <div className="mx-auto max-w-3xl space-y-4">
             <div className="overflow-hidden rounded-[1.8rem] border border-violet-100 bg-white">
               {PRIMARY_NAV.map((item) => (
@@ -420,7 +426,7 @@ export function Header() {
 
             <div className="overflow-hidden rounded-[1.8rem] border border-violet-100 bg-white">
               <Link href="/dashboard" className="flex items-center justify-between border-b border-violet-100 px-4 py-4 text-sm font-bold text-slate-700 transition hover:bg-violet-50 hover:text-violet-700">
-                {accountLabel}
+                Login / Sign up
                 <ArrowRight size={15} />
               </Link>
 
@@ -457,7 +463,6 @@ export function Header() {
             </div>
 
             <Link href="/editor" className="header-cta min-h-14 w-full px-6 text-sm">
-              <Sparkles size={15} />
               <span>Start Editing</span>
               <ArrowRight size={16} />
             </Link>
