@@ -18,7 +18,6 @@ import {
 } from "@/lib/tools";
 import {
   ArrowRight,
-  BadgeCheck,
   CheckCircle2,
   Filter,
   Search,
@@ -59,10 +58,6 @@ const PROCESSING_FILTERS: Array<{ readonly id: ProcessingFilter; readonly label:
 ];
 
 function toneForCategory(category: ToolCategory): ToolGlyphTone {
-  if (category === "security" || category === "ai") {
-    return "blush";
-  }
-
   if (category === "convert-from" || category === "convert-to" || category === "scan") {
     return "mint";
   }
@@ -92,26 +87,26 @@ function processingLabel(mode: ToolProcessingMode): string {
 
 function statusClassName(status: ToolStatus): string {
   if (status === "working") {
-    return "bg-emerald-50 text-emerald-700";
+    return "status-live";
   }
 
   if (status === "beta") {
-    return "bg-violet-50 text-violet-700";
+    return "status-beta";
   }
 
-  return "bg-rose-50 text-rose-600";
+  return "status-soon";
 }
 
 function processingClassName(mode: ToolProcessingMode): string {
   if (mode === "browser") {
-    return "text-violet-600";
+    return "text-[var(--violet-600)]";
   }
 
   if (mode === "backend") {
-    return "text-rose-500";
+    return "text-[var(--text-secondary)]";
   }
 
-  return "text-emerald-600";
+  return "text-[var(--success-text)]";
 }
 
 function FilterChip({
@@ -128,10 +123,10 @@ function FilterChip({
       type="button"
       onClick={onClick}
       className={[
-        "inline-flex min-h-10 items-center rounded-full border px-4 py-2 text-[13px] font-semibold transition duration-200",
+        "inline-flex min-h-10 items-center rounded-full border px-4 py-2 text-[13px] font-medium transition duration-200",
         active
-          ? "border-violet-600 bg-violet-600 text-white shadow-[0_14px_30px_rgba(91,63,193,0.2)]"
-          : "border-violet-100 bg-white/90 text-slate-600 hover:border-violet-200 hover:text-violet-700",
+          ? "border-[var(--violet-600)] bg-[var(--violet-600)] text-white"
+          : "border-[var(--cream-border)] bg-[var(--cream-base)] text-[var(--text-secondary)] hover:border-[var(--violet-border)] hover:bg-[var(--violet-50)] hover:text-[var(--violet-600)]",
       ].join(" ")}
     >
       {label}
@@ -146,24 +141,22 @@ function ToolGridCell({ tool, showCategory = false }: { readonly tool: Tool; rea
   return (
     <Link
       href={tool.href}
-      className="group flex min-h-[108px] items-center justify-between gap-4 border-b border-r border-violet-100 bg-white/68 px-4 py-4 transition duration-200 hover:bg-white sm:px-5"
+      className="group flex min-h-[106px] items-center justify-between gap-4 border-b border-r border-[var(--cream-border)] bg-[var(--cream-base)] px-4 py-4 transition duration-200 hover:bg-[var(--cream-secondary)] sm:px-5"
     >
       <div className="flex min-w-0 items-center gap-4">
         <ToolGlyph icon={Icon} tone={tone} size="md" />
 
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="truncate text-[15px] font-semibold tracking-[-0.02em] text-slate-950 transition group-hover:text-violet-700">
+            <span className="truncate text-[15px] font-semibold tracking-[-0.01em] text-[var(--text-primary)] transition group-hover:text-[var(--violet-600)]">
               {tool.title}
             </span>
-            <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${statusClassName(tool.status)}`}>
-              {statusLabel(tool)}
-            </span>
+            <span className={statusClassName(tool.status)}>{statusLabel(tool)}</span>
           </div>
 
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--text-caption)]">
             {showCategory ? <span>{tool.category.replaceAll("-", " ")}</span> : null}
-            {showCategory ? <span className="h-1 w-1 rounded-full bg-violet-200" /> : null}
+            {showCategory ? <span className="h-1 w-1 rounded-full bg-[var(--violet-border)]" /> : null}
             <span className={processingClassName(tool.capabilities.processingMode)}>
               {processingLabel(tool.capabilities.processingMode)}
             </span>
@@ -173,7 +166,7 @@ function ToolGridCell({ tool, showCategory = false }: { readonly tool: Tool; rea
 
       <ArrowRight
         size={16}
-        className="shrink-0 text-violet-200 transition duration-200 group-hover:translate-x-1 group-hover:text-violet-700"
+        className="shrink-0 text-[var(--text-caption)] transition duration-200 group-hover:translate-x-1 group-hover:text-[var(--violet-600)]"
       />
     </Link>
   );
@@ -181,14 +174,14 @@ function ToolGridCell({ tool, showCategory = false }: { readonly tool: Tool; rea
 
 function EmptyResults({ onReset }: { readonly onReset: () => void }) {
   return (
-    <div className="overflow-hidden rounded-[2rem] border border-dashed border-violet-200 bg-white/74 px-6 py-14 text-center shadow-[0_18px_50px_rgba(91,63,193,0.08)]">
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-[1.25rem] border border-violet-100 bg-violet-50 text-violet-600">
+    <div className="overflow-hidden rounded-2xl border border-dashed border-[var(--violet-border)] bg-[var(--cream-base)] px-6 py-14 text-center shadow-[var(--shadow-soft)]">
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-[var(--violet-border)] bg-[var(--violet-50)] text-[var(--violet-600)]">
         <Search size={22} />
       </div>
-      <h3 className="display-font mt-5 text-[1.8rem] font-medium tracking-[-0.04em] text-slate-950">
+      <h3 className="display-font mt-5 text-[1.8rem] font-semibold tracking-[-0.03em] text-[var(--text-primary)]">
         No matching tools found
       </h3>
-      <p className="mx-auto mt-3 max-w-xl text-sm font-medium leading-7 text-slate-600">
+      <p className="mx-auto mt-3 max-w-xl text-sm font-normal leading-7 text-[var(--text-secondary)]">
         Try another phrase or reset the filters to return to the full PDFMantra directory.
       </p>
       <button type="button" onClick={onReset} className="btn-primary mt-6">
@@ -253,53 +246,46 @@ export default function ToolsPage() {
     <>
       <Header />
 
-      <main className="min-h-screen bg-[#faf8ff] text-slate-950">
-        <section className="relative overflow-hidden border-b border-violet-100/90">
-          <div className="pointer-events-none absolute inset-0">
-            <div className="absolute left-[-15rem] top-[-13rem] h-[34rem] w-[34rem] rounded-full bg-violet-200/60 blur-3xl" />
-            <div className="absolute right-[-16rem] top-[-10rem] h-[34rem] w-[34rem] rounded-full bg-rose-200/55 blur-3xl" />
-          </div>
-
-          <div className="relative mx-auto max-w-7xl px-4 py-9 sm:px-6 lg:px-8 lg:py-11">
-            <div className="grid gap-6 lg:grid-cols-[0.82fr_1.18fr] lg:items-center">
+      <main className="min-h-screen bg-[var(--cream-base)] text-[var(--text-primary)]">
+        <section className="border-b border-[var(--cream-border)] bg-[var(--cream-base)]">
+          <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
+            <div className="grid gap-8 lg:grid-cols-[0.82fr_1.18fr] lg:items-center">
               <div className="max-w-xl">
-                <div className="inline-flex items-center gap-2 rounded-full border border-violet-100 bg-white/88 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-violet-700 shadow-sm backdrop-blur">
+                <div className="eyebrow-chip">
                   <Sparkles size={13} />
                   PDFMantra Tools
                 </div>
 
-                <h1 className="display-font mt-5 text-[2.35rem] font-medium leading-[1.08] tracking-[-0.045em] text-slate-950 sm:text-[2.9rem] lg:text-[3.35rem]">
+                <h1 className="display-font mt-5 text-[2.35rem] font-semibold leading-[1.16] tracking-[-0.03em] text-[var(--text-primary)] sm:text-[2.9rem] lg:text-[3.35rem]">
                   All PDF tools,
-                  <span className="block bg-gradient-to-r from-violet-700 via-violet-600 to-rose-500 bg-clip-text text-transparent">
-                    ready to open.
-                  </span>
+                  <span className="block text-[var(--violet-600)]">ready to open.</span>
                 </h1>
 
-                <p className="mt-4 max-w-lg text-[15px] font-medium leading-7 text-slate-600">
-                  Pick a tool below or search by task. PDF upload starts inside the tool you choose.
+                <p className="mt-4 max-w-lg text-[15px] font-normal leading-7 text-[var(--text-secondary)]">
+                  Pick a workflow below or search by task. PDF upload begins inside the tool you choose.
                 </p>
 
-                <div className="mt-5 flex flex-wrap gap-2.5 text-[12px] font-semibold text-slate-600">
-                  <span className="rounded-full border border-violet-100 bg-white/88 px-3 py-2">{tools.length} tools</span>
-                  <span className="rounded-full border border-violet-100 bg-white/88 px-3 py-2">{WORKING_TOOLS.length} live</span>
-                  <span className="rounded-full border border-violet-100 bg-white/88 px-3 py-2">{BACKEND_TOOLS.length} backend-ready</span>
+                <div className="mt-5 flex flex-wrap gap-2.5 text-[12px] font-medium text-[var(--text-secondary)]">
+                  <span className="soft-pill">{tools.length} tools</span>
+                  <span className="soft-pill">{WORKING_TOOLS.length} live</span>
+                  <span className="soft-pill">{BACKEND_TOOLS.length} backend-ready</span>
                 </div>
               </div>
 
-              <div className="overflow-hidden rounded-[2rem] border border-violet-100 bg-white/86 shadow-[0_24px_70px_rgba(91,63,193,0.11)] backdrop-blur">
-                <label className="flex min-h-[72px] items-center gap-4 border-b border-violet-100 px-5 sm:px-6">
-                  <Search size={20} className="shrink-0 text-violet-500" />
+              <div className="overflow-hidden rounded-2xl border border-[var(--cream-border)] bg-[var(--cream-base)] shadow-[var(--shadow-soft)]">
+                <label className="flex min-h-[72px] items-center gap-4 border-b border-[var(--cream-border)] px-5 sm:px-6">
+                  <Search size={20} className="shrink-0 text-[var(--violet-600)]" />
                   <input
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
                     placeholder="Search merge, split, OCR, redact, sign, protect..."
-                    className="w-full bg-transparent text-[15px] font-semibold text-slate-950 outline-none placeholder:text-slate-400"
+                    className="w-full bg-transparent text-[15px] font-medium text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
                   />
                   {normalizedQuery ? (
                     <button
                       type="button"
                       onClick={() => setQuery("")}
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-50 text-slate-500 transition hover:text-violet-700"
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--cream-border)] bg-[var(--cream-base)] text-[var(--text-muted)] transition hover:border-[var(--violet-border)] hover:bg-[var(--violet-50)] hover:text-[var(--violet-600)]"
                       aria-label="Clear tools search"
                     >
                       <X size={16} />
@@ -307,41 +293,54 @@ export default function ToolsPage() {
                   ) : null}
                 </label>
 
-                <div className="flex flex-wrap gap-2 px-5 py-4 sm:px-6">
+                <div className="flex flex-wrap gap-2 border-b border-[var(--cream-border)] px-5 py-4 sm:px-6">
                   {QUICK_SEARCHES.map((item) => (
                     <button
                       key={item}
                       type="button"
                       onClick={() => setQuery(item)}
-                      className="rounded-full border border-violet-100 bg-violet-50/75 px-3 py-2 text-[12px] font-semibold text-violet-700 transition hover:border-violet-200 hover:bg-violet-100"
+                      className="rounded-full border border-[var(--violet-border)] bg-[var(--violet-50)] px-3 py-2 text-[12px] font-medium text-[var(--violet-600)] transition hover:bg-[var(--violet-100)]"
                     >
                       {item}
                     </button>
                   ))}
+                </div>
+
+                <div className="grid grid-cols-3 divide-x divide-[var(--cream-border)] text-center">
+                  <div className="px-4 py-4">
+                    <div className="text-[1.35rem] font-semibold tracking-[-0.03em] text-[var(--text-primary)]">{tools.length}</div>
+                    <div className="mt-1 text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--text-caption)]">Tools</div>
+                  </div>
+                  <div className="px-4 py-4">
+                    <div className="text-[1.35rem] font-semibold tracking-[-0.03em] text-[var(--text-primary)]">{WORKING_TOOLS.length}</div>
+                    <div className="mt-1 text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--text-caption)]">Live</div>
+                  </div>
+                  <div className="px-4 py-4">
+                    <div className="text-[1.35rem] font-semibold tracking-[-0.03em] text-[var(--text-primary)]">{BACKEND_TOOLS.length}</div>
+                    <div className="mt-1 text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--text-caption)]">Backend</div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </section>
 
-        <section className="border-b border-violet-100 bg-white/78">
-          <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-12">
+        <section className="border-b border-[var(--cream-border)] bg-[var(--cream-secondary)]">
+          <div className="mx-auto max-w-7xl px-4 py-11 sm:px-6 lg:px-8 lg:py-14">
             <div className="grid gap-5 lg:grid-cols-[0.85fr_1.15fr] lg:items-end">
               <div>
-                <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-violet-600">
-                  Quick view
-                </p>
-                <h2 className="display-font mt-3 text-[2rem] font-medium leading-[1.08] tracking-[-0.045em] text-slate-950 sm:text-[2.55rem]">
+                <p className="section-eyebrow">Quick view</p>
+                <h2 className="display-font mt-3 text-[2rem] font-semibold leading-[1.15] tracking-[-0.03em] text-[var(--text-primary)] sm:text-[2.55rem]">
                   Popular PDF workflows
                 </h2>
               </div>
-              <p className="max-w-2xl text-sm font-medium leading-7 text-slate-600 sm:text-[15px] lg:justify-self-end">
-                A cleaner tools page starts with the flows people look for first, then expands into the full categorized directory.
+              <p className="max-w-2xl text-sm font-normal leading-7 text-[var(--text-secondary)] sm:text-[15px] lg:justify-self-end">
+                Start with the flows people use most, then move into the full categorized directory.
               </p>
             </div>
 
-            <div className="mt-7 overflow-hidden rounded-[2rem] border border-violet-100 bg-white/72 shadow-[0_18px_50px_rgba(91,63,193,0.08)]">
-              <div className="grid border-l border-t border-violet-100 md:grid-cols-2 xl:grid-cols-4">
+            <div className="mt-7 overflow-hidden rounded-2xl border border-[var(--cream-border)] bg-[var(--cream-base)] shadow-[var(--shadow-soft)]">
+              <div className="grid border-l border-t border-[var(--cream-border)] md:grid-cols-2 xl:grid-cols-4">
                 {POPULAR_TOOLS.map((tool) => (
                   <ToolGridCell key={`popular-${tool.id}`} tool={tool} />
                 ))}
@@ -350,14 +349,12 @@ export default function ToolsPage() {
           </div>
         </section>
 
-        <section className="border-b border-violet-100 bg-[#faf8ff]">
-          <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-12">
+        <section className="border-b border-[var(--cream-border)] bg-[var(--cream-base)]">
+          <div className="mx-auto max-w-7xl px-4 py-11 sm:px-6 lg:px-8 lg:py-14">
             <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
               <div>
-                <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-violet-600">
-                  Refine the directory
-                </p>
-                <h2 className="display-font mt-3 text-[2rem] font-medium leading-[1.08] tracking-[-0.045em] text-slate-950 sm:text-[2.55rem]">
+                <p className="section-eyebrow">Refine the directory</p>
+                <h2 className="display-font mt-3 text-[2rem] font-semibold leading-[1.15] tracking-[-0.03em] text-[var(--text-primary)] sm:text-[2.55rem]">
                   Filter without clutter
                 </h2>
               </div>
@@ -366,7 +363,7 @@ export default function ToolsPage() {
                 <button
                   type="button"
                   onClick={resetFilters}
-                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-violet-100 bg-white/92 px-4 text-[13px] font-semibold text-slate-600 transition hover:border-violet-200 hover:text-violet-700"
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-[var(--cream-border)] bg-[var(--cream-base)] px-4 text-[13px] font-medium text-[var(--text-secondary)] transition hover:border-[var(--violet-border)] hover:bg-[var(--violet-50)] hover:text-[var(--violet-600)]"
                 >
                   Reset {activeFilterCount} filter{activeFilterCount === 1 ? "" : "s"}
                   <X size={15} />
@@ -374,10 +371,10 @@ export default function ToolsPage() {
               ) : null}
             </div>
 
-            <div className="mt-7 space-y-5 rounded-[2rem] border border-violet-100 bg-white/72 px-5 py-5 shadow-[0_18px_50px_rgba(91,63,193,0.08)] sm:px-6">
+            <div className="mt-7 space-y-5 rounded-2xl border border-[var(--cream-border)] bg-[var(--cream-base)] px-5 py-5 shadow-[var(--shadow-soft)] sm:px-6">
               <div>
-                <div className="mb-3 flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.18em] text-slate-500">
-                  <Filter size={14} className="text-violet-600" />
+                <div className="mb-3 flex items-center gap-2 text-[12px] font-medium uppercase tracking-[0.08em] text-[var(--text-caption)]">
+                  <Filter size={14} className="text-[var(--violet-600)]" />
                   Category
                 </div>
                 <div className="flex flex-wrap gap-2.5">
@@ -395,7 +392,7 @@ export default function ToolsPage() {
 
               <div className="grid gap-5 lg:grid-cols-2">
                 <div>
-                  <div className="mb-3 text-[12px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                  <div className="mb-3 text-[12px] font-medium uppercase tracking-[0.08em] text-[var(--text-caption)]">
                     Status
                   </div>
                   <div className="flex flex-wrap gap-2.5">
@@ -406,7 +403,7 @@ export default function ToolsPage() {
                 </div>
 
                 <div>
-                  <div className="mb-3 text-[12px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                  <div className="mb-3 text-[12px] font-medium uppercase tracking-[0.08em] text-[var(--text-caption)]">
                     Processing
                   </div>
                   <div className="flex flex-wrap gap-2.5">
@@ -425,19 +422,17 @@ export default function ToolsPage() {
           </div>
         </section>
 
-        <section className="bg-white/82">
+        <section className="bg-[var(--cream-secondary)]">
           <div className="mx-auto max-w-7xl px-4 py-11 sm:px-6 lg:px-8 lg:py-14">
             <div className="mb-7 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
               <div>
-                <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-violet-600">
-                  {normalizedQuery ? "Search results" : "Tool directory"}
-                </p>
-                <h2 className="display-font mt-3 text-[2rem] font-medium leading-[1.08] tracking-[-0.045em] text-slate-950 sm:text-[2.55rem]">
+                <p className="section-eyebrow">{normalizedQuery ? "Search results" : "Tool directory"}</p>
+                <h2 className="display-font mt-3 text-[2rem] font-semibold leading-[1.15] tracking-[-0.03em] text-[var(--text-primary)] sm:text-[2.55rem]">
                   {filteredTools.length} tool{filteredTools.length === 1 ? "" : "s"} matched
                 </h2>
               </div>
 
-              <div className="inline-flex items-center gap-2 rounded-full border border-violet-100 bg-violet-50/75 px-4 py-2 text-[12px] font-semibold text-violet-700">
+              <div className="soft-pill">
                 <CheckCircle2 size={14} />
                 {activeFilterCount === 0 ? "Showing full directory" : `${activeFilterCount} active filter${activeFilterCount === 1 ? "" : "s"}`}
               </div>
@@ -446,8 +441,8 @@ export default function ToolsPage() {
             {filteredTools.length === 0 ? (
               <EmptyResults onReset={resetFilters} />
             ) : normalizedQuery ? (
-              <div className="overflow-hidden rounded-[2rem] border border-violet-100 bg-white/72 shadow-[0_18px_50px_rgba(91,63,193,0.08)]">
-                <div className="grid border-l border-t border-violet-100 md:grid-cols-2 xl:grid-cols-3">
+              <div className="overflow-hidden rounded-2xl border border-[var(--cream-border)] bg-[var(--cream-base)] shadow-[var(--shadow-soft)]">
+                <div className="grid border-l border-t border-[var(--cream-border)] md:grid-cols-2 xl:grid-cols-3">
                   {filteredTools.map((tool) => (
                     <ToolGridCell key={`search-${tool.id}`} tool={tool} showCategory />
                   ))}
@@ -458,23 +453,19 @@ export default function ToolsPage() {
                 {groupedTools.map((group) => (
                   <section
                     key={group.category.id}
-                    className="overflow-hidden rounded-[2rem] border border-violet-100 bg-white/72 shadow-[0_18px_46px_rgba(91,63,193,0.08)]"
+                    className="overflow-hidden rounded-2xl border border-[var(--cream-border)] bg-[var(--cream-base)] shadow-[var(--shadow-soft)]"
                   >
-                    <div className="flex flex-col justify-between gap-4 border-b border-violet-100 bg-gradient-to-r from-violet-50/90 via-white to-rose-50/70 px-5 py-5 sm:flex-row sm:items-end sm:px-6">
+                    <div className="flex flex-col justify-between gap-4 border-b border-[var(--cream-border)] bg-[var(--cream-base)] px-5 py-5 sm:flex-row sm:items-end sm:px-6">
                       <div>
-                        <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-violet-600">
-                          {group.category.menuLabel}
-                        </p>
-                        <h3 className="display-font mt-2 text-[1.75rem] font-medium tracking-[-0.035em] text-slate-950">
+                        <p className="section-eyebrow !text-[11px]">{group.category.menuLabel}</p>
+                        <h3 className="mt-2 text-[1.55rem] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
                           {group.category.label}
                         </h3>
                       </div>
-                      <span className="rounded-full bg-white/90 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-rose-500 shadow-sm">
-                        {group.tools.length} tools
-                      </span>
+                      <span className="status-soon">{group.tools.length} tools</span>
                     </div>
 
-                    <div className="grid border-l border-t border-violet-100 md:grid-cols-2 xl:grid-cols-3">
+                    <div className="grid border-l border-t border-[var(--cream-border)] md:grid-cols-2 xl:grid-cols-3">
                       {group.tools.map((tool) => (
                         <ToolGridCell key={tool.id} tool={tool} />
                       ))}
