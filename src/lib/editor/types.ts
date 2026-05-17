@@ -1,307 +1,144 @@
+// src/lib/editor/types.ts
+
 /**
- * PDFMantra Editor Types
- * ---------------------------------------------------------------------------
- * This file now serves two purposes:
- *
- * 1. It preserves the current live editor's legacy contracts so the app keeps
- *    working while the fresh editor architecture is introduced safely.
- *
- * 2. It defines the new Phase 1 editor architecture contracts:
- *    - compact pro ribbon command model
- *    - future-proof tool registry primitives
- *    - normalized 0–1 geometry primitives for the new editor engine
- *
- * Once the full fresh editor shell is complete, legacy percent-based types can
- * be retired in a controlled cleanup pass.
+ * Core Tooling State
  */
+export type ActiveTool = "select" | "edit" | "text" | "highlight";
 
-/* -------------------------------------------------------------------------- */
-/* Current editor compatibility                                                */
-/* -------------------------------------------------------------------------- */
-
-export type ActiveTool =
-  | "none"
-  | "select"
-  | "object"
-  | "edit"
-  | "text"
-  | "highlight"
-  | "image"
-  | "signature"
-  | "signature-image"
-  | "form-text"
-  | "form-checkbox"
-  | "form-date";
-
-export type EditorTool = ActiveTool;
-
-export type LayerType = "text" | "highlight" | "image" | "signature";
-
-export type ExportMode = "full" | "current" | "range";
+/**
+ * Layer Identification & Interaction
+ */
+export type LayerType = "text" | "highlight";
 
 export type ResizeHandle =
-  | "tl"
-  | "tm"
-  | "tr"
-  | "mr"
-  | "br"
-  | "bm"
-  | "bl"
-  | "ml";
+  | "top-left"
+  | "top-right"
+  | "bottom-left"
+  | "bottom-right"
+  | "top"
+  | "bottom"
+  | "left"
+  | "right";
+
+export interface Point {
+  x: number;
+  y: number;
+}
+
+export interface Dimensions {
+  width: number;
+  height: number;
+}
 
 /**
- * Legacy live-editor layer contract.
- * Kept intact because the current editor page still renders and exports from it.
- * The fresh architecture will move toward normalized geometry objects instead.
+ * Base Layer Model
+ *
+ * All coordinates and dimensions must be stored in absolute PDF Points (pt).
+ * 1 pt = 1/72 inch.
+ *
+ * These values stay unscaled in editor state.
+ * UI rendering converts pt -> px by multiplying with zoomScale.
  */
-export type PdfLayer = {
+export interface BaseLayer {
   id: string;
-  page: number;
   type: LayerType;
-  xPercent: number;
-  yPercent: number;
-  widthPercent: number;
-  heightPercent: number;
-  text?: string;
-  fontSize?: number;
-  isBold?: boolean;
-  isItalic?: boolean;
-  opacity?: number;
-  imageUrl?: string;
-  imageBytes?: Uint8Array;
-  imageKind?: "png" | "jpg";
-  coverText?: boolean;
+  pageIndex: number; // 0-based page index
+
+  x: number; // Unscaled PDF points (pt)
+  y: number; // Unscaled PDF points (pt)
+  width: number; // Unscaled PDF points (pt)
+  height: number; // Unscaled PDF points (pt)
+}
+
+/**
+ * Text Layer Model
+ */
+export interface TextLayer extends BaseLayer {
+  type: "text";
+  content: string;
+
+  fontSize: number; // Unscaled PDF points (pt)
+  fontFamily: "Helvetica";
+
+  isBold: boolean;
+  isItalic: boolean;
+
+  color: string; // Hex format, e.g. "#000000"
+}
+
+/**
+ * Highlight Layer Model
+ */
+export interface HighlightLayer extends BaseLayer {
+  type: "highlight";
+
+  opacity: number; // Float between 0.0 and 1.0
+  color: string; // Hex format, e.g. "#FFFF00"
+}
+
+export type PdfLayer = TextLayer | HighlightLayer;
+
+/**
+ * Document & Canvas State Models
+ */
+export interface PageThumb {
+  pageIndex: number;
+  thumbnailUrl: string; // Blob URL or base64 preview image
+
+  width: number; // Native PDF width in pt
+  height: number; // Native PDF height in pt
+
+  rotation: 0 | 90 | 180 | 270;
+  status: "loading" | "ready" | "error";
+}
+
+/**
+ * Drag & Resize State
+ *
+ * This strictly separates:
+ * - Browser screen pixels from MouseEvent / TouchEvent
+ * - PDF point values used by layer data
+ *
+ * Movement formula:
+ * deltaPt = deltaPx / zoomScale
+ */
+export interface DragState {
+  isDragging: boolean;
+  layerId: string | null;
+  activeHandle: ResizeHandle | "move" | null;
 
   /**
-   * Highlight metadata.
-   * These are used by the editor preview, inspector controls,
-   * and final PDF export.
+   * Browser screen pixels captured when the pointer interaction begins.
    */
-  highlightColorIndex?: number;
-  highlightColorCss?: string;
-  highlightColorR?: number;
-  highlightColorG?: number;
-  highlightColorB?: number;
-};
+  pointerStartClientX: number;
+  pointerStartClientY: number;
 
-export type PageThumb = {
-  pageNumber: number;
-  url: string;
-};
+  /**
+   * Original layer geometry in PDF points before drag/resize begins.
+   */
+  initialLayerX: number;
+  initialLayerY: number;
 
-export type DragState = {
-  id: string;
-  mode: "move" | "resize";
-  handle?: ResizeHandle;
-  startPointerX: number;
-  startPointerY: number;
-  startXPercent: number;
-  startYPercent: number;
-  startWidthPercent: number;
-  startHeightPercent: number;
-};
-
-export type DraftBox = {
-  xPercent: number;
-  yPercent: number;
-  widthPercent: number;
-  heightPercent: number;
-};
-
-export type DrawState = {
-  startXPercent: number;
-  startYPercent: number;
-  currentXPercent: number;
-  currentYPercent: number;
-};
-
-export type TextOverlayItem = {
-  id: string;
-  text: string;
-  leftPercent: number;
-  topPercent: number;
-  widthPercent: number;
-  heightPercent: number;
-  fontSizePx: number;
-};
-
-/* -------------------------------------------------------------------------- */
-/* Fresh editor architecture: normalized geometry                              */
-/* -------------------------------------------------------------------------- */
+  /**
+   * Required only for resize interactions.
+   */
+  initialLayerWidth?: number;
+  initialLayerHeight?: number;
+}
 
 /**
- * All fresh-editor geometry must use 0–1 normalized coordinates.
- * Example:
- * - x: 0.25 means 25% from the page's left edge
- * - width: 0.5 means 50% of the page width
+ * The Editor State Shape
+ *
+ * This is the shared typed state contract for the editor UI.
+ * It can later be backed by React Context, Zustand, or another state layer.
  */
-export type NormalizedUnit = number;
+export interface EditorState {
+  activeTool: ActiveTool;
+  selectedLayerId: string | null;
 
-export type NormalizedPoint = {
-  x: NormalizedUnit;
-  y: NormalizedUnit;
-};
+  zoomScale: number; // e.g. 1.0 = 100%, 1.5 = 150%
+  currentPageIndex: number;
 
-export type NormalizedSize = {
-  width: NormalizedUnit;
-  height: NormalizedUnit;
-};
-
-export type NormalizedRect = NormalizedPoint & NormalizedSize;
-
-export type NormalizedRotation = number;
-
-export type EditorPageNumber = number;
-
-/* -------------------------------------------------------------------------- */
-/* Fresh editor architecture: command ribbon model                             */
-/* -------------------------------------------------------------------------- */
-
-export type EditorRibbonToolId =
-  | "select"
-  | "object"
-  | "edit"
-  | "text"
-  | "highlight"
-  | "image"
-  | "signature"
-  | "whiteout"
-  | "annotate"
-  | "shapes";
-
-export type EditorRibbonActionId =
-  | "undo"
-  | "redo"
-  | "export";
-
-export type EditorCommandId =
-  | EditorRibbonToolId
-  | EditorRibbonActionId;
-
-export type EditorCommandKind =
-  | "tool"
-  | "action"
-  | "menu";
-
-export type EditorCommandGroupId =
-  | "selection"
-  | "insert"
-  | "annotate"
-  | "sign"
-  | "history"
-  | "export";
-
-export type EditorCommandStatus =
-  | "ready"
-  | "beta"
-  | "coming-soon";
-
-export type EditorCommandAvailability =
-  | "always"
-  | "document-loaded"
-  | "layer-selected"
-  | "future-ready";
-
-export type EditorShortcutModifier =
-  | "meta"
-  | "ctrl"
-  | "shift"
-  | "alt"
-  | "meta-shift"
-  | "ctrl-shift";
-
-export type EditorShortcut = {
-  key: string;
-  label: string;
-  modifier?: EditorShortcutModifier;
-  preventDefault?: boolean;
-};
-
-export type EditorCommandPresentation = {
-  desktop: "ribbon" | "overflow";
-  mobile: "dock" | "sheet" | "hidden";
-  priority: number;
-};
-
-export type EditorCommandDefinition = {
-  id: EditorCommandId;
-  label: string;
-  shortLabel?: string;
-  description: string;
-  tooltip: string;
-  kind: EditorCommandKind;
-  group: EditorCommandGroupId;
-  status: EditorCommandStatus;
-  availability: EditorCommandAvailability;
-  shortcut?: EditorShortcut;
-  presentation: EditorCommandPresentation;
-};
-
-/* -------------------------------------------------------------------------- */
-/* Fresh editor architecture: future layer model                               */
-/* -------------------------------------------------------------------------- */
-
-export type EditorLayerKind =
-  | "text"
-  | "highlight"
-  | "image"
-  | "signature"
-  | "whiteout"
-  | "shape";
-
-export type EditorLayerBase = {
-  id: string;
-  pageNumber: EditorPageNumber;
-  kind: EditorLayerKind;
-  rect: NormalizedRect;
-  rotation?: NormalizedRotation;
-  opacity?: number;
-  locked?: boolean;
-  hidden?: boolean;
-  createdAt?: number;
-  updatedAt?: number;
-};
-
-export type EditorTextLayer = EditorLayerBase & {
-  kind: "text" | "signature";
-  content: string;
-  fontSize?: number;
-  fontFamily?: string;
-  fontWeight?: "normal" | "semibold" | "bold";
-  fontStyle?: "normal" | "italic";
-  color?: string;
-  textAlign?: "left" | "center" | "right";
-};
-
-export type EditorHighlightLayer = EditorLayerBase & {
-  kind: "highlight";
-  color?: string;
-  blendMode?: "multiply" | "normal";
-};
-
-export type EditorImageLayer = EditorLayerBase & {
-  kind: "image";
-  sourceUrl?: string;
-  sourceBytes?: Uint8Array;
-  mimeType?: "image/png" | "image/jpeg" | "image/webp";
-};
-
-export type EditorWhiteoutLayer = EditorLayerBase & {
-  kind: "whiteout";
-  fill?: string;
-};
-
-export type EditorShapeLayer = EditorLayerBase & {
-  kind: "shape";
-  shape: "rectangle" | "ellipse" | "line" | "arrow";
-  stroke?: string;
-  strokeWidth?: number;
-  fill?: string;
-};
-
-export type FutureEditorLayer =
-  | EditorTextLayer
-  | EditorHighlightLayer
-  | EditorImageLayer
-  | EditorWhiteoutLayer
-  | EditorShapeLayer;
+  layers: PdfLayer[];
+  dragState: DragState;
+}
