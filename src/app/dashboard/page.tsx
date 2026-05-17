@@ -25,45 +25,32 @@ export default function DashboardPage() {
     <>
       <Header />
 
-      <main className="min-h-screen bg-[var(--pm-bg)] text-slate-950">
-        <section className="relative overflow-hidden border-b border-violet-100/90">
-          <div className="pointer-events-none absolute inset-0">
-            <div className="absolute left-[-15rem] top-[-13rem] h-[34rem] w-[34rem] rounded-full bg-violet-200/45 blur-3xl" />
-            <div className="absolute right-[-16rem] top-[-10rem] h-[34rem] w-[34rem] rounded-full bg-rose-200/42 blur-3xl" />
-          </div>
-
-          <div className="relative mx-auto max-w-7xl px-4 py-11 sm:px-6 lg:px-8 lg:py-14">
+      <main className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)]">
+        <section className="hero-aurora border-b border-[var(--border-light)]">
+          <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
             <div className="max-w-5xl">
-              <div className="inline-flex items-center gap-2 rounded-full border border-violet-100 bg-[#fffdf8]/90 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-violet-700 shadow-sm backdrop-blur">
+              <div className="eyebrow-chip">
                 <Sparkles size={13} />
                 PDFMantra Account
               </div>
 
-              <h1 className="display-font mt-5 max-w-5xl text-[2.35rem] font-medium leading-[1.08] tracking-[-0.045em] text-slate-950 sm:text-[2.9rem] lg:text-[3.45rem]">
+              <h1 className="display-font mt-5 max-w-5xl text-[2.45rem] font-bold leading-[1.14] tracking-[-0.025em] text-[var(--text-primary)] sm:text-[3.1rem] lg:text-[3.7rem]">
                 Account dashboard comes
-                <span className="block bg-gradient-to-r from-violet-700 via-violet-600 to-rose-500 bg-clip-text text-transparent">
-                  with the backend phase.
-                </span>
+                <span className="brand-gradient-text block">with the backend phase.</span>
               </h1>
 
-              <p className="mt-4 max-w-3xl text-[15px] font-medium leading-7 text-slate-600 sm:text-base">
+              <p className="mt-4 max-w-3xl text-[15px] font-normal leading-7 text-[var(--text-secondary)] sm:text-base">
                 Login, saved files, usage limits, billing, and team workspaces will be connected when the backend architecture, storage, and premium processing flow are ready.
               </p>
 
               <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-                <Link
-                  href="/editor"
-                  className="inline-flex min-h-13 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-violet-600 via-violet-600 to-rose-500 px-6 py-3 text-sm font-semibold text-white shadow-[0_20px_48px_rgba(91,63,193,0.24)] transition hover:-translate-y-0.5 hover:shadow-[0_24px_54px_rgba(91,63,193,0.32)]"
-                >
-                  Open PDF Editor
+                <Link href="/editor" className="btn-primary">
+                  <span>Open PDF Editor</span>
                   <ArrowRight size={16} />
                 </Link>
 
-                <Link
-                  href="/pricing"
-                  className="inline-flex min-h-13 items-center justify-center gap-2 rounded-full border border-violet-200 bg-[#fffdf8]/92 px-6 py-3 text-sm font-semibold text-violet-700 shadow-sm backdrop-blur transition hover:-translate-y-0.5 hover:border-violet-300 hover:bg-white"
-                >
-                  View Pricing
+                <Link href="/pricing" className="btn-secondary">
+                  <span>View Pricing</span>
                   <ArrowRight size={16} />
                 </Link>
               </div>
@@ -71,63 +58,61 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
+        <section className="mx-auto max-w-7xl px-4 py-11 sm:px-6 lg:px-8 lg:py-14">
           <div className="grid gap-6 lg:grid-cols-[0.82fr_1.18fr] lg:items-end">
             <div>
-              <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-violet-600">
-                Coming later
-              </p>
-              <h2 className="display-font mt-3 text-[2rem] font-medium leading-[1.08] tracking-[-0.045em] text-slate-950 sm:text-[2.55rem]">
+              <p className="section-eyebrow">Coming later</p>
+              <h2 className="display-font mt-3 text-[2rem] font-bold leading-[1.16] tracking-[-0.02em] text-[var(--text-primary)] sm:text-[2.55rem]">
                 Dashboard roadmap
               </h2>
             </div>
 
-            <p className="max-w-2xl text-sm font-medium leading-7 text-slate-600 sm:text-[15px] lg:justify-self-end">
+            <p className="max-w-2xl text-sm font-normal leading-7 text-[var(--text-secondary)] sm:text-[15px] lg:justify-self-end">
               This page stays honest while the final product foundation is being finalized. It shows what belongs in the account system without pretending those features already exist.
             </p>
           </div>
 
           <div className="mt-8 grid gap-6 lg:grid-cols-[0.92fr_1.08fr]">
-            <div className="overflow-hidden rounded-[2rem] border border-violet-100 bg-gradient-to-br from-violet-50/70 via-[#fffdf8] to-rose-50/55 p-6 shadow-[0_18px_46px_rgba(91,63,193,0.08)]">
-              <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-[1.2rem] border border-violet-100 bg-[#fffdf8] text-violet-700 shadow-sm">
+            <div className="overflow-hidden rounded-[1.5rem] border border-[var(--border-light)] bg-[var(--bg-card)] p-6 shadow-[var(--shadow-card)]">
+              <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl border border-[var(--violet-border)] bg-[var(--violet-50)] text-[var(--violet-600)] shadow-[var(--shadow-soft)]">
                 <UserRound size={22} />
               </div>
 
-              <h3 className="display-font text-[1.8rem] font-medium tracking-[-0.04em] text-slate-950">
+              <h3 className="display-font text-[1.8rem] font-bold tracking-[-0.02em] text-[var(--text-primary)]">
                 Login not enabled yet
               </h3>
 
-              <p className="mt-3 text-sm font-medium leading-7 text-slate-600">
+              <p className="mt-3 text-sm font-normal leading-7 text-[var(--text-secondary)]">
                 User accounts should be added after the frontend demo and backend architecture are finalized. Supabase Auth remains the planned direction.
               </p>
 
-              <div className="mt-6 rounded-[1.35rem] border border-rose-100 bg-rose-50/75 p-4">
-                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-rose-700">
+              <div className="mt-6 rounded-[1.25rem] border border-[var(--violet-border)] bg-[var(--bg-panel)] p-4">
+                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-[var(--violet-600)]">
                   <Lock size={16} />
                   Backend phase
                 </div>
-                <p className="text-sm font-medium leading-6 text-rose-700/90">
+                <p className="text-sm font-normal leading-6 text-[var(--text-secondary)]">
                   Auth, database, file storage, and payment gating should be implemented together to avoid rebuilding access control later.
                 </p>
               </div>
             </div>
 
-            <div className="overflow-hidden rounded-[2rem] border border-violet-100 bg-[#fffdf8]/82 shadow-[0_18px_46px_rgba(91,63,193,0.08)]">
-              <div className="grid border-l border-t border-violet-100 sm:grid-cols-2">
+            <div className="overflow-hidden rounded-[1.5rem] border border-[var(--border-light)] bg-[var(--bg-card)] shadow-[var(--shadow-card)]">
+              <div className="grid border-l border-t border-[var(--border-light)] sm:grid-cols-2">
                 {dashboardItems.map((item) => (
                   <div
                     key={item}
-                    className="min-h-[142px] border-b border-r border-violet-100 bg-[#fffdf8]/65 px-5 py-5 transition hover:bg-white"
+                    className="min-h-[142px] border-b border-r border-[var(--border-light)] bg-[var(--bg-card)] px-5 py-5 transition hover:bg-[var(--violet-50)]"
                   >
-                    <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-[1rem] border border-violet-100 bg-violet-50/80 text-violet-700">
+                    <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--violet-border)] bg-[var(--violet-50)] text-[var(--violet-600)]">
                       <Clock size={18} />
                     </div>
 
-                    <h3 className="text-[15px] font-semibold tracking-[-0.02em] text-slate-950">
+                    <h3 className="text-[15px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
                       {item}
                     </h3>
 
-                    <p className="mt-2 text-sm font-medium leading-6 text-slate-600">
+                    <p className="mt-2 text-sm font-normal leading-6 text-[var(--text-secondary)]">
                       Planned for the backend and account phase.
                     </p>
                   </div>
@@ -137,41 +122,41 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        <section className="border-t border-violet-100 bg-[#fffdf8]/74">
+        <section className="border-t border-[var(--border-light)] bg-[var(--bg-panel)]/72">
           <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
             <div className="grid gap-6 lg:grid-cols-3">
-              <div className="overflow-hidden rounded-[2rem] border border-violet-100 bg-[#fffdf8]/82 p-6 shadow-[0_18px_46px_rgba(91,63,193,0.08)]">
-                <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-[1.1rem] border border-emerald-100 bg-emerald-50 text-emerald-700">
+              <div className="overflow-hidden rounded-[1.5rem] border border-[var(--border-light)] bg-[var(--bg-card)] p-6 shadow-[var(--shadow-soft)]">
+                <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--violet-border)] bg-[var(--violet-50)] text-[var(--violet-600)]">
                   <BadgeCheck size={20} />
                 </div>
-                <h3 className="display-font text-[1.55rem] font-medium tracking-[-0.035em] text-slate-950">
+                <h3 className="display-font text-[1.55rem] font-bold tracking-[-0.02em] text-[var(--text-primary)]">
                   Current focus
                 </h3>
-                <p className="mt-2 text-sm font-medium leading-7 text-slate-600">
+                <p className="mt-2 text-sm font-normal leading-7 text-[var(--text-secondary)]">
                   Browser-side PDF tools and product demo polish.
                 </p>
               </div>
 
-              <div className="overflow-hidden rounded-[2rem] border border-violet-100 bg-gradient-to-br from-violet-50/70 via-[#fffdf8] to-rose-50/55 p-6 shadow-[0_18px_46px_rgba(91,63,193,0.08)]">
-                <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-[1.1rem] border border-violet-100 bg-[#fffdf8] text-violet-700">
+              <div className="overflow-hidden rounded-[1.5rem] border border-[var(--border-light)] bg-[var(--bg-card)] p-6 shadow-[var(--shadow-soft)]">
+                <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--violet-border)] bg-[var(--violet-50)] text-[var(--violet-600)]">
                   <ShieldCheck size={20} />
                 </div>
-                <h3 className="display-font text-[1.55rem] font-medium tracking-[-0.035em] text-slate-950">
+                <h3 className="display-font text-[1.55rem] font-bold tracking-[-0.02em] text-[var(--text-primary)]">
                   Backend later
                 </h3>
-                <p className="mt-2 text-sm font-medium leading-7 text-slate-600">
+                <p className="mt-2 text-sm font-normal leading-7 text-[var(--text-secondary)]">
                   Supabase Auth, database, and protected premium usage.
                 </p>
               </div>
 
-              <div className="overflow-hidden rounded-[2rem] border border-violet-100 bg-[#fffdf8]/82 p-6 shadow-[0_18px_46px_rgba(91,63,193,0.08)]">
-                <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-[1.1rem] border border-rose-100 bg-rose-50 text-rose-600">
+              <div className="overflow-hidden rounded-[1.5rem] border border-[var(--border-light)] bg-[var(--bg-card)] p-6 shadow-[var(--shadow-soft)]">
+                <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--violet-border)] bg-[var(--violet-50)] text-[var(--violet-600)]">
                   <FileText size={20} />
                 </div>
-                <h3 className="display-font text-[1.55rem] font-medium tracking-[-0.035em] text-slate-950">
+                <h3 className="display-font text-[1.55rem] font-bold tracking-[-0.02em] text-[var(--text-primary)]">
                   File storage later
                 </h3>
-                <p className="mt-2 text-sm font-medium leading-7 text-slate-600">
+                <p className="mt-2 text-sm font-normal leading-7 text-[var(--text-secondary)]">
                   Cloudflare R2 or Supabase Storage for saved documents.
                 </p>
               </div>
