@@ -41,7 +41,6 @@ interface HomeToolCard {
   readonly href: string;
   readonly icon: LucideIcon;
   readonly tone: ToolGlyphTone;
-  readonly badge?: "Live" | "Beta" | "Soon";
 }
 
 interface ToolCategoryGroup {
@@ -59,7 +58,6 @@ const primaryToolCards: readonly HomeToolCard[] = [
     href: "/tools/merge",
     icon: Combine,
     tone: "indigo",
-    badge: "Live",
   },
   {
     title: "Split PDF",
@@ -67,39 +65,34 @@ const primaryToolCards: readonly HomeToolCard[] = [
     href: "/tools/split",
     icon: Scissors,
     tone: "violet",
-    badge: "Live",
   },
   {
     title: "Compress PDF",
-    description: "Prepare smaller files with backend-ready flow.",
+    description: "Reduce file size through a cleaner workflow.",
     href: "/tools/compress",
     icon: FileArchive,
     tone: "mint",
-    badge: "Soon",
   },
   {
     title: "PDF to Word",
-    description: "Conversion entry point for editable docs.",
+    description: "Move documents into an editable format.",
     href: "/tools/pdf-to-word",
     icon: Wand2,
     tone: "mint",
-    badge: "Soon",
   },
   {
     title: "PDF to Images",
-    description: "Export pages as image-ready assets.",
+    description: "Turn PDF pages into shareable image files.",
     href: "/tools/pdf-to-images",
     icon: Image,
     tone: "mint",
-    badge: "Soon",
   },
   {
     title: "Images to PDF",
-    description: "Turn uploads into a polished PDF flow.",
+    description: "Build a PDF from scans, photos, and artwork.",
     href: "/tools/images-to-pdf",
     icon: FileImage,
     tone: "indigo",
-    badge: "Soon",
   },
   {
     title: "Edit PDF",
@@ -107,15 +100,13 @@ const primaryToolCards: readonly HomeToolCard[] = [
     href: "/editor",
     icon: FileText,
     tone: "violet",
-    badge: "Beta",
   },
   {
     title: "Highlight PDF",
-    description: "Smart text snapping with clean export.",
+    description: "Mark important content with smart snapping.",
     href: "/tools/highlight-pdf",
     icon: Highlighter,
     tone: "violet",
-    badge: "Beta",
   },
   {
     title: "Rotate Pages",
@@ -123,23 +114,20 @@ const primaryToolCards: readonly HomeToolCard[] = [
     href: "/tools/rotate",
     icon: RotateCw,
     tone: "indigo",
-    badge: "Live",
   },
   {
     title: "Protect PDF",
-    description: "Security workflows prepared for backend phase.",
+    description: "Secure sensitive files with dedicated tools.",
     href: "/tools/protect",
     icon: ShieldCheck,
     tone: "violet",
-    badge: "Soon",
   },
   {
     title: "Watermark PDF",
-    description: "Add branded document overlays with ease.",
+    description: "Add branded overlays to your documents.",
     href: "/tools/watermark",
     icon: Stamp,
     tone: "indigo",
-    badge: "Soon",
   },
   {
     title: "Page Numbers",
@@ -147,7 +135,6 @@ const primaryToolCards: readonly HomeToolCard[] = [
     href: "/tools/page-numbers",
     icon: Hash,
     tone: "indigo",
-    badge: "Soon",
   },
 ] as const;
 
@@ -265,22 +252,13 @@ const annotationDepth = [
   "Visibility",
 ] as const;
 
-function badgeClassName(badge?: HomeToolCard["badge"]): string {
-  if (badge === "Live") return "status-live";
-  if (badge === "Beta") return "status-beta";
-  return "status-soon";
-}
-
 function PrimaryToolCard({ tool }: { tool: HomeToolCard }) {
   return (
     <Link
       href={tool.href}
       className="group relative flex min-h-[216px] flex-col rounded-[1.35rem] border border-[var(--border-light)] bg-[var(--bg-card)] p-5 shadow-[var(--shadow-soft)] transition duration-200 hover:-translate-y-1 hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] hover:shadow-[var(--shadow-card-hover)]"
     >
-      <div className="flex items-start justify-between gap-3">
-        <ToolGlyph icon={tool.icon} tone={tool.tone} size="lg" />
-        {tool.badge ? <span className={badgeClassName(tool.badge)}>{tool.badge}</span> : null}
-      </div>
+      <ToolGlyph icon={tool.icon} tone={tool.tone} size="lg" />
 
       <h3 className="display-font mt-5 text-[1.28rem] font-bold tracking-[-0.02em] text-[var(--text-primary)] transition group-hover:text-[var(--violet-600)]">
         {tool.title}
@@ -378,7 +356,7 @@ export default function HomePage() {
         <section className="border-b border-[var(--border-light)] bg-[var(--bg-card)]">
           <div className="mx-auto max-w-7xl px-4 py-9 sm:px-6 lg:px-8 lg:py-11">
             <div className="grid gap-3 border-y border-[var(--border-light)] py-5 sm:grid-cols-3 sm:divide-x sm:divide-[var(--border-light)]">
-              {["Fast task entry", "Category-led tool discovery", "Backend-ready premium roadmap"].map((item) => (
+              {["Fast task entry", "Clear tool discovery", "Focused document workflows"].map((item) => (
                 <div key={item} className="flex items-start gap-2.5 px-1 text-[13px] font-semibold leading-6 text-[var(--text-secondary)] sm:px-5">
                   <BadgeCheck size={16} className="mt-1 shrink-0 text-[var(--violet-600)]" />
                   <span>{item}</span>
@@ -398,7 +376,7 @@ export default function HomePage() {
                 </h2>
               </div>
               <p className="max-w-2xl text-sm font-normal leading-7 text-[var(--text-secondary)] sm:text-[15px] lg:justify-self-end">
-                The first screen helps users act immediately. These grouped sections help them browse the full PDFMantra system without feeling lost.
+                The first screen helps users act immediately. These grouped sections help them browse the wider PDFMantra workspace without feeling lost.
               </p>
             </div>
 
@@ -423,7 +401,6 @@ export default function HomePage() {
                           </h3>
                         </div>
                       </div>
-                      <span className="status-beta shrink-0">{category.items.length} tools</span>
                     </div>
 
                     <div className="grid border-l border-t border-[var(--border-light)] sm:grid-cols-2">
@@ -441,12 +418,12 @@ export default function HomePage() {
         <section className="border-b border-[var(--border-light)] bg-[var(--bg-panel)]/65">
           <div className="mx-auto grid max-w-7xl gap-8 px-4 py-12 sm:px-6 lg:grid-cols-[0.8fr_1.2fr] lg:px-8 lg:py-16">
             <div>
-              <p className="section-eyebrow">Editing depth target</p>
+              <p className="section-eyebrow">Editing depth</p>
               <h2 className="display-font mt-3 text-[2rem] font-bold leading-[1.15] tracking-[-0.02em] text-[var(--text-primary)] sm:text-[2.55rem]">
                 Annotation should feel rich, not basic.
               </h2>
               <p className="mt-4 max-w-xl text-sm font-normal leading-7 text-[var(--text-secondary)] sm:text-[15px]">
-                PDFMantra is growing beyond simple one-click tools. The editor roadmap includes richer review controls, smart highlights, and clean export behavior.
+                PDFMantra brings together smart highlights, annotation controls, visual page handling, and clean export flows in one focused workspace.
               </p>
             </div>
 
@@ -475,13 +452,13 @@ export default function HomePage() {
             <div>
               <div className="eyebrow-chip">
                 <ShieldCheck size={14} />
-                PDFMantra direction
+                PDFMantra Workspace
               </div>
               <h2 className="display-font mt-5 max-w-4xl text-[2.15rem] font-bold leading-[1.12] tracking-[-0.02em] text-[var(--text-primary)] sm:text-[2.7rem] lg:text-[3.3rem]">
                 Eye-catching discovery. Serious PDF workflows.
               </h2>
               <p className="mt-4 max-w-3xl text-[15px] font-normal leading-8 text-[var(--text-secondary)]">
-                The homepage now prioritizes faster tool discovery first, then guides users into deeper PDFMantra categories, editor depth, and backend-ready premium workflows.
+                PDFMantra helps users find the right tool faster, move into action immediately, and complete document work with a cleaner, more confident flow.
               </p>
             </div>
 
