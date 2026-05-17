@@ -318,7 +318,7 @@ export default function HomePage() {
             <div className="mx-auto max-w-6xl text-center">
               <GitaWisdomSpotlight />
 
-              <h1 className="display-font mx-auto mt-6 max-w-5xl text-[2.15rem] font-bold leading-[1.08] tracking-[-0.03em] text-[var(--text-primary)] sm:text-[2.9rem] lg:text-[3.4rem]">
+              <h1 className="display-font mx-auto mt-5 max-w-4xl text-[1.9rem] font-bold leading-[1.08] tracking-[-0.03em] text-[var(--text-primary)] sm:text-[2.45rem] lg:text-[2.95rem]">
                 Every PDF task,
                 <span className="brand-gradient-text block">one clear workspace.</span>
               </h1>
