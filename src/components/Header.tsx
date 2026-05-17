@@ -5,198 +5,126 @@ import { usePathname } from "next/navigation";
 import {
   ArrowRight,
   ChevronDown,
+  Grid3X3,
   Menu,
   Sparkles,
   X,
+  BadgeDollarSign,
+  ShieldCheck,
+  Shapes,
+  Info,
 } from "lucide-react";
 import { BrandMark } from "@/components/BrandMark";
+import { TOOL_CATEGORIES, tools, type Tool } from "@/lib/tools";
 import { useEffect, useMemo, useState } from "react";
 
-interface HeaderNavItem {
-  readonly label: string;
-  readonly href: string;
-  readonly status?: "live" | "beta" | "soon";
-}
+type HeaderTray = "convert" | "tools" | "utility" | null;
 
-interface HeaderNavGroup {
-  readonly label: string;
-  readonly href: string;
-  readonly items: readonly HeaderNavItem[];
-}
+const PRIMARY_NAV = [
+  { label: "Merge PDF", href: "/tools/merge" },
+  { label: "Split PDF", href: "/tools/split" },
+  { label: "Compress PDF", href: "/tools/compress" },
+] as const;
 
-const CATEGORY_NAV: readonly HeaderNavGroup[] = [
+const UTILITY_LINKS = [
   {
-    label: "Edit",
-    href: "/editor",
-    items: [
-      { label: "PDF Editor", href: "/editor", status: "beta" },
-      { label: "Add Text", href: "/editor", status: "beta" },
-      { label: "Add Images", href: "/editor", status: "beta" },
-      { label: "Sign PDF", href: "/editor", status: "beta" },
-      { label: "Whiteout", href: "/editor", status: "soon" },
-    ],
+    label: "Pricing",
+    href: "/pricing",
+    description: "Plans and product access",
+    icon: BadgeDollarSign,
   },
   {
-    label: "Merge",
-    href: "/tools/merge",
-    items: [
-      { label: "Merge PDF", href: "/tools/merge", status: "soon" },
-      { label: "Combine Files", href: "/tools/merge", status: "soon" },
-      { label: "Organize PDF", href: "/tools/organize", status: "soon" },
-      { label: "Images to PDF", href: "/tools/images-to-pdf", status: "soon" },
-    ],
+    label: "Security",
+    href: "/security",
+    description: "Trust and document protection",
+    icon: ShieldCheck,
   },
   {
-    label: "Split",
-    href: "/tools/split",
-    items: [
-      { label: "Split PDF", href: "/tools/split", status: "soon" },
-      { label: "Extract Pages", href: "/tools/extract", status: "soon" },
-      { label: "Delete Pages", href: "/tools/delete-pages", status: "soon" },
-      { label: "Reorder Pages", href: "/tools/reorder", status: "soon" },
-      { label: "Rotate Pages", href: "/tools/rotate", status: "soon" },
-    ],
+    label: "Features",
+    href: "/features",
+    description: "What PDFMantra helps you do",
+    icon: Shapes,
   },
   {
-    label: "Compress",
-    href: "/tools/compress",
-    items: [
-      { label: "Compress PDF", href: "/tools/compress", status: "soon" },
-      { label: "OCR PDF", href: "/tools/ocr", status: "soon" },
-      { label: "Repair PDF", href: "/tools", status: "soon" },
-      { label: "Flatten PDF", href: "/tools", status: "soon" },
-    ],
-  },
-  {
-    label: "Annotate",
-    href: "/tools/highlight-pdf",
-    items: [
-      { label: "Highlight", href: "/tools/highlight-pdf", status: "beta" },
-      { label: "Underline", href: "/tools/highlight-pdf", status: "soon" },
-      { label: "Strikeout", href: "/tools/highlight-pdf", status: "soon" },
-      { label: "Shapes", href: "/editor", status: "soon" },
-      { label: "Freehand Draw", href: "/editor", status: "soon" },
-    ],
-  },
-  {
-    label: "Watermark",
-    href: "/tools/watermark",
-    items: [
-      { label: "Add Watermark", href: "/tools/watermark", status: "soon" },
-      { label: "Remove Watermark", href: "/tools", status: "soon" },
-      { label: "Stamp PDF", href: "/tools", status: "soon" },
-      { label: "Page Numbers", href: "/tools/page-numbers", status: "soon" },
-    ],
-  },
-  {
-    label: "Protect",
-    href: "/tools/protect",
-    items: [
-      { label: "Protect PDF", href: "/tools/protect", status: "soon" },
-      { label: "Unlock PDF", href: "/tools/unlock", status: "soon" },
-      { label: "Redact PDF", href: "/tools/redact", status: "soon" },
-      { label: "Secure Share", href: "/tools", status: "soon" },
-    ],
+    label: "About us",
+    href: "/about",
+    description: "The product story and direction",
+    icon: Info,
   },
 ] as const;
 
-function StatusDot({ status }: { status?: HeaderNavItem["status"] }) {
-  if (!status) {
-    return null;
-  }
-
-  const dotClassName =
-    status === "live"
-      ? "bg-emerald-500"
-      : status === "beta"
-        ? "bg-violet-500"
-        : "bg-slate-300";
-
-  return <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${dotClassName}`} />;
+function isConvertToPdf(tool: Tool): boolean {
+  const title = tool.title.toLowerCase();
+  return title.includes("to pdf") && !title.startsWith("pdf to");
 }
 
-function DesktopNavButton({
-  group,
-  activeLabel,
-  onOpen,
-  onToggle,
-}: {
-  group: HeaderNavGroup;
-  activeLabel: string | null;
-  onOpen: (label: string) => void;
-  onToggle: (label: string) => void;
-}) {
-  const pathname = usePathname();
-  const isOpen = activeLabel === group.label;
-  const isGroupLanding = pathname === group.href;
-  const isDistinctToolRoute = group.items.some(
-    (item) =>
-      item.href !== group.href &&
-      item.href !== "/tools" &&
-      item.href.startsWith("/tools/") &&
-      pathname === item.href,
-  );
-  const isActive = isGroupLanding || isDistinctToolRoute;
+function isConvertFromPdf(tool: Tool): boolean {
+  return tool.title.toLowerCase().startsWith("pdf to");
+}
+
+function TrayLink({ tool }: { readonly tool: Tool }) {
+  const Icon = tool.icon;
 
   return (
-    <button
-      type="button"
-      onMouseEnter={() => onOpen(group.label)}
-      onFocus={() => onOpen(group.label)}
-      onClick={() => onToggle(group.label)}
-      className={[
-        "inline-flex min-h-11 items-center gap-1 border-b-2 px-0.5 text-[13px] font-semibold tracking-[-0.01em] transition duration-200",
-        isActive || isOpen
-          ? "border-violet-600 text-violet-700"
-          : "border-transparent text-slate-600 hover:border-violet-300 hover:text-violet-700",
-      ].join(" ")}
-      aria-expanded={isOpen}
-      aria-haspopup="true"
+    <Link
+      href={tool.href}
+      className="group flex items-center gap-3 rounded-2xl px-3 py-2.5 text-[13px] font-semibold text-slate-700 transition hover:bg-violet-50 hover:text-violet-700"
     >
-      {group.label}
-      <ChevronDown size={13} className={`transition duration-200 ${isOpen ? "rotate-180" : ""}`} />
-    </button>
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-violet-100 bg-white text-violet-600 shadow-[0_1px_3px_rgba(24,21,46,0.06)] transition group-hover:border-violet-200 group-hover:bg-violet-50">
+        <Icon size={15} />
+      </span>
+      <span className="truncate">{tool.title}</span>
+    </Link>
   );
 }
 
-function DesktopCategoryTray({
-  group,
-}: {
-  group: HeaderNavGroup;
-}) {
+function ConvertTray({ toPdfTools, fromPdfTools }: { readonly toPdfTools: readonly Tool[]; readonly fromPdfTools: readonly Tool[] }) {
   return (
-    <div className="hidden border-t border-violet-100 bg-white/96 shadow-[0_18px_42px_rgba(76,47,209,0.08)] backdrop-blur-xl xl:block">
-      <div className="mx-auto max-w-[1480px] px-4 sm:px-6 lg:px-8">
-        <div className="grid min-h-[88px] grid-cols-[220px_1fr] items-stretch">
-          <Link
-            href={group.href}
-            className="group flex flex-col justify-center border-r border-violet-100 pr-6 transition"
-          >
-            <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-violet-600">
-              {group.label} tools
-            </span>
-            <span className="mt-1.5 inline-flex items-center gap-2 text-[15px] font-semibold text-violet-800 transition group-hover:text-violet-950">
-              Open {group.label}
-              <ArrowRight size={15} />
-            </span>
-          </Link>
+    <div className="hidden border-t border-violet-100 bg-white/96 shadow-[0_20px_48px_rgba(76,47,209,0.08)] backdrop-blur-xl xl:block">
+      <div className="mx-auto max-w-[1480px] px-4 py-4 sm:px-6 lg:px-8">
+        <div className="w-fit min-w-[640px] rounded-[1.5rem] border border-violet-100 bg-white p-4 shadow-[0_16px_48px_rgba(76,47,209,0.08)]">
+          <div className="grid gap-5 md:grid-cols-2">
+            <div>
+              <div className="px-3 pb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
+                Convert to PDF
+              </div>
+              <div className="space-y-0.5">
+                {toPdfTools.length > 0 ? toPdfTools.map((tool) => <TrayLink key={tool.id} tool={tool} />) : null}
+              </div>
+            </div>
 
-          <div
-            className="grid items-stretch"
-            style={{ gridTemplateColumns: `repeat(${group.items.length}, minmax(0, 1fr))` }}
-          >
-            {group.items.map((item) => (
-              <Link
-                key={`${group.label}-tray-${item.label}`}
-                href={item.href}
-                className="group flex min-h-[88px] items-center justify-between gap-3 border-r border-violet-100 px-5 text-sm font-semibold text-slate-700 transition last:border-r-0 hover:bg-violet-50/55 hover:text-violet-700"
-              >
-                <span className="flex items-center gap-2">
-                  <StatusDot status={item.status} />
-                  {item.label}
-                </span>
-                <ArrowRight size={14} className="shrink-0 text-violet-200 transition group-hover:translate-x-0.5 group-hover:text-violet-600" />
-              </Link>
+            <div className="border-l border-violet-100 pl-5">
+              <div className="px-3 pb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
+                Convert from PDF
+              </div>
+              <div className="space-y-0.5">
+                {fromPdfTools.length > 0 ? fromPdfTools.map((tool) => <TrayLink key={tool.id} tool={tool} />) : null}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AllToolsTray({ groupedTools }: { readonly groupedTools: readonly { label: string; tools: Tool[] }[] }) {
+  return (
+    <div className="hidden border-t border-violet-100 bg-white/96 shadow-[0_20px_48px_rgba(76,47,209,0.08)] backdrop-blur-xl xl:block">
+      <div className="mx-auto max-w-[1480px] px-4 py-4 sm:px-6 lg:px-8">
+        <div className="rounded-[1.75rem] border border-violet-100 bg-white p-5 shadow-[0_18px_56px_rgba(76,47,209,0.09)]">
+          <div className="grid gap-5 xl:grid-cols-5">
+            {groupedTools.map((group) => (
+              <div key={group.label} className="min-w-0">
+                <div className="px-3 pb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
+                  {group.label}
+                </div>
+                <div className="space-y-0.5">
+                  {group.tools.slice(0, 7).map((tool) => (
+                    <TrayLink key={tool.id} tool={tool} />
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         </div>
@@ -205,24 +133,117 @@ function DesktopCategoryTray({
   );
 }
 
+function UtilityTray() {
+  return (
+    <div className="hidden border-t border-violet-100 bg-white/96 shadow-[0_20px_48px_rgba(76,47,209,0.08)] backdrop-blur-xl xl:block">
+      <div className="mx-auto flex max-w-[1480px] justify-end px-4 py-4 sm:px-6 lg:px-8">
+        <div className="w-[520px] rounded-[1.6rem] border border-violet-100 bg-white p-4 shadow-[0_18px_56px_rgba(76,47,209,0.1)]">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {UTILITY_LINKS.map((item) => {
+              const Icon = item.icon;
+
+              return (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className="group rounded-[1.25rem] border border-violet-100 bg-violet-50/35 p-4 transition hover:-translate-y-0.5 hover:border-violet-200 hover:bg-violet-50 hover:shadow-[0_14px_28px_rgba(101,80,232,0.08)]"
+                >
+                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-violet-100 bg-white text-violet-700 shadow-[0_1px_3px_rgba(24,21,46,0.06)]">
+                    <Icon size={18} />
+                  </div>
+                  <div className="mt-3 text-sm font-bold tracking-[-0.01em] text-slate-950 transition group-hover:text-violet-700">
+                    {item.label}
+                  </div>
+                  <div className="mt-1 text-xs font-medium leading-5 text-slate-500">
+                    {item.description}
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DesktopTrayButton({
+  label,
+  tray,
+  activeTray,
+  onOpen,
+  onToggle,
+}: {
+  readonly label: string;
+  readonly tray: Exclude<HeaderTray, null>;
+  readonly activeTray: HeaderTray;
+  readonly onOpen: (tray: Exclude<HeaderTray, null>) => void;
+  readonly onToggle: (tray: Exclude<HeaderTray, null>) => void;
+}) {
+  const isOpen = activeTray === tray;
+
+  return (
+    <button
+      type="button"
+      onMouseEnter={() => onOpen(tray)}
+      onFocus={() => onOpen(tray)}
+      onClick={() => onToggle(tray)}
+      className={[
+        "inline-flex min-h-11 items-center gap-1 border-b-2 px-0.5 text-[13px] font-bold tracking-[-0.01em] transition duration-200",
+        isOpen
+          ? "border-violet-600 text-violet-700"
+          : "border-transparent text-slate-700 hover:border-violet-300 hover:text-violet-700",
+      ].join(" ")}
+      aria-expanded={isOpen}
+      aria-haspopup="true"
+    >
+      {label}
+      <ChevronDown size={13} className={`transition duration-200 ${isOpen ? "rotate-180" : ""}`} />
+    </button>
+  );
+}
+
 export function Header() {
   const pathname = usePathname();
-  const [activeGroup, setActiveGroup] = useState<string | null>(null);
+  const [activeTray, setActiveTray] = useState<HeaderTray>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [expandedMobileGroup, setExpandedMobileGroup] = useState<string | null>(CATEGORY_NAV[0].label);
+  const [mobileConvertOpen, setMobileConvertOpen] = useState(false);
+  const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
+  const [mobileUtilityOpen, setMobileUtilityOpen] = useState(false);
 
   const accountLabel = useMemo(
     () => (pathname === "/dashboard" ? "My Account" : "Login / My Account"),
     [pathname],
   );
 
-  const activeDesktopGroup = useMemo(
-    () => CATEGORY_NAV.find((group) => group.label === activeGroup) ?? null,
-    [activeGroup],
+  const convertTools = useMemo(
+    () => tools.filter((tool) => tool.category === "convert" && tool.visibility.showInMegaMenu),
+    [],
+  );
+
+  const toPdfTools = useMemo(
+    () => convertTools.filter(isConvertToPdf),
+    [convertTools],
+  );
+
+  const fromPdfTools = useMemo(
+    () => convertTools.filter(isConvertFromPdf),
+    [convertTools],
+  );
+
+  const groupedTools = useMemo(
+    () =>
+      TOOL_CATEGORIES.map((category) => ({
+        label: category.menuLabel,
+        tools: tools.filter(
+          (tool) => tool.category === category.id && tool.visibility.showInMegaMenu,
+        ),
+      })).filter((group) => group.tools.length > 0),
+    [],
   );
 
   useEffect(() => {
-    setActiveGroup(null);
+    setActiveTray(null);
     setMobileMenuOpen(false);
   }, [pathname]);
 
@@ -234,14 +255,14 @@ export function Header() {
     };
   }, [mobileMenuOpen]);
 
-  function toggleDesktopGroup(label: string) {
-    setActiveGroup((current) => (current === label ? null : label));
+  function toggleTray(tray: Exclude<HeaderTray, null>) {
+    setActiveTray((current) => (current === tray ? null : tray));
   }
 
   return (
     <header
-      className="sticky top-0 z-50 border-b border-violet-100 bg-[var(--bg-base)]/92 backdrop-blur-xl"
-      onMouseLeave={() => setActiveGroup(null)}
+      className="sticky top-0 z-50 border-b border-violet-100 bg-[var(--bg-base)]/94 backdrop-blur-xl"
+      onMouseLeave={() => setActiveTray(null)}
     >
       <div className="mx-auto max-w-[1480px] px-4 sm:px-6 lg:px-8">
         <div className="flex min-h-[78px] items-center justify-between gap-4">
@@ -258,29 +279,36 @@ export function Header() {
             </div>
           </Link>
 
-          <nav className="hidden min-w-0 flex-1 items-center justify-center gap-4 2xl:gap-5 xl:flex">
-            {CATEGORY_NAV.map((group) => (
-              <DesktopNavButton
-                key={group.label}
-                group={group}
-                activeLabel={activeGroup}
-                onOpen={setActiveGroup}
-                onToggle={toggleDesktopGroup}
-              />
+          <nav className="hidden min-w-0 flex-1 items-center justify-center gap-7 xl:flex">
+            {PRIMARY_NAV.map((item) => (
+              <Link
+                key={item.label}
+                href={item.href}
+                className="inline-flex min-h-11 items-center border-b-2 border-transparent px-0.5 text-[13px] font-bold tracking-[-0.01em] text-slate-700 transition duration-200 hover:border-violet-300 hover:text-violet-700"
+              >
+                {item.label}
+              </Link>
             ))}
+
+            <DesktopTrayButton
+              label="Convert PDF"
+              tray="convert"
+              activeTray={activeTray}
+              onOpen={setActiveTray}
+              onToggle={toggleTray}
+            />
+
+            <DesktopTrayButton
+              label="All PDF Tools"
+              tray="tools"
+              activeTray={activeTray}
+              onOpen={setActiveTray}
+              onToggle={toggleTray}
+            />
           </nav>
 
           <div className="hidden shrink-0 items-center gap-4 xl:flex">
-            <Link href="/pricing" className="text-[13px] font-semibold text-slate-600 transition hover:text-violet-700">
-              Pricing
-            </Link>
-            <Link href="/desktop" className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-slate-600 transition hover:text-violet-700">
-              Desktop
-              <span className="rounded-full bg-violet-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-violet-700">
-                Soon
-              </span>
-            </Link>
-            <Link href="/dashboard" className="text-[13px] font-semibold text-slate-600 transition hover:text-violet-700">
+            <Link href="/dashboard" className="text-[13px] font-bold text-slate-700 transition hover:text-violet-700">
               {accountLabel}
             </Link>
             <Link href="/editor" className="header-cta min-h-11 px-4 text-[13px]">
@@ -288,6 +316,22 @@ export function Header() {
               <span>Start Editing</span>
               <ArrowRight size={14} />
             </Link>
+            <button
+              type="button"
+              onMouseEnter={() => setActiveTray("utility")}
+              onFocus={() => setActiveTray("utility")}
+              onClick={() => toggleTray("utility")}
+              className={[
+                "inline-flex h-11 w-11 items-center justify-center rounded-full border transition",
+                activeTray === "utility"
+                  ? "border-violet-300 bg-violet-50 text-violet-700"
+                  : "border-violet-100 bg-white text-slate-700 hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700",
+              ].join(" ")}
+              aria-label="Open quick links"
+              aria-expanded={activeTray === "utility"}
+            >
+              <Grid3X3 size={19} />
+            </button>
           </div>
 
           <button
@@ -302,65 +346,117 @@ export function Header() {
         </div>
       </div>
 
-      {activeDesktopGroup ? <DesktopCategoryTray group={activeDesktopGroup} /> : null}
+      {activeTray === "convert" ? <ConvertTray toPdfTools={toPdfTools} fromPdfTools={fromPdfTools} /> : null}
+      {activeTray === "tools" ? <AllToolsTray groupedTools={groupedTools} /> : null}
+      {activeTray === "utility" ? <UtilityTray /> : null}
 
       {mobileMenuOpen ? (
         <div className="fixed inset-x-0 top-[79px] z-40 h-[calc(100vh-79px)] overflow-y-auto border-t border-violet-100 bg-[var(--bg-base)] px-4 py-5 xl:hidden">
-          <div className="mx-auto max-w-3xl">
-            <div className="grid gap-0 overflow-hidden rounded-[1.8rem] border border-violet-100 bg-white">
-              {CATEGORY_NAV.map((group) => {
-                const expanded = expandedMobileGroup === group.label;
+          <div className="mx-auto max-w-3xl space-y-4">
+            <div className="overflow-hidden rounded-[1.8rem] border border-violet-100 bg-white">
+              {PRIMARY_NAV.map((item) => (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className="flex items-center justify-between border-b border-violet-100 px-4 py-4 text-base font-bold text-slate-950 transition hover:bg-violet-50 hover:text-violet-700 last:border-b-0"
+                >
+                  {item.label}
+                  <ArrowRight size={16} className="text-violet-400" />
+                </Link>
+              ))}
 
-                return (
-                  <div key={group.label} className="border-b border-violet-100 last:border-b-0">
-                    <button
-                      type="button"
-                      onClick={() => setExpandedMobileGroup(expanded ? null : group.label)}
-                      className="flex w-full items-center justify-between px-4 py-4 text-left text-base font-semibold text-slate-950"
-                    >
-                      {group.label}
-                      <ChevronDown size={16} className={`text-violet-600 transition ${expanded ? "rotate-180" : ""}`} />
-                    </button>
+              <button
+                type="button"
+                onClick={() => setMobileConvertOpen((current) => !current)}
+                className="flex w-full items-center justify-between border-t border-violet-100 px-4 py-4 text-left text-base font-bold text-slate-950"
+              >
+                Convert PDF
+                <ChevronDown size={16} className={`text-violet-600 transition ${mobileConvertOpen ? "rotate-180" : ""}`} />
+              </button>
 
-                    {expanded ? (
-                      <div className="border-t border-violet-100 bg-violet-50/38 px-3 py-2">
-                        <Link href={group.href} className="flex items-center justify-between rounded-xl px-3 py-3 text-sm font-semibold text-violet-800">
-                          Open {group.label}
-                          <ArrowRight size={15} />
-                        </Link>
-                        {group.items.map((item) => (
-                          <Link
-                            key={`${group.label}-mobile-${item.label}`}
-                            href={item.href}
-                            className="flex items-center justify-between rounded-xl px-3 py-3 text-sm font-semibold text-slate-700 transition hover:bg-white hover:text-violet-700"
-                          >
-                            <span className="flex items-center gap-2">
-                              <StatusDot status={item.status} />
-                              {item.label}
-                            </span>
-                            <ArrowRight size={14} className="text-violet-300" />
-                          </Link>
+              {mobileConvertOpen ? (
+                <div className="grid gap-4 border-t border-violet-100 bg-violet-50/38 px-3 py-3 sm:grid-cols-2">
+                  <div>
+                    <div className="px-3 pb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
+                      Convert to PDF
+                    </div>
+                    {toPdfTools.map((tool) => <TrayLink key={`mobile-to-${tool.id}`} tool={tool} />)}
+                  </div>
+                  <div>
+                    <div className="px-3 pb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
+                      Convert from PDF
+                    </div>
+                    {fromPdfTools.map((tool) => <TrayLink key={`mobile-from-${tool.id}`} tool={tool} />)}
+                  </div>
+                </div>
+              ) : null}
+
+              <button
+                type="button"
+                onClick={() => setMobileToolsOpen((current) => !current)}
+                className="flex w-full items-center justify-between border-t border-violet-100 px-4 py-4 text-left text-base font-bold text-slate-950"
+              >
+                All PDF Tools
+                <ChevronDown size={16} className={`text-violet-600 transition ${mobileToolsOpen ? "rotate-180" : ""}`} />
+              </button>
+
+              {mobileToolsOpen ? (
+                <div className="border-t border-violet-100 bg-violet-50/38 px-3 py-3">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {groupedTools.map((group) => (
+                      <div key={`mobile-group-${group.label}`}>
+                        <div className="px-3 pb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
+                          {group.label}
+                        </div>
+                        {group.tools.slice(0, 6).map((tool) => (
+                          <TrayLink key={`mobile-tool-${tool.id}`} tool={tool} />
                         ))}
                       </div>
-                    ) : null}
+                    ))}
                   </div>
-                );
-              })}
+                </div>
+              ) : null}
             </div>
 
-            <div className="mt-5 grid gap-0 overflow-hidden rounded-[1.8rem] border border-violet-100 bg-white sm:grid-cols-3">
-              <Link href="/pricing" className="border-b border-violet-100 px-4 py-4 text-sm font-semibold text-slate-700 transition hover:bg-violet-50/42 hover:text-violet-700 sm:border-b-0 sm:border-r">
-                Pricing
+            <div className="overflow-hidden rounded-[1.8rem] border border-violet-100 bg-white">
+              <Link href="/dashboard" className="flex items-center justify-between border-b border-violet-100 px-4 py-4 text-sm font-bold text-slate-700 transition hover:bg-violet-50 hover:text-violet-700">
+                {accountLabel}
+                <ArrowRight size={15} />
               </Link>
-              <Link href="/desktop" className="border-b border-violet-100 px-4 py-4 text-sm font-semibold text-slate-700 transition hover:bg-violet-50/42 hover:text-violet-700 sm:border-b-0 sm:border-r">
-                Desktop App · Soon
-              </Link>
-              <Link href="/dashboard" className="px-4 py-4 text-sm font-semibold text-slate-700 transition hover:bg-violet-50/42 hover:text-violet-700">
-                Login / My Account
-              </Link>
+
+              <button
+                type="button"
+                onClick={() => setMobileUtilityOpen((current) => !current)}
+                className="flex w-full items-center justify-between px-4 py-4 text-left text-sm font-bold text-slate-700"
+              >
+                More PDFMantra
+                <ChevronDown size={16} className={`text-violet-600 transition ${mobileUtilityOpen ? "rotate-180" : ""}`} />
+              </button>
+
+              {mobileUtilityOpen ? (
+                <div className="grid gap-3 border-t border-violet-100 bg-violet-50/38 p-3 sm:grid-cols-2">
+                  {UTILITY_LINKS.map((item) => {
+                    const Icon = item.icon;
+
+                    return (
+                      <Link
+                        key={`mobile-utility-${item.label}`}
+                        href={item.href}
+                        className="rounded-[1.25rem] border border-violet-100 bg-white p-4 text-slate-950 transition hover:border-violet-200 hover:bg-violet-50"
+                      >
+                        <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-violet-100 bg-violet-50 text-violet-700">
+                          <Icon size={18} />
+                        </div>
+                        <div className="mt-3 text-sm font-bold">{item.label}</div>
+                        <div className="mt-1 text-xs font-medium leading-5 text-slate-500">{item.description}</div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              ) : null}
             </div>
 
-            <Link href="/editor" className="header-cta mt-5 min-h-14 w-full px-6 text-sm">
+            <Link href="/editor" className="header-cta min-h-14 w-full px-6 text-sm">
               <Sparkles size={15} />
               <span>Start Editing</span>
               <ArrowRight size={16} />
