@@ -433,10 +433,15 @@ export default function EditorPage() {
 
       event.preventDefault();
 
+      const deltaXPt =
+        (event.clientX - drag.startPointerX) / Math.max(renderScale, 0.001);
+      const deltaYPt =
+        (event.clientY - drag.startPointerY) / Math.max(renderScale, 0.001);
+
       const dx =
-        ((event.clientX - drag.startPointerX) / canvasSize.width) * 100;
+        (deltaXPt / Math.max(pagePointSize.width, 1)) * 100;
       const dy =
-        ((event.clientY - drag.startPointerY) / canvasSize.height) * 100;
+        (deltaYPt / Math.max(pagePointSize.height, 1)) * 100;
 
       setLayers((previousLayers) =>
         previousLayers.map((layer) => {
@@ -536,7 +541,7 @@ export default function EditorPage() {
       window.removeEventListener("pointerup", endPointerInteraction);
       window.removeEventListener("pointercancel", endPointerInteraction);
     };
-  }, [canvasSize.height, canvasSize.width]);
+  }, [pagePointSize.height, pagePointSize.width, renderScale]);
 
   const currentPageLayers = useMemo(
     () => layers.filter((layer) => layer.page === currentPage),
