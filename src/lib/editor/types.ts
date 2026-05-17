@@ -1,22 +1,22 @@
 /**
  * PDFMantra Editor Types
  * ---------------------------------------------------------------------------
- * This file now serves two purposes:
+ * This file intentionally supports two editor contracts during the migration:
  *
- * 1. It preserves the current live editor's legacy contracts so the app keeps
- *    working while the fresh editor architecture is introduced safely.
+ * 1. The current live editor contract, which still uses percent-based geometry
+ *    and powers the existing editor page, toolbar, inspector, export, image,
+ *    highlight, and signature flows.
  *
- * 2. It defines the new Phase 1 editor architecture contracts:
- *    - compact pro ribbon command model
- *    - future-proof tool registry primitives
- *    - normalized 0–1 geometry primitives for the new editor engine
+ * 2. The next editor geometry contract, which stores coordinates in absolute
+ *    PDF Points (pt). This pt-based contract becomes the source of truth as the
+ *    canvas, drag/resize, and export pipeline are migrated file-by-file.
  *
- * Once the full fresh editor shell is complete, legacy percent-based types can
- * be retired in a controlled cleanup pass.
+ * Keeping both contracts here allows us to introduce the correct architecture
+ * without breaking the working editor before the renderer migration lands.
  */
 
 /* -------------------------------------------------------------------------- */
-/* Current editor compatibility                                                */
+/* Current live editor compatibility                                           */
 /* -------------------------------------------------------------------------- */
 
 export type ActiveTool =
@@ -39,6 +39,11 @@ export type LayerType = "text" | "highlight" | "image" | "signature";
 
 export type ExportMode = "full" | "current" | "range";
 
+/**
+ * Legacy resize-handle IDs currently consumed by the live editor UI.
+ * They are intentionally kept until Step 2/3 moves the page renderer and drag
+ * math onto the pt-based coordinate model.
+ */
 export type ResizeHandle =
   | "tl"
   | "tm"
@@ -52,7 +57,6 @@ export type ResizeHandle =
 /**
  * Legacy live-editor layer contract.
  * Kept intact because the current editor page still renders and exports from it.
- * The fresh architecture will move toward normalized geometry objects instead.
  */
 export type PdfLayer = {
   id: string;
@@ -126,35 +130,123 @@ export type TextOverlayItem = {
 };
 
 /* -------------------------------------------------------------------------- */
-/* Fresh editor architecture: normalized geometry                              */
+/* Next geometry system: absolute PDF point coordinates                         */
 /* -------------------------------------------------------------------------- */
 
 /**
- * All fresh-editor geometry must use 0–1 normalized coordinates.
- * Example:
- * - x: 0.25 means 25% from the page's left edge
- * - width: 0.5 means 50% of the page width
+ * Absolute PDF point values.
+ * 1 pt = 1 / 72 inch.
  */
-export type NormalizedUnit = number;
+export type PdfPointUnit = number;
 
-export type NormalizedPoint = {
-  x: NormalizedUnit;
-  y: NormalizedUnit;
+export type PdfPoint = {
+  x: PdfPointUnit;
+  y: PdfPointUnit;
 };
 
-export type NormalizedSize = {
-  width: NormalizedUnit;
-  height: NormalizedUnit;
+export type PdfDimensions = {
+  width: PdfPointUnit;
+  height: PdfPointUnit;
 };
 
-export type NormalizedRect = NormalizedPoint & NormalizedSize;
+export type PdfRect = PdfPoint & PdfDimensions;
 
-export type NormalizedRotation = number;
+export type PdfPageIndex = number;
 
-export type EditorPageNumber = number;
+export type PdfRotation = 0 | 90 | 180 | 270;
+
+/**
+ * Future resize-handle IDs for the pt-based editor geometry model.
+ * These are not yet consumed by the live page, but they define the target
+ * contract for the migration pass.
+ */
+export type PdfPointResizeHandle =
+  | "top-left"
+  | "top-right"
+  | "bottom-left"
+  | "bottom-right"
+  | "top"
+  | "bottom"
+  | "left"
+  | "right";
+
+export type PdfPointLayerType = "text" | "highlight" | "image" | "signature";
+
+export type PdfPointBaseLayer = {
+  id: string;
+  type: PdfPointLayerType;
+  pageIndex: PdfPageIndex;
+  x: PdfPointUnit;
+  y: PdfPointUnit;
+  width: PdfPointUnit;
+  height: PdfPointUnit;
+};
+
+export type PdfPointTextLayer = PdfPointBaseLayer & {
+  type: "text" | "signature";
+  content: string;
+  fontSize: PdfPointUnit;
+  fontFamily: "Helvetica";
+  isBold: boolean;
+  isItalic: boolean;
+  color: string;
+};
+
+export type PdfPointHighlightLayer = PdfPointBaseLayer & {
+  type: "highlight";
+  opacity: number;
+  color: string;
+};
+
+export type PdfPointImageLayer = PdfPointBaseLayer & {
+  type: "image";
+  imageUrl?: string;
+  imageBytes?: Uint8Array;
+  imageKind?: "png" | "jpg";
+};
+
+export type PdfPointLayer =
+  | PdfPointTextLayer
+  | PdfPointHighlightLayer
+  | PdfPointImageLayer;
+
+export type PdfPointPageThumb = {
+  pageIndex: PdfPageIndex;
+  thumbnailUrl: string;
+  width: PdfPointUnit;
+  height: PdfPointUnit;
+  rotation: PdfRotation;
+  status: "loading" | "ready" | "error";
+};
+
+/**
+ * Explicit pt-migration drag state.
+ * Pointer values stay in browser client pixels; layer geometry stays in PDF pt.
+ * Movement formula: deltaPt = deltaPx / zoomScale.
+ */
+export type PdfPointDragState = {
+  isDragging: boolean;
+  layerId: string | null;
+  activeHandle: PdfPointResizeHandle | "move" | null;
+  pointerStartClientX: number;
+  pointerStartClientY: number;
+  initialLayerX: PdfPointUnit;
+  initialLayerY: PdfPointUnit;
+  initialLayerWidth?: PdfPointUnit;
+  initialLayerHeight?: PdfPointUnit;
+};
+
+export type PdfPointEditorState = {
+  activeTool: ActiveTool;
+  selectedLayerId: string | null;
+  zoomScale: number;
+  currentPageIndex: PdfPageIndex;
+  layers: PdfPointLayer[];
+  dragState: PdfPointDragState;
+};
 
 /* -------------------------------------------------------------------------- */
-/* Fresh editor architecture: command ribbon model                             */
+/* Existing fresh-editor command ribbon model                                  */
 /* -------------------------------------------------------------------------- */
 
 export type EditorRibbonToolId =
@@ -238,7 +330,7 @@ export type EditorCommandDefinition = {
 };
 
 /* -------------------------------------------------------------------------- */
-/* Fresh editor architecture: future layer model                               */
+/* Existing fresh-editor future layer model                                    */
 /* -------------------------------------------------------------------------- */
 
 export type EditorLayerKind =
@@ -248,6 +340,29 @@ export type EditorLayerKind =
   | "signature"
   | "whiteout"
   | "shape";
+
+/**
+ * This future ribbon/shell model remains intact for the broader editor roadmap.
+ * The concrete renderer migration will use the more explicit PdfPoint* types
+ * above so the pt-based editor geometry stays unmistakable.
+ */
+export type NormalizedUnit = number;
+
+export type NormalizedPoint = {
+  x: NormalizedUnit;
+  y: NormalizedUnit;
+};
+
+export type NormalizedSize = {
+  width: NormalizedUnit;
+  height: NormalizedUnit;
+};
+
+export type NormalizedRect = NormalizedPoint & NormalizedSize;
+
+export type NormalizedRotation = number;
+
+export type EditorPageNumber = number;
 
 export type EditorLayerBase = {
   id: string;
