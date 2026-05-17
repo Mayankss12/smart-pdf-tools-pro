@@ -1,0 +1,27 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="doc" x1="116" y1="56" x2="418" y2="468" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1C24A8"/>
+      <stop offset="0.58" stop-color="#15209B"/>
+      <stop offset="1" stop-color="#2537D1"/>
+    </linearGradient>
+    <linearGradient id="fold" x1="316" y1="52" x2="430" y2="188" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#B7A9FF"/>
+      <stop offset="1" stop-color="#7E6BFF"/>
+    </linearGradient>
+    <linearGradient id="base" x1="104" y1="394" x2="432" y2="474" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2741D8"/>
+      <stop offset="1" stop-color="#1832BE"/>
+    </linearGradient>
+    <filter id="shadow" x="74" y="40" width="364" height="426" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="18" stdDeviation="16" flood-color="#1D1A5F" flood-opacity="0.16"/>
+    </filter>
+  </defs>
+  <g filter="url(#shadow)">
+    <path d="M143 58H307L421 172V409C421 435.51 399.51 457 373 457H143C116.49 457 95 435.51 95 409V106C95 79.49 116.49 58 143 58Z" fill="url(#doc)"/>
+    <path d="M307 58V140.5C307 159.002 321.998 174 340.5 174H421L307 58Z" fill="url(#fold)"/>
+    <path d="M95 379L185 307L256 366L327 307L421 379V409C421 435.51 399.51 457 373 457H143C116.49 457 95 435.51 95 409V379Z" fill="url(#base)"/>
+  </g>
+  <path d="M154 227V391H208V316L256 356L303 316V391H357V227L256 311L154 227Z" fill="white"/>
+  <path d="M164 126L177 154L205 167L177 180L164 208L151 180L123 167L151 154L164 126Z" fill="#B7A9FF"/>
+</svg>
