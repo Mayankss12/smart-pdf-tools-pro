@@ -1,17 +1,18 @@
 import type { Metadata, Viewport } from "next";
-import { Lato, Poppins } from "next/font/google";
+import { Inter, Plus_Jakarta_Sans } from "next/font/google";
+import "@/styles/tokens.css";
 import "./globals.css";
 
-const body = Lato({
+const body = Inter({
   subsets: ["latin"],
-  weight: ["400", "700", "900"],
+  weight: ["400", "500", "600", "700"],
   display: "swap",
   variable: "--font-body",
 });
 
-const display = Poppins({
+const display = Plus_Jakarta_Sans({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["500", "600", "700"],
   display: "swap",
   variable: "--font-display",
 });
@@ -57,7 +58,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#8b73ff",
+  themeColor: "#5b4ecc",
 };
 
 export default function RootLayout({
@@ -67,7 +68,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${body.variable} ${display.variable}`}>
-      <body className="min-h-screen bg-[var(--pm-bg)] text-[var(--pm-ink)] antialiased">
+      <body className="min-h-screen bg-[var(--cream-base)] text-[var(--text-primary)] antialiased">
         {children}
       </body>
     </html>
