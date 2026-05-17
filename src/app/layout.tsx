@@ -1,9 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Plus_Jakarta_Sans } from "next/font/google";
+import { DM_Sans, Plus_Jakarta_Sans } from "next/font/google";
 import "@/styles/tokens.css";
 import "./globals.css";
 
-const body = Inter({
+const body = DM_Sans({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   display: "swap",
@@ -12,7 +12,7 @@ const body = Inter({
 
 const display = Plus_Jakarta_Sans({
   subsets: ["latin"],
-  weight: ["500", "600", "700"],
+  weight: ["500", "600", "700", "800"],
   display: "swap",
   variable: "--font-display",
 });
@@ -58,7 +58,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#5b4ecc",
+  themeColor: "#6550e8",
 };
 
 export default function RootLayout({
@@ -68,7 +68,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${body.variable} ${display.variable}`}>
-      <body className="min-h-screen bg-[var(--cream-base)] text-[var(--text-primary)] antialiased">
+      <body className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)] antialiased">
         {children}
       </body>
     </html>
