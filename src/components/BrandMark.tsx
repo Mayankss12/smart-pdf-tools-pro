@@ -5,10 +5,9 @@ export interface BrandMarkProps extends SVGProps<SVGSVGElement> {
 }
 
 /**
- * Original PDFMantra brand mark.
- * --------------------------------------------
- * A folded document shape nested inside a soft gear orbit.
- * This keeps the mark product-relevant without copying another PDF brand.
+ * PDFMantra mark — folded document + hidden "M" monogram.
+ * Built as SVG so the logo stays crisp in the header, favicon-sized UI,
+ * and future product surfaces without depending on raster exports.
  */
 export function BrandMark({
   title = "PDFMantra",
@@ -24,40 +23,47 @@ export function BrandMark({
       {...props}
     >
       <defs>
-        <linearGradient id="pdfmantra-gear" x1="8" y1="6" x2="58" y2="60" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#8C63FF" />
-          <stop offset="0.52" stopColor="#7254F7" />
-          <stop offset="1" stopColor="#A85CFF" />
+        <linearGradient id="pdfmantra-doc" x1="12" y1="8" x2="54" y2="61" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#1C24A8" />
+          <stop offset="0.58" stopColor="#15209B" />
+          <stop offset="1" stopColor="#2537D1" />
         </linearGradient>
-        <linearGradient id="pdfmantra-paper" x1="20" y1="16" x2="45" y2="49" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#FFFFFF" />
-          <stop offset="1" stopColor="#EEE8FF" />
+        <linearGradient id="pdfmantra-fold" x1="38" y1="6" x2="54" y2="24" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#B7A9FF" />
+          <stop offset="1" stopColor="#7E6BFF" />
         </linearGradient>
+        <linearGradient id="pdfmantra-base" x1="12" y1="52" x2="54" y2="62" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#2741D8" />
+          <stop offset="1" stopColor="#1832BE" />
+        </linearGradient>
+        <filter id="pdfmantra-soft-shadow" x="4" y="3" width="56" height="61" colorInterpolationFilters="sRGB">
+          <feDropShadow dx="0" dy="2" stdDeviation="2.1" floodColor="#1D1A5F" floodOpacity="0.16" />
+        </filter>
       </defs>
 
+      <g filter="url(#pdfmantra-soft-shadow)">
+        <path
+          d="M17.5 6.5H38.1L53.5 21.9V55.2C53.5 58.68 50.68 61.5 47.2 61.5H17.5C14.02 61.5 11.2 58.68 11.2 55.2V12.8C11.2 9.32 14.02 6.5 17.5 6.5Z"
+          fill="url(#pdfmantra-doc)"
+        />
+        <path
+          d="M38.1 6.5V17.65C38.1 20.08 40.07 22.05 42.5 22.05H53.5L38.1 6.5Z"
+          fill="url(#pdfmantra-fold)"
+        />
+        <path
+          d="M11.2 51.2L23.1 41.75L32.35 49.45L41.7 41.75L53.5 51.2V55.2C53.5 58.68 50.68 61.5 47.2 61.5H17.5C14.02 61.5 11.2 58.68 11.2 55.2V51.2Z"
+          fill="url(#pdfmantra-base)"
+        />
+      </g>
+
       <path
-        d="M32 5.5L36.4 8.3L41.6 7.7L44.6 11.8L49.7 13L50.8 18.2L55.3 20.7L54.6 26L58.5 29.6L56.7 34.6L59.2 39.4L56.1 43.4L56.9 48.6L52.5 51.2L51.4 56.3L46.2 57.5L43.2 61.6L38 61L33.6 63.8L29.2 61L24 61.6L21 57.5L15.8 56.3L14.7 51.2L10.3 48.6L11.1 43.4L8 39.4L10.5 34.6L8.7 29.6L12.6 26L11.9 20.7L16.4 18.2L17.5 13L22.6 11.8L25.6 7.7L30.8 8.3L32 5.5Z"
-        fill="url(#pdfmantra-gear)"
+        d="M18.95 31.05V52.8H26.05V42.9L32.35 48.2L38.55 42.9V52.8H45.65V31.05L32.35 42.15L18.95 31.05Z"
+        fill="#FFFFFF"
       />
-
-      <circle cx="32" cy="33" r="21" fill="rgba(255,255,255,0.14)" />
-
       <path
-        d="M23 17.5H37.8L45 24.8V47.5C45 49.433 43.433 51 41.5 51H23C21.067 51 19.5 49.433 19.5 47.5V21C19.5 19.067 21.067 17.5 23 17.5Z"
-        fill="url(#pdfmantra-paper)"
+        d="M20.15 17.6L21.85 21.35L25.6 23.05L21.85 24.75L20.15 28.5L18.45 24.75L14.7 23.05L18.45 21.35L20.15 17.6Z"
+        fill="#B7A9FF"
       />
-      <path d="M37.5 17.5V24.6H44.6" stroke="#D9CCFF" strokeWidth="2.2" strokeLinejoin="round" />
-
-      <path d="M25 31H39" stroke="#7657FF" strokeWidth="2.5" strokeLinecap="round" />
-      <path d="M25 37H39" stroke="#7657FF" strokeWidth="2.5" strokeLinecap="round" opacity="0.92" />
-      <path d="M25 43H34.5" stroke="#A35DFF" strokeWidth="2.5" strokeLinecap="round" />
-
-      <circle cx="48.7" cy="45.5" r="8.2" fill="#FFFFFF" />
-      <path
-        d="M48.7 40.7L49.9 42.6L52.1 42.3L52.8 44.4L54.8 45.5L52.8 46.6L52.1 48.7L49.9 48.4L48.7 50.3L47.5 48.4L45.3 48.7L44.6 46.6L42.6 45.5L44.6 44.4L45.3 42.3L47.5 42.6L48.7 40.7Z"
-        fill="#7657FF"
-      />
-      <circle cx="48.7" cy="45.5" r="2.45" fill="#FFFFFF" />
     </svg>
   );
 }
