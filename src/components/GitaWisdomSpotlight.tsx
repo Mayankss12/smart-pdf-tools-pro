@@ -54,31 +54,31 @@ export function GitaWisdomSpotlight() {
   }, []);
 
   if (!verse) {
-    return <div className="mx-auto h-[92px] w-full max-w-[760px]" aria-hidden="true" />;
+    return <div className="mx-auto h-[68px] w-full max-w-[720px]" aria-hidden="true" />;
   }
 
   return (
     <Link
       href={`/gita/${verse.id}`}
       aria-label={`Open meaning for Bhagavad Gita Chapter ${verse.chapter}, Verse ${verse.verse}`}
-      className="group relative mx-auto block w-full max-w-[790px] px-12 py-3 text-center transition duration-200 hover:-translate-y-0.5"
+      className="group relative mx-auto block w-full max-w-[720px] px-10 py-2 text-center transition duration-200 hover:-translate-y-0.5"
     >
-      <span className="pointer-events-none absolute left-1/2 top-0 flex h-8 w-8 -translate-x-1/2 items-center justify-center rounded-full text-[1.35rem] font-bold leading-none text-[#dd8450] transition group-hover:text-[#d77337]">
+      <span className="pointer-events-none absolute left-1/2 top-0 flex h-6 w-6 -translate-x-1/2 items-center justify-center rounded-full text-[0.95rem] font-medium leading-none text-[#dd8450] transition group-hover:text-[#d77337]">
         ॐ
       </span>
 
       <span className="pointer-events-none absolute left-2 top-1/2 flex -translate-y-1/2 gap-1.5" aria-hidden="true">
-        <span className="h-14 w-px rounded-full bg-[var(--text-primary)]/68" />
-        <span className="h-14 w-px rounded-full bg-[var(--text-primary)]/68" />
+        <span className="h-10 w-px rounded-full bg-[var(--text-primary)]/58" />
+        <span className="h-10 w-px rounded-full bg-[var(--text-primary)]/58" />
       </span>
 
       <span className="pointer-events-none absolute right-2 top-1/2 flex -translate-y-1/2 gap-1.5" aria-hidden="true">
-        <span className="h-14 w-px rounded-full bg-[var(--text-primary)]/68" />
-        <span className="h-14 w-px rounded-full bg-[var(--text-primary)]/68" />
+        <span className="h-10 w-px rounded-full bg-[var(--text-primary)]/58" />
+        <span className="h-10 w-px rounded-full bg-[var(--text-primary)]/58" />
       </span>
 
       <span
-        className="block whitespace-pre-line pt-5 text-[0.98rem] font-semibold leading-7 tracking-[0.01em] text-[var(--text-primary)] sm:text-[1.08rem] sm:leading-8"
+        className="block whitespace-pre-line pt-4 text-[0.72rem] font-normal leading-5 tracking-[0.01em] text-[var(--text-primary)] sm:text-[0.78rem] sm:leading-5"
         style={{ fontFamily: '"Noto Sans Devanagari", "Nirmala UI", "Kohinoor Devanagari", sans-serif' }}
       >
         {verse.sanskrit}
