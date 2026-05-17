@@ -110,7 +110,7 @@ function StatusDot({ status }: { status?: HeaderNavItem["status"] }) {
       ? "bg-emerald-500"
       : status === "beta"
         ? "bg-violet-500"
-        : "bg-rose-400";
+        : "bg-slate-300";
 
   return <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${dotClassName}`} />;
 }
@@ -165,14 +165,14 @@ function DesktopCategoryTray({
   group: HeaderNavGroup;
 }) {
   return (
-    <div className="hidden border-t border-violet-100 bg-[#fffdf8]/96 shadow-[0_18px_42px_rgba(76,47,209,0.08)] backdrop-blur-xl xl:block">
+    <div className="hidden border-t border-violet-100 bg-white/96 shadow-[0_18px_42px_rgba(76,47,209,0.08)] backdrop-blur-xl xl:block">
       <div className="mx-auto max-w-[1480px] px-4 sm:px-6 lg:px-8">
         <div className="grid min-h-[88px] grid-cols-[220px_1fr] items-stretch">
           <Link
             href={group.href}
             className="group flex flex-col justify-center border-r border-violet-100 pr-6 transition"
           >
-            <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-rose-500">
+            <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-violet-600">
               {group.label} tools
             </span>
             <span className="mt-1.5 inline-flex items-center gap-2 text-[15px] font-semibold text-violet-800 transition group-hover:text-violet-950">
@@ -240,7 +240,7 @@ export function Header() {
 
   return (
     <header
-      className="sticky top-0 z-50 border-b border-violet-100 bg-[#fffaf2]/92 backdrop-blur-xl"
+      className="sticky top-0 z-50 border-b border-violet-100 bg-[var(--bg-base)]/92 backdrop-blur-xl"
       onMouseLeave={() => setActiveGroup(null)}
     >
       <div className="mx-auto max-w-[1480px] px-4 sm:px-6 lg:px-8">
@@ -248,11 +248,11 @@ export function Header() {
           <Link href="/" className="group flex shrink-0 items-center gap-3">
             <BrandMark className="h-11 w-11 shrink-0 transition duration-200 group-hover:-translate-y-0.5" />
             <div className="min-w-[194px]">
-              <div className="display-font text-[1.72rem] font-medium leading-none tracking-[-0.045em] text-slate-950 transition duration-200 group-hover:text-violet-700">
+              <div className="display-font text-[1.72rem] font-semibold leading-none tracking-[-0.035em] text-slate-950 transition duration-200 group-hover:text-violet-700">
                 PDFMantra
               </div>
-              <div className="mt-1 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">
-                <span className="h-px w-5 bg-gradient-to-r from-violet-500 to-rose-400" />
+              <div className="mt-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                <span className="h-px w-5 bg-gradient-to-r from-violet-500 via-violet-400 to-violet-200" />
                 Smart PDF Workspace
               </div>
             </div>
@@ -276,19 +276,16 @@ export function Header() {
             </Link>
             <Link href="/desktop" className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-slate-600 transition hover:text-violet-700">
               Desktop
-              <span className="rounded-full bg-rose-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-rose-500">
+              <span className="rounded-full bg-violet-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-violet-700">
                 Soon
               </span>
             </Link>
             <Link href="/dashboard" className="text-[13px] font-semibold text-slate-600 transition hover:text-violet-700">
               {accountLabel}
             </Link>
-            <Link
-              href="/editor"
-              className="inline-flex min-h-11 items-center gap-2 rounded-full bg-gradient-to-r from-violet-600 via-violet-600 to-rose-500 px-4 text-[13px] font-semibold text-white shadow-[0_16px_38px_rgba(91,63,193,0.24)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_22px_48px_rgba(91,63,193,0.32)]"
-            >
+            <Link href="/editor" className="header-cta min-h-11 px-4 text-[13px]">
               <Sparkles size={14} />
-              Start Editing
+              <span>Start Editing</span>
               <ArrowRight size={14} />
             </Link>
           </div>
@@ -296,7 +293,7 @@ export function Header() {
           <button
             type="button"
             onClick={() => setMobileMenuOpen((current) => !current)}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-violet-100 bg-[#fffdf8] text-slate-950 transition hover:border-violet-200 hover:text-violet-700 xl:hidden"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-violet-100 bg-white text-slate-950 transition hover:border-violet-200 hover:text-violet-700 xl:hidden"
             aria-label="Toggle navigation menu"
             aria-expanded={mobileMenuOpen}
           >
@@ -308,9 +305,9 @@ export function Header() {
       {activeDesktopGroup ? <DesktopCategoryTray group={activeDesktopGroup} /> : null}
 
       {mobileMenuOpen ? (
-        <div className="fixed inset-x-0 top-[79px] z-40 h-[calc(100vh-79px)] overflow-y-auto border-t border-violet-100 bg-[#fffaf2] px-4 py-5 xl:hidden">
+        <div className="fixed inset-x-0 top-[79px] z-40 h-[calc(100vh-79px)] overflow-y-auto border-t border-violet-100 bg-[var(--bg-base)] px-4 py-5 xl:hidden">
           <div className="mx-auto max-w-3xl">
-            <div className="grid gap-0 overflow-hidden rounded-[1.8rem] border border-violet-100 bg-[#fffdf8]">
+            <div className="grid gap-0 overflow-hidden rounded-[1.8rem] border border-violet-100 bg-white">
               {CATEGORY_NAV.map((group) => {
                 const expanded = expandedMobileGroup === group.label;
 
@@ -335,7 +332,7 @@ export function Header() {
                           <Link
                             key={`${group.label}-mobile-${item.label}`}
                             href={item.href}
-                            className="flex items-center justify-between rounded-xl px-3 py-3 text-sm font-semibold text-slate-700 transition hover:bg-[#fffdf8] hover:text-violet-700"
+                            className="flex items-center justify-between rounded-xl px-3 py-3 text-sm font-semibold text-slate-700 transition hover:bg-white hover:text-violet-700"
                           >
                             <span className="flex items-center gap-2">
                               <StatusDot status={item.status} />
@@ -351,7 +348,7 @@ export function Header() {
               })}
             </div>
 
-            <div className="mt-5 grid gap-0 overflow-hidden rounded-[1.8rem] border border-violet-100 bg-[#fffdf8] sm:grid-cols-3">
+            <div className="mt-5 grid gap-0 overflow-hidden rounded-[1.8rem] border border-violet-100 bg-white sm:grid-cols-3">
               <Link href="/pricing" className="border-b border-violet-100 px-4 py-4 text-sm font-semibold text-slate-700 transition hover:bg-violet-50/42 hover:text-violet-700 sm:border-b-0 sm:border-r">
                 Pricing
               </Link>
@@ -363,12 +360,9 @@ export function Header() {
               </Link>
             </div>
 
-            <Link
-              href="/editor"
-              className="mt-5 inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-violet-600 via-violet-600 to-rose-500 px-6 text-sm font-semibold text-white shadow-[0_18px_42px_rgba(91,63,193,0.24)]"
-            >
+            <Link href="/editor" className="header-cta mt-5 min-h-14 w-full px-6 text-sm">
               <Sparkles size={15} />
-              Start Editing
+              <span>Start Editing</span>
               <ArrowRight size={16} />
             </Link>
           </div>
