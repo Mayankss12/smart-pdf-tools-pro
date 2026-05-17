@@ -1,6 +1,7 @@
 "use client";
 
 import { Header } from "@/components/Header";
+import { ToolPageHeader } from "@/components/ToolPageHeader";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -337,78 +338,41 @@ export default function SplitPage() {
     <>
       <Header />
 
-      <main className="min-h-screen bg-[var(--pm-bg)] text-slate-950">
-        <section className="relative overflow-hidden border-b border-violet-100/90">
-          <div className="pointer-events-none absolute inset-0">
-            <div className="absolute left-[-15rem] top-[-13rem] h-[34rem] w-[34rem] rounded-full bg-violet-200/45 blur-3xl" />
-            <div className="absolute right-[-16rem] top-[-10rem] h-[34rem] w-[34rem] rounded-full bg-rose-200/42 blur-3xl" />
-          </div>
-
-          <div className="relative mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-12">
-            <div className="grid gap-7 lg:grid-cols-[1fr_360px] lg:items-center">
-              <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-violet-100 bg-[#fffdf8]/90 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-violet-700 shadow-sm backdrop-blur">
-                  <Scissors size={13} />
-                  PDFMantra Split Tool
-                </div>
-
-                <h1 className="display-font mt-5 max-w-4xl text-[2.35rem] font-medium leading-[1.08] tracking-[-0.045em] text-slate-950 sm:text-[2.9rem] lg:text-[3.35rem]">
-                  Split PDFs into
-                  <span className="block bg-gradient-to-r from-violet-700 via-violet-600 to-rose-500 bg-clip-text text-transparent">
-                    clean page groups.
-                  </span>
-                </h1>
-
-                <p className="mt-4 max-w-2xl text-[15px] font-medium leading-7 text-slate-600 sm:text-base">
-                  Upload one PDF, preview its pages, define ranges like 1-4,5-8, and download separate files for each group.
-                </p>
-              </div>
-
-              <div className="overflow-hidden rounded-[2rem] border border-violet-100 bg-[#fffdf8]/84 p-4 shadow-[0_24px_70px_rgba(91,63,193,0.11)] backdrop-blur">
-                <div className="grid grid-cols-3 divide-x divide-violet-100 text-center">
-                  <div className="px-3 py-4">
-                    <div className="text-[1.45rem] font-bold tracking-[-0.03em] text-slate-950">
-                      {pageCount || "-"}
-                    </div>
-                    <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
-                      Pages
-                    </div>
-                  </div>
-
-                  <div className="px-3 py-4">
-                    <div className="text-[1.45rem] font-bold tracking-[-0.03em] text-slate-950">
-                      {groups.length || "-"}
-                    </div>
-                    <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
-                      Outputs
-                    </div>
-                  </div>
-
-                  <div className="px-3 py-4">
-                    <div className="text-[1.45rem] font-bold tracking-[-0.03em] text-slate-950">
-                      {selectedPageSet.size || "-"}
-                    </div>
-                    <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
-                      Selected
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="application/pdf"
-                className="hidden"
-                onChange={(event) => handleFile(event.target.files?.[0])}
-              />
-            </div>
-          </div>
-        </section>
-
+      <main className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)]">
         <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
-          <div className="grid overflow-hidden rounded-[2rem] border border-violet-100 bg-[#fffdf8]/82 shadow-[0_18px_50px_rgba(91,63,193,0.08)] lg:grid-cols-[1fr_390px]">
-            <section className="min-h-[700px] border-r border-violet-100 bg-[#fffaf4]/72 p-5 sm:p-6">
+          <ToolPageHeader
+            icon={Scissors}
+            eyebrow="PDFMantra Split PDF"
+            title="Split PDFs into clean page groups."
+            description="Upload one PDF, preview its pages, define ranges like 1-4,5-8, and download separate files for every group you create."
+            meta={
+              <div className="grid min-w-[260px] grid-cols-3 divide-x divide-[var(--border-light)] text-center">
+                <div className="px-3">
+                  <div className="text-[1.35rem] font-bold tracking-[-0.03em] text-[var(--text-primary)]">{pageCount || "-"}</div>
+                  <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">Pages</div>
+                </div>
+                <div className="px-3">
+                  <div className="text-[1.35rem] font-bold tracking-[-0.03em] text-[var(--text-primary)]">{groups.length || "-"}</div>
+                  <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">Outputs</div>
+                </div>
+                <div className="px-3">
+                  <div className="text-[1.35rem] font-bold tracking-[-0.03em] text-[var(--text-primary)]">{selectedPageSet.size || "-"}</div>
+                  <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">Selected</div>
+                </div>
+              </div>
+            }
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/pdf"
+              className="hidden"
+              onChange={(event) => handleFile(event.target.files?.[0])}
+            />
+          </ToolPageHeader>
+
+          <div className="mt-6 grid overflow-hidden rounded-[1.75rem] border border-[var(--border-light)] bg-[var(--bg-card)] shadow-[var(--shadow-card)] lg:grid-cols-[1fr_390px]">
+            <section className="min-h-[700px] border-r border-[var(--border-light)] bg-[var(--bg-base)] p-5 sm:p-6">
               <div
                 onClick={() => fileInputRef.current?.click()}
                 onDrop={(event) => {
@@ -423,35 +387,35 @@ export default function SplitPage() {
                     fileInputRef.current?.click();
                   }
                 }}
-                className="cursor-pointer rounded-[1.8rem] border-2 border-dashed border-violet-200 bg-gradient-to-br from-[#fffdf8] via-violet-50/52 to-rose-50/42 p-6 text-center transition hover:border-violet-400 hover:bg-white"
+                className="cursor-pointer rounded-[1.5rem] border-2 border-dashed border-[var(--violet-border)] bg-[var(--bg-card)] p-6 text-center shadow-[var(--shadow-soft)] transition hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)]"
               >
-                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-[1.15rem] bg-gradient-to-r from-violet-600 to-rose-500 text-white shadow-[0_18px_42px_rgba(91,63,193,0.22)]">
+                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--violet-600)] text-white shadow-[0_16px_36px_rgba(101,80,232,0.20)]">
                   <FileText size={22} />
                 </div>
 
-                <div className="text-[15px] font-semibold tracking-[-0.02em] text-slate-950">
+                <div className="text-[15px] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
                   {file ? file.name : "Drop PDF here"}
                 </div>
 
-                <div className="mt-1 text-sm font-medium text-slate-600">
+                <div className="mt-1 text-sm font-medium text-[var(--text-secondary)]">
                   {file
                     ? `${pageCount} page${pageCount > 1 ? "s" : ""} loaded`
                     : "Click here or drag one PDF to begin."}
                 </div>
 
-                <div className="mt-4 inline-flex items-center justify-center gap-2 rounded-full border border-violet-100 bg-[#fffdf8] px-4 py-2 text-sm font-semibold text-violet-700 shadow-sm">
+                <div className="mt-4 inline-flex items-center justify-center gap-2 rounded-full border border-[var(--violet-border)] bg-[var(--violet-50)] px-4 py-2 text-sm font-semibold text-[var(--violet-600)]">
                   <Upload size={17} />
                   Choose PDF
                 </div>
               </div>
 
-              <div className="mt-5 rounded-[1.8rem] border border-violet-100 bg-[#fffdf8]/92 p-5 shadow-[0_14px_36px_rgba(91,63,193,0.06)]">
+              <div className="mt-5 rounded-[1.5rem] border border-[var(--border-light)] bg-[var(--bg-card)] p-5 shadow-[var(--shadow-soft)]">
                 <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
                   <div>
-                    <h2 className="display-font text-[1.75rem] font-medium tracking-[-0.035em] text-slate-950">
+                    <h2 className="display-font text-[1.75rem] font-bold tracking-[-0.02em] text-[var(--text-primary)]">
                       Visual Page Map
                     </h2>
-                    <p className="mt-1 text-sm font-medium text-slate-600">
+                    <p className="mt-1 text-sm font-normal text-[var(--text-secondary)]">
                       Highlighted pages are included in your current split groups.
                     </p>
                   </div>
@@ -459,7 +423,7 @@ export default function SplitPage() {
                   {file && (
                     <button
                       onClick={clearFile}
-                      className="inline-flex items-center justify-center gap-2 rounded-full border border-rose-100 bg-rose-50/90 px-4 py-2 text-sm font-semibold text-rose-600 transition hover:bg-rose-100"
+                      className="inline-flex items-center justify-center gap-2 rounded-full border border-red-100 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-100"
                     >
                       <X size={15} />
                       Remove PDF
@@ -468,8 +432,8 @@ export default function SplitPage() {
                 </div>
 
                 {busy && thumbs.length === 0 ? (
-                  <div className="mt-5 flex min-h-80 items-center justify-center rounded-[1.5rem] bg-violet-50/45">
-                    <div className="flex items-center gap-2 rounded-full bg-[#fffdf8] px-4 py-3 text-sm font-semibold text-violet-700 shadow-sm">
+                  <div className="mt-5 flex min-h-80 items-center justify-center rounded-[1.35rem] border border-[var(--violet-border)] bg-[var(--violet-50)]">
+                    <div className="flex items-center gap-2 rounded-full border border-[var(--violet-border)] bg-white px-4 py-3 text-sm font-semibold text-[var(--violet-600)] shadow-[var(--shadow-soft)]">
                       <Loader2 className="animate-spin" size={18} />
                       Rendering preview
                     </div>
@@ -482,27 +446,27 @@ export default function SplitPage() {
                       return (
                         <div
                           key={thumb.pageNumber}
-                          className={`overflow-hidden rounded-[1.25rem] border bg-[#fffdf8] shadow-sm transition ${
+                          className={`overflow-hidden rounded-[1.25rem] border bg-[var(--bg-card)] shadow-[var(--shadow-soft)] transition ${
                             isSelected
-                              ? "border-violet-300 ring-4 ring-violet-100"
-                              : "border-violet-100"
+                              ? "border-[var(--border-focus)] ring-4 ring-[rgba(101,80,232,0.12)]"
+                              : "border-[var(--border-light)]"
                           }`}
                         >
                           <div
                             className={`border-b px-3 py-2 text-xs font-semibold ${
                               isSelected
-                                ? "border-violet-200 bg-violet-50/80 text-violet-700"
-                                : "border-violet-100 bg-[#fffaf4] text-slate-600"
+                                ? "border-[var(--violet-border)] bg-[var(--violet-50)] text-[var(--violet-600)]"
+                                : "border-[var(--border-light)] bg-[var(--bg-panel)] text-[var(--text-secondary)]"
                             }`}
                           >
                             Page {thumb.pageNumber}
                           </div>
 
-                          <div className="flex min-h-40 items-start justify-center bg-[#fffaf4] p-2">
+                          <div className="flex min-h-40 items-start justify-center bg-[var(--bg-panel)] p-2">
                             <img
                               src={thumb.url}
                               alt={`Page ${thumb.pageNumber}`}
-                              className="max-h-56 rounded border border-violet-100 bg-white"
+                              className="max-h-56 rounded border border-[var(--border-light)] bg-white"
                             />
                           </div>
                         </div>
@@ -510,13 +474,13 @@ export default function SplitPage() {
                     })}
                   </div>
                 ) : (
-                  <div className="mt-5 flex min-h-80 items-center justify-center rounded-[1.5rem] border border-dashed border-violet-100 bg-violet-50/30 text-center">
+                  <div className="mt-5 flex min-h-80 items-center justify-center rounded-[1.35rem] border border-dashed border-[var(--violet-border)] bg-[var(--violet-50)]/52 text-center">
                     <div>
-                      <FileText className="mx-auto text-violet-300" size={38} />
-                      <div className="mt-3 text-[15px] font-semibold text-slate-950">
+                      <FileText className="mx-auto text-[var(--violet-400)]" size={38} />
+                      <div className="mt-3 text-[15px] font-semibold text-[var(--text-primary)]">
                         No PDF preview yet
                       </div>
-                      <p className="mt-1 text-sm font-medium text-slate-600">
+                      <p className="mt-1 text-sm font-normal text-[var(--text-secondary)]">
                         Upload a PDF to see page thumbnails and split planning.
                       </p>
                     </div>
@@ -525,15 +489,15 @@ export default function SplitPage() {
               </div>
             </section>
 
-            <aside className="bg-[#fffdf8]/86 p-5 sm:p-6">
-              <div className="rounded-[1.8rem] border border-violet-100 bg-gradient-to-br from-violet-50/72 via-[#fffdf8] to-rose-50/58 p-5 shadow-[0_14px_36px_rgba(91,63,193,0.06)]">
-                <h2 className="display-font text-[1.75rem] font-medium tracking-[-0.035em] text-slate-950">
+            <aside className="bg-[var(--bg-card)] p-5 sm:p-6">
+              <div className="rounded-[1.5rem] border border-[var(--border-light)] bg-[var(--bg-panel)] p-5 shadow-[var(--shadow-soft)]">
+                <h2 className="display-font text-[1.75rem] font-bold tracking-[-0.02em] text-[var(--text-primary)]">
                   Split Planner
                 </h2>
 
-                <p className="mt-2 text-sm font-medium leading-6 text-slate-600">
+                <p className="mt-2 text-sm font-normal leading-6 text-[var(--text-secondary)]">
                   Use commas to create separate output files. Example{" "}
-                  <span className="rounded-lg bg-[#fffdf8] px-2 py-1 font-semibold text-violet-700">
+                  <span className="rounded-lg border border-[var(--violet-border)] bg-white px-2 py-1 font-semibold text-[var(--violet-600)]">
                     1-4,5-8
                   </span>{" "}
                   creates two PDFs.
@@ -543,7 +507,7 @@ export default function SplitPage() {
                   <button
                     type="button"
                     onClick={() => applyPreset("1-1,2-2")}
-                    className="rounded-2xl border border-violet-100 bg-[#fffdf8] px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-violet-200 hover:bg-violet-50/70 hover:text-violet-700"
+                    className="rounded-2xl border border-[var(--border-light)] bg-white px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] hover:text-[var(--violet-600)]"
                   >
                     First 2
                   </button>
@@ -551,7 +515,7 @@ export default function SplitPage() {
                   <button
                     type="button"
                     onClick={() => applyPreset("1-4,5-8")}
-                    className="rounded-2xl border border-violet-100 bg-[#fffdf8] px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-violet-200 hover:bg-violet-50/70 hover:text-violet-700"
+                    className="rounded-2xl border border-[var(--border-light)] bg-white px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] hover:text-[var(--violet-600)]"
                   >
                     4-page sets
                   </button>
@@ -561,14 +525,14 @@ export default function SplitPage() {
                     onClick={() =>
                       applyPreset(pageCount ? `1-${pageCount}` : "1-3")
                     }
-                    className="rounded-2xl border border-violet-100 bg-[#fffdf8] px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-violet-200 hover:bg-violet-50/70 hover:text-violet-700"
+                    className="rounded-2xl border border-[var(--border-light)] bg-white px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] hover:text-[var(--violet-600)]"
                   >
                     All pages
                   </button>
                 </div>
 
                 <label className="mt-5 block">
-                  <span className="text-sm font-semibold text-slate-800">
+                  <span className="text-sm font-semibold text-[var(--text-primary)]">
                     Page groups
                   </span>
 
@@ -580,8 +544,8 @@ export default function SplitPage() {
                   />
                 </label>
 
-                <div className="mt-5 rounded-2xl border border-violet-100 bg-violet-50/64 p-4">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-violet-800">
+                <div className="mt-5 rounded-2xl border border-[var(--violet-border)] bg-[var(--violet-50)] p-4">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-[var(--violet-600)]">
                     <Layers size={17} />
                     Output files
                   </div>
@@ -591,33 +555,33 @@ export default function SplitPage() {
                       {groups.map((group, index) => (
                         <div
                           key={`${group.label}-${index}`}
-                          className="rounded-xl bg-[#fffdf8] px-3 py-3 text-sm font-medium text-slate-700"
+                          className="rounded-xl border border-[var(--border-light)] bg-white px-3 py-3 text-sm font-medium text-[var(--text-secondary)]"
                         >
                           <div className="flex items-center justify-between gap-3">
-                            <span className="font-semibold text-slate-900">
+                            <span className="font-semibold text-[var(--text-primary)]">
                               Split file {index + 1}
                             </span>
-                            <span className="rounded-full bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700">
+                            <span className="rounded-full border border-[var(--violet-border)] bg-[var(--violet-50)] px-2.5 py-1 text-xs font-semibold text-[var(--violet-600)]">
                               {group.pages.length} page
                               {group.pages.length > 1 ? "s" : ""}
                             </span>
                           </div>
 
-                          <div className="mt-1 text-xs font-medium text-slate-500">
+                          <div className="mt-1 text-xs font-medium text-[var(--text-muted)]">
                             Pages {group.label}
                           </div>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <p className="mt-2 text-sm font-medium text-violet-700">
+                    <p className="mt-2 text-sm font-medium text-[var(--violet-600)]">
                       Upload a PDF to preview split output.
                     </p>
                   )}
                 </div>
 
                 {file && unassignedPages.length > 0 && (
-                  <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50/90 p-4 text-sm font-medium leading-6 text-amber-900">
+                  <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-medium leading-6 text-amber-900">
                     <div className="mb-1 flex items-center gap-2 font-semibold">
                       <AlertTriangle size={16} />
                       Pages not included
@@ -636,26 +600,26 @@ export default function SplitPage() {
                   {busy ? (
                     <>
                       <Loader2 className="animate-spin" size={18} />
-                      Splitting
+                      <span>Splitting</span>
                     </>
                   ) : (
                     <>
                       <Download size={18} />
-                      Split & Download
+                      <span>Split & Download</span>
                     </>
                   )}
                 </button>
               </div>
 
-              <div className="mt-5 rounded-[1.5rem] border border-violet-100 bg-[#fffdf8] p-4 text-sm font-medium leading-6 text-slate-600 shadow-[0_12px_28px_rgba(91,63,193,0.05)]">
-                <div className="mb-1 flex items-center gap-2 font-semibold text-slate-900">
+              <div className="mt-5 rounded-[1.5rem] border border-[var(--border-light)] bg-[var(--bg-card)] p-4 text-sm font-medium leading-6 text-[var(--text-secondary)] shadow-[var(--shadow-soft)]">
+                <div className="mb-1 flex items-center gap-2 font-semibold text-[var(--text-primary)]">
                   <Sparkles size={16} />
                   Smart grouping
                 </div>
                 Each comma-separated group becomes a separate PDF file.
               </div>
 
-              <div className="mt-5 rounded-[1.5rem] border border-violet-100 bg-violet-50/72 p-4 text-sm font-medium leading-6 text-violet-800 shadow-[0_12px_28px_rgba(91,63,193,0.05)]">
+              <div className="mt-5 rounded-[1.5rem] border border-[var(--violet-border)] bg-[var(--violet-50)] p-4 text-sm font-medium leading-6 text-[var(--violet-600)] shadow-[var(--shadow-soft)]">
                 <div className="mb-1 flex items-center gap-2 font-semibold">
                   <CheckCircle2 size={16} />
                   Status
