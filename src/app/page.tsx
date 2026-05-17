@@ -1,13 +1,14 @@
 import Link from "next/link";
+import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { ToolGlyph, type ToolGlyphTone } from "@/components/ToolGlyph";
 import {
   ArrowRight,
-  BookOpenCheck,
+  BadgeCheck,
   Combine,
   Copy,
   Crop,
-  Eye,
+  Download,
   FileArchive,
   FileImage,
   FileText,
@@ -16,11 +17,8 @@ import {
   Image,
   Layers,
   Lock,
-  Minimize2,
-  MousePointer2,
   MoveUpRight,
   PenLine,
-  PencilRuler,
   RotateCw,
   Scissors,
   Search,
@@ -29,9 +27,7 @@ import {
   Sparkles,
   Stamp,
   Trash2,
-  Underline,
   Wand2,
-  XCircle,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -43,150 +39,271 @@ interface HomeToolCard {
   readonly tone: ToolGlyphTone;
 }
 
-interface ToolCategoryGroup {
-  readonly eyebrow: string;
-  readonly title: string;
-  readonly icon: LucideIcon;
-  readonly tone: ToolGlyphTone;
-  readonly items: readonly HomeToolCard[];
-}
-
-const primaryToolCards: readonly HomeToolCard[] = [
-  { title: "Merge PDF", description: "Combine files into one clean document.", href: "/tools/merge", icon: Combine, tone: "indigo" },
-  { title: "Split PDF", description: "Separate pages into organized outputs.", href: "/tools/split", icon: Scissors, tone: "violet" },
-  { title: "Compress PDF", description: "Reduce file size through a cleaner workflow.", href: "/tools/compress", icon: FileArchive, tone: "mint" },
-  { title: "PDF to Word", description: "Move documents into an editable format.", href: "/tools/pdf-to-word", icon: Wand2, tone: "mint" },
-  { title: "PDF to Images", description: "Turn PDF pages into shareable image files.", href: "/tools/pdf-to-images", icon: Image, tone: "mint" },
-  { title: "Images to PDF", description: "Build a PDF from scans, photos, and artwork.", href: "/tools/images-to-pdf", icon: FileImage, tone: "indigo" },
-  { title: "Edit PDF", description: "Add text, images, signatures, and marks.", href: "/editor", icon: FileText, tone: "violet" },
-  { title: "Highlight PDF", description: "Mark important content with smart snapping.", href: "/tools/highlight-pdf", icon: Highlighter, tone: "violet" },
-  { title: "Rotate Pages", description: "Fix page orientation visually and quickly.", href: "/tools/rotate", icon: RotateCw, tone: "indigo" },
-  { title: "Protect PDF", description: "Secure sensitive files with dedicated tools.", href: "/tools/protect", icon: ShieldCheck, tone: "violet" },
-  { title: "Watermark PDF", description: "Add branded overlays to your documents.", href: "/tools/watermark", icon: Stamp, tone: "indigo" },
-  { title: "Page Numbers", description: "Number long PDFs in a cleaner output flow.", href: "/tools/page-numbers", icon: Hash, tone: "indigo" },
+const heroCategories = [
+  "All",
+  "Workflows",
+  "Organize PDF",
+  "Optimize PDF",
+  "Convert PDF",
+  "Edit PDF",
+  "PDF Security",
 ] as const;
 
-const toolCategories: readonly ToolCategoryGroup[] = [
+const homeTools: readonly HomeToolCard[] = [
   {
-    eyebrow: "Edit",
-    title: "Write, place, sign",
-    icon: FileText,
-    tone: "violet",
-    items: [
-      { title: "PDF Editor", description: "", href: "/editor", icon: FileText, tone: "violet" },
-      { title: "Add Text", description: "", href: "/editor", icon: PenLine, tone: "violet" },
-      { title: "Add Images", description: "", href: "/editor", icon: Image, tone: "violet" },
-      { title: "Sign PDF", description: "", href: "/editor", icon: ShieldCheck, tone: "violet" },
-      { title: "Fill Form", description: "", href: "/editor", icon: BookOpenCheck, tone: "violet" },
-      { title: "Whiteout", description: "", href: "/editor", icon: XCircle, tone: "violet" },
-      { title: "Crop PDF", description: "", href: "/tools", icon: Crop, tone: "violet" },
-    ],
-  },
-  {
-    eyebrow: "Merge & Organize",
-    title: "Combine and arrange",
-    icon: Layers,
+    title: "Merge PDF",
+    description: "Combine PDFs into one polished document.",
+    href: "/tools/merge",
+    icon: Combine,
     tone: "indigo",
-    items: [
-      { title: "Merge PDF", description: "", href: "/tools/merge", icon: Combine, tone: "indigo" },
-      { title: "Organize PDF", description: "", href: "/tools/organize", icon: Layers, tone: "indigo" },
-      { title: "Reorder Pages", description: "", href: "/tools/reorder", icon: MousePointer2, tone: "indigo" },
-      { title: "Rotate Pages", description: "", href: "/tools/rotate", icon: RotateCw, tone: "indigo" },
-      { title: "Delete Pages", description: "", href: "/tools/delete-pages", icon: Trash2, tone: "indigo" },
-      { title: "Extract Pages", description: "", href: "/tools/extract", icon: Copy, tone: "indigo" },
-      { title: "Insert Pages", description: "", href: "/tools", icon: Layers, tone: "indigo" },
-    ],
   },
   {
-    eyebrow: "Split",
-    title: "Divide and isolate",
+    title: "Split PDF",
+    description: "Separate pages into cleaner outputs.",
+    href: "/tools/split",
     icon: Scissors,
     tone: "violet",
-    items: [
-      { title: "Split PDF", description: "", href: "/tools/split", icon: Scissors, tone: "violet" },
-      { title: "Split by Range", description: "", href: "/tools/split", icon: Scissors, tone: "violet" },
-      { title: "Split Every Page", description: "", href: "/tools/split", icon: Copy, tone: "violet" },
-      { title: "Extract Range", description: "", href: "/tools/extract", icon: Copy, tone: "violet" },
-      { title: "Remove Blank", description: "", href: "/tools", icon: Trash2, tone: "violet" },
-      { title: "Page Preview", description: "", href: "/tools/organize", icon: Eye, tone: "violet" },
-    ],
   },
   {
-    eyebrow: "Compress & Convert",
-    title: "Shrink and transform",
+    title: "Compress PDF",
+    description: "Reduce file size through a guided flow.",
+    href: "/tools/compress",
     icon: FileArchive,
     tone: "mint",
-    items: [
-      { title: "Compress PDF", description: "", href: "/tools/compress", icon: FileArchive, tone: "mint" },
-      { title: "OCR PDF", description: "", href: "/tools/ocr", icon: Search, tone: "mint" },
-      { title: "PDF to Word", description: "", href: "/tools/pdf-to-word", icon: Wand2, tone: "mint" },
-      { title: "PDF to Images", description: "", href: "/tools/pdf-to-images", icon: Image, tone: "mint" },
-      { title: "Images to PDF", description: "", href: "/tools/images-to-pdf", icon: FileImage, tone: "mint" },
-      { title: "Repair PDF", description: "", href: "/tools", icon: Wand2, tone: "mint" },
-      { title: "Flatten PDF", description: "", href: "/tools", icon: Minimize2, tone: "mint" },
-    ],
   },
   {
-    eyebrow: "Annotate",
-    title: "Review in detail",
+    title: "PDF to Word",
+    description: "Turn documents into editable files.",
+    href: "/tools/pdf-to-word",
+    icon: Wand2,
+    tone: "mint",
+  },
+  {
+    title: "PDF to Images",
+    description: "Export PDF pages as image files.",
+    href: "/tools/pdf-to-images",
+    icon: Image,
+    tone: "mint",
+  },
+  {
+    title: "Images to PDF",
+    description: "Create PDFs from scans and photos.",
+    href: "/tools/images-to-pdf",
+    icon: FileImage,
+    tone: "indigo",
+  },
+  {
+    title: "Edit PDF",
+    description: "Add text, images, notes, and signatures.",
+    href: "/editor",
+    icon: FileText,
+    tone: "violet",
+  },
+  {
+    title: "Highlight PDF",
+    description: "Mark key content with cleaner precision.",
+    href: "/tools/highlight-pdf",
     icon: Highlighter,
     tone: "violet",
-    items: [
-      { title: "Highlight", description: "", href: "/tools/highlight-pdf", icon: Highlighter, tone: "violet" },
-      { title: "Underline", description: "", href: "/tools/highlight-pdf", icon: Underline, tone: "violet" },
-      { title: "Strikeout", description: "", href: "/tools/highlight-pdf", icon: XCircle, tone: "violet" },
-      { title: "Freehand Draw", description: "", href: "/editor", icon: PenLine, tone: "violet" },
-      { title: "Shapes", description: "", href: "/editor", icon: PencilRuler, tone: "violet" },
-      { title: "Comments", description: "", href: "/editor", icon: BookOpenCheck, tone: "violet" },
-      { title: "Stamp", description: "", href: "/tools", icon: Stamp, tone: "violet" },
-    ],
   },
   {
-    eyebrow: "Watermark & Protect",
-    title: "Brand and secure",
-    icon: Lock,
+    title: "Rotate Pages",
+    description: "Fix document orientation in seconds.",
+    href: "/tools/rotate",
+    icon: RotateCw,
     tone: "indigo",
-    items: [
-      { title: "Add Watermark", description: "", href: "/tools/watermark", icon: Stamp, tone: "indigo" },
-      { title: "Remove Watermark", description: "", href: "/tools", icon: XCircle, tone: "indigo" },
-      { title: "Page Numbers", description: "", href: "/tools/page-numbers", icon: Hash, tone: "indigo" },
-      { title: "Protect PDF", description: "", href: "/tools/protect", icon: Lock, tone: "indigo" },
-      { title: "Unlock PDF", description: "", href: "/tools/unlock", icon: ShieldOff, tone: "indigo" },
-      { title: "Redact PDF", description: "", href: "/tools/redact", icon: Eye, tone: "indigo" },
-      { title: "Secure Share", description: "", href: "/tools", icon: ShieldCheck, tone: "indigo" },
-    ],
+  },
+  {
+    title: "Delete Pages",
+    description: "Remove pages you no longer need.",
+    href: "/tools/delete-pages",
+    icon: Trash2,
+    tone: "indigo",
+  },
+  {
+    title: "Extract Pages",
+    description: "Pull the exact pages you want.",
+    href: "/tools/extract",
+    icon: Copy,
+    tone: "indigo",
+  },
+  {
+    title: "Organize PDF",
+    description: "Reorder and manage document pages.",
+    href: "/tools/organize",
+    icon: Layers,
+    tone: "indigo",
+  },
+  {
+    title: "Watermark PDF",
+    description: "Add branding and document overlays.",
+    href: "/tools/watermark",
+    icon: Stamp,
+    tone: "violet",
+  },
+  {
+    title: "Page Numbers",
+    description: "Number documents with cleaner output.",
+    href: "/tools/page-numbers",
+    icon: Hash,
+    tone: "violet",
+  },
+  {
+    title: "Protect PDF",
+    description: "Secure important files with purpose.",
+    href: "/tools/protect",
+    icon: ShieldCheck,
+    tone: "violet",
+  },
+  {
+    title: "Unlock PDF",
+    description: "Open protected files through a clear flow.",
+    href: "/tools/unlock",
+    icon: ShieldOff,
+    tone: "violet",
+  },
+  {
+    title: "Redact PDF",
+    description: "Hide sensitive information permanently.",
+    href: "/tools/redact",
+    icon: Lock,
+    tone: "violet",
+  },
+  {
+    title: "OCR PDF",
+    description: "Make scanned content easier to search.",
+    href: "/tools/ocr",
+    icon: Search,
+    tone: "mint",
+  },
+  {
+    title: "Sign PDF",
+    description: "Place signatures directly on documents.",
+    href: "/editor",
+    icon: PenLine,
+    tone: "violet",
+  },
+  {
+    title: "Crop PDF",
+    description: "Trim page boundaries more precisely.",
+    href: "/tools",
+    icon: Crop,
+    tone: "indigo",
+  },
+  {
+    title: "Download Ready",
+    description: "Finish each workflow with clean exports.",
+    href: "/tools",
+    icon: Download,
+    tone: "mint",
   },
 ] as const;
 
-const categoryPills = ["All tools", "Workflows", "Organize PDF", "Optimize PDF", "Convert PDF", "Edit PDF", "PDF Security", "PDF Intelligence"] as const;
-const annotationDepth = ["Highlight", "Underline", "Strikeout", "Freehand", "Shapes", "Colors", "Line weight", "Visibility"] as const;
+const premiumBenefits = [
+  "Sharper document workflows across editing, organizing, and conversion",
+  "Focused PDF actions designed to feel cleaner from upload to export",
+  "A premium interface that keeps power tools easy to discover",
+] as const;
 
-function PrimaryToolCard({ tool }: { tool: HomeToolCard }) {
+function ToolCard({ tool }: { readonly tool: HomeToolCard }) {
   return (
-    <Link href={tool.href} className="group relative flex min-h-[216px] flex-col rounded-[1.35rem] border border-[var(--border-light)] bg-[var(--bg-card)] p-5 shadow-[var(--shadow-soft)] transition duration-200 hover:-translate-y-1 hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] hover:shadow-[var(--shadow-card-hover)]">
+    <Link
+      href={tool.href}
+      className="group relative flex min-h-[238px] flex-col rounded-[1.35rem] border border-[var(--border-light)] bg-[var(--bg-card)] p-5 shadow-[var(--shadow-soft)] transition duration-200 hover:-translate-y-1 hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] hover:shadow-[var(--shadow-card-hover)]"
+    >
       <div className="flex items-start justify-between gap-4">
         <ToolGlyph icon={tool.icon} tone={tool.tone} size="lg" />
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--violet-border)] bg-[var(--violet-50)] text-[var(--violet-600)] transition duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:border-[var(--border-focus)] group-hover:bg-[var(--violet-600)] group-hover:text-white">
           <MoveUpRight size={18} />
         </span>
       </div>
-      <h3 className="display-font mt-5 text-[1.28rem] font-bold tracking-[-0.02em] text-[var(--text-primary)] transition group-hover:text-[var(--violet-600)]">{tool.title}</h3>
-      <p className="mt-2 max-w-[16rem] text-sm font-normal leading-6 text-[var(--text-secondary)]">{tool.description}</p>
+
+      <h3 className="display-font mt-5 text-[1.18rem] font-bold tracking-[-0.02em] text-[var(--text-primary)] transition group-hover:text-[var(--violet-600)]">
+        {tool.title}
+      </h3>
+
+      <p className="mt-2 text-[13px] font-normal leading-6 text-[var(--text-secondary)]">
+        {tool.description}
+      </p>
     </Link>
   );
 }
 
-function CompactToolLink({ tool }: { tool: HomeToolCard }) {
+function DesktopVisual() {
   return (
-    <Link href={tool.href} className="group flex min-h-[62px] items-center justify-between gap-3 border-b border-r border-[var(--border-light)] bg-[var(--bg-card)] px-3.5 py-3 transition duration-200 hover:bg-[var(--violet-50)] sm:px-4">
-      <div className="flex min-w-0 items-center gap-3">
-        <ToolGlyph icon={tool.icon} tone={tool.tone} size="sm" />
-        <span className="truncate text-[13px] font-medium tracking-[-0.01em] text-[var(--text-secondary)] transition group-hover:text-[var(--violet-600)]">{tool.title}</span>
+    <div className="relative h-[212px] overflow-hidden rounded-t-[1.5rem] bg-[linear-gradient(180deg,#f1eeff_0%,#faf8ff_100%)] px-5 pt-5">
+      <div className="h-full rounded-t-[1.2rem] border border-[var(--violet-border)] bg-white shadow-[0_18px_42px_rgba(101,80,232,0.10)]">
+        <div className="flex h-8 items-center gap-2 border-b border-[var(--border-light)] px-4">
+          <span className="h-2 w-2 rounded-full bg-rose-300" />
+          <span className="h-2 w-2 rounded-full bg-amber-300" />
+          <span className="h-2 w-2 rounded-full bg-emerald-300" />
+        </div>
+        <div className="grid h-[172px] grid-cols-[72px_1fr]">
+          <div className="border-r border-[var(--border-light)] bg-[var(--violet-50)] p-3">
+            <div className="space-y-3">
+              <div className="h-3 rounded bg-[var(--violet-100)]" />
+              <div className="h-3 rounded bg-[var(--violet-100)]" />
+              <div className="h-3 rounded bg-[var(--violet-600)]/18" />
+            </div>
+          </div>
+          <div className="p-4">
+            <div className="mx-auto h-full max-w-[190px] rounded-xl border border-[var(--border-light)] bg-white p-4 shadow-[var(--shadow-soft)]">
+              <div className="h-3 w-4/5 rounded bg-[var(--violet-100)]" />
+              <div className="mt-4 h-2.5 w-full rounded bg-slate-100" />
+              <div className="mt-2 h-2.5 w-11/12 rounded bg-slate-100" />
+              <div className="mt-2 h-2.5 w-4/5 rounded bg-slate-100" />
+              <div className="mt-5 h-8 rounded-lg bg-[var(--violet-50)]" />
+            </div>
+          </div>
+        </div>
       </div>
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[var(--violet-border)] bg-[var(--violet-50)] text-[var(--violet-600)] transition group-hover:border-[var(--border-focus)] group-hover:bg-[var(--violet-600)] group-hover:text-white">
-        <MoveUpRight size={13} />
-      </span>
-    </Link>
+    </div>
+  );
+}
+
+function MobileVisual() {
+  return (
+    <div className="relative h-[212px] overflow-hidden rounded-t-[1.5rem] bg-[linear-gradient(180deg,#f1eeff_0%,#faf8ff_100%)] px-5 pt-5">
+      <div className="mx-auto h-[196px] w-[118px] rounded-[1.7rem] border-[6px] border-white bg-white shadow-[0_18px_42px_rgba(101,80,232,0.12)]">
+        <div className="h-full overflow-hidden rounded-[1.28rem] border border-[var(--border-light)] bg-[var(--bg-card)]">
+          <div className="flex h-7 items-center justify-center border-b border-[var(--border-light)] text-[10px] font-bold text-[var(--text-muted)]">
+            9:41
+          </div>
+          <div className="space-y-3 p-3">
+            <div className="rounded-xl border border-[var(--violet-border)] bg-[var(--violet-50)] p-2">
+              <div className="h-2.5 w-4/5 rounded bg-[var(--violet-600)]/20" />
+              <div className="mt-2 h-2 w-full rounded bg-white/90" />
+            </div>
+            <div className="rounded-xl border border-[var(--border-light)] bg-white p-2">
+              <div className="h-2.5 w-3/4 rounded bg-slate-100" />
+              <div className="mt-2 h-2 w-full rounded bg-slate-100" />
+            </div>
+            <div className="h-8 rounded-xl bg-[var(--violet-600)]/90" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BusinessVisual() {
+  return (
+    <div className="relative h-[212px] overflow-hidden rounded-t-[1.5rem] bg-[linear-gradient(180deg,#f1eeff_0%,#faf8ff_100%)] px-5 pt-5">
+      <div className="absolute left-7 top-7 h-36 w-32 rounded-[1.2rem] border border-[var(--border-light)] bg-white p-4 shadow-[0_16px_38px_rgba(101,80,232,0.10)]">
+        <div className="h-3 w-3/5 rounded bg-[var(--violet-100)]" />
+        <div className="mt-4 h-2.5 w-full rounded bg-slate-100" />
+        <div className="mt-2 h-2.5 w-5/6 rounded bg-slate-100" />
+        <div className="mt-7 h-8 rounded-lg bg-[var(--violet-50)]" />
+      </div>
+      <div className="absolute bottom-6 right-6 h-28 w-36 rounded-[1.15rem] bg-[#282a36] p-4 text-white shadow-[0_18px_42px_rgba(24,21,46,0.18)]">
+        <div className="text-[10px] font-semibold text-white/60">workflow.ts</div>
+        <div className="mt-3 space-y-2">
+          <div className="h-2 w-4/5 rounded bg-white/18" />
+          <div className="h-2 w-full rounded bg-white/18" />
+          <div className="h-2 w-3/5 rounded bg-white/18" />
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -194,67 +311,168 @@ export default function HomePage() {
   return (
     <>
       <Header />
+
       <main className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)]">
         <section className="hero-aurora overflow-hidden border-b border-[var(--border-light)]">
-          <div className="mx-auto max-w-[1520px] px-4 pb-12 pt-12 sm:px-6 lg:px-8 lg:pb-14 lg:pt-16">
+          <div className="mx-auto max-w-[1600px] px-4 pb-12 pt-12 sm:px-6 lg:px-8 lg:pb-16 lg:pt-16">
             <div className="mx-auto max-w-6xl text-center">
-              <div className="eyebrow-chip mx-auto"><Sparkles size={13} />PDFMantra Smart PDF Workspace</div>
-              <h1 className="display-font mx-auto mt-6 max-w-6xl text-[2.8rem] font-bold leading-[1.08] tracking-[-0.03em] text-[var(--text-primary)] sm:text-[3.7rem] lg:text-[4.5rem]">
-                Every PDF tool you need,
-                <span className="brand-gradient-text block">in one clearer workspace.</span>
-              </h1>
-              <p className="mx-auto mt-5 max-w-4xl text-[15px] font-normal leading-7 text-[var(--text-secondary)] sm:text-[1.08rem] sm:leading-8">
-                Edit, merge, split, compress, convert, annotate, protect, and organize PDFs through a polished workflow-first experience built for PDFMantra.
-              </p>
-              <div className="mt-7 flex items-center justify-center">
-                <Link href="/editor" className="btn-primary"><span>Start Editing</span><ArrowRight size={16} /></Link>
+              <div className="eyebrow-chip mx-auto">
+                <Sparkles size={13} />
+                PDFMantra Smart PDF Workspace
               </div>
+
+              <h1 className="display-font mx-auto mt-6 max-w-6xl text-[2.85rem] font-bold leading-[1.08] tracking-[-0.03em] text-[var(--text-primary)] sm:text-[3.9rem] lg:text-[4.55rem]">
+                Every tool you need to work with PDFs,
+                <span className="brand-gradient-text block">in one clear workspace.</span>
+              </h1>
+
+              <p className="mx-auto mt-5 max-w-5xl text-[15px] font-normal leading-7 text-[var(--text-secondary)] sm:text-[1.08rem] sm:leading-8">
+                Merge, split, compress, convert, edit, organize, protect, and annotate PDFs with a cleaner experience built for fast document work.
+              </p>
+
               <div className="mt-8 flex flex-wrap justify-center gap-2.5">
-                {categoryPills.map((pill, index) => (
-                  <Link key={pill} href="/tools" className={["inline-flex min-h-10 items-center rounded-full border px-4 py-2 text-[13px] font-semibold transition duration-200", index === 0 ? "border-[var(--violet-600)] bg-[var(--violet-600)] text-white shadow-[0_14px_30px_rgba(101,80,232,0.18)]" : "border-[var(--border-light)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] hover:text-[var(--violet-600)]"].join(" ")}>{pill}</Link>
+                {heroCategories.map((item, index) => (
+                  <Link
+                    key={item}
+                    href="/tools"
+                    className={[
+                      "inline-flex min-h-10 items-center rounded-full border px-4 py-2 text-[13px] font-semibold transition duration-200",
+                      index === 0
+                        ? "border-[var(--violet-600)] bg-[var(--violet-600)] text-white shadow-[0_14px_30px_rgba(101,80,232,0.18)]"
+                        : "border-[var(--border-light)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] hover:text-[var(--violet-600)]",
+                    ].join(" ")}
+                  >
+                    {item}
+                  </Link>
                 ))}
               </div>
             </div>
-            <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
-              {primaryToolCards.map((tool) => <PrimaryToolCard key={tool.title} tool={tool} />)}
+
+            <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7">
+              {homeTools.map((tool) => (
+                <ToolCard key={tool.title} tool={tool} />
+              ))}
             </div>
           </div>
         </section>
 
-        <section className="border-b border-[var(--border-light)] bg-[var(--bg-base)]">
-          <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
-            <div className="grid gap-6 lg:grid-cols-[0.78fr_1.22fr] lg:items-end">
-              <div><p className="section-eyebrow">Explore tools</p><h2 className="display-font mt-3 text-[2rem] font-bold leading-[1.15] tracking-[-0.02em] text-[var(--text-primary)] sm:text-[2.55rem]">Clear categories for bigger workflows.</h2></div>
-              <p className="max-w-2xl text-sm font-normal leading-7 text-[var(--text-secondary)] sm:text-[15px] lg:justify-self-end">The first screen helps users act immediately. These grouped sections help them browse the wider PDFMantra workspace without feeling lost.</p>
+        <section className="bg-white px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
+          <div className="mx-auto max-w-[1480px]">
+            <div className="text-center">
+              <p className="section-eyebrow justify-center">Work your way</p>
+              <h2 className="display-font mt-3 text-[2.15rem] font-bold tracking-[-0.02em] text-[var(--text-primary)] sm:text-[2.8rem]">
+                More ways to keep PDF work moving.
+              </h2>
             </div>
-            <div className="mt-7 grid gap-5 lg:grid-cols-2">
-              {toolCategories.map((category) => {
-                const Icon = category.icon;
-                return (
-                  <section key={category.eyebrow} className="overflow-hidden rounded-2xl border border-[var(--border-light)] bg-[var(--bg-card)] shadow-[var(--shadow-soft)] transition duration-200 hover:border-[var(--border-focus)] hover:shadow-[var(--shadow-card)]">
-                    <div className="flex items-start justify-between gap-4 border-b border-[var(--border-light)] bg-[var(--bg-panel)] px-5 py-5 sm:px-6"><div className="flex min-w-0 items-start gap-4"><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--violet-border)] bg-white text-[var(--violet-600)] shadow-[var(--shadow-soft)]"><Icon size={20} /></div><div className="min-w-0"><p className="section-eyebrow !text-[11px]">{category.eyebrow}</p><h3 className="mt-2 text-[1.35rem] font-bold tracking-[-0.02em] text-[var(--text-primary)] sm:text-[1.5rem]">{category.title}</h3></div></div></div>
-                    <div className="grid border-l border-t border-[var(--border-light)] sm:grid-cols-2">{category.items.map((tool) => <CompactToolLink key={`${category.eyebrow}-${tool.title}`} tool={tool} />)}</div>
-                  </section>
-                );
-              })}
+
+            <div className="mt-10 grid gap-6 lg:grid-cols-3">
+              <article className="overflow-hidden rounded-[1.75rem] border border-[var(--border-light)] bg-[var(--bg-card)] shadow-[var(--shadow-card)] transition hover:-translate-y-1 hover:shadow-[var(--shadow-card-hover)]">
+                <DesktopVisual />
+                <div className="p-6">
+                  <h3 className="display-font text-[1.35rem] font-bold tracking-[-0.02em] text-[var(--text-primary)]">
+                    Work with focused tools
+                  </h3>
+                  <p className="mt-3 text-sm font-normal leading-7 text-[var(--text-secondary)]">
+                    Open a task-specific PDF workflow, upload your file, and finish the job without wandering through a busy dashboard.
+                  </p>
+                  <Link href="/tools" className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-[var(--violet-600)] transition hover:text-[var(--violet-500)]">
+                    Browse workflows
+                    <MoveUpRight size={16} />
+                  </Link>
+                </div>
+              </article>
+
+              <article className="overflow-hidden rounded-[1.75rem] border border-[var(--border-light)] bg-[var(--bg-card)] shadow-[var(--shadow-card)] transition hover:-translate-y-1 hover:shadow-[var(--shadow-card-hover)]">
+                <MobileVisual />
+                <div className="p-6">
+                  <h3 className="display-font text-[1.35rem] font-bold tracking-[-0.02em] text-[var(--text-primary)]">
+                    Move faster on smaller screens
+                  </h3>
+                  <p className="mt-3 text-sm font-normal leading-7 text-[var(--text-secondary)]">
+                    The interface stays readable and action-first, so users can find tools quickly even when working away from a desk.
+                  </p>
+                  <Link href="/features" className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-[var(--violet-600)] transition hover:text-[var(--violet-500)]">
+                    View features
+                    <MoveUpRight size={16} />
+                  </Link>
+                </div>
+              </article>
+
+              <article className="overflow-hidden rounded-[1.75rem] border border-[var(--border-light)] bg-[var(--bg-card)] shadow-[var(--shadow-card)] transition hover:-translate-y-1 hover:shadow-[var(--shadow-card-hover)]">
+                <BusinessVisual />
+                <div className="p-6">
+                  <h3 className="display-font text-[1.35rem] font-bold tracking-[-0.02em] text-[var(--text-primary)]">
+                    Built for serious document work
+                  </h3>
+                  <p className="mt-3 text-sm font-normal leading-7 text-[var(--text-secondary)]">
+                    From file cleanup to secure sharing, PDFMantra keeps advanced workflows visually calm and easier to trust.
+                  </p>
+                  <Link href="/security" className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-[var(--violet-600)] transition hover:text-[var(--violet-500)]">
+                    Explore security
+                    <MoveUpRight size={16} />
+                  </Link>
+                </div>
+              </article>
             </div>
           </div>
         </section>
 
-        <section className="border-b border-[var(--border-light)] bg-[var(--bg-panel)]/65">
-          <div className="mx-auto grid max-w-7xl gap-8 px-4 py-12 sm:px-6 lg:grid-cols-[0.8fr_1.2fr] lg:px-8 lg:py-16">
-            <div><p className="section-eyebrow">Editing depth</p><h2 className="display-font mt-3 text-[2rem] font-bold leading-[1.15] tracking-[-0.02em] text-[var(--text-primary)] sm:text-[2.55rem]">Annotation should feel rich, not basic.</h2><p className="mt-4 max-w-xl text-sm font-normal leading-7 text-[var(--text-secondary)] sm:text-[15px]">PDFMantra brings together smart highlights, annotation controls, visual page handling, and clean export flows in one focused workspace.</p></div>
-            <div className="overflow-hidden rounded-2xl border border-[var(--border-light)] bg-[var(--bg-card)] shadow-[var(--shadow-soft)]"><div className="grid border-l border-t border-[var(--border-light)] sm:grid-cols-2 lg:grid-cols-4">{annotationDepth.map((item, index) => <div key={item} className="min-h-[104px] border-b border-r border-[var(--border-light)] px-4 py-4 transition hover:bg-[var(--violet-50)]"><div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--text-caption)]">0{index + 1}</div><div className="mt-4 text-[15px] font-bold tracking-[-0.01em] text-[var(--text-primary)]">{item}</div></div>)}</div></div>
-          </div>
-        </section>
+        <section className="bg-white px-4 pb-16 sm:px-6 lg:px-8 lg:pb-24">
+          <div className="mx-auto max-w-[1320px] overflow-hidden rounded-[2rem] border border-[var(--border-light)] bg-[linear-gradient(135deg,#fff5d8_0%,#fff8ea_52%,#f4efff_100%)] shadow-[0_28px_90px_rgba(101,80,232,0.10)]">
+            <div className="grid gap-8 px-6 py-8 sm:px-8 sm:py-10 lg:grid-cols-[0.92fr_1.08fr] lg:px-12 lg:py-12">
+              <div className="flex flex-col justify-center">
+                <p className="section-eyebrow">PDFMantra Premium</p>
+                <h2 className="display-font mt-3 text-[2rem] font-bold leading-[1.14] tracking-[-0.02em] text-[var(--text-primary)] sm:text-[2.65rem]">
+                  Get more from every PDF workflow.
+                </h2>
+                <div className="mt-6 space-y-3.5">
+                  {premiumBenefits.map((item) => (
+                    <div key={item} className="flex items-start gap-3 text-sm font-semibold leading-6 text-[var(--text-primary)] sm:text-[15px]">
+                      <BadgeCheck size={18} className="mt-0.5 shrink-0 text-emerald-600" />
+                      <span>{item}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+                  <Link href="/pricing" className="btn-primary">
+                    <span>View Pricing</span>
+                    <ArrowRight size={16} />
+                  </Link>
+                  <Link href="/features" className="btn-secondary bg-white/90">
+                    <span>See Features</span>
+                    <ArrowRight size={16} />
+                  </Link>
+                </div>
+              </div>
 
-        <section className="bg-[var(--bg-base)]">
-          <div className="mx-auto grid max-w-7xl gap-8 px-4 py-12 sm:px-6 lg:grid-cols-[1fr_auto] lg:items-center lg:px-8 lg:py-16">
-            <div><div className="eyebrow-chip"><ShieldCheck size={14} />PDFMantra Workspace</div><h2 className="display-font mt-5 max-w-4xl text-[2.15rem] font-bold leading-[1.12] tracking-[-0.02em] text-[var(--text-primary)] sm:text-[2.7rem] lg:text-[3.3rem]">Eye-catching discovery. Serious PDF workflows.</h2><p className="mt-4 max-w-3xl text-[15px] font-normal leading-8 text-[var(--text-secondary)]">PDFMantra helps users find the right tool faster, move into action immediately, and complete document work with a cleaner, more confident flow.</p></div>
-            <div className="flex flex-col gap-3 sm:flex-row lg:flex-col"><Link href="/editor" className="btn-primary"><span>Open Editor</span><ArrowRight size={16} /></Link><Link href="/tools" className="btn-secondary"><span>Explore Tools</span><ArrowRight size={16} /></Link></div>
+              <div className="relative min-h-[360px] rounded-[1.8rem] border border-white/80 bg-white/68 p-5 shadow-[0_22px_60px_rgba(101,80,232,0.12)] backdrop-blur">
+                <div className="absolute right-5 top-5 rounded-full border border-amber-200 bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-700">
+                  Premium workspace
+                </div>
+                <div className="absolute left-8 top-10 h-60 w-48 rotate-[-3deg] rounded-[1.2rem] border border-[var(--border-light)] bg-white p-5 shadow-[0_18px_42px_rgba(101,80,232,0.12)]">
+                  <div className="h-3 w-3/5 rounded bg-rose-300" />
+                  <div className="mt-4 h-2.5 w-full rounded bg-slate-100" />
+                  <div className="mt-2 h-2.5 w-11/12 rounded bg-slate-100" />
+                  <div className="mt-2 h-2.5 w-4/5 rounded bg-slate-100" />
+                  <div className="mt-8 h-24 rounded-xl bg-[var(--violet-50)]" />
+                </div>
+                <div className="absolute bottom-8 right-8 h-48 w-60 rounded-[1.35rem] border border-[var(--violet-border)] bg-[var(--bg-panel)] p-5 shadow-[0_20px_48px_rgba(101,80,232,0.14)]">
+                  <div className="flex items-center justify-between">
+                    <div className="h-10 w-10 rounded-2xl bg-[var(--violet-600)]/90" />
+                    <div className="rounded-full bg-white px-3 py-1 text-[11px] font-bold text-[var(--violet-600)]">Aa</div>
+                  </div>
+                  <div className="mt-5 h-3 w-4/5 rounded bg-white" />
+                  <div className="mt-3 h-3 w-full rounded bg-white/85" />
+                  <div className="mt-3 h-3 w-3/5 rounded bg-white/75" />
+                  <div className="mt-5 h-10 rounded-xl bg-white/92" />
+                </div>
+              </div>
+            </div>
           </div>
         </section>
       </main>
+
+      <Footer />
     </>
   );
 }
