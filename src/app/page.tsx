@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Footer } from "@/components/Footer";
+import { GitaWisdomSpotlight } from "@/components/GitaWisdomSpotlight";
 import { Header } from "@/components/Header";
 import { ToolGlyph, type ToolGlyphTone } from "@/components/ToolGlyph";
 import {
@@ -24,7 +25,6 @@ import {
   Search,
   ShieldCheck,
   ShieldOff,
-  Sparkles,
   Stamp,
   Trash2,
   Wand2,
@@ -316,18 +316,15 @@ export default function HomePage() {
         <section className="hero-aurora overflow-hidden border-b border-[var(--border-light)]">
           <div className="mx-auto max-w-[1600px] px-4 pb-12 pt-12 sm:px-6 lg:px-8 lg:pb-16 lg:pt-16">
             <div className="mx-auto max-w-6xl text-center">
-              <div className="eyebrow-chip mx-auto">
-                <Sparkles size={13} />
-                PDFMantra Smart PDF Workspace
-              </div>
+              <GitaWisdomSpotlight />
 
-              <h1 className="display-font mx-auto mt-6 max-w-6xl text-[2.85rem] font-bold leading-[1.08] tracking-[-0.03em] text-[var(--text-primary)] sm:text-[3.9rem] lg:text-[4.55rem]">
-                Every tool you need to work with PDFs,
-                <span className="brand-gradient-text block">in one clear workspace.</span>
+              <h1 className="display-font mx-auto mt-6 max-w-5xl text-[2.45rem] font-bold leading-[1.08] tracking-[-0.03em] text-[var(--text-primary)] sm:text-[3.25rem] lg:text-[3.85rem]">
+                Every PDF task,
+                <span className="brand-gradient-text block">one clear workspace.</span>
               </h1>
 
-              <p className="mx-auto mt-5 max-w-5xl text-[15px] font-normal leading-7 text-[var(--text-secondary)] sm:text-[1.08rem] sm:leading-8">
-                Merge, split, compress, convert, edit, organize, protect, and annotate PDFs with a cleaner experience built for fast document work.
+              <p className="mx-auto mt-4 max-w-3xl text-[15px] font-normal leading-7 text-[var(--text-secondary)] sm:text-base sm:leading-7">
+                Merge, edit, convert, organize, and secure PDFs through a faster, cleaner workflow.
               </p>
 
               <div className="mt-8 flex flex-wrap justify-center gap-2.5">
