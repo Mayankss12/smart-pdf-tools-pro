@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
+  Copy,
   Download,
   FileText,
   Highlighter,
@@ -24,7 +25,10 @@ import {
   rectsIntersect,
 } from "@/engines/shared/coordinateUtils";
 import type { HighlightLayer } from "@/engines/highlight/types";
-import { createSmartHighlightFromDrag } from "@/engines/highlight/highlightOrchestrator";
+import {
+  createSmartHighlightFromDrag,
+  type HighlightSnapStrategy,
+} from "@/engines/highlight/highlightOrchestrator";
 import { updateHighlightLayerStyle } from "@/engines/highlight/highlightEngine";
 import { HIGHLIGHT_COLOR_PRESETS } from "./highlightToolTypes";
 import type {
@@ -44,11 +48,37 @@ import {
 const RENDER_SCALE = 1.08;
 const DEFAULT_HIGHLIGHT_COLOR = HIGHLIGHT_COLOR_PRESETS[0].value;
 const DEFAULT_HIGHLIGHT_OPACITY = 0.38;
+const DEFAULT_HIGHLIGHT_MODE: HighlightSnapStrategy =
+  "text-first-with-freeform-fallback";
 
 interface HistoryState {
   readonly undo: readonly (readonly HighlightLayer[])[];
   readonly redo: readonly (readonly HighlightLayer[])[];
 }
+
+interface HighlightModeOption {
+  readonly value: HighlightSnapStrategy;
+  readonly label: string;
+  readonly description: string;
+}
+
+const HIGHLIGHT_MODE_OPTIONS: readonly HighlightModeOption[] = [
+  {
+    value: "text-first-with-freeform-fallback",
+    label: "Smart",
+    description: "Snap to real PDF text first, then fall back to an area highlight when needed.",
+  },
+  {
+    value: "text-only",
+    label: "Text Only",
+    description: "Create precise text highlights only when the PDF exposes selectable text.",
+  },
+  {
+    value: "freeform-only",
+    label: "Area Only",
+    description: "Create a rectangular area highlight directly for scans, images, or manual marking.",
+  },
+] as const;
 
 function createStatusClassName(tone: "info" | "success" | "error"): string {
   if (tone === "success") {
@@ -74,7 +104,7 @@ function getLayerRegionCount(layer: HighlightLayer): number {
   return layer.regions.length;
 }
 
-function getLayerPreviewText(layer: HighlightLayer): string {
+function getLayerCopyText(layer: HighlightLayer): string | null {
   const text = layer.regions
     .map((region) => region.text?.trim())
     .filter((value): value is string => Boolean(value))
@@ -82,12 +112,18 @@ function getLayerPreviewText(layer: HighlightLayer): string {
     .replace(/\s+/g, " ")
     .trim();
 
-  if (text.length > 0) {
+  return text.length > 0 ? text : null;
+}
+
+function getLayerPreviewText(layer: HighlightLayer): string {
+  const text = getLayerCopyText(layer);
+
+  if (text) {
     return text.length > 84 ? `${text.slice(0, 81)}...` : text;
   }
 
   return layer.creationSource === "freeform-drag"
-    ? "Freeform highlight region"
+    ? "Area highlight region"
     : "Smart highlight region";
 }
 
@@ -96,6 +132,10 @@ function getPageLayerCount(
   pageIndex: number,
 ): number {
   return layers.filter((layer) => layer.pageIndex === pageIndex).length;
+}
+
+function getHighlightModeLabel(mode: HighlightSnapStrategy): string {
+  return HIGHLIGHT_MODE_OPTIONS.find((option) => option.value === mode)?.label ?? "Smart";
 }
 
 function dragIntersectsDetectedText(
@@ -122,6 +162,9 @@ export function HighlightToolPage() {
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryState>({ undo: [], redo: [] });
 
+  const [highlightMode, setHighlightMode] = useState<HighlightSnapStrategy>(
+    DEFAULT_HIGHLIGHT_MODE,
+  );
   const [selectedColor, setSelectedColor] = useState(DEFAULT_HIGHLIGHT_COLOR);
   const [selectedOpacity, setSelectedOpacity] = useState(DEFAULT_HIGHLIGHT_OPACITY);
 
@@ -174,9 +217,35 @@ export function HighlightToolPage() {
     setLayers([]);
     setSelectedLayerId(null);
     setHistory({ undo: [], redo: [] });
+    setHighlightMode(DEFAULT_HIGHLIGHT_MODE);
     setSelectedColor(DEFAULT_HIGHLIGHT_COLOR);
     setSelectedOpacity(DEFAULT_HIGHLIGHT_OPACITY);
     updateStatus("Upload a PDF to start Smart Highlight.", "info");
+  }
+
+  function handleHighlightModeChange(mode: HighlightSnapStrategy) {
+    setHighlightMode(mode);
+
+    if (mode === "text-only") {
+      updateStatus(
+        "Text Only mode active. Drag across selectable PDF text to create precise highlights.",
+        "info",
+      );
+      return;
+    }
+
+    if (mode === "freeform-only") {
+      updateStatus(
+        "Area Only mode active. Drag any rectangle to create a manual highlight region.",
+        "info",
+      );
+      return;
+    }
+
+    updateStatus(
+      "Smart mode active. PDFMantra will snap to text first and use area fallback only when needed.",
+      "info",
+    );
   }
 
   async function handleFile(selectedFile?: File) {
@@ -220,7 +289,7 @@ export function HighlightToolPage() {
       );
 
       updateStatus(
-        `PDF ready. ${pdf.numPages} page${pdf.numPages === 1 ? "" : "s"} loaded with ${totalTextUnits} text unit${totalTextUnits === 1 ? "" : "s"} available for Smart Highlight snapping.`,
+        `PDF ready. ${pdf.numPages} page${pdf.numPages === 1 ? "" : "s"} loaded with ${totalTextUnits} text unit${totalTextUnits === 1 ? "" : "s"} available for ${getHighlightModeLabel(highlightMode)} highlighting.`,
         "success",
       );
 
@@ -250,6 +319,7 @@ export function HighlightToolPage() {
       pageIndex: activePage.pageIndex,
       dragBounds,
       textUnits: activePage.textUnits,
+      strategy: highlightMode,
       style: {
         color: selectedColor,
         opacity: selectedOpacity,
@@ -259,6 +329,22 @@ export function HighlightToolPage() {
     });
 
     if (!result.layer) {
+      if (highlightMode === "text-only") {
+        updateStatus(
+          "Text Only mode could not create a text highlight from that drag. Drag wider across visible selectable text or switch back to Smart mode.",
+          "info",
+        );
+        return;
+      }
+
+      if (highlightMode === "freeform-only") {
+        updateStatus(
+          "Area Only mode needs a slightly larger drag rectangle. Try again with a wider region.",
+          "info",
+        );
+        return;
+      }
+
       updateStatus(
         "That drag was too small or did not produce a reliable highlight region. Try a slightly clearer selection.",
         "info",
@@ -267,6 +353,7 @@ export function HighlightToolPage() {
     }
 
     if (
+      highlightMode === "text-first-with-freeform-fallback" &&
       result.status === "created-from-freeform-fallback" &&
       activePage.textUnits.length > 0 &&
       dragIntersectsDetectedText(dragBounds, activePage.textUnits)
@@ -284,14 +371,19 @@ export function HighlightToolPage() {
 
     if (result.status === "created-from-text-snap") {
       updateStatus(
-        `Smart highlight created from detected PDF text. ${result.selectedRegionCount} precise region${result.selectedRegionCount === 1 ? "" : "s"} added.`,
+        `Text highlight created. ${result.selectedRegionCount} precise region${result.selectedRegionCount === 1 ? "" : "s"} added from detected PDF text.`,
         "success",
       );
       return;
     }
 
+    if (highlightMode === "freeform-only") {
+      updateStatus("Area highlight created successfully.", "success");
+      return;
+    }
+
     updateStatus(
-      "Freeform fallback highlight created. This page area did not expose a reliable text target yet.",
+      "Area fallback highlight created. This page region did not expose a reliable text target yet.",
       "success",
     );
   }
@@ -378,6 +470,29 @@ export function HighlightToolPage() {
     updateStatus("Selected highlight opacity updated.", "success");
   }
 
+  async function handleCopyLayerText(layer: HighlightLayer) {
+    const text = getLayerCopyText(layer);
+
+    if (!text) {
+      updateStatus(
+        "This highlight does not currently contain extracted PDF text to copy.",
+        "info",
+      );
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(text);
+      updateStatus("Highlight text copied to clipboard.", "success");
+    } catch (error) {
+      console.error(error);
+      updateStatus(
+        "Copy failed in this browser. You can still review the extracted text in the highlight card.",
+        "error",
+      );
+    }
+  }
+
   async function handleExport() {
     if (!bytes || pages.length === 0) {
       updateStatus("Upload a PDF first.", "error");
@@ -433,7 +548,7 @@ export function HighlightToolPage() {
             icon={Highlighter}
             eyebrow="PDFMantra Smart Highlight"
             title="Highlight PDF with smart text snapping and clean export."
-            description="Drag over a PDF page. Text-based pages snap to intended content, while scanned or image-only areas use a freeform fallback. Same-color overlaps are composed before export so highlights stay clean."
+            description="Drag over a PDF page. Smart mode snaps to intended text, Text Only enforces precision, and Area Only handles scans or manual rectangular marking. Same-color overlaps are composed before export so highlights stay clean."
             meta={
               <div className="grid min-w-[220px] grid-cols-3 divide-x divide-[var(--border-light)] text-center">
                 <div className="px-3">
@@ -507,6 +622,9 @@ export function HighlightToolPage() {
                     <div className="mt-1 text-lg font-bold tracking-[-0.02em] text-[var(--text-primary)]">
                       {activePage.pageLabel} of {pages.length}
                     </div>
+                    <div className="mt-2 inline-flex items-center rounded-full border border-[var(--violet-border)] bg-[var(--violet-50)] px-3 py-1 text-xs font-semibold text-[var(--violet-600)]">
+                      {getHighlightModeLabel(highlightMode)} mode active
+                    </div>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
@@ -573,7 +691,7 @@ export function HighlightToolPage() {
                       Highlight Controls
                     </h2>
                     <p className="mt-1 text-sm font-normal leading-6 text-[var(--text-secondary)]">
-                      Defaults apply to new drags. Selecting an existing highlight lets you restyle it directly.
+                      Choose the drag behavior, then set the default style. Selecting an existing highlight lets you restyle it directly.
                     </p>
                   </div>
                   {file && (
@@ -586,6 +704,36 @@ export function HighlightToolPage() {
                       <X size={17} />
                     </button>
                   )}
+                </div>
+
+                <div className="mt-5">
+                  <div className="text-sm font-semibold text-[var(--text-primary)]">Highlight Mode</div>
+                  <div className="mt-3 grid gap-2">
+                    {HIGHLIGHT_MODE_OPTIONS.map((option) => {
+                      const active = highlightMode === option.value;
+
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => handleHighlightModeChange(option.value)}
+                          className={`rounded-[1.15rem] border p-3 text-left transition ${
+                            active
+                              ? "border-[var(--border-focus)] bg-[var(--violet-50)] shadow-[var(--shadow-soft)]"
+                              : "border-[var(--border-light)] bg-white hover:border-[var(--violet-border)] hover:bg-[var(--violet-50)]"
+                          }`}
+                          aria-pressed={active}
+                        >
+                          <div className="text-sm font-semibold text-[var(--text-primary)]">
+                            {option.label}
+                          </div>
+                          <p className="mt-1 text-xs font-medium leading-5 text-[var(--text-secondary)]">
+                            {option.description}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div className="mt-5">
@@ -702,46 +850,62 @@ export function HighlightToolPage() {
                     selectedPageLayers
                       .slice()
                       .reverse()
-                      .map((layer) => (
-                        <div
-                          key={layer.id}
-                          className={`rounded-[1.25rem] border p-4 transition ${
-                            layer.id === selectedLayerId
-                              ? "border-[var(--border-focus)] bg-[var(--violet-50)]"
-                              : "border-[var(--border-light)] bg-[var(--bg-card)] hover:border-[var(--violet-border)] hover:bg-[var(--violet-50)]"
-                          }`}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => selectLayer(layer.id)}
-                            className="block w-full text-left"
-                          >
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="text-sm font-semibold text-[var(--text-primary)]">
-                                {layer.creationSource === "text-drag-snap"
-                                  ? "Smart text highlight"
-                                  : "Freeform fallback highlight"}
-                              </div>
-                              <div className="h-5 w-5 rounded-full border border-white shadow-sm" style={{ backgroundColor: layer.style.color }} />
-                            </div>
-                            <p className="mt-2 text-sm font-medium leading-6 text-[var(--text-secondary)]">
-                              {getLayerPreviewText(layer)}
-                            </p>
-                            <div className="mt-2 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                              {getLayerRegionCount(layer)} region{getLayerRegionCount(layer) === 1 ? "" : "s"} · {Math.round(layer.style.opacity * 100)}% opacity
-                            </div>
-                          </button>
+                      .map((layer) => {
+                        const copyText = getLayerCopyText(layer);
 
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteLayer(layer.id)}
-                            className="mt-3 inline-flex items-center gap-2 rounded-full border border-red-100 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100"
+                        return (
+                          <div
+                            key={layer.id}
+                            className={`rounded-[1.25rem] border p-4 transition ${
+                              layer.id === selectedLayerId
+                                ? "border-[var(--border-focus)] bg-[var(--violet-50)]"
+                                : "border-[var(--border-light)] bg-[var(--bg-card)] hover:border-[var(--violet-border)] hover:bg-[var(--violet-50)]"
+                            }`}
                           >
-                            <Trash2 size={14} />
-                            Delete
-                          </button>
-                        </div>
-                      ))
+                            <button
+                              type="button"
+                              onClick={() => selectLayer(layer.id)}
+                              className="block w-full text-left"
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="text-sm font-semibold text-[var(--text-primary)]">
+                                  {layer.creationSource === "text-drag-snap"
+                                    ? "Smart text highlight"
+                                    : "Area / freeform highlight"}
+                                </div>
+                                <div className="h-5 w-5 rounded-full border border-white shadow-sm" style={{ backgroundColor: layer.style.color }} />
+                              </div>
+                              <p className="mt-2 text-sm font-medium leading-6 text-[var(--text-secondary)]">
+                                {getLayerPreviewText(layer)}
+                              </p>
+                              <div className="mt-2 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                                {getLayerRegionCount(layer)} region{getLayerRegionCount(layer) === 1 ? "" : "s"} · {Math.round(layer.style.opacity * 100)}% opacity
+                              </div>
+                            </button>
+
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => void handleCopyLayerText(layer)}
+                                disabled={!copyText}
+                                className="inline-flex items-center gap-2 rounded-full border border-[var(--border-light)] bg-white px-3 py-2 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                <Copy size={14} />
+                                Copy Text
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteLayer(layer.id)}
+                                className="inline-flex items-center gap-2 rounded-full border border-red-100 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100"
+                              >
+                                <Trash2 size={14} />
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })
                   )}
                 </div>
               </div>
