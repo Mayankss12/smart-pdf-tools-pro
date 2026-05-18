@@ -10,10 +10,12 @@ html {
   scroll-behavior: smooth;
   text-rendering: optimizeLegibility;
   background: var(--bg-base);
+  overflow-x: clip;
 }
 
 body {
   min-height: 100vh;
+  overflow-x: clip;
   background:
     radial-gradient(ellipse at 50% 0%, rgba(101, 80, 232, 0.08) 0%, transparent 52rem),
     var(--bg-base);
