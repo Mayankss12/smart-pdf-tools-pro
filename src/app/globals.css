@@ -347,6 +347,122 @@ a {
     -webkit-background-clip: initial;
     background-clip: initial;
   }
+
+  .hero-aurora > div {
+    padding-top: 2rem;
+    padding-bottom: 2.5rem;
+  }
+
+  .hero-aurora h1 {
+    font-size: clamp(1.72rem, 8vw, 1.95rem);
+    line-height: 1.1;
+  }
+
+  .hero-aurora p {
+    font-size: 0.875rem;
+    line-height: 1.55;
+  }
+
+  .hero-aurora > div > div:first-child > div.mt-8 {
+    margin-top: 1.5rem;
+    margin-left: -0.25rem;
+    margin-right: -0.25rem;
+    padding-inline: 0.25rem;
+    padding-bottom: 0.2rem;
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  .hero-aurora > div > div:first-child > div.mt-8::-webkit-scrollbar {
+    display: none;
+  }
+
+  .hero-aurora > div > div:first-child > div.mt-8 > a {
+    flex: 0 0 auto;
+  }
+
+  .hero-aurora > div > div.mt-10.grid {
+    margin-top: 1.75rem;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.75rem;
+  }
+
+  .hero-aurora > div > div.mt-10.grid > a {
+    min-height: 12.15rem;
+    min-width: 0;
+    border-radius: 1.15rem;
+    padding: 1rem;
+  }
+
+  .hero-aurora > div > div.mt-10.grid > a h3 {
+    margin-top: 1rem;
+    font-size: 1.08rem;
+  }
+
+  main > section.bg-white {
+    padding-top: 2.75rem;
+  }
+
+  main > section.bg-white h2 {
+    font-size: 1.82rem;
+    line-height: 1.18;
+  }
+
+  main > section.bg-white article {
+    border-radius: 1.45rem;
+  }
+
+  main > section.bg-white article > div:last-child {
+    padding: 1.25rem;
+  }
+
+  main > section.bg-white article h3 {
+    font-size: 1.22rem;
+  }
+
+  main > section.bg-white:last-of-type {
+    padding-bottom: 3.5rem;
+  }
+
+  main > section.bg-white:last-of-type > div {
+    border-radius: 1.65rem;
+  }
+
+  main > section.bg-white:last-of-type > div > div {
+    gap: 1.75rem;
+    padding: 1.5rem 1.25rem;
+  }
+
+  main > section.bg-white:last-of-type .btn-primary,
+  main > section.bg-white:last-of-type .btn-secondary {
+    width: 100%;
+  }
+
+  main > section.bg-white:last-of-type .relative.min-h-\[360px\] {
+    min-height: 18rem;
+    border-radius: 1.45rem;
+    padding: 1rem;
+  }
+
+  main > section.bg-white:last-of-type .absolute.left-8.top-10 {
+    left: 1rem;
+    top: 3rem;
+    width: 9rem;
+    height: 11rem;
+    padding: 1rem;
+  }
+
+  main > section.bg-white:last-of-type .absolute.bottom-8.right-8 {
+    right: 1rem;
+    bottom: 1rem;
+    width: 11rem;
+    height: 9rem;
+    padding: 1rem;
+  }
 }
 
 /* Transitional harmonizer while older pages are rebuilt into the final violet-led system. */
