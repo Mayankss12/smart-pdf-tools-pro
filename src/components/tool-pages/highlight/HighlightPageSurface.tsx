@@ -84,35 +84,37 @@ export function HighlightPageSurface({
   }, [drag]);
 
   return (
-    <div className="rounded-[2rem] border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <div className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-600">
+    <div className="min-w-0 rounded-[1.35rem] border border-slate-200 bg-white p-3 shadow-sm sm:rounded-[2rem] sm:p-4">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3 sm:items-center">
+        <div className="min-w-0">
+          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600 sm:text-sm">
             Active page
           </div>
-          <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+          <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-950 sm:text-3xl">
             {page.pageLabel}
           </h2>
         </div>
 
-        <div className="rounded-2xl bg-slate-50 px-4 py-3 text-right">
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <div className="rounded-2xl bg-slate-50 px-3 py-2.5 text-left sm:px-4 sm:py-3 sm:text-right">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 sm:text-xs">
             Text units detected
           </div>
-          <div className="mt-1 text-xl font-semibold tracking-[-0.03em] text-slate-950">
+          <div className="mt-1 text-lg font-semibold tracking-[-0.03em] text-slate-950 sm:text-xl">
             {page.textUnits.length}
           </div>
         </div>
       </div>
 
-      <div className="overflow-auto rounded-[1.75rem] border border-slate-200 bg-slate-100 p-4">
-        <div className="mx-auto w-fit max-w-full rounded-2xl bg-white p-3 shadow-xl shadow-slate-300/35">
+      <div className="min-w-0 overflow-hidden rounded-[1.35rem] border border-slate-200 bg-slate-100 p-2.5 sm:rounded-[1.75rem] sm:p-4">
+        <div
+          className="mx-auto w-full rounded-[1.1rem] bg-white p-2 shadow-xl shadow-slate-300/35 sm:rounded-2xl sm:p-3"
+          style={{ maxWidth: `${page.geometry.viewportSize.width + 24}px` }}
+        >
           <div
             ref={surfaceRef}
-            className="relative select-none overflow-hidden rounded-xl bg-white touch-none"
+            className="relative mx-auto w-full select-none overflow-hidden rounded-lg bg-white touch-none sm:rounded-xl"
             style={{
-              width: `${page.geometry.viewportSize.width}px`,
-              maxWidth: "100%",
+              maxWidth: `${page.geometry.viewportSize.width}px`,
               aspectRatio: `${page.geometry.viewportSize.width} / ${page.geometry.viewportSize.height}`,
             }}
             onPointerDown={(event) => {
