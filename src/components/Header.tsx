@@ -76,12 +76,12 @@ function TrayLink({ tool }: { readonly tool: Tool }) {
   return (
     <Link
       href={tool.href}
-      className="group flex items-center gap-3 rounded-2xl px-3 py-2.5 text-[13px] font-semibold text-slate-700 transition hover:bg-violet-50 hover:text-violet-700"
+      className="group flex min-w-0 items-center gap-3 rounded-2xl px-3 py-2.5 text-[13px] font-semibold text-slate-700 transition hover:bg-violet-50 hover:text-violet-700"
     >
       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-violet-100 bg-white text-violet-600 shadow-[0_1px_3px_rgba(24,21,46,0.06)] transition group-hover:border-violet-200 group-hover:bg-violet-50">
         <Icon size={15} />
       </span>
-      <span className="truncate">{tool.title}</span>
+      <span className="min-w-0 truncate">{tool.title}</span>
     </Link>
   );
 }
@@ -273,15 +273,15 @@ export function Header() {
       onMouseLeave={() => setActiveTray(null)}
     >
       <div className="mx-auto max-w-[1480px] px-4 sm:px-6 lg:px-8">
-        <div className="flex min-h-[72px] items-center justify-between gap-4">
-          <Link href="/" className="group flex shrink-0 items-center gap-3">
-            <BrandMark className="h-10 w-10 shrink-0 transition duration-200 group-hover:-translate-y-0.5" />
-            <div className="min-w-[184px]">
-              <div className="display-font text-[1.58rem] font-semibold leading-none tracking-[-0.035em] text-slate-950 transition duration-200 group-hover:text-violet-700">
+        <div className="flex min-h-[64px] min-w-0 items-center justify-between gap-2.5 sm:min-h-[72px] sm:gap-4">
+          <Link href="/" className="group flex min-w-0 shrink items-center gap-2.5 sm:gap-3">
+            <BrandMark className="h-9 w-9 shrink-0 transition duration-200 group-hover:-translate-y-0.5 sm:h-10 sm:w-10" />
+            <div className="min-w-0">
+              <div className="display-font truncate text-[1.35rem] font-semibold leading-none tracking-[-0.035em] text-slate-950 transition duration-200 group-hover:text-violet-700 sm:text-[1.58rem]">
                 PDFMantra
               </div>
-              <div className="mt-1 flex items-center gap-2 text-[9px] font-semibold uppercase tracking-[0.22em] text-slate-500">
-                <span className="h-px w-5 bg-gradient-to-r from-violet-500 via-violet-400 to-violet-200" />
+              <div className="mt-1 hidden items-center gap-2 whitespace-nowrap text-[8px] font-semibold uppercase tracking-[0.18em] text-slate-500 min-[390px]:flex sm:text-[9px] sm:tracking-[0.22em]">
+                <span className="h-px w-4 bg-gradient-to-r from-violet-500 via-violet-400 to-violet-200 sm:w-5" />
                 Smart PDF Workspace
               </div>
             </div>
@@ -343,11 +343,11 @@ export function Header() {
           <button
             type="button"
             onClick={() => setMobileMenuOpen((current) => !current)}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-violet-100 bg-white text-slate-950 transition hover:border-violet-200 hover:text-violet-700 xl:hidden"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-violet-100 bg-white text-slate-950 transition hover:border-violet-200 hover:text-violet-700 sm:h-11 sm:w-11 xl:hidden"
             aria-label="Toggle navigation menu"
             aria-expanded={mobileMenuOpen}
           >
-            {mobileMenuOpen ? <X size={21} /> : <Menu size={22} />}
+            {mobileMenuOpen ? <X size={20} /> : <Menu size={21} />}
           </button>
         </div>
       </div>
@@ -357,9 +357,9 @@ export function Header() {
       {activeTray === "utility" ? <UtilityTray /> : null}
 
       {mobileMenuOpen ? (
-        <div className="fixed inset-x-0 top-[73px] z-40 h-[calc(100vh-73px)] overflow-y-auto border-t border-violet-100 bg-[var(--bg-base)] px-4 py-5 xl:hidden">
+        <div className="fixed inset-x-0 top-[65px] z-40 h-[calc(100vh-65px)] overflow-y-auto border-t border-violet-100 bg-[var(--bg-base)] px-4 py-5 sm:top-[73px] sm:h-[calc(100vh-73px)] xl:hidden">
           <div className="mx-auto max-w-3xl space-y-4">
-            <div className="overflow-hidden rounded-[1.8rem] border border-violet-100 bg-white">
+            <div className="overflow-hidden rounded-[1.5rem] border border-violet-100 bg-white sm:rounded-[1.8rem]">
               {PRIMARY_NAV.map((item) => (
                 <Link
                   key={item.label}
@@ -382,13 +382,13 @@ export function Header() {
 
               {mobileConvertOpen ? (
                 <div className="grid gap-4 border-t border-violet-100 bg-violet-50/38 px-3 py-3 sm:grid-cols-2">
-                  <div>
+                  <div className="min-w-0">
                     <div className="px-3 pb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
                       Convert to PDF
                     </div>
                     {toPdfTools.map((tool) => <TrayLink key={`mobile-to-${tool.id}`} tool={tool} />)}
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <div className="px-3 pb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
                       Convert from PDF
                     </div>
@@ -410,7 +410,7 @@ export function Header() {
                 <div className="border-t border-violet-100 bg-violet-50/38 px-3 py-3">
                   <div className="grid gap-4 md:grid-cols-2">
                     {groupedTools.map((group) => (
-                      <div key={`mobile-group-${group.label}`}>
+                      <div key={`mobile-group-${group.label}`} className="min-w-0">
                         <div className="px-3 pb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
                           {group.label}
                         </div>
@@ -424,7 +424,7 @@ export function Header() {
               ) : null}
             </div>
 
-            <div className="overflow-hidden rounded-[1.8rem] border border-violet-100 bg-white">
+            <div className="overflow-hidden rounded-[1.5rem] border border-violet-100 bg-white sm:rounded-[1.8rem]">
               <Link href="/dashboard" className="flex items-center justify-between border-b border-violet-100 px-4 py-4 text-sm font-bold text-slate-700 transition hover:bg-violet-50 hover:text-violet-700">
                 Login / Sign up
                 <ArrowRight size={15} />
