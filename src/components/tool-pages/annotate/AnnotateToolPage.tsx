@@ -73,8 +73,8 @@ const TOOL_OPTIONS: readonly ToolOption[] = [
   },
   {
     tool: "highlighter-pen",
-    label: "Highlighter",
-    description: "Draw marker-style highlighting freely with your pointer.",
+    label: "Marker",
+    description: "Swipe a broad translucent marker across text or content.",
     icon: Highlighter,
   },
   {
@@ -138,7 +138,7 @@ function getToolLabel(tool: AnnotationTool): string {
 function getAnnotationKindLabel(annotation: AnnotationLayer): string {
   switch (annotation.kind) {
     case "highlighter-stroke":
-      return "Highlighter stroke";
+      return "Marker stroke";
     case "ink-stroke":
       return "Pen stroke";
     case "rectangle":
@@ -188,8 +188,8 @@ function resolveToolDefaultStyle(tool: AnnotationTool): AnnotationStyle {
   if (tool === "highlighter-pen") {
     return {
       color: DEFAULT_COLOR,
-      opacity: 0.46,
-      strokeWidth: 15,
+      opacity: 0.38,
+      strokeWidth: 22,
     };
   }
 
@@ -206,6 +206,14 @@ function resolveToolDefaultStyle(tool: AnnotationTool): AnnotationStyle {
     opacity: DEFAULT_OPACITY,
     strokeWidth: DEFAULT_STROKE_WIDTH,
   };
+}
+
+function shouldKeepToolActive(annotation: AnnotationLayer): boolean {
+  return annotation.kind === "highlighter-stroke" || annotation.kind === "ink-stroke";
+}
+
+function getContinuousToolForAnnotation(annotation: AnnotationLayer): AnnotationTool {
+  return annotation.kind === "highlighter-stroke" ? "highlighter-pen" : "pen";
 }
 
 export function AnnotateToolPage() {
@@ -339,8 +347,23 @@ export function AnnotateToolPage() {
   }
 
   function handleCreateAnnotation(annotation: AnnotationLayer) {
-    commitAnnotations([...annotations, annotation], annotation.id);
-    setActiveTool("select");
+    const keepToolActive = shouldKeepToolActive(annotation);
+    const nextTool = keepToolActive ? getContinuousToolForAnnotation(annotation) : "select";
+    const nextSelectedId = keepToolActive ? null : annotation.id;
+
+    commitAnnotations([...annotations, annotation], nextSelectedId);
+    setActiveTool(nextTool);
+
+    if (annotation.kind === "highlighter-stroke") {
+      updateStatus("Marker swipe added. Continue highlighting without reselecting the tool.", "success");
+      return;
+    }
+
+    if (annotation.kind === "ink-stroke") {
+      updateStatus("Pen stroke added. Continue drawing or switch tools when ready.", "success");
+      return;
+    }
+
     updateStatus(`${getAnnotationKindLabel(annotation)} added. Select it to review or delete it.`, "success");
   }
 
@@ -527,7 +550,7 @@ export function AnnotateToolPage() {
             icon={PenLine}
             eyebrow="PDFMantra Annotate PDF"
             title="Annotate PDFs with pen, marker, notes, arrows, and shapes."
-            description="This is the advanced standalone annotation workspace: draw highlighter and ink strokes, add clean review shapes, place notes, manage annotations, and export the marked PDF directly."
+            description="This is the advanced standalone annotation workspace: sweep marker highlights, draw ink strokes, add clean review shapes, place notes, manage annotations, and export the marked PDF directly."
             meta={
               <div className="grid min-w-[220px] grid-cols-3 divide-x divide-[var(--border-light)] text-center">
                 <div className="px-3">
@@ -658,7 +681,7 @@ export function AnnotateToolPage() {
                         Upload a PDF to annotate
                       </h2>
                       <p className="mt-2 text-sm font-normal leading-6 text-[var(--text-secondary)]">
-                        Pen, marker, shapes, arrows, notes, undo, redo, and PDF export are built into this workspace.
+                        Marker, pen, shapes, arrows, notes, undo, redo, and PDF export are built into this workspace.
                       </p>
                     </div>
                   </div>
