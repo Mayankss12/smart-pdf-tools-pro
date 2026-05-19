@@ -1,5 +1,5 @@
-import { HighlightToolPage } from "@/components/tool-pages/highlight/HighlightToolPage";
+import { AnnotateToolPage } from "@/components/tool-pages/annotate/AnnotateToolPage";
 
 export default function HighlightPdfPage() {
-  return <HighlightToolPage />;
+  return <AnnotateToolPage />;
 }
