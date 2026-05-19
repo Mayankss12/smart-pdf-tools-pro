@@ -1,10 +1,10 @@
 "use client";
 
 import { createBrowserClient } from "@supabase/ssr";
-import { getSupabasePublicConfig } from "@/lib/backend/env";
+import { getSupabaseBrowserConfig } from "@/lib/backend/public-env";
 
 export function createSupabaseBrowserClient() {
-  const config = getSupabasePublicConfig();
+  const config = getSupabaseBrowserConfig();
 
   if (!config) {
     return null;
