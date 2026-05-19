@@ -43,6 +43,11 @@ interface PointerDraft {
   readonly points: readonly NormalizedPoint[];
 }
 
+type PreviewStrokeRole = "marker" | "ink" | "shape";
+
+const MARKER_POINT_DISTANCE = 0.0035;
+const PEN_POINT_DISTANCE = 0.0014;
+
 function createUuid(): string {
   return crypto.randomUUID();
 }
@@ -58,6 +63,60 @@ function pointerEventToNormalizedPoint(
   return clampNormalizedPoint({
     x: (event.clientX - rect.left) / width,
     y: (event.clientY - rect.top) / height,
+  });
+}
+
+function getPointDistance(first: NormalizedPoint, second: NormalizedPoint): number {
+  const deltaX = second.x - first.x;
+  const deltaY = second.y - first.y;
+
+  return Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+}
+
+function appendPointIfMeaningful(input: {
+  readonly points: readonly NormalizedPoint[];
+  readonly nextPoint: NormalizedPoint;
+  readonly minimumDistance: number;
+}): readonly NormalizedPoint[] {
+  const lastPoint = input.points[input.points.length - 1];
+
+  if (!lastPoint) {
+    return [input.nextPoint];
+  }
+
+  if (getPointDistance(lastPoint, input.nextPoint) < input.minimumDistance) {
+    return input.points;
+  }
+
+  return [...input.points, input.nextPoint];
+}
+
+function resolvePointerPointDistance(tool: AnnotationTool): number {
+  if (tool === "highlighter-pen") {
+    return MARKER_POINT_DISTANCE;
+  }
+
+  if (tool === "pen") {
+    return PEN_POINT_DISTANCE;
+  }
+
+  return 0;
+}
+
+function resolvePreviewStrokeWidth(style: AnnotationStyle, role: PreviewStrokeRole): number {
+  if (role === "marker") {
+    return Math.max(2.8, style.strokeWidth / 6);
+  }
+
+  return Math.max(0.18, style.strokeWidth / 12);
+}
+
+function expandNormalizedRect(rect: NormalizedRect, padding: number): NormalizedRect {
+  return clampNormalizedRect({
+    x: rect.x - padding,
+    y: rect.y - padding,
+    width: rect.width + padding * 2,
+    height: rect.height + padding * 2,
   });
 }
 
@@ -165,7 +224,10 @@ function buildAnnotationBounds(annotation: AnnotationLayer): NormalizedRect {
   }
 
   if (annotation.kind === "line" || annotation.kind === "arrow") {
-    return createNormalizedRectFromPoints(annotation.start, annotation.end);
+    return expandNormalizedRect(
+      createNormalizedRectFromPoints(annotation.start, annotation.end),
+      0.006,
+    );
   }
 
   if (annotation.points.length === 0) {
@@ -178,19 +240,23 @@ function buildAnnotationBounds(annotation: AnnotationLayer): NormalizedRect {
   const maxX = Math.max(...xs);
   const minY = Math.min(...ys);
   const maxY = Math.max(...ys);
-
-  return clampNormalizedRect({
+  const baseBounds = clampNormalizedRect({
     x: minX,
     y: minY,
     width: maxX - minX,
     height: maxY - minY,
   });
+
+  return expandNormalizedRect(
+    baseBounds,
+    annotation.kind === "highlighter-stroke" ? 0.02 : 0.008,
+  );
 }
 
 function annotationTitle(annotation: AnnotationLayer): string {
   switch (annotation.kind) {
     case "highlighter-stroke":
-      return "Highlighter stroke";
+      return "Marker stroke";
     case "ink-stroke":
       return "Pen stroke";
     case "rectangle":
@@ -280,7 +346,11 @@ export function AnnotatePageSurface({
         ...currentDraft,
         current: point,
         points: shouldAppendPoint
-          ? [...currentDraft.points, point]
+          ? appendPointIfMeaningful({
+              points: currentDraft.points,
+              nextPoint: point,
+              minimumDistance: resolvePointerPointDistance(activeTool),
+            })
           : currentDraft.points,
       };
     });
@@ -300,7 +370,11 @@ export function AnnotatePageSurface({
       current: end,
       points:
         activeTool === "highlighter-pen" || activeTool === "pen"
-          ? [...currentDraft.points, end]
+          ? appendPointIfMeaningful({
+              points: currentDraft.points,
+              nextPoint: end,
+              minimumDistance: resolvePointerPointDistance(activeTool),
+            })
           : currentDraft.points,
     };
 
@@ -441,12 +515,10 @@ export function AnnotatePageSurface({
               preserveAspectRatio="none"
             >
               {pageAnnotations.map((annotation) => {
-                const selected = annotation.id === selectedAnnotationId;
-                const strokeWidth = Math.max(0.18, annotation.style.strokeWidth / 12);
                 const stroke = annotation.style.color;
                 const opacity = annotation.style.opacity;
 
-                if (annotation.kind === "highlighter-stroke" || annotation.kind === "ink-stroke") {
+                if (annotation.kind === "highlighter-stroke") {
                   return (
                     <polyline
                       key={annotation.id}
@@ -454,7 +526,22 @@ export function AnnotatePageSurface({
                       fill="none"
                       stroke={stroke}
                       strokeOpacity={opacity}
-                      strokeWidth={strokeWidth}
+                      strokeWidth={resolvePreviewStrokeWidth(annotation.style, "marker")}
+                      strokeLinecap="square"
+                      strokeLinejoin="round"
+                    />
+                  );
+                }
+
+                if (annotation.kind === "ink-stroke") {
+                  return (
+                    <polyline
+                      key={annotation.id}
+                      points={pointListToSvgPoints(annotation.points)}
+                      fill="none"
+                      stroke={stroke}
+                      strokeOpacity={opacity}
+                      strokeWidth={resolvePreviewStrokeWidth(annotation.style, "ink")}
                       strokeLinecap="round"
                       strokeLinejoin="round"
                     />
@@ -463,6 +550,7 @@ export function AnnotatePageSurface({
 
                 if (annotation.kind === "rectangle" || annotation.kind === "ellipse") {
                   const bounds = annotation.bounds;
+                  const strokeWidth = resolvePreviewStrokeWidth(annotation.style, "shape");
 
                   return annotation.kind === "rectangle" ? (
                     <rect
@@ -493,6 +581,7 @@ export function AnnotatePageSurface({
 
                 if (annotation.kind === "line" || annotation.kind === "arrow") {
                   const arrowHead = buildArrowHeadPoints(annotation.start, annotation.end);
+                  const strokeWidth = resolvePreviewStrokeWidth(annotation.style, "shape");
 
                   return (
                     <g key={annotation.id}>
@@ -524,13 +613,25 @@ export function AnnotatePageSurface({
                 return null;
               })}
 
-              {draft && (activeTool === "highlighter-pen" || activeTool === "pen") ? (
+              {draft && activeTool === "highlighter-pen" ? (
                 <polyline
                   points={pointListToSvgPoints(draft.points)}
                   fill="none"
                   stroke={style.color}
                   strokeOpacity={style.opacity}
-                  strokeWidth={Math.max(0.18, style.strokeWidth / 12)}
+                  strokeWidth={resolvePreviewStrokeWidth(style, "marker")}
+                  strokeLinecap="square"
+                  strokeLinejoin="round"
+                />
+              ) : null}
+
+              {draft && activeTool === "pen" ? (
+                <polyline
+                  points={pointListToSvgPoints(draft.points)}
+                  fill="none"
+                  stroke={style.color}
+                  strokeOpacity={style.opacity}
+                  strokeWidth={resolvePreviewStrokeWidth(style, "ink")}
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
@@ -546,7 +647,7 @@ export function AnnotatePageSurface({
                     fill="none"
                     stroke={style.color}
                     strokeOpacity={style.opacity}
-                    strokeWidth={Math.max(0.18, style.strokeWidth / 12)}
+                    strokeWidth={resolvePreviewStrokeWidth(style, "shape")}
                     strokeDasharray="1.2 0.7"
                   />
                 ) : (
@@ -558,7 +659,7 @@ export function AnnotatePageSurface({
                     fill="none"
                     stroke={style.color}
                     strokeOpacity={style.opacity}
-                    strokeWidth={Math.max(0.18, style.strokeWidth / 12)}
+                    strokeWidth={resolvePreviewStrokeWidth(style, "shape")}
                     strokeDasharray="1.2 0.7"
                   />
                 )
@@ -573,7 +674,7 @@ export function AnnotatePageSurface({
                     y2={draft.current.y * 100}
                     stroke={style.color}
                     strokeOpacity={style.opacity}
-                    strokeWidth={Math.max(0.18, style.strokeWidth / 12)}
+                    strokeWidth={resolvePreviewStrokeWidth(style, "shape")}
                     strokeLinecap="round"
                     strokeDasharray="1.2 0.7"
                   />
@@ -583,7 +684,7 @@ export function AnnotatePageSurface({
                       fill="none"
                       stroke={style.color}
                       strokeOpacity={style.opacity}
-                      strokeWidth={Math.max(0.18, style.strokeWidth / 12)}
+                      strokeWidth={resolvePreviewStrokeWidth(style, "shape")}
                       strokeLinecap="round"
                       strokeLinejoin="round"
                     />
