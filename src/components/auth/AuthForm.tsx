@@ -2,11 +2,20 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, Loader2, LockKeyhole, Mail, UserPlus } from "lucide-react";
+import {
+  ArrowRight,
+  Loader2,
+  LockKeyhole,
+  Mail,
+  RefreshCcw,
+  ShieldCheck,
+  UserPlus,
+} from "lucide-react";
 import { FormEvent, useMemo, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 type AuthMode = "login" | "signup";
+type OtpStep = "email" | "verify";
 
 export interface AuthFormProps {
   readonly mode: AuthMode;
@@ -20,13 +29,23 @@ function getOrigin(): string {
   return window.location.origin;
 }
 
+function getEmailRedirectUrl(redirectTo: string): string {
+  return `${getOrigin()}/auth/callback?next=${encodeURIComponent(redirectTo)}`;
+}
+
+function normalizeOtp(value: string): string {
+  return value.replace(/\D/g, "").slice(0, 6);
+}
+
 export function AuthForm({ mode }: AuthFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [otp, setOtp] = useState("");
+  const [step, setStep] = useState<OtpStep>("email");
   const [busy, setBusy] = useState(false);
+  const [resendBusy, setResendBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,54 +56,98 @@ export function AuthForm({ mode }: AuthFormProps) {
 
   const isSignup = mode === "signup";
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setBusy(true);
-    setMessage(null);
-    setError(null);
+  async function sendOtpEmail(options?: { readonly resend?: boolean }) {
+    const trimmedEmail = email.trim().toLowerCase();
+
+    if (!trimmedEmail) {
+      setError("Enter your email address first.");
+      return;
+    }
 
     const supabase = createSupabaseBrowserClient();
 
     if (!supabase) {
-      setBusy(false);
       setError("Supabase is not configured yet. Please check the project environment variables.");
       return;
     }
 
+    const setLoading = options?.resend ? setResendBusy : setBusy;
+    setLoading(true);
+    setError(null);
+    setMessage(null);
+
     try {
-      if (isSignup) {
-        const { data, error: signUpError } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: `${getOrigin()}/auth/callback?next=${encodeURIComponent(redirectTo)}`,
-            data: {
-              full_name: fullName.trim() || null,
-            },
-          },
-        });
-
-        if (signUpError) {
-          throw signUpError;
-        }
-
-        if (data.session) {
-          router.replace(redirectTo);
-          router.refresh();
-          return;
-        }
-
-        setMessage("Account created. Please check your email to confirm your account, then log in.");
-        return;
-      }
-
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      const { error: otpError } = await supabase.auth.signInWithOtp({
+        email: trimmedEmail,
+        options: {
+          shouldCreateUser: isSignup,
+          emailRedirectTo: getEmailRedirectUrl(redirectTo),
+          data: isSignup
+            ? {
+                full_name: fullName.trim() || null,
+              }
+            : undefined,
+        },
       });
 
-      if (signInError) {
-        throw signInError;
+      if (otpError) {
+        throw otpError;
+      }
+
+      setEmail(trimmedEmail);
+      setStep("verify");
+      setOtp("");
+      setMessage(
+        options?.resend
+          ? "A fresh OTP code has been sent to your email."
+          : "OTP code sent. Check your email and enter the 6-digit code here.",
+      );
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Could not send OTP code. Please try again.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function verifyOtpCode() {
+    const trimmedEmail = email.trim().toLowerCase();
+    const normalizedOtp = normalizeOtp(otp);
+
+    if (!trimmedEmail) {
+      setError("Enter your email address first.");
+      setStep("email");
+      return;
+    }
+
+    if (normalizedOtp.length !== 6) {
+      setError("Enter the 6-digit OTP code from your email.");
+      return;
+    }
+
+    const supabase = createSupabaseBrowserClient();
+
+    if (!supabase) {
+      setError("Supabase is not configured yet. Please check the project environment variables.");
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const { error: verifyError } = await supabase.auth.verifyOtp({
+        email: trimmedEmail,
+        token: normalizedOtp,
+        type: "email",
+      });
+
+      if (verifyError) {
+        throw verifyError;
       }
 
       router.replace(redirectTo);
@@ -93,11 +156,22 @@ export function AuthForm({ mode }: AuthFormProps) {
       setError(
         caughtError instanceof Error
           ? caughtError.message
-          : "Authentication failed. Please try again.",
+          : "OTP verification failed. Please request a new OTP and try again.",
       );
     } finally {
       setBusy(false);
     }
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (step === "verify") {
+      await verifyOtpCode();
+      return;
+    }
+
+    await sendOtpEmail();
   }
 
   return (
@@ -111,13 +185,13 @@ export function AuthForm({ mode }: AuthFormProps) {
         </h1>
         <p className="mt-2 text-sm font-medium leading-6 text-[var(--text-secondary)]">
           {isSignup
-            ? "Create an account so PDFMantra can later save projects, signatures, documents, and usage history."
-            : "Access your dashboard and prepare for saved PDF projects, signatures, and document history."}
+            ? "Use email OTP to create your account. No password or confirmation-link redirect needed."
+            : "Use email OTP to access your dashboard securely without a password."}
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4 p-6 sm:p-7">
-        {isSignup ? (
+        {isSignup && step === "email" ? (
           <label className="block">
             <span className="text-sm font-semibold text-[var(--text-primary)]">Full name</span>
             <input
@@ -137,7 +211,14 @@ export function AuthForm({ mode }: AuthFormProps) {
             <Mail className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={17} />
             <input
               value={email}
-              onChange={(event) => setEmail(event.target.value)}
+              onChange={(event) => {
+                setEmail(event.target.value);
+                if (step === "verify") {
+                  setStep("email");
+                  setOtp("");
+                  setMessage(null);
+                }
+              }}
               type="email"
               required
               autoComplete="email"
@@ -147,19 +228,25 @@ export function AuthForm({ mode }: AuthFormProps) {
           </div>
         </label>
 
-        <label className="block">
-          <span className="text-sm font-semibold text-[var(--text-primary)]">Password</span>
-          <input
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            type="password"
-            required
-            minLength={6}
-            autoComplete={isSignup ? "new-password" : "current-password"}
-            placeholder="Minimum 6 characters"
-            className="input-premium mt-2"
-          />
-        </label>
+        {step === "verify" ? (
+          <label className="block">
+            <span className="text-sm font-semibold text-[var(--text-primary)]">Email OTP code</span>
+            <div className="relative mt-2">
+              <ShieldCheck className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={17} />
+              <input
+                value={otp}
+                onChange={(event) => setOtp(normalizeOtp(event.target.value))}
+                inputMode="numeric"
+                pattern="[0-9]*"
+                autoComplete="one-time-code"
+                placeholder="6-digit OTP"
+                className="input-premium pl-11 tracking-[0.3em]"
+                maxLength={6}
+                required
+              />
+            </div>
+          </label>
+        ) : null}
 
         {message ? (
           <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-medium leading-6 text-emerald-800">
@@ -173,25 +260,37 @@ export function AuthForm({ mode }: AuthFormProps) {
           </div>
         ) : null}
 
-        <button type="submit" disabled={busy} className="btn-primary w-full">
+        <button type="submit" disabled={busy || resendBusy} className="btn-primary w-full">
           {busy ? <Loader2 className="animate-spin" size={18} /> : null}
-          <span>{isSignup ? "Create account" : "Log in"}</span>
+          <span>{step === "verify" ? "Verify OTP" : isSignup ? "Send signup OTP" : "Send login OTP"}</span>
           {!busy ? <ArrowRight size={16} /> : null}
         </button>
+
+        {step === "verify" ? (
+          <button
+            type="button"
+            onClick={() => sendOtpEmail({ resend: true })}
+            disabled={busy || resendBusy}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--violet-border)] bg-[var(--violet-50)] px-4 py-3 text-sm font-bold text-[var(--violet-600)] transition hover:border-[var(--border-focus)] hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {resendBusy ? <Loader2 className="animate-spin" size={16} /> : <RefreshCcw size={16} />}
+            Resend OTP
+          </button>
+        ) : null}
 
         <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-base)] px-4 py-4 text-center text-sm font-medium text-[var(--text-secondary)]">
           {isSignup ? (
             <>
               Already have an account?{" "}
               <Link href="/login" className="font-bold text-[var(--violet-600)] hover:text-[var(--violet-500)]">
-                Log in
+                Log in with OTP
               </Link>
             </>
           ) : (
             <>
               New to PDFMantra?{" "}
               <Link href="/signup" className="font-bold text-[var(--violet-600)] hover:text-[var(--violet-500)]">
-                Create account
+                Create account with OTP
               </Link>
             </>
           )}
