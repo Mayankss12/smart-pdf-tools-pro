@@ -1,18 +1,26 @@
-import { Suspense } from "react";
-import { Header } from "@/components/Header";
-import { AuthForm } from "@/components/auth/AuthForm";
+import type { Metadata } from "next";
+import Link from "next/link";
+
+import { AuthPageShell } from "@/components/auth/AuthPageShell";
+import { SignupForm } from "@/components/auth/SignupForm";
+
+export const metadata: Metadata = {
+  title: "Create Account — PDFMantra",
+};
 
 export default function SignupPage() {
   return (
-    <>
-      <Header />
-      <main className="min-h-screen bg-[var(--bg-base)] px-4 py-10 text-[var(--text-primary)] sm:px-6 lg:px-8 lg:py-14">
-        <div className="mx-auto max-w-2xl">
-          <Suspense fallback={null}>
-            <AuthForm mode="signup" />
-          </Suspense>
-        </div>
-      </main>
-    </>
+    <AuthPageShell
+      title="Create your account"
+      subtitle="Start using PDFMantra for free. No credit card required."
+    >
+      <SignupForm />
+      <p className="mt-6 text-center text-sm text-[var(--text-muted)]">
+        Already have an account?{" "}
+        <Link href="/login" className="font-semibold text-[var(--violet-600)] hover:underline">
+          Sign in
+        </Link>
+      </p>
+    </AuthPageShell>
   );
 }
