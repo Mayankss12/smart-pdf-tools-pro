@@ -1,15 +1,46 @@
-import { NextResponse, type NextRequest } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { NextRequest, NextResponse } from "next/server";
+
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export async function GET(request: NextRequest) {
-  const requestUrl = new URL(request.url);
-  const code = requestUrl.searchParams.get("code");
-  const next = requestUrl.searchParams.get("next") ?? "/dashboard";
+  const { searchParams, origin } = new URL(request.url);
+  const code = searchParams.get("code");
+  const error = searchParams.get("error");
+  const errorDescription = searchParams.get("error_description");
+  const next = searchParams.get("next") ?? "/dashboard";
+  const type = searchParams.get("type");
 
-  if (code) {
-    const supabase = await createSupabaseServerClient();
-    await supabase?.auth.exchangeCodeForSession(code);
+  if (error) {
+    const params = new URLSearchParams({
+      error: errorDescription || error,
+    });
+
+    return NextResponse.redirect(`${origin}/auth/error?${params}`);
   }
 
-  return NextResponse.redirect(new URL(next.startsWith("/") ? next : "/dashboard", request.url));
+  if (!code) {
+    return NextResponse.redirect(`${origin}/auth/error?error=Invalid+authentication+link`);
+  }
+
+  const supabase = await createServerSupabaseClient();
+
+  if (!supabase) {
+    return NextResponse.redirect(`${origin}/auth/error?error=Authentication+service+is+not+configured`);
+  }
+
+  const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+
+  if (exchangeError) {
+    const params = new URLSearchParams({
+      error: "Authentication failed. Please try again.",
+    });
+
+    return NextResponse.redirect(`${origin}/auth/error?${params}`);
+  }
+
+  if (type === "recovery") {
+    return NextResponse.redirect(`${origin}/reset-password`);
+  }
+
+  return NextResponse.redirect(`${origin}${next.startsWith("/") ? next : "/dashboard"}`);
 }
