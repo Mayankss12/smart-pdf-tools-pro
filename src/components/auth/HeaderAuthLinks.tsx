@@ -1,42 +1,54 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ArrowRight } from "lucide-react";
+
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 
-function useSignedInState() {
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [isSignedIn, setIsSignedIn] = useState(false);
+type HeaderAuthState = {
+  isLoaded: boolean;
+  isSignedIn: boolean;
+};
+
+const HeaderAuthContext = createContext<HeaderAuthState | null>(null);
+
+export function HeaderAuthProvider({ children }: { readonly children: ReactNode }) {
+  const [authState, setAuthState] = useState<HeaderAuthState>({
+    isLoaded: false,
+    isSignedIn: false,
+  });
 
   useEffect(() => {
     let isMounted = true;
     const supabase = createSupabaseBrowserClient();
 
     if (!supabase) {
-      setIsLoaded(true);
-      setIsSignedIn(false);
+      setAuthState({ isLoaded: true, isSignedIn: false });
       return () => {
         isMounted = false;
       };
     }
 
-    supabase.auth.getSession().then(({ data }) => {
+    function updateState(isSignedIn: boolean) {
       if (!isMounted) {
         return;
       }
 
-      setIsSignedIn(Boolean(data.session?.user));
-      setIsLoaded(true);
-    });
+      setAuthState({ isLoaded: true, isSignedIn });
+    }
+
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        updateState(Boolean(data.session?.user));
+      })
+      .catch(() => {
+        updateState(false);
+      });
 
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!isMounted) {
-        return;
-      }
-
-      setIsSignedIn(Boolean(session?.user));
-      setIsLoaded(true);
+      updateState(Boolean(session?.user));
     });
 
     return () => {
@@ -45,11 +57,26 @@ function useSignedInState() {
     };
   }, []);
 
-  return { isLoaded, isSignedIn };
+  const value = useMemo(
+    () => authState,
+    [authState],
+  );
+
+  return <HeaderAuthContext.Provider value={value}>{children}</HeaderAuthContext.Provider>;
+}
+
+function useHeaderAuthState() {
+  const context = useContext(HeaderAuthContext);
+
+  if (context) {
+    return context;
+  }
+
+  return { isLoaded: true, isSignedIn: false };
 }
 
 export function HeaderAuthLinks() {
-  const { isLoaded, isSignedIn } = useSignedInState();
+  const { isLoaded, isSignedIn } = useHeaderAuthState();
 
   if (!isLoaded) {
     return (
@@ -86,7 +113,7 @@ export function HeaderAuthLinks() {
 }
 
 export function MobileHeaderAuthLink() {
-  const { isLoaded, isSignedIn } = useSignedInState();
+  const { isLoaded, isSignedIn } = useHeaderAuthState();
 
   if (!isLoaded) {
     return (
