@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 function setLink(link: HTMLAnchorElement, href: string, label: string) {
-  link.href = href;
+  link.setAttribute("href", href);
   link.textContent = label;
 }
 
@@ -36,35 +37,65 @@ function syncHeaderAuthLinks(isSignedIn: boolean) {
   });
 }
 
+function syncAfterRender(isSignedIn: boolean) {
+  syncHeaderAuthLinks(isSignedIn);
+  window.requestAnimationFrame(() => syncHeaderAuthLinks(isSignedIn));
+  window.setTimeout(() => syncHeaderAuthLinks(isSignedIn), 120);
+  window.setTimeout(() => syncHeaderAuthLinks(isSignedIn), 400);
+}
+
 export function AuthHeaderSync() {
+  const pathname = usePathname();
+  const isSignedInRef = useRef(false);
+
   useEffect(() => {
     let isMounted = true;
     const supabase = createSupabaseBrowserClient();
 
+    function updateSignedInState(isSignedIn: boolean) {
+      if (!isMounted) {
+        return;
+      }
+
+      isSignedInRef.current = isSignedIn;
+      syncAfterRender(isSignedIn);
+    }
+
     if (!supabase) {
-      syncHeaderAuthLinks(false);
+      updateSignedInState(false);
       return () => {
         isMounted = false;
       };
     }
 
     supabase.auth.getSession().then(({ data }) => {
-      if (isMounted) {
-        syncHeaderAuthLinks(Boolean(data.session?.user));
-      }
+      updateSignedInState(Boolean(data.session?.user));
+    });
+
+    const observer = new MutationObserver(() => {
+      syncHeaderAuthLinks(isSignedInRef.current);
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true,
     });
 
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (isMounted) {
-        syncHeaderAuthLinks(Boolean(session?.user));
-      }
+      updateSignedInState(Boolean(session?.user));
     });
 
     return () => {
       isMounted = false;
+      observer.disconnect();
       data.subscription.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    syncAfterRender(isSignedInRef.current);
+  }, [pathname]);
 
   return null;
 }
