@@ -1,117 +1,224 @@
-import Link from "next/link";
-import { ArrowRight, Clock3, FileArchive, ShieldCheck, Sparkles } from "lucide-react";
+"use client";
+
+import { useRef, useState } from "react";
+import { PDFDocument } from "pdf-lib";
+import { CheckCircle2, Download, FileArchive, Loader2, Upload, X } from "lucide-react";
 
 import { Header } from "@/components/Header";
 
-const COMING_SOON_POINTS = [
-  "Backend-grade compression for stronger size reduction",
-  "Clear before/after file size reporting",
-  "Quality-safe optimization for business documents",
-] as const;
+function isPdfFile(file: File) {
+  return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function downloadBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function optimizePdf(file: File) {
+  const inputBytes = await file.arrayBuffer();
+  const pdf = await PDFDocument.load(inputBytes, { ignoreEncryption: true });
+
+  pdf.setTitle("");
+  pdf.setAuthor("");
+  pdf.setSubject("");
+  pdf.setKeywords([]);
+  pdf.setProducer("PDFMantra");
+  pdf.setCreator("PDFMantra");
+
+  const outputBytes = await pdf.save({
+    useObjectStreams: true,
+    addDefaultPage: false,
+    objectsPerTick: 50,
+  });
+
+  return new Blob([outputBytes], { type: "application/pdf" });
+}
 
 export default function CompressPage() {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState("Upload a PDF to optimize and download.");
+  const [outputSize, setOutputSize] = useState<number | null>(null);
+
+  function handleFile(selectedFile?: File) {
+    if (!selectedFile) return;
+
+    if (!isPdfFile(selectedFile)) {
+      setFile(null);
+      setOutputSize(null);
+      setStatus("Please upload a valid PDF file.");
+      return;
+    }
+
+    setFile(selectedFile);
+    setOutputSize(null);
+    setStatus(`Ready to optimize ${selectedFile.name}.`);
+  }
+
+  function clearFile() {
+    setFile(null);
+    setOutputSize(null);
+    setStatus("Upload a PDF to optimize and download.");
+  }
+
+  async function handleCompress() {
+    if (!file || busy) return;
+
+    setBusy(true);
+    setStatus("Optimizing PDF...");
+
+    try {
+      const optimized = await optimizePdf(file);
+      setOutputSize(optimized.size);
+      downloadBlob(optimized, `PDFMantra-compressed-${file.name.replace(/\.pdf$/i, "")}.pdf`);
+
+      const reduction = Math.round((1 - optimized.size / file.size) * 100);
+      setStatus(
+        optimized.size < file.size
+          ? `Optimized successfully. Reduced by ${Math.max(0, reduction)}%. Download started.`
+          : "PDF optimized and downloaded. This file was already compact, so size reduction may be minimal."
+      );
+    } catch (error) {
+      console.error(error);
+      setStatus("Compression failed. This PDF may be encrypted, damaged, or unsupported.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <>
       <Header />
 
       <main className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)]">
-        <section className="relative overflow-hidden border-b border-violet-100/90">
-          <div className="pointer-events-none absolute inset-0">
-            <div className="absolute left-[-15rem] top-[-13rem] h-[34rem] w-[34rem] rounded-full bg-violet-200/45 blur-3xl" />
-            <div className="absolute right-[-16rem] top-[-10rem] h-[34rem] w-[34rem] rounded-full bg-rose-200/42 blur-3xl" />
-          </div>
-
-          <div className="relative mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
-            <div className="max-w-4xl">
-              <div className="inline-flex items-center gap-2 rounded-full border border-violet-100 bg-[#fffdf8]/90 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-violet-700 shadow-sm backdrop-blur">
-                <Clock3 size={14} />
-                Coming Soon
+        <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+          <div className="overflow-hidden rounded-[2rem] border border-violet-100 bg-white shadow-[0_18px_50px_rgba(91,63,193,0.08)]">
+            <section className="bg-gradient-to-br from-indigo-700 via-violet-700 to-purple-700 px-6 py-12 text-white sm:px-10 lg:px-14">
+              <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-xs font-semibold uppercase tracking-wide ring-1 ring-white/20">
+                <FileArchive size={14} />
+                PDFMantra Optimize Tool
               </div>
 
-              <h1 className="display-font mt-5 max-w-4xl text-[2.35rem] font-medium leading-[1.08] tracking-[-0.045em] text-slate-950 sm:text-[2.9rem] lg:text-[3.35rem]">
-                Compress PDF is being rebuilt for reliable, backend-grade optimization.
+              <h1 className="mt-5 max-w-3xl text-4xl font-semibold leading-[1.08] tracking-[-0.04em] sm:text-5xl">
+                Compress PDF
               </h1>
 
-              <p className="mt-4 max-w-2xl text-[15px] font-medium leading-7 text-slate-600 sm:text-base">
-                We have temporarily disabled browser-only compression because it cannot consistently reduce every PDF safely. A stronger compression workflow will return with proper backend processing.
+              <p className="mt-5 max-w-2xl text-base font-medium leading-8 text-indigo-50/95">
+                Upload a PDF, optimize its structure in your browser, and download the processed file instantly.
               </p>
-            </div>
-          </div>
-        </section>
+            </section>
 
-        <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
-          <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
-            <div className="rounded-[2rem] border border-violet-100 bg-[#fffdf8]/84 p-6 shadow-[0_18px_50px_rgba(91,63,193,0.08)] backdrop-blur sm:p-8">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-600 text-white shadow-[0_16px_36px_rgba(101,80,232,0.20)]">
-                <FileArchive size={26} />
-              </div>
+            <section className="grid gap-0 lg:grid-cols-[1fr_360px]">
+              <div className="border-r border-violet-100 bg-slate-50/70 p-5 sm:p-6">
+                <input
+                  ref={inputRef}
+                  type="file"
+                  accept="application/pdf"
+                  className="hidden"
+                  onChange={(event) => handleFile(event.target.files?.[0])}
+                />
 
-              <h2 className="display-font mt-6 text-2xl font-bold tracking-[-0.03em] text-slate-950 sm:text-3xl">
-                Why this tool is paused
-              </h2>
-
-              <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 sm:text-base">
-                Basic browser compression can sometimes make PDFs larger or provide only minor savings. For a professional PDF tool, compression should be predictable, safe, and transparent.
-              </p>
-
-              <div className="mt-6 grid gap-3">
-                {COMING_SOON_POINTS.map((point) => (
-                  <div
-                    key={point}
-                    className="flex items-start gap-3 rounded-2xl border border-violet-100 bg-white px-4 py-3 text-sm font-semibold leading-6 text-slate-700 shadow-[0_8px_24px_rgba(101,80,232,0.06)]"
-                  >
-                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-100 text-xs font-black text-violet-700">
-                      ✓
-                    </span>
-                    {point}
+                <div
+                  onClick={() => inputRef.current?.click()}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    handleFile(event.dataTransfer.files?.[0]);
+                  }}
+                  onDragOver={(event) => event.preventDefault()}
+                  role="button"
+                  tabIndex={0}
+                  className="cursor-pointer rounded-[1.75rem] border-2 border-dashed border-indigo-200 bg-white p-8 text-center shadow-sm transition hover:border-indigo-400 hover:bg-indigo-50/40"
+                >
+                  <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-600 text-white">
+                    <Upload size={24} />
                   </div>
-                ))}
-              </div>
-            </div>
-
-            <aside className="rounded-[2rem] border border-violet-100 bg-white p-6 shadow-[0_18px_50px_rgba(91,63,193,0.08)]">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-700">
-                <Sparkles size={22} />
-              </div>
-
-              <h2 className="display-font mt-5 text-2xl font-bold tracking-[-0.03em] text-slate-950">
-                Use these tools now
-              </h2>
-
-              <div className="mt-5 space-y-3">
-                <Link
-                  href="/tools/merge"
-                  className="flex items-center justify-between rounded-2xl border border-violet-100 bg-violet-50/50 px-4 py-3 text-sm font-bold text-slate-800 transition hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700"
-                >
-                  Merge PDF
-                  <ArrowRight size={16} />
-                </Link>
-
-                <Link
-                  href="/tools/split"
-                  className="flex items-center justify-between rounded-2xl border border-violet-100 bg-violet-50/50 px-4 py-3 text-sm font-bold text-slate-800 transition hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700"
-                >
-                  Split PDF
-                  <ArrowRight size={16} />
-                </Link>
-
-                <Link
-                  href="/editor"
-                  className="flex items-center justify-between rounded-2xl border border-violet-100 bg-violet-50/50 px-4 py-3 text-sm font-bold text-slate-800 transition hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700"
-                >
-                  PDF Editor
-                  <ArrowRight size={16} />
-                </Link>
-              </div>
-
-              <div className="mt-5 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-semibold leading-6 text-emerald-800">
-                <div className="mb-1 flex items-center gap-2">
-                  <ShieldCheck size={16} />
-                  Safe product decision
+                  <div className="text-lg font-semibold tracking-[-0.02em] text-slate-950">
+                    {file ? file.name : "Drop PDF here"}
+                  </div>
+                  <div className="mt-2 text-sm font-medium text-slate-500">
+                    {file ? `${formatFileSize(file.size)} selected` : "Click here or drag a PDF to begin."}
+                  </div>
                 </div>
-                This page now clearly communicates that compression is not ready instead of offering a weak output.
+
+                {file ? (
+                  <div className="mt-5 rounded-[1.5rem] border border-violet-100 bg-white p-5 shadow-sm">
+                    <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+                      <div>
+                        <div className="text-sm font-bold uppercase tracking-wide text-slate-500">Selected file</div>
+                        <div className="mt-1 truncate text-lg font-semibold text-slate-950">{file.name}</div>
+                        <div className="mt-1 text-sm text-slate-500">Original size: {formatFileSize(file.size)}</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={clearFile}
+                        className="inline-flex items-center justify-center gap-2 rounded-full border border-red-100 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100"
+                      >
+                        <X size={15} />
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
               </div>
-            </aside>
+
+              <aside className="bg-white p-5 sm:p-6">
+                <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5">
+                  <h2 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">Compression Summary</h2>
+
+                  <div className="mt-4 grid gap-3">
+                    <div className="rounded-2xl bg-white p-4">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Original</div>
+                      <div className="mt-1 text-xl font-semibold text-slate-950">{file ? formatFileSize(file.size) : "-"}</div>
+                    </div>
+                    <div className="rounded-2xl bg-white p-4">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Output</div>
+                      <div className="mt-1 text-xl font-semibold text-slate-950">{outputSize ? formatFileSize(outputSize) : "-"}</div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleCompress}
+                    disabled={!file || busy}
+                    className="btn-primary mt-5 w-full"
+                  >
+                    {busy ? (
+                      <>
+                        <Loader2 className="animate-spin" size={18} />
+                        Processing
+                      </>
+                    ) : (
+                      <>
+                        <Download size={18} />
+                        Optimize & Download
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <div className="mt-5 rounded-[1.5rem] border border-indigo-100 bg-indigo-50 p-4 text-sm font-medium leading-6 text-indigo-800">
+                  <div className="mb-1 flex items-center gap-2 font-semibold">
+                    <CheckCircle2 size={16} />
+                    Status
+                  </div>
+                  {status}
+                </div>
+              </aside>
+            </section>
           </div>
         </section>
       </main>
