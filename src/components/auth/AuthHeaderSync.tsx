@@ -42,6 +42,7 @@ function syncAfterRender(isSignedIn: boolean) {
   window.requestAnimationFrame(() => syncHeaderAuthLinks(isSignedIn));
   window.setTimeout(() => syncHeaderAuthLinks(isSignedIn), 120);
   window.setTimeout(() => syncHeaderAuthLinks(isSignedIn), 400);
+  window.setTimeout(() => syncHeaderAuthLinks(isSignedIn), 900);
 }
 
 export function AuthHeaderSync() {
@@ -72,23 +73,12 @@ export function AuthHeaderSync() {
       updateSignedInState(Boolean(data.session?.user));
     });
 
-    const observer = new MutationObserver(() => {
-      syncHeaderAuthLinks(isSignedInRef.current);
-    });
-
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-      characterData: true,
-    });
-
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       updateSignedInState(Boolean(session?.user));
     });
 
     return () => {
       isMounted = false;
-      observer.disconnect();
       data.subscription.unsubscribe();
     };
   }, []);
