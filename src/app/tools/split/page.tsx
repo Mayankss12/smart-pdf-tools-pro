@@ -1,7 +1,6 @@
 "use client";
 
-import { Header } from "@/components/Header";
-import { ToolPageHeader } from "@/components/ToolPageHeader";
+import { useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -14,306 +13,92 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { PDFDocument } from "pdf-lib";
-import * as pdfjsLib from "pdfjs-dist";
-import { useEffect, useMemo, useRef, useState } from "react";
 
-type SplitGroup = {
-  label: string;
-  pages: number[];
-};
+import { Header } from "@/components/Header";
+import { ToolPageHeader } from "@/components/ToolPageHeader";
+import {
+  PdfEngineError,
+  downloadBlob,
+  formatFileSize,
+  loadPdfDocument,
+  parsePageGroups,
+  splitPdfIntoGroups,
+  validatePdfFile,
+  type PageGroup,
+  type PdfProcessingResult,
+} from "@/lib/pdf-engine";
 
-type PdfThumb = {
-  pageNumber: number;
-  url: string;
-};
-
-function downloadBlob(blob: Blob, fileName: string) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-
-  link.href = url;
-  link.download = fileName;
-
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-
-  URL.revokeObjectURL(url);
-}
-
-function uniqueSortedNumbers(numbers: number[]) {
-  return Array.from(new Set(numbers)).sort((a, b) => a - b);
-}
-
-function parseSplitGroups(input: string, totalPages: number): SplitGroup[] {
-  const cleaned = input.trim();
-
-  if (!cleaned) {
-    throw new Error("Enter page groups first. Example: 1-4,5-8");
+function getErrorMessage(error: unknown) {
+  if (error instanceof PdfEngineError) {
+    return error.message;
   }
 
-  const rawGroups = cleaned
-    .split(",")
-    .map((part) => part.trim())
-    .filter(Boolean);
-
-  if (rawGroups.length === 0) {
-    throw new Error("Enter valid page groups. Example: 1-4,5-8");
-  }
-
-  return rawGroups.map((groupText) => {
-    const pages: number[] = [];
-
-    if (groupText.includes("-")) {
-      const pieces = groupText.split("-").map((part) => part.trim());
-
-      if (pieces.length !== 2 || !pieces[0] || !pieces[1]) {
-        throw new Error(`Invalid range: ${groupText}`);
-      }
-
-      const start = Number(pieces[0]);
-      const end = Number(pieces[1]);
-
-      if (!Number.isInteger(start) || !Number.isInteger(end)) {
-        throw new Error(`Invalid page number in range: ${groupText}`);
-      }
-
-      if (start <= 0 || end <= 0) {
-        throw new Error("Page number 0 is invalid. Pages start from 1.");
-      }
-
-      if (start > end) {
-        throw new Error(`Invalid reversed range: ${groupText}`);
-      }
-
-      if (end > totalPages) {
-        throw new Error(
-          `Page ${end} is outside this PDF. Total pages: ${totalPages}.`
-        );
-      }
-
-      for (let page = start; page <= end; page += 1) {
-        pages.push(page);
-      }
-    } else {
-      const page = Number(groupText);
-
-      if (!Number.isInteger(page)) {
-        throw new Error(`Invalid page number: ${groupText}`);
-      }
-
-      if (page <= 0) {
-        throw new Error("Page number 0 is invalid. Pages start from 1.");
-      }
-
-      if (page > totalPages) {
-        throw new Error(
-          `Page ${page} is outside this PDF. Total pages: ${totalPages}.`
-        );
-      }
-
-      pages.push(page);
-    }
-
-    return {
-      label: groupText,
-      pages: uniqueSortedNumbers(pages),
-    };
-  });
+  return "Split failed. Please check your PDF and page groups.";
 }
 
-async function splitPdfIntoGroups(file: File, groups: SplitGroup[]) {
-  const arrayBuffer = await file.arrayBuffer();
-  const sourcePdf = await PDFDocument.load(arrayBuffer);
-
-  const outputs: { blob: Blob; fileName: string; group: SplitGroup }[] = [];
-
-  for (let index = 0; index < groups.length; index += 1) {
-    const group = groups[index];
-    const newPdf = await PDFDocument.create();
-
-    const copiedPages = await newPdf.copyPages(
-      sourcePdf,
-      group.pages.map((pageNumber) => pageNumber - 1)
-    );
-
-    copiedPages.forEach((page) => newPdf.addPage(page));
-
-    const pdfBytes = await newPdf.save();
-    const cleanBaseName = file.name.replace(/\.pdf$/i, "");
-    const safeGroupName = group.label.replace(/[^0-9,-]/g, "");
-
-    outputs.push({
-      blob: new Blob([pdfBytes], { type: "application/pdf" }),
-      fileName: `PDFMantra-${cleanBaseName}-split-${index + 1}-${safeGroupName}.pdf`,
-      group,
-    });
-  }
-
-  return outputs;
+function getSelectedPages(groups: PageGroup[]) {
+  return new Set(groups.flatMap((group) => group.pages));
 }
 
-async function getPdfPageCount(file: File) {
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await PDFDocument.load(arrayBuffer);
-
-  return pdf.getPageCount();
-}
-
-async function renderPdfThumbnails(
-  file: File,
-  maxPages = 16
-): Promise<PdfThumb[]> {
-  const buffer = await file.arrayBuffer();
-  const loadingTask = pdfjsLib.getDocument({ data: buffer.slice(0) });
-  const pdf = await loadingTask.promise;
-
-  const thumbnails: PdfThumb[] = [];
-  const totalToRender = Math.min(pdf.numPages, maxPages);
-
-  for (let pageNumber = 1; pageNumber <= totalToRender; pageNumber += 1) {
-    const page = await pdf.getPage(pageNumber);
-    const viewport = page.getViewport({ scale: 0.34 });
-
-    const canvas = document.createElement("canvas");
-    const context = canvas.getContext("2d");
-
-    if (!context) continue;
-
-    const outputScale = window.devicePixelRatio || 1;
-
-    canvas.width = Math.floor(viewport.width * outputScale);
-    canvas.height = Math.floor(viewport.height * outputScale);
-    canvas.style.width = `${viewport.width}px`;
-    canvas.style.height = `${viewport.height}px`;
-
-    context.setTransform(outputScale, 0, 0, outputScale, 0, 0);
-
-    await page.render({
-      canvasContext: context,
-      viewport,
-    }).promise;
-
-    thumbnails.push({
-      pageNumber,
-      url: canvas.toDataURL("image/png"),
-    });
-  }
-
-  return thumbnails;
-}
-
-function isPdfFile(file: File) {
-  return (
-    file.type === "application/pdf" ||
-    file.name.toLowerCase().endsWith(".pdf")
+function getUnassignedPages(pageCount: number, groups: PageGroup[]) {
+  const selectedPages = getSelectedPages(groups);
+  return Array.from({ length: pageCount }, (_, index) => index + 1).filter(
+    (pageNumber) => !selectedPages.has(pageNumber),
   );
+}
+
+function getPagePreviewNumbers(pageCount: number) {
+  return Array.from({ length: Math.min(pageCount, 40) }, (_, index) => index + 1);
 }
 
 export default function SplitPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-
   const [file, setFile] = useState<File | null>(null);
   const [pageInput, setPageInput] = useState("1-4,5-8");
   const [pageCount, setPageCount] = useState(0);
-  const [thumbs, setThumbs] = useState<PdfThumb[]>([]);
-  const [status, setStatus] = useState("Upload a PDF and define split groups.");
+  const [status, setStatus] = useState("Upload one PDF and define split groups.");
   const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
-  }, []);
+  const [results, setResults] = useState<PdfProcessingResult[]>([]);
 
   const groups = useMemo(() => {
-    if (!pageCount) return [];
+    if (!file || pageCount <= 0) return [];
 
     try {
-      return parseSplitGroups(pageInput, pageCount);
+      return parsePageGroups(pageInput, pageCount);
     } catch {
       return [];
     }
-  }, [pageInput, pageCount]);
+  }, [file, pageCount, pageInput]);
 
-  const selectedPageSet = useMemo(() => {
-    return new Set(groups.flatMap((group) => group.pages));
-  }, [groups]);
-
-  const unassignedPages = useMemo(() => {
-    if (!pageCount) return [];
-
-    const allPages = Array.from({ length: pageCount }, (_, index) => index + 1);
-
-    return allPages.filter((page) => !selectedPageSet.has(page));
-  }, [pageCount, selectedPageSet]);
+  const selectedPageSet = useMemo(() => getSelectedPages(groups), [groups]);
+  const unassignedPages = useMemo(
+    () => (file ? getUnassignedPages(pageCount, groups) : []),
+    [file, groups, pageCount],
+  );
+  const pagePreviewNumbers = useMemo(() => getPagePreviewNumbers(pageCount), [pageCount]);
 
   async function handleFile(selectedFile?: File) {
     if (!selectedFile) return;
 
-    if (!isPdfFile(selectedFile)) {
-      setStatus("Please upload a valid PDF file.");
-      return;
-    }
-
     setBusy(true);
-    setStatus("Loading PDF preview...");
+    setResults([]);
+    setStatus("Reading PDF with PDFMantra engine...");
 
     try {
+      validatePdfFile(selectedFile);
+      const pdf = await loadPdfDocument(selectedFile);
+      const totalPages = pdf.getPageCount();
+
       setFile(selectedFile);
-      setThumbs([]);
-
-      const totalPages = await getPdfPageCount(selectedFile);
       setPageCount(totalPages);
-
-      const renderedThumbs = await renderPdfThumbnails(selectedFile, 16);
-      setThumbs(renderedThumbs);
-
       setStatus(
-        `PDF loaded with ${totalPages} page${totalPages > 1 ? "s" : ""}. Define groups like 1-4,5-8.`
+        `PDF loaded with ${totalPages} page${totalPages > 1 ? "s" : ""}. Define groups like 1-4,5-8.`,
       );
     } catch (error) {
-      console.error(error);
       setFile(null);
       setPageCount(0);
-      setThumbs([]);
-      setStatus("Unable to load this PDF. Please try another file.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleSplit() {
-    if (!file) {
-      setStatus("Please upload one PDF first.");
-      return;
-    }
-
-    setBusy(true);
-
-    try {
-      const parsedGroups = parseSplitGroups(pageInput, pageCount);
-
-      setStatus(
-        `Creating ${parsedGroups.length} split file${
-          parsedGroups.length > 1 ? "s" : ""
-        }...`
-      );
-
-      const outputs = await splitPdfIntoGroups(file, parsedGroups);
-
-      for (const output of outputs) {
-        downloadBlob(output.blob, output.fileName);
-        await new Promise((resolve) => setTimeout(resolve, 300));
-      }
-
-      setStatus(
-        `Done. Downloaded ${outputs.length} split PDF${
-          outputs.length > 1 ? "s" : ""
-        }.`
-      );
-    } catch (error) {
-      console.error(error);
-      setStatus(error instanceof Error ? error.message : "Split failed.");
+      setResults([]);
+      setStatus(getErrorMessage(error));
     } finally {
       setBusy(false);
     }
@@ -322,17 +107,55 @@ export default function SplitPage() {
   function clearFile() {
     setFile(null);
     setPageCount(0);
-    setThumbs([]);
-    setStatus("Upload a PDF and define split groups.");
+    setResults([]);
+    setStatus("Upload one PDF and define split groups.");
   }
 
   function applyPreset(preset: string) {
     setPageInput(preset);
+    setResults([]);
     setStatus(`Preset applied: ${preset}`);
   }
 
-  const hasValidGroups = Boolean(file && groups.length > 0);
+  async function handleSplit() {
+    if (!file || busy) {
+      setStatus("Please upload one PDF first.");
+      return;
+    }
+
+    setBusy(true);
+    setResults([]);
+
+    try {
+      const parsedGroups = parsePageGroups(pageInput, pageCount);
+      setStatus(`Creating ${parsedGroups.length} split PDF${parsedGroups.length > 1 ? "s" : ""}...`);
+
+      const outputs = await splitPdfIntoGroups(file, parsedGroups);
+      setResults(outputs);
+
+      for (const output of outputs) {
+        downloadBlob(output.blob, output.fileName);
+        await new Promise((resolve) => window.setTimeout(resolve, 250));
+      }
+
+      setStatus(`Split completed. Downloaded ${outputs.length} PDF${outputs.length > 1 ? "s" : ""}.`);
+    } catch (error) {
+      setResults([]);
+      setStatus(getErrorMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const hasValidGroups = file && groups.length > 0;
   const canSplit = Boolean(file && groups.length > 0 && !busy);
+  const statusLooksLikeError =
+    status.toLowerCase().includes("failed") ||
+    status.toLowerCase().includes("invalid") ||
+    status.toLowerCase().includes("outside") ||
+    status.toLowerCase().includes("unsupported") ||
+    status.toLowerCase().includes("too large") ||
+    status.toLowerCase().includes("empty");
 
   return (
     <>
@@ -342,9 +165,9 @@ export default function SplitPage() {
         <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
           <ToolPageHeader
             icon={Scissors}
-            eyebrow="PDFMantra Split PDF"
-            title="Split PDFs into clean page groups."
-            description="Upload one PDF, preview its pages, define ranges like 1-4,5-8, and download separate files for every group you create."
+            eyebrow="PDFMantra Engine Tool"
+            title="Split PDFs into controlled page groups."
+            description="Upload one PDF, define exact page ranges like 1-4,5-8, and export each group as a separate PDF through the shared PDFMantra engine."
             meta={
               <div className="grid min-w-[260px] grid-cols-3 divide-x divide-[var(--border-light)] text-center">
                 <div className="px-3">
@@ -372,7 +195,7 @@ export default function SplitPage() {
           </ToolPageHeader>
 
           <div className="mt-6 grid overflow-hidden rounded-[1.75rem] border border-[var(--border-light)] bg-[var(--bg-card)] shadow-[var(--shadow-card)] lg:grid-cols-[1fr_390px]">
-            <section className="min-h-[700px] border-r border-[var(--border-light)] bg-[var(--bg-base)] p-5 sm:p-6">
+            <section className="min-h-[620px] border-r border-[var(--border-light)] bg-[var(--bg-base)] p-5 sm:p-6">
               <div
                 onClick={() => fileInputRef.current?.click()}
                 onDrop={(event) => {
@@ -380,17 +203,17 @@ export default function SplitPage() {
                   handleFile(event.dataTransfer.files?.[0]);
                 }}
                 onDragOver={(event) => event.preventDefault()}
-                role="button"
-                tabIndex={0}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {
                     fileInputRef.current?.click();
                   }
                 }}
-                className="cursor-pointer rounded-[1.5rem] border-2 border-dashed border-[var(--violet-border)] bg-[var(--bg-card)] p-6 text-center shadow-[var(--shadow-soft)] transition hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)]"
+                role="button"
+                tabIndex={0}
+                className="cursor-pointer rounded-[1.5rem] border-2 border-dashed border-[var(--violet-border)] bg-[var(--bg-card)] p-6 text-center shadow-[var(--shadow-soft)] transition hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] focus:border-[var(--border-focus)] focus:outline-none focus:ring-4 focus:ring-violet-100"
               >
                 <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--violet-600)] text-white shadow-[0_16px_36px_rgba(101,80,232,0.20)]">
-                  <FileText size={22} />
+                  <Upload size={22} />
                 </div>
 
                 <div className="text-[15px] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
@@ -399,7 +222,7 @@ export default function SplitPage() {
 
                 <div className="mt-1 text-sm font-medium text-[var(--text-secondary)]">
                   {file
-                    ? `${pageCount} page${pageCount > 1 ? "s" : ""} loaded`
+                    ? `${pageCount} page${pageCount > 1 ? "s" : ""} loaded • ${formatFileSize(file.size)}`
                     : "Click here or drag one PDF to begin."}
                 </div>
 
@@ -412,77 +235,55 @@ export default function SplitPage() {
               <div className="mt-5 rounded-[1.5rem] border border-[var(--border-light)] bg-[var(--bg-card)] p-5 shadow-[var(--shadow-soft)]">
                 <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
                   <div>
-                    <h2 className="display-font text-[1.75rem] font-bold tracking-[-0.02em] text-[var(--text-primary)]">
-                      Visual Page Map
-                    </h2>
-                    <p className="mt-1 text-sm font-normal text-[var(--text-secondary)]">
-                      Highlighted pages are included in your current split groups.
-                    </p>
+                    <h2 className="display-font text-[1.75rem] font-bold tracking-[-0.02em] text-[var(--text-primary)]">Page Selection Map</h2>
+                    <p className="mt-1 text-sm font-normal text-[var(--text-secondary)]">Selected pages are highlighted. Up to 40 pages are shown in this fast browser map.</p>
                   </div>
 
-                  {file && (
+                  {file ? (
                     <button
+                      type="button"
                       onClick={clearFile}
-                      className="inline-flex items-center justify-center gap-2 rounded-full border border-red-100 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-100"
+                      disabled={busy}
+                      className="inline-flex items-center justify-center gap-2 rounded-full border border-red-100 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <X size={15} />
                       Remove PDF
                     </button>
-                  )}
+                  ) : null}
                 </div>
 
-                {busy && thumbs.length === 0 ? (
-                  <div className="mt-5 flex min-h-80 items-center justify-center rounded-[1.35rem] border border-[var(--violet-border)] bg-[var(--violet-50)]">
+                {busy && !file ? (
+                  <div className="mt-5 flex min-h-72 items-center justify-center rounded-[1.35rem] border border-[var(--violet-border)] bg-[var(--violet-50)]">
                     <div className="flex items-center gap-2 rounded-full border border-[var(--violet-border)] bg-white px-4 py-3 text-sm font-semibold text-[var(--violet-600)] shadow-[var(--shadow-soft)]">
                       <Loader2 className="animate-spin" size={18} />
-                      Rendering preview
+                      Reading PDF
                     </div>
                   </div>
-                ) : thumbs.length > 0 ? (
-                  <div className="mt-5 grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
-                    {thumbs.map((thumb) => {
-                      const isSelected = selectedPageSet.has(thumb.pageNumber);
+                ) : pagePreviewNumbers.length > 0 ? (
+                  <div className="mt-5 grid grid-cols-4 gap-3 sm:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10">
+                    {pagePreviewNumbers.map((pageNumber) => {
+                      const isSelected = selectedPageSet.has(pageNumber);
 
                       return (
                         <div
-                          key={thumb.pageNumber}
-                          className={`overflow-hidden rounded-[1.25rem] border bg-[var(--bg-card)] shadow-[var(--shadow-soft)] transition ${
+                          key={pageNumber}
+                          className={`rounded-2xl border px-3 py-4 text-center text-sm font-bold transition ${
                             isSelected
-                              ? "border-[var(--border-focus)] ring-4 ring-[rgba(101,80,232,0.12)]"
-                              : "border-[var(--border-light)]"
+                              ? "border-[var(--border-focus)] bg-[var(--violet-50)] text-[var(--violet-600)] ring-4 ring-[rgba(101,80,232,0.12)]"
+                              : "border-[var(--border-light)] bg-white text-[var(--text-secondary)]"
                           }`}
                         >
-                          <div
-                            className={`border-b px-3 py-2 text-xs font-semibold ${
-                              isSelected
-                                ? "border-[var(--violet-border)] bg-[var(--violet-50)] text-[var(--violet-600)]"
-                                : "border-[var(--border-light)] bg-[var(--bg-panel)] text-[var(--text-secondary)]"
-                            }`}
-                          >
-                            Page {thumb.pageNumber}
-                          </div>
-
-                          <div className="flex min-h-40 items-start justify-center bg-[var(--bg-panel)] p-2">
-                            <img
-                              src={thumb.url}
-                              alt={`Page ${thumb.pageNumber}`}
-                              className="max-h-56 rounded border border-[var(--border-light)] bg-white"
-                            />
-                          </div>
+                          {pageNumber}
                         </div>
                       );
                     })}
                   </div>
                 ) : (
-                  <div className="mt-5 flex min-h-80 items-center justify-center rounded-[1.35rem] border border-dashed border-[var(--violet-border)] bg-[var(--violet-50)]/52 text-center">
+                  <div className="mt-5 flex min-h-72 items-center justify-center rounded-[1.35rem] border border-dashed border-[var(--violet-border)] bg-[var(--violet-50)]/52 text-center">
                     <div>
                       <FileText className="mx-auto text-[var(--violet-400)]" size={38} />
-                      <div className="mt-3 text-[15px] font-semibold text-[var(--text-primary)]">
-                        No PDF preview yet
-                      </div>
-                      <p className="mt-1 text-sm font-normal text-[var(--text-secondary)]">
-                        Upload a PDF to see page thumbnails and split planning.
-                      </p>
+                      <div className="mt-3 text-[15px] font-semibold text-[var(--text-primary)]">No PDF loaded</div>
+                      <p className="mt-1 text-sm font-normal text-[var(--text-secondary)]">Upload a PDF to build split groups.</p>
                     </div>
                   </div>
                 )}
@@ -491,27 +292,20 @@ export default function SplitPage() {
 
             <aside className="bg-[var(--bg-card)] p-5 sm:p-6">
               <div className="rounded-[1.5rem] border border-[var(--border-light)] bg-[var(--bg-panel)] p-5 shadow-[var(--shadow-soft)]">
-                <h2 className="display-font text-[1.75rem] font-bold tracking-[-0.02em] text-[var(--text-primary)]">
-                  Split Planner
-                </h2>
+                <h2 className="display-font text-[1.75rem] font-bold tracking-[-0.02em] text-[var(--text-primary)]">Split Planner</h2>
 
                 <p className="mt-2 text-sm font-normal leading-6 text-[var(--text-secondary)]">
-                  Use commas to create separate output files. Example{" "}
-                  <span className="rounded-lg border border-[var(--violet-border)] bg-white px-2 py-1 font-semibold text-[var(--violet-600)]">
-                    1-4,5-8
-                  </span>{" "}
-                  creates two PDFs.
+                  Use commas to create separate files. Example <span className="rounded-lg border border-[var(--violet-border)] bg-white px-2 py-1 font-semibold text-[var(--violet-600)]">1-4,5-8</span> creates two PDFs.
                 </p>
 
                 <div className="mt-4 grid grid-cols-3 gap-2">
                   <button
                     type="button"
-                    onClick={() => applyPreset("1-1,2-2")}
+                    onClick={() => applyPreset("1")}
                     className="rounded-2xl border border-[var(--border-light)] bg-white px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] hover:text-[var(--violet-600)]"
                   >
-                    First 2
+                    Page 1
                   </button>
-
                   <button
                     type="button"
                     onClick={() => applyPreset("1-4,5-8")}
@@ -519,12 +313,9 @@ export default function SplitPage() {
                   >
                     4-page sets
                   </button>
-
                   <button
                     type="button"
-                    onClick={() =>
-                      applyPreset(pageCount ? `1-${pageCount}` : "1-3")
-                    }
+                    onClick={() => applyPreset(pageCount ? `1-${pageCount}` : "1-3")}
                     className="rounded-2xl border border-[var(--border-light)] bg-white px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] hover:text-[var(--violet-600)]"
                   >
                     All pages
@@ -532,13 +323,13 @@ export default function SplitPage() {
                 </div>
 
                 <label className="mt-5 block">
-                  <span className="text-sm font-semibold text-[var(--text-primary)]">
-                    Page groups
-                  </span>
-
+                  <span className="text-sm font-semibold text-[var(--text-primary)]">Page groups</span>
                   <input
                     value={pageInput}
-                    onChange={(event) => setPageInput(event.target.value)}
+                    onChange={(event) => {
+                      setPageInput(event.target.value);
+                      setResults([]);
+                    }}
                     placeholder="Example: 1-4,5-8"
                     className="input-premium mt-2"
                   />
@@ -553,34 +344,23 @@ export default function SplitPage() {
                   {hasValidGroups ? (
                     <div className="mt-3 space-y-2">
                       {groups.map((group, index) => (
-                        <div
-                          key={`${group.label}-${index}`}
-                          className="rounded-xl border border-[var(--border-light)] bg-white px-3 py-3 text-sm font-medium text-[var(--text-secondary)]"
-                        >
+                        <div key={`${group.label}-${index}`} className="rounded-xl border border-[var(--border-light)] bg-white px-3 py-3 text-sm font-medium text-[var(--text-secondary)]">
                           <div className="flex items-center justify-between gap-3">
-                            <span className="font-semibold text-[var(--text-primary)]">
-                              Split file {index + 1}
-                            </span>
+                            <span className="font-semibold text-[var(--text-primary)]">Split file {index + 1}</span>
                             <span className="rounded-full border border-[var(--violet-border)] bg-[var(--violet-50)] px-2.5 py-1 text-xs font-semibold text-[var(--violet-600)]">
-                              {group.pages.length} page
-                              {group.pages.length > 1 ? "s" : ""}
+                              {group.pages.length} page{group.pages.length > 1 ? "s" : ""}
                             </span>
                           </div>
-
-                          <div className="mt-1 text-xs font-medium text-[var(--text-muted)]">
-                            Pages {group.label}
-                          </div>
+                          <div className="mt-1 text-xs font-medium text-[var(--text-muted)]">Pages {group.label}</div>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <p className="mt-2 text-sm font-medium text-[var(--violet-600)]">
-                      Upload a PDF to preview split output.
-                    </p>
+                    <p className="mt-2 text-sm font-medium text-[var(--violet-600)]">Upload a PDF and enter valid page groups.</p>
                   )}
                 </div>
 
-                {file && unassignedPages.length > 0 && (
+                {file && unassignedPages.length > 0 ? (
                   <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-medium leading-6 text-amber-900">
                     <div className="mb-1 flex items-center gap-2 font-semibold">
                       <AlertTriangle size={16} />
@@ -590,13 +370,19 @@ export default function SplitPage() {
                       ? `${unassignedPages.length} pages are not included in the output groups.`
                       : `Pages ${unassignedPages.join(", ")} are not included.`}
                   </div>
-                )}
+                ) : null}
 
-                <button
-                  onClick={handleSplit}
-                  disabled={!canSplit}
-                  className="btn-primary mt-5 w-full"
-                >
+                {results.length > 0 ? (
+                  <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm font-medium leading-6 text-emerald-800">
+                    <div className="mb-1 flex items-center gap-2 font-semibold">
+                      <CheckCircle2 size={16} />
+                      Last output
+                    </div>
+                    {results.length} file{results.length > 1 ? "s" : ""} created.
+                  </div>
+                ) : null}
+
+                <button type="button" onClick={handleSplit} disabled={!canSplit} className="btn-primary mt-5 w-full">
                   {busy ? (
                     <>
                       <Loader2 className="animate-spin" size={18} />
@@ -614,12 +400,18 @@ export default function SplitPage() {
               <div className="mt-5 rounded-[1.5rem] border border-[var(--border-light)] bg-[var(--bg-card)] p-4 text-sm font-medium leading-6 text-[var(--text-secondary)] shadow-[var(--shadow-soft)]">
                 <div className="mb-1 flex items-center gap-2 font-semibold text-[var(--text-primary)]">
                   <Sparkles size={16} />
-                  Smart grouping
+                  Engine grouping
                 </div>
-                Each comma-separated group becomes a separate PDF file.
+                Each comma-separated group becomes a separate PDF file with safe output names.
               </div>
 
-              <div className="mt-5 rounded-[1.5rem] border border-[var(--violet-border)] bg-[var(--violet-50)] p-4 text-sm font-medium leading-6 text-[var(--violet-600)] shadow-[var(--shadow-soft)]">
+              <div
+                className={`mt-5 rounded-[1.5rem] border p-4 text-sm font-medium leading-6 shadow-[var(--shadow-soft)] ${
+                  statusLooksLikeError
+                    ? "border-red-100 bg-red-50 text-red-700"
+                    : "border-[var(--violet-border)] bg-[var(--violet-50)] text-[var(--violet-600)]"
+                }`}
+              >
                 <div className="mb-1 flex items-center gap-2 font-semibold">
                   <CheckCircle2 size={16} />
                   Status
