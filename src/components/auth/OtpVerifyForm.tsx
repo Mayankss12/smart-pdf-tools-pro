@@ -5,8 +5,14 @@ import { useActionState, useRef, useState } from "react";
 
 import { resendOtpAction, verifyOtpAction, type ActionResult } from "@/app/actions/auth";
 
+const OTP_LENGTH = 6;
+
 interface OtpVerifyFormProps {
   readonly email: string;
+}
+
+function normalizeOtp(value: string) {
+  return value.replace(/\D/g, "").slice(0, OTP_LENGTH);
 }
 
 export function OtpVerifyForm({ email }: OtpVerifyFormProps) {
@@ -21,25 +27,46 @@ export function OtpVerifyForm({ email }: OtpVerifyFormProps) {
     null,
   );
 
+  function focusDigit(index: number) {
+    const safeIndex = Math.max(0, Math.min(index, OTP_LENGTH - 1));
+    inputRefs.current[safeIndex]?.focus();
+  }
+
   function handleDigitChange(index: number, value: string) {
-    if (!/^\d*$/.test(value)) {
+    const cleanValue = normalizeOtp(value);
+
+    if (cleanValue.length > 1) {
+      setOtp(cleanValue);
+      focusDigit(cleanValue.length >= OTP_LENGTH ? OTP_LENGTH - 1 : cleanValue.length);
       return;
     }
 
-    const digits = otp.padEnd(6, " ").split("");
-    digits[index] = value.slice(-1) || " ";
-    const nextOtp = digits.join("").replace(/\s/g, "").slice(0, 6);
+    const digits = Array.from({ length: OTP_LENGTH }, (_, digitIndex) => otp[digitIndex] || "");
+    digits[index] = cleanValue;
+    const nextOtp = digits.join("").slice(0, OTP_LENGTH);
 
     setOtp(nextOtp);
 
-    if (value && index < 5) {
-      inputRefs.current[index + 1]?.focus();
+    if (cleanValue && index < OTP_LENGTH - 1) {
+      focusDigit(index + 1);
     }
+  }
+
+  function handlePaste(event: React.ClipboardEvent<HTMLInputElement>) {
+    event.preventDefault();
+    const pastedOtp = normalizeOtp(event.clipboardData.getData("text"));
+
+    if (!pastedOtp) {
+      return;
+    }
+
+    setOtp(pastedOtp);
+    focusDigit(pastedOtp.length >= OTP_LENGTH ? OTP_LENGTH - 1 : pastedOtp.length);
   }
 
   function handleKeyDown(index: number, event: React.KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Backspace" && !otp[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus();
+      focusDigit(index - 1);
     }
   }
 
@@ -50,7 +77,7 @@ export function OtpVerifyForm({ email }: OtpVerifyFormProps) {
           Verification code
         </label>
         <div className="flex justify-between gap-2">
-          {Array.from({ length: 6 }).map((_, index) => (
+          {Array.from({ length: OTP_LENGTH }).map((_, index) => (
             <input
               key={index}
               ref={(element) => {
@@ -58,15 +85,20 @@ export function OtpVerifyForm({ email }: OtpVerifyFormProps) {
               }}
               type="text"
               inputMode="numeric"
-              maxLength={1}
+              autoComplete={index === 0 ? "one-time-code" : "off"}
+              maxLength={OTP_LENGTH}
               value={otp[index] || ""}
               onChange={(event) => handleDigitChange(index, event.target.value)}
               onKeyDown={(event) => handleKeyDown(index, event)}
+              onPaste={handlePaste}
               className="h-12 w-11 rounded-xl border border-[var(--border-light)] bg-white text-center text-xl font-bold text-[var(--text-primary)] outline-none transition focus:border-[var(--violet-600)] focus:ring-2 focus:ring-[rgba(101,80,232,0.16)] sm:w-12"
               aria-label={`Digit ${index + 1}`}
             />
           ))}
         </div>
+        <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">
+          Paste the full code from your email or type it one digit at a time.
+        </p>
       </div>
 
       <form action={verifyAction} id="verify-otp-form">
@@ -83,7 +115,7 @@ export function OtpVerifyForm({ email }: OtpVerifyFormProps) {
       <button
         type="submit"
         form="verify-otp-form"
-        disabled={otp.length !== 6 || isVerifying}
+        disabled={otp.length !== OTP_LENGTH || isVerifying}
         className="inline-flex min-h-12 w-full items-center justify-center rounded-full bg-[var(--violet-600)] px-5 py-3 text-sm font-semibold text-white shadow-[0_16px_34px_rgba(101,80,232,0.18)] transition hover:bg-[var(--violet-500)] disabled:cursor-not-allowed disabled:opacity-60"
       >
         {isVerifying ? "Verifying..." : "Verify & Sign In"}
