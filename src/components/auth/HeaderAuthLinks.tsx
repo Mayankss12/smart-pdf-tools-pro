@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { ArrowRight } from "lucide-react";
 
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
@@ -11,9 +11,7 @@ type HeaderAuthState = {
   isSignedIn: boolean;
 };
 
-const HeaderAuthContext = createContext<HeaderAuthState | null>(null);
-
-export function HeaderAuthProvider({ children }: { readonly children: ReactNode }) {
+function useHeaderAuthState(): HeaderAuthState {
   const [authState, setAuthState] = useState<HeaderAuthState>({
     isLoaded: false,
     isSignedIn: false,
@@ -23,29 +21,23 @@ export function HeaderAuthProvider({ children }: { readonly children: ReactNode 
     let isMounted = true;
     const supabase = createSupabaseBrowserClient();
 
+    function updateState(isSignedIn: boolean) {
+      if (isMounted) {
+        setAuthState({ isLoaded: true, isSignedIn });
+      }
+    }
+
     if (!supabase) {
-      setAuthState({ isLoaded: true, isSignedIn: false });
+      updateState(false);
       return () => {
         isMounted = false;
       };
     }
 
-    function updateState(isSignedIn: boolean) {
-      if (!isMounted) {
-        return;
-      }
-
-      setAuthState({ isLoaded: true, isSignedIn });
-    }
-
     supabase.auth
       .getSession()
-      .then(({ data }) => {
-        updateState(Boolean(data.session?.user));
-      })
-      .catch(() => {
-        updateState(false);
-      });
+      .then(({ data }) => updateState(Boolean(data.session?.user)))
+      .catch(() => updateState(false));
 
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       updateState(Boolean(session?.user));
@@ -57,22 +49,7 @@ export function HeaderAuthProvider({ children }: { readonly children: ReactNode 
     };
   }, []);
 
-  const value = useMemo(
-    () => authState,
-    [authState],
-  );
-
-  return <HeaderAuthContext.Provider value={value}>{children}</HeaderAuthContext.Provider>;
-}
-
-function useHeaderAuthState() {
-  const context = useContext(HeaderAuthContext);
-
-  if (context) {
-    return context;
-  }
-
-  return { isLoaded: true, isSignedIn: false };
+  return authState;
 }
 
 export function HeaderAuthLinks() {
