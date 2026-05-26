@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { DM_Sans, Plus_Jakarta_Sans } from "next/font/google";
-import { AuthHeaderSync } from "@/components/auth/AuthHeaderSync";
 import "@/styles/tokens.css";
 import "./globals.css";
 
@@ -70,7 +69,6 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${body.variable} ${display.variable}`}>
       <body className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)] antialiased">
-        <AuthHeaderSync />
         {children}
       </body>
     </html>
