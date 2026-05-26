@@ -37,6 +37,8 @@ export type PageGroup = {
   pages: number[];
 };
 
+export type RotationMap = Record<number, number>;
+
 const DEFAULT_MAX_SIZE_MB = 80;
 
 export function isPdfFile(file: File) {
@@ -68,6 +70,10 @@ export function createPdfFileName(prefix: string, sourceName: string) {
 export function getReductionPercent(originalSize: number, outputSize: number) {
   if (originalSize <= 0) return 0;
   return Math.max(0, Math.round((1 - outputSize / originalSize) * 100));
+}
+
+export function normalizePdfRotation(value: number) {
+  return ((value % 360) + 360) % 360;
 }
 
 export function validatePdfFile(file: File | null | undefined, options: PdfValidationOptions = {}) {
@@ -257,6 +263,21 @@ export async function rotatePdfPages(file: File, rotation: 90 | 180 | 270): Prom
   const pdf = await loadPdfDocument(file);
   pdf.getPages().forEach((page) => page.setRotation(degrees(rotation)));
   return savePdfResult(pdf, file.size, createPdfFileName(`rotated-${rotation}`, file.name));
+}
+
+export async function rotatePdfWithMap(file: File, rotationMap: RotationMap): Promise<PdfProcessingResult> {
+  const pdf = await loadPdfDocument(file);
+
+  pdf.getPages().forEach((page, index) => {
+    const pageNumber = index + 1;
+    const existingRotation = page.getRotation().angle || 0;
+    const extraRotation = rotationMap[pageNumber] || 0;
+    const finalRotation = normalizePdfRotation(existingRotation + extraRotation);
+
+    page.setRotation(degrees(finalRotation));
+  });
+
+  return savePdfResult(pdf, file.size, createPdfFileName("rotated", file.name));
 }
 
 export async function addTextWatermark(file: File, text: string): Promise<PdfProcessingResult> {
