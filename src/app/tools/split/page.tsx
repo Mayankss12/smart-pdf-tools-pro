@@ -16,12 +16,14 @@ import {
 
 import { Header } from "@/components/Header";
 import { ToolPageHeader } from "@/components/ToolPageHeader";
+import { createZipBlob } from "@/lib/browser-zip";
 import {
   PdfEngineError,
   downloadBlob,
   formatFileSize,
   loadPdfDocument,
   parsePageGroups,
+  safeFileBaseName,
   splitPdfIntoGroups,
   validatePdfFile,
   type PageGroup,
@@ -133,12 +135,21 @@ export default function SplitPage() {
       const outputs = await splitPdfIntoGroups(file, parsedGroups);
       setResults(outputs);
 
-      for (const output of outputs) {
-        downloadBlob(output.blob, output.fileName);
-        await new Promise((resolve) => window.setTimeout(resolve, 250));
-      }
+      if (outputs.length === 1) {
+        downloadBlob(outputs[0].blob, outputs[0].fileName);
+        setStatus("Split completed. Downloaded 1 PDF.");
+      } else {
+        setStatus(`Packaging ${outputs.length} PDFs into one ZIP...`);
+        const zipBlob = await createZipBlob(
+          outputs.map((output) => ({
+            fileName: output.fileName,
+            blob: output.blob,
+          })),
+        );
 
-      setStatus(`Split completed. Downloaded ${outputs.length} PDF${outputs.length > 1 ? "s" : ""}.`);
+        downloadBlob(zipBlob, `PDFMantra-split-${safeFileBaseName(file.name)}.zip`);
+        setStatus(`Split completed. Downloaded 1 ZIP containing ${outputs.length} PDFs.`);
+      }
     } catch (error) {
       setResults([]);
       setStatus(getErrorMessage(error));
@@ -167,7 +178,7 @@ export default function SplitPage() {
             icon={Scissors}
             eyebrow="PDFMantra Engine Tool"
             title="Split PDFs into controlled page groups."
-            description="Upload one PDF, define exact page ranges like 1-4,5-8, and export each group as a separate PDF through the shared PDFMantra engine."
+            description="Upload one PDF, define exact page ranges like 1-4,5-8, and export each group as a separate PDF. Multiple outputs download together as one ZIP."
             meta={
               <div className="grid min-w-[260px] grid-cols-3 divide-x divide-[var(--border-light)] text-center">
                 <div className="px-3">
@@ -299,27 +310,9 @@ export default function SplitPage() {
                 </p>
 
                 <div className="mt-4 grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => applyPreset("1")}
-                    className="rounded-2xl border border-[var(--border-light)] bg-white px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] hover:text-[var(--violet-600)]"
-                  >
-                    Page 1
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => applyPreset("1-4,5-8")}
-                    className="rounded-2xl border border-[var(--border-light)] bg-white px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] hover:text-[var(--violet-600)]"
-                  >
-                    4-page sets
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => applyPreset(pageCount ? `1-${pageCount}` : "1-3")}
-                    className="rounded-2xl border border-[var(--border-light)] bg-white px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] hover:text-[var(--violet-600)]"
-                  >
-                    All pages
-                  </button>
+                  <button type="button" onClick={() => applyPreset("1")} className="rounded-2xl border border-[var(--border-light)] bg-white px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] hover:text-[var(--violet-600)]">Page 1</button>
+                  <button type="button" onClick={() => applyPreset("1-4,5-8")} className="rounded-2xl border border-[var(--border-light)] bg-white px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] hover:text-[var(--violet-600)]">4-page sets</button>
+                  <button type="button" onClick={() => applyPreset(pageCount ? `1-${pageCount}` : "1-3")} className="rounded-2xl border border-[var(--border-light)] bg-white px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] hover:text-[var(--violet-600)]">All pages</button>
                 </div>
 
                 <label className="mt-5 block">
@@ -378,7 +371,9 @@ export default function SplitPage() {
                       <CheckCircle2 size={16} />
                       Last output
                     </div>
-                    {results.length} file{results.length > 1 ? "s" : ""} created.
+                    {results.length === 1
+                      ? "1 PDF created."
+                      : `${results.length} PDFs created and packed into one ZIP.`}
                   </div>
                 ) : null}
 
@@ -391,7 +386,7 @@ export default function SplitPage() {
                   ) : (
                     <>
                       <Download size={18} />
-                      <span>Split & Download</span>
+                      <span>{groups.length > 1 ? "Split & Download ZIP" : "Split & Download"}</span>
                     </>
                   )}
                 </button>
@@ -402,7 +397,7 @@ export default function SplitPage() {
                   <Sparkles size={16} />
                   Engine grouping
                 </div>
-                Each comma-separated group becomes a separate PDF file with safe output names.
+                One group downloads as a PDF. Multiple groups download together as one ZIP file.
               </div>
 
               <div
