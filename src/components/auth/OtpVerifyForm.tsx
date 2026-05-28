@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useActionState, useRef, useState } from "react";
+import { CheckCircle2, Loader2, MailCheck, RefreshCw, ShieldCheck } from "lucide-react";
 
 import { resendOtpAction, verifyOtpAction, type ActionResult } from "@/app/actions/auth";
 
@@ -30,6 +31,7 @@ export function OtpVerifyForm({ email }: OtpVerifyFormProps) {
   function focusDigit(index: number) {
     const safeIndex = Math.max(0, Math.min(index, OTP_LENGTH - 1));
     inputRefs.current[safeIndex]?.focus();
+    inputRefs.current[safeIndex]?.select();
   }
 
   function handleDigitChange(index: number, value: string) {
@@ -56,9 +58,7 @@ export function OtpVerifyForm({ email }: OtpVerifyFormProps) {
     event.preventDefault();
     const pastedOtp = normalizeOtp(event.clipboardData.getData("text"));
 
-    if (!pastedOtp) {
-      return;
-    }
+    if (!pastedOtp) return;
 
     setOtp(pastedOtp);
     focusDigit(pastedOtp.length >= OTP_LENGTH ? OTP_LENGTH - 1 : pastedOtp.length);
@@ -68,15 +68,45 @@ export function OtpVerifyForm({ email }: OtpVerifyFormProps) {
     if (event.key === "Backspace" && !otp[index] && index > 0) {
       focusDigit(index - 1);
     }
+
+    if (event.key === "ArrowLeft" && index > 0) {
+      event.preventDefault();
+      focusDigit(index - 1);
+    }
+
+    if (event.key === "ArrowRight" && index < OTP_LENGTH - 1) {
+      event.preventDefault();
+      focusDigit(index + 1);
+    }
   }
+
+  const isComplete = otp.length === OTP_LENGTH;
 
   return (
     <div className="space-y-5">
+      <div className="rounded-[1.35rem] border border-violet-100 bg-violet-50/70 p-4">
+        <div className="flex gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-violet-700 shadow-sm">
+            <MailCheck size={22} />
+          </div>
+          <div className="min-w-0">
+            <div className="text-sm font-bold text-slate-950">Verification code sent</div>
+            <p className="mt-1 break-words text-sm leading-6 text-slate-600">
+              Enter the 6-digit code sent to <span className="font-semibold text-slate-950">{email}</span>.
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div>
-        <label className="mb-3 block text-sm font-semibold text-[var(--text-primary)]">
-          Verification code
+        <label className="mb-3 flex items-center justify-between gap-3 text-sm font-semibold text-[var(--text-primary)]">
+          <span>6-digit code</span>
+          <span className="rounded-full border border-violet-100 bg-white px-3 py-1 text-xs font-semibold text-slate-500">
+            {otp.length}/{OTP_LENGTH}
+          </span>
         </label>
-        <div className="flex justify-between gap-2">
+
+        <div className="grid grid-cols-6 gap-2 sm:gap-3">
           {Array.from({ length: OTP_LENGTH }).map((_, index) => (
             <input
               key={index}
@@ -91,13 +121,15 @@ export function OtpVerifyForm({ email }: OtpVerifyFormProps) {
               onChange={(event) => handleDigitChange(index, event.target.value)}
               onKeyDown={(event) => handleKeyDown(index, event)}
               onPaste={handlePaste}
-              className="h-12 w-11 rounded-xl border border-[var(--border-light)] bg-white text-center text-xl font-bold text-[var(--text-primary)] outline-none transition focus:border-[var(--violet-600)] focus:ring-2 focus:ring-[rgba(101,80,232,0.16)] sm:w-12"
+              disabled={isVerifying}
+              className="h-13 min-h-13 w-full rounded-2xl border border-[var(--border-light)] bg-white text-center text-2xl font-black tracking-[-0.04em] text-[var(--text-primary)] outline-none transition focus:border-[var(--violet-600)] focus:ring-4 focus:ring-[rgba(101,80,232,0.16)] disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 sm:h-14 sm:min-h-14"
               aria-label={`Digit ${index + 1}`}
             />
           ))}
         </div>
-        <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">
-          Paste the full code from your email or type it one digit at a time.
+
+        <p className="mt-3 text-xs leading-5 text-[var(--text-muted)]">
+          You can paste the full code from your email. Only numbers are accepted.
         </p>
       </div>
 
@@ -107,7 +139,7 @@ export function OtpVerifyForm({ email }: OtpVerifyFormProps) {
       </form>
 
       {verifyState?.success === false ? (
-        <div className="rounded-xl border border-red-100 bg-red-50 px-3 py-2.5 text-sm font-medium leading-6 text-red-700">
+        <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium leading-6 text-red-700">
           {verifyState.error}
         </div>
       ) : null}
@@ -115,28 +147,45 @@ export function OtpVerifyForm({ email }: OtpVerifyFormProps) {
       <button
         type="submit"
         form="verify-otp-form"
-        disabled={otp.length !== OTP_LENGTH || isVerifying}
-        className="inline-flex min-h-12 w-full items-center justify-center rounded-full bg-[var(--violet-600)] px-5 py-3 text-sm font-semibold text-white shadow-[0_16px_34px_rgba(101,80,232,0.18)] transition hover:bg-[var(--violet-500)] disabled:cursor-not-allowed disabled:opacity-60"
+        disabled={!isComplete || isVerifying}
+        className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-[var(--violet-600)] px-5 py-3 text-sm font-semibold text-white shadow-[0_16px_34px_rgba(101,80,232,0.18)] transition hover:bg-[var(--violet-500)] disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {isVerifying ? "Verifying..." : "Verify & Sign In"}
+        {isVerifying ? (
+          <>
+            <Loader2 className="animate-spin" size={18} />
+            Verifying secure login
+          </>
+        ) : (
+          <>
+            <ShieldCheck size={18} />
+            Verify & Sign In
+          </>
+        )}
       </button>
 
-      <div className="border-t border-[var(--border-light)] pt-4">
+      <div className="rounded-[1.35rem] border border-[var(--border-light)] bg-slate-50 p-4">
         {resendState?.success ? (
-          <p className="mb-2 text-sm font-medium text-emerald-700">{resendState.message}</p>
+          <div className="mb-3 flex items-start gap-2 rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-2.5 text-sm font-medium leading-6 text-emerald-800">
+            <CheckCircle2 className="mt-0.5 shrink-0" size={16} />
+            <span>{resendState.message}</span>
+          </div>
         ) : null}
         {resendState?.success === false ? (
-          <p className="mb-2 text-sm font-medium text-red-700">{resendState.error}</p>
+          <p className="mb-3 rounded-2xl border border-red-100 bg-red-50 px-3 py-2.5 text-sm font-medium text-red-700">
+            {resendState.error}
+          </p>
         ) : null}
-        <form action={resendAction} className="flex items-center justify-between gap-3">
+
+        <form action={resendAction} className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <input type="hidden" name="email" value={email} />
-          <p className="text-sm text-[var(--text-muted)]">Didn&apos;t receive a code?</p>
+          <p className="text-sm text-[var(--text-muted)]">Didn&apos;t receive the code?</p>
           <button
             type="submit"
-            disabled={isResending}
-            className="text-sm font-semibold text-[var(--violet-600)] hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={isResending || isVerifying}
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-violet-100 bg-white px-4 py-2 text-sm font-semibold text-[var(--violet-600)] transition hover:border-violet-200 hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isResending ? "Sending..." : "Resend code"}
+            <RefreshCw className={isResending ? "animate-spin" : ""} size={15} />
+            {isResending ? "Sending" : "Resend code"}
           </button>
         </form>
       </div>
