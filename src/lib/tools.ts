@@ -88,7 +88,14 @@ export interface ToolSearchOptions {
   limit?: number;
 }
 
-export type ToolSearchMatchKind = "exact-title" | "title" | "alias" | "keyword" | "use-case" | "description" | "category";
+export type ToolSearchMatchKind =
+  | "exact-title"
+  | "title"
+  | "alias"
+  | "keyword"
+  | "use-case"
+  | "description"
+  | "category";
 
 export interface ToolSearchResult {
   tool: Tool;
@@ -120,7 +127,7 @@ export const TOOL_CATEGORIES: readonly ToolCategoryMeta[] = [
     description: "Merge, split, delete, extract, rotate, reorder, and organize PDF pages.",
     shortDescription: "Merge, split, rotate, extract, delete, and reorder pages.",
     sortOrder: 2,
-    searchAliases: ["organize", "pages", "merge", "split", "combine", "delete", "extract", "rotate", "rearrange"],
+    searchAliases: ["organize", "pages", "merge", "split", "combine", "delete", "extract", "rotate", "rearrange", "reorder"],
   },
   {
     id: "convert",
@@ -212,17 +219,7 @@ function browserTool(experience: ToolExperience, recommendedEntry: "editor" | "t
   };
 }
 
-function upcomingBrowserTool(experience: ToolExperience): ToolCapabilityMeta {
-  return {
-    processingMode: "browser",
-    experience,
-    launchTier: "next-product-wave",
-    needsBackendProcessing: false,
-    recommendedEntry: "tool-page",
-  };
-}
-
-function backendTool(experience: ToolExperience): ToolCapabilityMeta {
+function backendWorkflow(experience: ToolExperience): ToolCapabilityMeta {
   return {
     processingMode: "backend",
     experience,
@@ -281,7 +278,6 @@ export const tools: Tool[] = [
     status: "working",
     isClientOnly: true,
     popular: true,
-    featured: false,
     search: searchMeta(["highlight", "mark text", "pdf highlighter"], ["text selection", "highlight color", "annotation"], ["highlight text in pdf", "mark important sentences"], 98),
     visibility: everywhere,
     capabilities: browserTool("workspace"),
@@ -334,8 +330,8 @@ export const tools: Tool[] = [
   {
     id: "split-pdf",
     title: "Split PDF",
-    description: "Extract pages or split a PDF into multiple files by range.",
-    menuDescription: "Break large PDFs into page ranges or smaller documents.",
+    description: "Split a PDF into page groups with ZIP output for multiple files.",
+    menuDescription: "Break PDFs into page ranges and package multiple outputs as one ZIP.",
     category: "organize",
     href: "/tools/split",
     icon: Scissors,
@@ -371,8 +367,6 @@ export const tools: Tool[] = [
     icon: Trash2,
     status: "working",
     isClientOnly: true,
-    popular: false,
-    featured: false,
     search: searchMeta(["remove pages", "delete pdf page", "drop pages", "erase pages"], ["page cleanup", "remove sheet", "discard pages"], ["delete pages from pdf", "remove blank pages", "drop unwanted pages"], 92),
     visibility: directoryOnly,
     capabilities: browserTool("guided-processing"),
@@ -394,32 +388,32 @@ export const tools: Tool[] = [
   {
     id: "reorder-pages",
     title: "Reorder Pages",
-    description: "Drag and drop to rearrange PDF pages in any order.",
+    description: "Move pages up or down and export a reordered PDF.",
     menuDescription: "Rearrange page order visually before exporting.",
     category: "organize",
     href: "/tools/reorder",
     icon: ArrowUpDown,
-    status: "coming-soon",
+    status: "working",
     isClientOnly: true,
-    search: searchMeta(["rearrange pages", "move pages", "change page order"], ["drag and drop", "page order", "sequence"], ["reorder pdf pages", "arrange scanned pages"], 84),
+    search: searchMeta(["rearrange pages", "move pages", "change page order", "reorder pdf"], ["page order", "sequence", "reverse pages"], ["reorder pdf pages", "move page 5 to front", "arrange scanned pages"], 97),
     visibility: directoryOnly,
-    capabilities: upcomingBrowserTool("guided-processing"),
+    capabilities: browserTool("guided-processing"),
   },
   {
     id: "organize-pdf",
     title: "Organize PDF",
-    description: "Visually manage, rotate, and arrange all pages.",
-    menuDescription: "Open a page workspace for broader PDF organization tasks.",
+    description: "Open a workspace that links all page organization tools.",
+    menuDescription: "Access merge, split, delete, extract, reorder, and rotate tools from one page.",
     category: "organize",
     href: "/tools/organize",
     icon: Layers,
-    status: "coming-soon",
+    status: "working",
     isClientOnly: true,
     popular: true,
     featured: true,
-    search: searchMeta(["page organizer", "organize pdf", "manage pdf pages"], ["thumbnail workspace", "page canvas", "rotate", "reorder", "delete"], ["manage all pages visually", "organize scanned file"], 102),
+    search: searchMeta(["page organizer", "organize pdf", "manage pdf pages"], ["thumbnail workspace", "page tools", "rotate", "reorder", "delete", "extract"], ["manage all pages visually", "organize scanned file", "choose page tool"], 102),
     visibility: everywhere,
-    capabilities: upcomingBrowserTool("workspace"),
+    capabilities: browserTool("workspace"),
   },
   {
     id: "images-to-pdf",
@@ -455,18 +449,18 @@ export const tools: Tool[] = [
   {
     id: "pdf-to-word",
     title: "PDF to Word",
-    description: "Convert PDFs into editable Word documents.",
-    menuDescription: "Create editable Word documents from PDF content.",
+    description: "Backend workflow shell for editable document output.",
+    menuDescription: "Prepared backend workflow for PDF to Word processing.",
     category: "convert",
     href: "/tools/pdf-to-word",
     icon: Wand2,
-    status: "coming-soon",
+    status: "beta",
     isClientOnly: false,
     popular: true,
     featured: true,
-    search: searchMeta(["pdf to doc", "pdf to docx", "convert pdf to word"], ["document conversion", "docx", "editable document"], ["turn pdf into editable document", "copy pdf into word"], 112),
+    search: searchMeta(["pdf to doc", "pdf to docx", "convert pdf to word"], ["document workflow", "docx", "editable document", "backend"], ["prepare pdf for word workflow", "convert document through backend"], 112),
     visibility: everywhere,
-    capabilities: backendTool("guided-processing"),
+    capabilities: backendWorkflow("guided-processing"),
   },
   {
     id: "compress-pdf",
@@ -487,47 +481,47 @@ export const tools: Tool[] = [
   {
     id: "ocr-pdf",
     title: "OCR PDF",
-    description: "Make scanned PDFs searchable and selectable with OCR.",
-    menuDescription: "Recognize scanned text so it can be searched and selected.",
+    description: "Backend workflow shell for searchable scanned PDFs.",
+    menuDescription: "Prepared OCR workflow for scanned document processing.",
     category: "optimize",
     href: "/tools/ocr",
     icon: Brain,
-    status: "coming-soon",
+    status: "beta",
     isClientOnly: false,
     popular: true,
     featured: true,
-    search: searchMeta(["scan text", "make pdf searchable", "ocr scan"], ["searchable pdf", "selectable text", "scanned document"], ["convert scan to searchable pdf", "read image-based pdf"], 114),
+    search: searchMeta(["scan text", "make pdf searchable", "ocr scan"], ["searchable pdf", "selectable text", "scanned document", "backend"], ["prepare searchable pdf workflow", "read image-based pdf"], 114),
     visibility: everywhere,
-    capabilities: backendTool("guided-processing"),
+    capabilities: backendWorkflow("guided-processing"),
   },
   {
     id: "protect-pdf",
     title: "Protect PDF",
-    description: "Add a password to prevent unauthorized access.",
-    menuDescription: "Secure a PDF with password protection and safer sharing.",
+    description: "Backend workflow shell for password-protected PDF output.",
+    menuDescription: "Prepared security workflow for PDF password protection.",
     category: "security",
     href: "/tools/protect",
     icon: ShieldCheck,
-    status: "coming-soon",
+    status: "beta",
     isClientOnly: false,
     popular: true,
-    search: searchMeta(["password pdf", "lock pdf", "secure pdf"], ["protection", "document security", "password access"], ["password protect a pdf", "secure document before sharing"], 101),
+    search: searchMeta(["password pdf", "lock pdf", "secure pdf"], ["protection", "document security", "password access", "backend"], ["password protect a pdf", "secure document before sharing"], 101),
     visibility: directoryOnly,
-    capabilities: backendTool("guided-processing"),
+    capabilities: backendWorkflow("guided-processing"),
   },
   {
     id: "unlock-pdf",
     title: "Unlock PDF",
-    description: "Remove password protection from PDFs you own.",
-    menuDescription: "Open permitted password-protected PDFs you are allowed to access.",
+    description: "Backend workflow shell for authorized PDF unlocking.",
+    menuDescription: "Prepared authorized workflow for password-known PDFs.",
     category: "security",
     href: "/tools/unlock",
     icon: ShieldOff,
-    status: "coming-soon",
+    status: "beta",
     isClientOnly: false,
-    search: searchMeta(["remove pdf password", "unlock protected pdf"], ["password removal", "authorized access", "decrypt"], ["unlock my own pdf", "remove protection from document I own"], 88),
+    search: searchMeta(["remove pdf password", "unlock protected pdf"], ["password removal", "authorized access", "backend"], ["unlock my own pdf", "remove protection from document I own"], 88),
     visibility: directoryOnly,
-    capabilities: backendTool("guided-processing"),
+    capabilities: backendWorkflow("guided-processing"),
   },
   {
     id: "watermark-remover",
@@ -543,21 +537,21 @@ export const tools: Tool[] = [
     newTool: true,
     search: searchMeta(["remove watermark", "watermark remover", "delete watermark"], ["pro", "authorized cleanup", "stamp removal", "backend"], ["remove watermark from my pdf", "clean up authorized document"], 103),
     visibility: directoryOnly,
-    capabilities: backendTool("guided-processing"),
+    capabilities: backendWorkflow("guided-processing"),
   },
   {
     id: "redact-pdf",
     title: "Redact PDF",
-    description: "Permanently black out sensitive text and images.",
-    menuDescription: "Remove sensitive content permanently through true redaction workflows.",
+    description: "Backend workflow shell for permanent content redaction.",
+    menuDescription: "Prepared privacy workflow for true PDF redaction.",
     category: "security",
     href: "/tools/redact",
     icon: Eye,
-    status: "coming-soon",
+    status: "beta",
     isClientOnly: false,
-    search: searchMeta(["hide private text", "remove sensitive data", "blackout pdf"], ["privacy", "permanent removal", "sensitive information"], ["redact personal data", "hide confidential text permanently"], 90),
+    search: searchMeta(["hide private text", "remove sensitive data", "blackout pdf", "redact pdf"], ["privacy", "permanent removal", "sensitive information", "backend"], ["redact personal data", "hide confidential text permanently"], 90),
     visibility: directoryOnly,
-    capabilities: backendTool("guided-processing"),
+    capabilities: backendWorkflow("guided-processing"),
   },
 ];
 
