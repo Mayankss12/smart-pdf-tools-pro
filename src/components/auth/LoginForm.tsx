@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useActionState, useEffect } from "react";
+import { AlertCircle, CheckCircle2, KeyRound, MailCheck } from "lucide-react";
 
 import { loginVerifyPasswordAction, type ActionResult } from "@/app/actions/auth";
 import { AuthButton } from "./AuthButton";
@@ -28,22 +29,38 @@ export function LoginForm() {
   return (
     <form action={action} className="space-y-4">
       {accountCreated ? (
-        <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2.5 text-sm font-medium leading-6 text-emerald-800">
-          Account created successfully. Sign in below.
+        <div className="flex gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-medium leading-6 text-emerald-800">
+          <CheckCircle2 className="mt-0.5 shrink-0" size={17} />
+          <span>Account created successfully. Sign in below to receive your verification code.</span>
         </div>
       ) : null}
 
       {passwordReset ? (
-        <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2.5 text-sm font-medium leading-6 text-emerald-800">
-          Password updated successfully. Sign in with your new password.
+        <div className="flex gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-medium leading-6 text-emerald-800">
+          <CheckCircle2 className="mt-0.5 shrink-0" size={17} />
+          <span>Password updated successfully. Sign in with your new password.</span>
         </div>
       ) : null}
+
+      <div className="rounded-[1.35rem] border border-violet-100 bg-violet-50/70 p-4">
+        <div className="flex gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-violet-700 shadow-sm">
+            <KeyRound size={20} />
+          </div>
+          <div>
+            <div className="text-sm font-bold text-slate-950">Two-step secure login</div>
+            <p className="mt-1 text-sm leading-6 text-slate-600">
+              First verify your password, then enter the 6-digit email code.
+            </p>
+          </div>
+        </div>
+      </div>
 
       <AuthInput
         name="email"
         label="Email address"
         type="email"
-        placeholder="jane@example.com"
+        placeholder="you@example.com"
         autoComplete="email"
         required
         error={state?.success === false && state.field === "email" ? state.error : undefined}
@@ -52,31 +69,38 @@ export function LoginForm() {
         name="password"
         label="Password"
         type="password"
-        placeholder="Your password"
+        placeholder="Enter your password"
         autoComplete="current-password"
         required
         error={state?.success === false && state.field === "password" ? state.error : undefined}
       />
 
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between gap-3">
+        <div className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500">
+          <MailCheck size={14} />
+          Code sent after password check
+        </div>
         <Link href="/forgot-password" className="text-sm font-semibold text-[var(--violet-600)] hover:underline">
           Forgot password?
         </Link>
       </div>
 
       {state?.success === false && !state.field ? (
-        <div className="rounded-xl border border-red-100 bg-red-50 px-3 py-2.5 text-sm font-medium leading-6 text-red-700">
-          <p>{state.error}</p>
-          <p className="mt-1 text-xs text-red-600/80">
-            Signed up previously?{" "}
-            <Link href="/forgot-password" className="font-semibold underline">
-              Use Forgot Password to set your password.
-            </Link>
-          </p>
+        <div className="flex gap-3 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium leading-6 text-red-700">
+          <AlertCircle className="mt-0.5 shrink-0" size={17} />
+          <div>
+            <p>{state.error}</p>
+            <p className="mt-1 text-xs text-red-600/80">
+              Signed up previously?{" "}
+              <Link href="/forgot-password" className="font-semibold underline">
+                Use Forgot Password to set your password.
+              </Link>
+            </p>
+          </div>
         </div>
       ) : null}
 
-      <AuthButton isPending={isPending} label="Continue" pendingLabel="Verifying..." />
+      <AuthButton isPending={isPending} label="Continue to email code" pendingLabel="Checking password" />
     </form>
   );
 }
