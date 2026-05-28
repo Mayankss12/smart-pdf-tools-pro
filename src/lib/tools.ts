@@ -23,32 +23,11 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-/**
- * PDFMantra Tool Registry
- * Central product intelligence layer for tool search, discovery, menu groups,
- * homepage blocks, and capability messaging.
- */
-
 export type ToolStatus = "working" | "beta" | "coming-soon";
-
-export type ToolCategory =
-  | "edit"
-  | "organize"
-  | "convert"
-  | "optimize"
-  | "security";
-
+export type ToolCategory = "edit" | "organize" | "convert" | "optimize" | "security";
 export type ToolProcessingMode = "browser" | "backend" | "hybrid";
-
-export type ToolExperience =
-  | "workspace"
-  | "quick-action"
-  | "guided-processing";
-
-export type ToolLaunchTier =
-  | "available-now"
-  | "next-product-wave"
-  | "backend-roadmap";
+export type ToolExperience = "workspace" | "quick-action" | "guided-processing";
+export type ToolLaunchTier = "available-now" | "next-product-wave" | "backend-roadmap";
 
 export interface ToolCategoryMeta {
   id: ToolCategory;
@@ -109,14 +88,7 @@ export interface ToolSearchOptions {
   limit?: number;
 }
 
-export type ToolSearchMatchKind =
-  | "exact-title"
-  | "title"
-  | "alias"
-  | "keyword"
-  | "use-case"
-  | "description"
-  | "category";
+export type ToolSearchMatchKind = "exact-title" | "title" | "alias" | "keyword" | "use-case" | "description" | "category";
 
 export interface ToolSearchResult {
   tool: Tool;
@@ -139,22 +111,22 @@ export const TOOL_CATEGORIES: readonly ToolCategoryMeta[] = [
     description: "Make visual changes, add content, annotate, and sign documents inside the PDFMantra workspace.",
     shortDescription: "Edit, annotate, highlight, watermark, number, and sign PDFs.",
     sortOrder: 1,
-    searchAliases: ["edit", "annotate", "write", "mark", "signature", "fill", "watermark", "page numbers"],
+    searchAliases: ["edit", "annotate", "write", "mark", "signature", "watermark", "page numbers"],
   },
   {
     id: "organize",
     label: "Organize Pages",
     menuLabel: "Organize",
-    description: "Restructure PDFs by merging, splitting, extracting, reordering, rotating, and managing pages visually.",
+    description: "Merge, split, delete, extract, rotate, reorder, and organize PDF pages.",
     shortDescription: "Merge, split, rotate, extract, delete, and reorder pages.",
     sortOrder: 2,
-    searchAliases: ["organize", "pages", "merge", "split", "combine", "rotate", "rearrange"],
+    searchAliases: ["organize", "pages", "merge", "split", "combine", "delete", "rotate", "rearrange"],
   },
   {
     id: "convert",
     label: "Convert",
     menuLabel: "Convert",
-    description: "Move between PDF and other useful document or image formats with clear conversion flows.",
+    description: "Move between PDF and useful document or image formats.",
     shortDescription: "Convert PDFs, images, and editable formats.",
     sortOrder: 3,
     searchAliases: ["convert", "export", "word", "image", "jpg", "png", "webp"],
@@ -163,7 +135,7 @@ export const TOOL_CATEGORIES: readonly ToolCategoryMeta[] = [
     id: "optimize",
     label: "Optimize & OCR",
     menuLabel: "Optimize & OCR",
-    description: "Reduce file size, improve usability, and make scanned content searchable with advanced processing.",
+    description: "Reduce file size, improve usability, and make scanned content searchable.",
     shortDescription: "Compress, optimize, and make scans searchable.",
     sortOrder: 4,
     searchAliases: ["compress", "reduce size", "optimize", "ocr", "scan", "searchable"],
@@ -172,16 +144,14 @@ export const TOOL_CATEGORIES: readonly ToolCategoryMeta[] = [
     id: "security",
     label: "Security",
     menuLabel: "Security",
-    description: "Protect, unlock, remove permitted marks, and redact sensitive PDF content through secure workflows.",
+    description: "Protect, unlock, remove permitted marks, and redact sensitive PDF content.",
     shortDescription: "Protect, unlock, remove marks, and redact PDFs.",
     sortOrder: 5,
-    searchAliases: ["security", "password", "protect", "unlock", "redact", "private", "remove watermark"],
+    searchAliases: ["security", "password", "protect", "unlock", "redact", "remove watermark"],
   },
 ] as const;
 
-export const TOOL_CATEGORY_ORDER: readonly ToolCategory[] = TOOL_CATEGORIES.map(
-  (category) => category.id,
-);
+export const TOOL_CATEGORY_ORDER: readonly ToolCategory[] = TOOL_CATEGORIES.map((category) => category.id);
 
 export const CATEGORY_LABELS: Record<ToolCategory, string> = {
   edit: "Edit & Annotate",
@@ -199,49 +169,39 @@ export const CATEGORY_MENU_LABELS: Record<ToolCategory, string> = {
   security: "Security",
 };
 
-export const STATUS_CONFIG: Record<
-  ToolStatus,
-  { label: string; className: string; rank: number }
-> = {
+export const STATUS_CONFIG: Record<ToolStatus, { label: string; className: string; rank: number }> = {
   working: {
     label: "Live",
-    className:
-      "rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700",
+    className: "rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700",
     rank: 1,
   },
   beta: {
     label: "Pro",
-    className:
-      "rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700",
+    className: "rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700",
     rank: 2,
   },
   "coming-soon": {
     label: "Coming Soon",
-    className:
-      "rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500",
+    className: "rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500",
     rank: 3,
   },
 };
 
-const visibleEverywhere: ToolVisibility = {
+const everywhere: ToolVisibility = {
   showInToolsPage: true,
   showInMegaMenu: true,
   showOnHomepage: true,
   searchable: true,
 };
 
-const visibleInDirectory: ToolVisibility = {
+const directoryOnly: ToolVisibility = {
   showInToolsPage: true,
   showInMegaMenu: true,
   showOnHomepage: false,
   searchable: true,
 };
 
-function browserTool(
-  experience: ToolExperience,
-  recommendedEntry: "editor" | "tool-page" = "tool-page",
-  supportsMultipleFiles = false,
-): ToolCapabilityMeta {
+function browserTool(experience: ToolExperience, recommendedEntry: "editor" | "tool-page" = "tool-page", supportsMultipleFiles = false): ToolCapabilityMeta {
   return {
     processingMode: "browser",
     experience,
@@ -272,6 +232,10 @@ function backendTool(experience: ToolExperience): ToolCapabilityMeta {
   };
 }
 
+function searchMeta(aliases: string[], keywords: string[], useCases: string[], resultPriority: number): ToolSearchMeta {
+  return { aliases, keywords, useCases, resultPriority };
+}
+
 export const tools: Tool[] = [
   {
     id: "pdf-editor",
@@ -286,13 +250,8 @@ export const tools: Tool[] = [
     isClientOnly: true,
     popular: true,
     featured: true,
-    search: {
-      aliases: ["edit pdf", "pdf editing", "change pdf", "modify pdf", "write on pdf", "annotate pdf", "pdf workspace"],
-      keywords: ["text", "image", "highlight", "whiteout", "signature", "overlay", "annotation"],
-      useCases: ["add text to pdf", "edit a pdf online", "place content on a pdf"],
-      resultPriority: 120,
-    },
-    visibility: visibleEverywhere,
+    search: searchMeta(["edit pdf", "pdf editing", "change pdf", "write on pdf", "annotate pdf"], ["text", "image", "highlight", "whiteout", "signature"], ["add text to pdf", "edit a pdf online", "place content on a pdf"], 120),
+    visibility: everywhere,
     capabilities: browserTool("workspace"),
   },
   {
@@ -307,13 +266,8 @@ export const tools: Tool[] = [
     isClientOnly: true,
     popular: true,
     featured: true,
-    search: {
-      aliases: ["signature", "add signature", "esign pdf", "sign document", "sign pdf online"],
-      keywords: ["draw signature", "typed signature", "upload signature", "sign image"],
-      useCases: ["sign a document", "put my signature on pdf", "add handwritten signature"],
-      resultPriority: 105,
-    },
-    visibility: visibleEverywhere,
+    search: searchMeta(["signature", "add signature", "esign pdf", "sign document"], ["draw signature", "typed signature", "upload signature"], ["sign a document", "put my signature on pdf"], 105),
+    visibility: everywhere,
     capabilities: browserTool("workspace", "editor"),
   },
   {
@@ -328,13 +282,8 @@ export const tools: Tool[] = [
     isClientOnly: true,
     popular: true,
     featured: false,
-    search: {
-      aliases: ["highlight", "mark text", "annotate text", "pdf highlighter", "marker"],
-      keywords: ["text selection", "highlight color", "marker style", "annotation"],
-      useCases: ["highlight text in pdf", "mark important sentences", "review pdf"],
-      resultPriority: 98,
-    },
-    visibility: visibleEverywhere,
+    search: searchMeta(["highlight", "mark text", "pdf highlighter"], ["text selection", "highlight color", "annotation"], ["highlight text in pdf", "mark important sentences"], 98),
+    visibility: everywhere,
     capabilities: browserTool("workspace"),
   },
   {
@@ -347,15 +296,8 @@ export const tools: Tool[] = [
     icon: Droplets,
     status: "working",
     isClientOnly: true,
-    popular: false,
-    featured: false,
-    search: {
-      aliases: ["watermark pdf", "stamp pdf", "logo watermark", "confidential mark"],
-      keywords: ["overlay", "text watermark", "stamp", "confidential"],
-      useCases: ["brand a pdf", "add confidential text", "stamp every page"],
-      resultPriority: 96,
-    },
-    visibility: visibleInDirectory,
+    search: searchMeta(["watermark pdf", "stamp pdf", "confidential mark"], ["overlay", "text watermark", "stamp"], ["brand a pdf", "add confidential text"], 96),
+    visibility: directoryOnly,
     capabilities: browserTool("quick-action"),
   },
   {
@@ -368,15 +310,8 @@ export const tools: Tool[] = [
     icon: Hash,
     status: "working",
     isClientOnly: true,
-    popular: false,
-    featured: false,
-    search: {
-      aliases: ["page numbers", "number pages", "paginate pdf", "pdf pagination"],
-      keywords: ["header", "footer", "page count", "numbering"],
-      useCases: ["add numbering to pdf", "paginate document", "label pdf pages"],
-      resultPriority: 90,
-    },
-    visibility: visibleInDirectory,
+    search: searchMeta(["page numbers", "number pages", "paginate pdf"], ["header", "footer", "page count", "numbering"], ["add numbering to pdf", "paginate document"], 90),
+    visibility: directoryOnly,
     capabilities: browserTool("quick-action"),
   },
   {
@@ -392,13 +327,8 @@ export const tools: Tool[] = [
     maxFiles: 20,
     popular: true,
     featured: true,
-    search: {
-      aliases: ["combine pdf", "join pdf", "append pdf", "merge documents", "put pdfs together"],
-      keywords: ["multiple files", "combine", "join", "order files", "stack files"],
-      useCases: ["merge pdf files", "combine invoices into one pdf", "join several documents"],
-      resultPriority: 115,
-    },
-    visibility: visibleEverywhere,
+    search: searchMeta(["combine pdf", "join pdf", "append pdf", "merge documents"], ["multiple files", "combine", "join", "order files"], ["merge pdf files", "combine invoices into one pdf"], 115),
+    visibility: everywhere,
     capabilities: browserTool("guided-processing", "tool-page", true),
   },
   {
@@ -413,13 +343,8 @@ export const tools: Tool[] = [
     isClientOnly: true,
     popular: true,
     featured: true,
-    search: {
-      aliases: ["divide pdf", "separate pdf", "split pages", "break pdf"],
-      keywords: ["page range", "extract range", "separate document"],
-      useCases: ["split one pdf into several files", "remove part of a pdf", "export selected page ranges"],
-      resultPriority: 108,
-    },
-    visibility: visibleEverywhere,
+    search: searchMeta(["divide pdf", "separate pdf", "split pages", "break pdf"], ["page range", "extract range", "separate document"], ["split one pdf into several files", "export selected page ranges"], 108),
+    visibility: everywhere,
     capabilities: browserTool("guided-processing"),
   },
   {
@@ -432,15 +357,8 @@ export const tools: Tool[] = [
     icon: RotateCw,
     status: "working",
     isClientOnly: true,
-    popular: false,
-    featured: false,
-    search: {
-      aliases: ["turn pages", "rotate pages", "fix pdf orientation", "sideways pdf"],
-      keywords: ["90 degrees", "landscape", "portrait", "orientation"],
-      useCases: ["rotate scanned pdf", "fix turned page", "change page direction"],
-      resultPriority: 94,
-    },
-    visibility: visibleInDirectory,
+    search: searchMeta(["turn pages", "rotate pages", "fix pdf orientation"], ["90 degrees", "landscape", "portrait", "orientation"], ["rotate scanned pdf", "fix turned page"], 94),
+    visibility: directoryOnly,
     capabilities: browserTool("quick-action"),
   },
   {
@@ -451,18 +369,13 @@ export const tools: Tool[] = [
     category: "organize",
     href: "/tools/delete-pages",
     icon: Trash2,
-    status: "coming-soon",
+    status: "working",
     isClientOnly: true,
     popular: false,
     featured: false,
-    search: {
-      aliases: ["remove pages", "delete pdf page", "drop pages", "erase pages"],
-      keywords: ["page cleanup", "remove sheet", "discard pages"],
-      useCases: ["delete pages from pdf", "remove blank pages", "drop unwanted pages"],
-      resultPriority: 78,
-    },
-    visibility: visibleInDirectory,
-    capabilities: upcomingBrowserTool("guided-processing"),
+    search: searchMeta(["remove pages", "delete pdf page", "drop pages", "erase pages"], ["page cleanup", "remove sheet", "discard pages"], ["delete pages from pdf", "remove blank pages", "drop unwanted pages"], 92),
+    visibility: directoryOnly,
+    capabilities: browserTool("guided-processing"),
   },
   {
     id: "extract-pages",
@@ -474,15 +387,8 @@ export const tools: Tool[] = [
     icon: Copy,
     status: "coming-soon",
     isClientOnly: true,
-    popular: false,
-    featured: false,
-    search: {
-      aliases: ["pull pages", "save selected pages", "extract pdf pages", "copy pages"],
-      keywords: ["selected pages", "export pages", "page extraction"],
-      useCases: ["extract a few pages", "save one section as pdf", "pull specific pages"],
-      resultPriority: 82,
-    },
-    visibility: visibleInDirectory,
+    search: searchMeta(["pull pages", "save selected pages", "extract pdf pages"], ["selected pages", "export pages"], ["extract a few pages", "save one section as pdf"], 82),
+    visibility: directoryOnly,
     capabilities: upcomingBrowserTool("guided-processing"),
   },
   {
@@ -495,15 +401,8 @@ export const tools: Tool[] = [
     icon: ArrowUpDown,
     status: "coming-soon",
     isClientOnly: true,
-    popular: false,
-    featured: false,
-    search: {
-      aliases: ["rearrange pages", "move pages", "change page order", "sort pdf pages"],
-      keywords: ["drag and drop", "page order", "sequence"],
-      useCases: ["reorder pdf pages", "move page 5 to front", "arrange scanned pages"],
-      resultPriority: 84,
-    },
-    visibility: visibleInDirectory,
+    search: searchMeta(["rearrange pages", "move pages", "change page order"], ["drag and drop", "page order", "sequence"], ["reorder pdf pages", "arrange scanned pages"], 84),
+    visibility: directoryOnly,
     capabilities: upcomingBrowserTool("guided-processing"),
   },
   {
@@ -518,13 +417,8 @@ export const tools: Tool[] = [
     isClientOnly: true,
     popular: true,
     featured: true,
-    search: {
-      aliases: ["page organizer", "organize pdf", "manage pdf pages", "arrange pages"],
-      keywords: ["thumbnail workspace", "page canvas", "rotate", "reorder", "delete"],
-      useCases: ["manage all pages visually", "organize scanned file", "clean up pdf page order"],
-      resultPriority: 102,
-    },
-    visibility: visibleEverywhere,
+    search: searchMeta(["page organizer", "organize pdf", "manage pdf pages"], ["thumbnail workspace", "page canvas", "rotate", "reorder", "delete"], ["manage all pages visually", "organize scanned file"], 102),
+    visibility: everywhere,
     capabilities: upcomingBrowserTool("workspace"),
   },
   {
@@ -540,13 +434,8 @@ export const tools: Tool[] = [
     maxFiles: 80,
     popular: true,
     featured: true,
-    search: {
-      aliases: ["jpg to pdf", "png to pdf", "photo to pdf", "image converter", "pictures to pdf"],
-      keywords: ["webp", "multiple images", "image bundle", "photo pages"],
-      useCases: ["make pdf from photos", "convert screenshots to pdf", "combine images as pdf"],
-      resultPriority: 108,
-    },
-    visibility: visibleEverywhere,
+    search: searchMeta(["jpg to pdf", "png to pdf", "photo to pdf", "image converter"], ["webp", "multiple images", "image bundle"], ["make pdf from photos", "convert screenshots to pdf"], 108),
+    visibility: everywhere,
     capabilities: browserTool("guided-processing", "tool-page", true),
   },
   {
@@ -559,15 +448,8 @@ export const tools: Tool[] = [
     icon: Image,
     status: "working",
     isClientOnly: true,
-    popular: false,
-    featured: false,
-    search: {
-      aliases: ["pdf to jpg", "pdf to png", "pdf pages as images", "convert pdf to photo"],
-      keywords: ["render pages", "export image", "download page image"],
-      useCases: ["save each pdf page as image", "turn pdf into png", "extract page previews"],
-      resultPriority: 92,
-    },
-    visibility: visibleInDirectory,
+    search: searchMeta(["pdf to jpg", "pdf to png", "pdf pages as images"], ["render pages", "export image", "download page image"], ["save each pdf page as image", "turn pdf into png"], 92),
+    visibility: directoryOnly,
     capabilities: browserTool("guided-processing"),
   },
   {
@@ -582,13 +464,8 @@ export const tools: Tool[] = [
     isClientOnly: false,
     popular: true,
     featured: true,
-    search: {
-      aliases: ["pdf to doc", "pdf to docx", "convert pdf to word", "editable word file"],
-      keywords: ["document conversion", "docx", "editable document"],
-      useCases: ["turn pdf into editable document", "copy pdf into word", "convert document for editing"],
-      resultPriority: 112,
-    },
-    visibility: visibleEverywhere,
+    search: searchMeta(["pdf to doc", "pdf to docx", "convert pdf to word"], ["document conversion", "docx", "editable document"], ["turn pdf into editable document", "copy pdf into word"], 112),
+    visibility: everywhere,
     capabilities: backendTool("guided-processing"),
   },
   {
@@ -603,13 +480,8 @@ export const tools: Tool[] = [
     isClientOnly: true,
     popular: true,
     featured: true,
-    search: {
-      aliases: ["reduce pdf size", "shrink pdf", "make pdf smaller", "compress file", "lower pdf mb"],
-      keywords: ["file size", "optimization", "smaller download", "quality"],
-      useCases: ["reduce pdf mb", "send smaller pdf by email", "optimize document size"],
-      resultPriority: 116,
-    },
-    visibility: visibleEverywhere,
+    search: searchMeta(["reduce pdf size", "shrink pdf", "make pdf smaller", "compress file"], ["file size", "optimization", "smaller download"], ["reduce pdf mb", "send smaller pdf by email"], 116),
+    visibility: everywhere,
     capabilities: browserTool("guided-processing"),
   },
   {
@@ -624,13 +496,8 @@ export const tools: Tool[] = [
     isClientOnly: false,
     popular: true,
     featured: true,
-    search: {
-      aliases: ["scan text", "make pdf searchable", "ocr scan", "read scanned pdf", "recognize text"],
-      keywords: ["searchable pdf", "selectable text", "scanned document", "text recognition"],
-      useCases: ["convert scan to searchable pdf", "select text from scanned file", "read image-based pdf"],
-      resultPriority: 114,
-    },
-    visibility: visibleEverywhere,
+    search: searchMeta(["scan text", "make pdf searchable", "ocr scan"], ["searchable pdf", "selectable text", "scanned document"], ["convert scan to searchable pdf", "read image-based pdf"], 114),
+    visibility: everywhere,
     capabilities: backendTool("guided-processing"),
   },
   {
@@ -644,14 +511,8 @@ export const tools: Tool[] = [
     status: "coming-soon",
     isClientOnly: false,
     popular: true,
-    featured: false,
-    search: {
-      aliases: ["password pdf", "lock pdf", "secure pdf", "encrypt pdf"],
-      keywords: ["protection", "document security", "password access"],
-      useCases: ["password protect a pdf", "lock confidential file", "secure document before sharing"],
-      resultPriority: 101,
-    },
-    visibility: visibleInDirectory,
+    search: searchMeta(["password pdf", "lock pdf", "secure pdf"], ["protection", "document security", "password access"], ["password protect a pdf", "secure document before sharing"], 101),
+    visibility: directoryOnly,
     capabilities: backendTool("guided-processing"),
   },
   {
@@ -664,15 +525,8 @@ export const tools: Tool[] = [
     icon: ShieldOff,
     status: "coming-soon",
     isClientOnly: false,
-    popular: false,
-    featured: false,
-    search: {
-      aliases: ["remove pdf password", "unlock protected pdf", "open locked pdf"],
-      keywords: ["password removal", "authorized access", "decrypt"],
-      useCases: ["unlock my own pdf", "remove protection from document I own", "open an accessible protected pdf"],
-      resultPriority: 88,
-    },
-    visibility: visibleInDirectory,
+    search: searchMeta(["remove pdf password", "unlock protected pdf"], ["password removal", "authorized access", "decrypt"], ["unlock my own pdf", "remove protection from document I own"], 88),
+    visibility: directoryOnly,
     capabilities: backendTool("guided-processing"),
   },
   {
@@ -685,16 +539,10 @@ export const tools: Tool[] = [
     icon: Crown,
     status: "beta",
     isClientOnly: false,
-    popular: false,
     featured: true,
     newTool: true,
-    search: {
-      aliases: ["remove watermark", "watermark remover", "delete watermark", "remove stamp", "cleanup pdf mark"],
-      keywords: ["pro", "authorized cleanup", "stamp removal", "object removal", "backend"],
-      useCases: ["remove watermark from my pdf", "clean up authorized document", "remove pdf stamp"],
-      resultPriority: 103,
-    },
-    visibility: visibleInDirectory,
+    search: searchMeta(["remove watermark", "watermark remover", "delete watermark"], ["pro", "authorized cleanup", "stamp removal", "backend"], ["remove watermark from my pdf", "clean up authorized document"], 103),
+    visibility: directoryOnly,
     capabilities: backendTool("guided-processing"),
   },
   {
@@ -707,15 +555,8 @@ export const tools: Tool[] = [
     icon: Eye,
     status: "coming-soon",
     isClientOnly: false,
-    popular: false,
-    featured: false,
-    search: {
-      aliases: ["hide private text", "remove sensitive data", "blackout pdf", "redaction"],
-      keywords: ["privacy", "permanent removal", "sensitive information"],
-      useCases: ["redact personal data", "hide confidential text permanently", "sanitize pdf before sharing"],
-      resultPriority: 90,
-    },
-    visibility: visibleInDirectory,
+    search: searchMeta(["hide private text", "remove sensitive data", "blackout pdf"], ["privacy", "permanent removal", "sensitive information"], ["redact personal data", "hide confidential text permanently"], 90),
+    visibility: directoryOnly,
     capabilities: backendTool("guided-processing"),
   },
 ];
@@ -749,9 +590,7 @@ function getToolSearchCorpus(tool: Tool) {
     title: normalizeSearchValue(tool.title),
     description: normalizeSearchValue(tool.description),
     menuDescription: normalizeSearchValue(tool.menuDescription),
-    category: normalizeSearchValue(
-      [categoryMeta.label, categoryMeta.menuLabel, categoryMeta.description, categoryMeta.shortDescription, ...categoryMeta.searchAliases].join(" "),
-    ),
+    category: normalizeSearchValue([categoryMeta.label, categoryMeta.menuLabel, categoryMeta.description, categoryMeta.shortDescription, ...categoryMeta.searchAliases].join(" ")),
     aliases: tool.search.aliases.map(normalizeSearchValue),
     keywords: tool.search.keywords.map(normalizeSearchValue),
     useCases: tool.search.useCases.map(normalizeSearchValue),
@@ -767,11 +606,9 @@ function scoreSingleToolQuery(tool: Tool, rawQuery: string): ToolSearchResult {
   const tokens = splitSearchTokens(rawQuery);
   const corpus = getToolSearchCorpus(tool);
   const matchedBy: ToolSearchMatchKind[] = [];
-
   if (!query) return { tool, score: tool.search.resultPriority, matchedBy };
 
   let score = 0;
-
   if (corpus.title === query) {
     score += 220;
     addMatchKind(matchedBy, "exact-title");
@@ -804,12 +641,10 @@ function scoreSingleToolQuery(tool: Tool, rawQuery: string): ToolSearchResult {
     score += 58;
     addMatchKind(matchedBy, "description");
   }
-
   if (corpus.menuDescription.includes(query)) {
     score += 48;
     addMatchKind(matchedBy, "description");
   }
-
   if (corpus.category.includes(query)) {
     score += 42;
     addMatchKind(matchedBy, "category");
@@ -848,7 +683,6 @@ function scoreSingleToolQuery(tool: Tool, rawQuery: string): ToolSearchResult {
   if (tool.featured) score += 10;
   if (tool.status === "working") score += 12;
   if (tool.status === "beta") score += 8;
-
   return { tool, score, matchedBy: uniqueValues(matchedBy) };
 }
 
@@ -910,9 +744,7 @@ export function getToolsNeedingBackend(): Tool[] {
 }
 
 export function getBrowserFirstTools(): Tool[] {
-  return tools
-    .filter((tool) => tool.capabilities.processingMode === "browser" || tool.capabilities.processingMode === "hybrid")
-    .sort(sortToolsForDiscovery);
+  return tools.filter((tool) => tool.capabilities.processingMode === "browser" || tool.capabilities.processingMode === "hybrid").sort(sortToolsForDiscovery);
 }
 
 export function getToolsByProcessingMode(processingMode: ToolProcessingMode): Tool[] {
@@ -934,8 +766,7 @@ export function searchTools(query: string, options: ToolSearchOptions = {}): Too
       if (b.score !== a.score) return b.score - a.score;
       return sortToolsForDiscovery(a.tool, b.tool);
     });
-
-  return typeof options.limit === "number" ? results.slice(0, options.limit) : results;
+  return typeof options.limit === "number" ? results.slice(0, limitToPositiveInteger(options.limit)) : results;
 }
 
 export function getSuggestedToolsForQuery(query: string, limit = 6): Tool[] {
@@ -945,23 +776,17 @@ export function getSuggestedToolsForQuery(query: string, limit = 6): Tool[] {
 export function sortToolsForDiscovery(a: Tool, b: Tool): number {
   const statusDifference = STATUS_CONFIG[a.status].rank - STATUS_CONFIG[b.status].rank;
   if (statusDifference !== 0) return statusDifference;
-
-  const categoryDifference =
-    getCategoryMeta(a.category).sortOrder - getCategoryMeta(b.category).sortOrder;
+  const categoryDifference = getCategoryMeta(a.category).sortOrder - getCategoryMeta(b.category).sortOrder;
   if (categoryDifference !== 0) return categoryDifference;
-
   const priorityDifference = b.search.resultPriority - a.search.resultPriority;
   if (priorityDifference !== 0) return priorityDifference;
-
-  if (Boolean(b.featured) !== Boolean(a.featured)) {
-    return Number(Boolean(b.featured)) - Number(Boolean(a.featured));
-  }
-
-  if (Boolean(b.popular) !== Boolean(a.popular)) {
-    return Number(Boolean(b.popular)) - Number(Boolean(a.popular));
-  }
-
+  if (Boolean(b.featured) !== Boolean(a.featured)) return Number(Boolean(b.featured)) - Number(Boolean(a.featured));
+  if (Boolean(b.popular) !== Boolean(a.popular)) return Number(Boolean(b.popular)) - Number(Boolean(a.popular));
   return a.title.localeCompare(b.title);
+}
+
+function limitToPositiveInteger(limit: number): number {
+  return Math.max(0, Math.floor(limit));
 }
 
 function toolMinimumSearchScore(query: string): number {
