@@ -26,6 +26,10 @@ function isConvertTool(title: string) {
   return title.toLowerCase().includes("pdf") && title.toLowerCase().includes("to");
 }
 
+function isPublicTool(tool: (typeof tools)[number]) {
+  return tool.status === "working" && tool.visibility.showInMegaMenu;
+}
+
 function DotGridIcon() {
   return (
     <span className="grid h-5 w-5 grid-cols-3 gap-1" aria-hidden="true">
@@ -42,7 +46,7 @@ export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const featuredTools = useMemo(
-    () => tools.filter((tool) => tool.visibility.showInMegaMenu).slice(0, 24),
+    () => tools.filter(isPublicTool).slice(0, 24),
     [],
   );
 
@@ -56,7 +60,7 @@ export function Header() {
       TOOL_CATEGORIES.map((category) => ({
         label: category.menuLabel,
         tools: tools
-          .filter((tool) => tool.category === category.id && tool.visibility.showInMegaMenu)
+          .filter((tool) => tool.category === category.id && isPublicTool(tool))
           .slice(0, 6),
       })).filter((group) => group.tools.length > 0),
     [],
