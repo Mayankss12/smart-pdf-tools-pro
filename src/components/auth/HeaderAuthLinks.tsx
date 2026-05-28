@@ -4,11 +4,13 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ArrowRight } from "lucide-react";
 
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
-
 type HeaderAuthState = {
   isLoaded: boolean;
   isSignedIn: boolean;
+};
+
+type SessionResponse = {
+  isSignedIn?: boolean;
 };
 
 function useHeaderAuthState(): HeaderAuthState {
@@ -19,33 +21,44 @@ function useHeaderAuthState(): HeaderAuthState {
 
   useEffect(() => {
     let isMounted = true;
-    const supabase = createSupabaseBrowserClient();
+    const controller = new AbortController();
 
-    function updateState(isSignedIn: boolean) {
-      if (isMounted) {
-        setAuthState({ isLoaded: true, isSignedIn });
+    async function loadSession() {
+      try {
+        const response = await fetch("/api/auth/session", {
+          cache: "no-store",
+          credentials: "include",
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error("Unable to read session");
+        }
+
+        const data = (await response.json()) as SessionResponse;
+
+        if (isMounted) {
+          setAuthState({ isLoaded: true, isSignedIn: Boolean(data.isSignedIn) });
+        }
+      } catch {
+        if (isMounted) {
+          setAuthState({ isLoaded: true, isSignedIn: false });
+        }
       }
     }
 
-    if (!supabase) {
-      updateState(false);
-      return () => {
-        isMounted = false;
-      };
+    loadSession();
+
+    function handleFocus() {
+      loadSession();
     }
 
-    supabase.auth
-      .getSession()
-      .then(({ data }) => updateState(Boolean(data.session?.user)))
-      .catch(() => updateState(false));
-
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-      updateState(Boolean(session?.user));
-    });
+    window.addEventListener("focus", handleFocus);
 
     return () => {
       isMounted = false;
-      data.subscription.unsubscribe();
+      controller.abort();
+      window.removeEventListener("focus", handleFocus);
     };
   }, []);
 
