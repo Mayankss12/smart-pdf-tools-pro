@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { BrandMark } from "@/components/BrandMark";
 import { HeaderAuthLinks, MobileHeaderAuthLink } from "@/components/auth/HeaderAuthLinks";
-import { TOOL_CATEGORIES, tools } from "@/lib/tools";
+import { TOOL_CATEGORIES, tools, type Tool } from "@/lib/tools";
 
 const PRIMARY_NAV = [
   { label: "MERGE PDF", href: "/tools/merge" },
@@ -26,7 +26,7 @@ function isConvertTool(title: string) {
   return title.toLowerCase().includes("pdf") && title.toLowerCase().includes("to");
 }
 
-function isPublicTool(tool: (typeof tools)[number]) {
+function isPublicTool(tool: Tool) {
   return tool.status === "working" && tool.visibility.showInMegaMenu;
 }
 
