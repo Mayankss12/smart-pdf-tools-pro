@@ -1,121 +1,45 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo, useState } from "react";
+import { ArrowRight, Search, Sparkles, X } from "lucide-react";
+
 import { Header } from "@/components/Header";
 import { ToolGlyph, type ToolGlyphTone } from "@/components/ToolGlyph";
 import {
-  STATUS_CONFIG,
   TOOL_CATEGORIES,
   getPopularTools,
-  getToolsNeedingBackend,
-  getWorkingTools,
   searchTools,
   tools,
   type Tool,
   type ToolCategory,
-  type ToolProcessingMode,
-  type ToolStatus,
 } from "@/lib/tools";
-import {
-  ArrowRight,
-  CheckCircle2,
-  Filter,
-  Search,
-  Sparkles,
-  X,
-} from "lucide-react";
-import { useMemo, useState } from "react";
 
 type CategoryFilter = "all" | ToolCategory;
-type StatusFilter = "all" | ToolStatus;
-type ProcessingFilter = "all" | ToolProcessingMode;
 
-const POPULAR_TOOLS = getPopularTools(8);
-const WORKING_TOOLS = getWorkingTools();
-const BACKEND_TOOLS = getToolsNeedingBackend();
-
-const QUICK_SEARCHES = [
-  "edit PDF",
-  "merge files",
-  "split pages",
-  "highlight PDF",
-  "protect PDF",
-  "OCR PDF",
-];
-
-const STATUS_FILTERS: Array<{ readonly id: StatusFilter; readonly label: string }> = [
-  { id: "all", label: "All" },
-  { id: "beta", label: "Beta" },
-  { id: "working", label: "Live" },
-  { id: "coming-soon", label: "Soon" },
-];
-
-const PROCESSING_FILTERS: Array<{ readonly id: ProcessingFilter; readonly label: string }> = [
-  { id: "all", label: "Any Engine" },
-  { id: "browser", label: "Browser" },
-  { id: "backend", label: "Backend" },
-  { id: "hybrid", label: "Hybrid" },
-];
+const AVAILABLE_TOOLS = tools.filter((tool) => tool.status === "working");
+const POPULAR_TOOLS = getPopularTools(8).filter((tool) => tool.status === "working");
+const QUICK_SEARCHES = ["edit PDF", "merge PDF", "split PDF", "compress PDF", "sign PDF", "watermark"];
 
 function toneForCategory(category: ToolCategory): ToolGlyphTone {
-  if (category === "convert-from" || category === "convert-to" || category === "scan") {
-    return "mint";
-  }
-
-  if (category === "organize" || category === "optimize") {
-    return "indigo";
-  }
-
+  if (category === "organize" || category === "optimize") return "indigo";
+  if (category === "convert") return "mint";
   return "violet";
 }
 
-function statusLabel(tool: Tool): string {
-  return STATUS_CONFIG[tool.status].label;
-}
-
-function processingLabel(mode: ToolProcessingMode): string {
-  if (mode === "browser") {
-    return "Browser";
-  }
-
-  if (mode === "backend") {
-    return "Backend";
-  }
-
-  return "Hybrid";
-}
-
-function statusClassName(status: ToolStatus): string {
-  if (status === "working") {
-    return "status-live";
-  }
-
-  if (status === "beta") {
-    return "status-beta";
-  }
-
-  return "status-soon";
-}
-
-function processingClassName(mode: ToolProcessingMode): string {
-  if (mode === "browser") {
-    return "text-[var(--violet-600)]";
-  }
-
-  if (mode === "backend") {
-    return "text-[var(--text-secondary)]";
-  }
-
-  return "text-[var(--success-text)]";
+function categoryLabel(category: ToolCategory) {
+  return TOOL_CATEGORIES.find((item) => item.id === category)?.menuLabel ?? category;
 }
 
 function FilterChip({
   active,
   label,
+  count,
   onClick,
 }: {
   readonly active: boolean;
   readonly label: string;
+  readonly count?: number;
   readonly onClick: () => void;
 }) {
   return (
@@ -123,58 +47,58 @@ function FilterChip({
       type="button"
       onClick={onClick}
       className={[
-        "inline-flex min-h-10 items-center rounded-full border px-4 py-2 text-[13px] font-medium transition duration-200",
+        "inline-flex min-h-10 items-center gap-2 rounded-full border px-4 py-2 text-[13px] font-semibold transition duration-200",
         active
           ? "border-[var(--violet-600)] bg-[var(--violet-600)] text-white"
-          : "border-[var(--cream-border)] bg-[var(--cream-base)] text-[var(--text-secondary)] hover:border-[var(--violet-border)] hover:bg-[var(--violet-50)] hover:text-[var(--violet-600)]",
+          : "border-[var(--cream-border)] bg-white text-[var(--text-secondary)] hover:border-[var(--violet-border)] hover:bg-[var(--violet-50)] hover:text-[var(--violet-600)]",
       ].join(" ")}
     >
-      {label}
+      <span>{label}</span>
+      {typeof count === "number" ? (
+        <span className={active ? "text-white/75" : "text-[var(--text-caption)]"}>{count}</span>
+      ) : null}
     </button>
   );
 }
 
-function ToolGridCell({ tool, showCategory = false }: { readonly tool: Tool; readonly showCategory?: boolean }) {
+function ToolTile({ tool, showCategory = true }: { readonly tool: Tool; readonly showCategory?: boolean }) {
   const Icon = tool.icon;
   const tone = toneForCategory(tool.category);
 
   return (
     <Link
       href={tool.href}
-      className="group flex min-h-[106px] items-center justify-between gap-4 border-b border-r border-[var(--cream-border)] bg-[var(--cream-base)] px-4 py-4 transition duration-200 hover:bg-[var(--cream-secondary)] sm:px-5"
+      className="group flex min-h-[190px] flex-col rounded-[1.35rem] border border-[var(--cream-border)] bg-white p-5 shadow-[var(--shadow-soft)] transition duration-200 hover:-translate-y-1 hover:border-[var(--violet-border)] hover:bg-[var(--violet-50)] hover:shadow-[var(--shadow-card-hover)]"
     >
-      <div className="flex min-w-0 items-center gap-4">
+      <div className="flex items-start justify-between gap-4">
         <ToolGlyph icon={Icon} tone={tone} size="md" />
-
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="truncate text-[15px] font-semibold tracking-[-0.01em] text-[var(--text-primary)] transition group-hover:text-[var(--violet-600)]">
-              {tool.title}
-            </span>
-            <span className={statusClassName(tool.status)}>{statusLabel(tool)}</span>
-          </div>
-
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--text-caption)]">
-            {showCategory ? <span>{tool.category.replaceAll("-", " ")}</span> : null}
-            {showCategory ? <span className="h-1 w-1 rounded-full bg-[var(--violet-border)]" /> : null}
-            <span className={processingClassName(tool.capabilities.processingMode)}>
-              {processingLabel(tool.capabilities.processingMode)}
-            </span>
-          </div>
-        </div>
+        <ArrowRight
+          size={17}
+          className="text-[var(--text-caption)] transition duration-200 group-hover:translate-x-1 group-hover:text-[var(--violet-600)]"
+        />
       </div>
 
-      <ArrowRight
-        size={16}
-        className="shrink-0 text-[var(--text-caption)] transition duration-200 group-hover:translate-x-1 group-hover:text-[var(--violet-600)]"
-      />
+      <div className="mt-5 min-w-0">
+        <h2 className="truncate text-[1.05rem] font-bold tracking-[-0.02em] text-[var(--text-primary)] transition group-hover:text-[var(--violet-600)]">
+          {tool.title}
+        </h2>
+        <p className="mt-2 line-clamp-2 text-sm font-normal leading-6 text-[var(--text-secondary)]">
+          {tool.menuDescription || tool.description}
+        </p>
+      </div>
+
+      {showCategory ? (
+        <div className="mt-auto pt-5 text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--text-caption)]">
+          {categoryLabel(tool.category)}
+        </div>
+      ) : null}
     </Link>
   );
 }
 
 function EmptyResults({ onReset }: { readonly onReset: () => void }) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-dashed border-[var(--violet-border)] bg-[var(--cream-base)] px-6 py-14 text-center shadow-[var(--shadow-soft)]">
+    <div className="rounded-[1.5rem] border border-dashed border-[var(--violet-border)] bg-white px-6 py-14 text-center shadow-[var(--shadow-soft)]">
       <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-[var(--violet-border)] bg-[var(--violet-50)] text-[var(--violet-600)]">
         <Search size={22} />
       </div>
@@ -182,7 +106,7 @@ function EmptyResults({ onReset }: { readonly onReset: () => void }) {
         No matching tools found
       </h3>
       <p className="mx-auto mt-3 max-w-xl text-sm font-normal leading-7 text-[var(--text-secondary)]">
-        Try another phrase or reset the filters to return to the full PDFMantra directory.
+        Try another phrase or choose a category to return to the available PDFMantra tools.
       </p>
       <button type="button" onClick={onReset} className="btn-primary mt-6">
         Reset view
@@ -195,51 +119,36 @@ function EmptyResults({ onReset }: { readonly onReset: () => void }) {
 export default function ToolsPage() {
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [processingFilter, setProcessingFilter] = useState<ProcessingFilter>("all");
 
   const normalizedQuery = query.trim();
 
   const searchRankedTools = useMemo(() => {
-    if (!normalizedQuery) {
-      return tools;
-    }
+    if (!normalizedQuery) return AVAILABLE_TOOLS;
 
-    return searchTools(normalizedQuery, {
-      includeComingSoon: true,
-    }).map((result) => result.tool);
+    const rankedIds = new Set(
+      searchTools(normalizedQuery, { includeComingSoon: false })
+        .map((result) => result.tool)
+        .filter((tool) => tool.status === "working")
+        .map((tool) => tool.id),
+    );
+
+    return AVAILABLE_TOOLS.filter((tool) => rankedIds.has(tool.id));
   }, [normalizedQuery]);
 
   const filteredTools = useMemo(() => {
-    return searchRankedTools.filter((tool) => {
-      const categoryMatches = categoryFilter === "all" || tool.category === categoryFilter;
-      const statusMatches = statusFilter === "all" || tool.status === statusFilter;
-      const processingMatches =
-        processingFilter === "all" || tool.capabilities.processingMode === processingFilter;
+    return searchRankedTools.filter((tool) => categoryFilter === "all" || tool.category === categoryFilter);
+  }, [categoryFilter, searchRankedTools]);
 
-      return categoryMatches && statusMatches && processingMatches;
-    });
-  }, [categoryFilter, processingFilter, searchRankedTools, statusFilter]);
-
-  const groupedTools = useMemo(() => {
+  const categoryCounts = useMemo(() => {
     return TOOL_CATEGORIES.map((category) => ({
-      category,
-      tools: filteredTools.filter((tool) => tool.category === category.id),
-    })).filter((group) => group.tools.length > 0);
-  }, [filteredTools]);
-
-  const activeFilterCount = [
-    categoryFilter !== "all",
-    statusFilter !== "all",
-    processingFilter !== "all",
-    normalizedQuery.length > 0,
-  ].filter(Boolean).length;
+      ...category,
+      count: AVAILABLE_TOOLS.filter((tool) => tool.category === category.id).length,
+    })).filter((category) => category.count > 0);
+  }, []);
 
   function resetFilters() {
     setQuery("");
     setCategoryFilter("all");
-    setStatusFilter("all");
-    setProcessingFilter("all");
   }
 
   return (
@@ -249,228 +158,130 @@ export default function ToolsPage() {
       <main className="min-h-screen bg-[var(--cream-base)] text-[var(--text-primary)]">
         <section className="border-b border-[var(--cream-border)] bg-[var(--cream-base)]">
           <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
-            <div className="grid gap-8 lg:grid-cols-[0.82fr_1.18fr] lg:items-center">
-              <div className="max-w-xl">
-                <div className="eyebrow-chip">
-                  <Sparkles size={13} />
-                  PDFMantra Tools
-                </div>
-
-                <h1 className="display-font mt-5 text-[2.35rem] font-semibold leading-[1.16] tracking-[-0.03em] text-[var(--text-primary)] sm:text-[2.9rem] lg:text-[3.35rem]">
-                  All PDF tools,
-                  <span className="block text-[var(--violet-600)]">ready to open.</span>
-                </h1>
-
-                <p className="mt-4 max-w-lg text-[15px] font-normal leading-7 text-[var(--text-secondary)]">
-                  Pick a workflow below or search by task. PDF upload begins inside the tool you choose.
-                </p>
-
-                <div className="mt-5 flex flex-wrap gap-2.5 text-[12px] font-medium text-[var(--text-secondary)]">
-                  <span className="soft-pill">{tools.length} tools</span>
-                  <span className="soft-pill">{WORKING_TOOLS.length} live</span>
-                  <span className="soft-pill">{BACKEND_TOOLS.length} backend-ready</span>
-                </div>
+            <div className="mx-auto max-w-4xl text-center">
+              <div className="eyebrow-chip mx-auto">
+                <Sparkles size={13} />
+                PDFMantra Tools
               </div>
 
-              <div className="overflow-hidden rounded-2xl border border-[var(--cream-border)] bg-[var(--cream-base)] shadow-[var(--shadow-soft)]">
-                <label className="flex min-h-[72px] items-center gap-4 border-b border-[var(--cream-border)] px-5 sm:px-6">
-                  <Search size={20} className="shrink-0 text-[var(--violet-600)]" />
-                  <input
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Search merge, split, OCR, redact, sign, protect..."
-                    className="w-full bg-transparent text-[15px] font-medium text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
-                  />
-                  {normalizedQuery ? (
-                    <button
-                      type="button"
-                      onClick={() => setQuery("")}
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--cream-border)] bg-[var(--cream-base)] text-[var(--text-muted)] transition hover:border-[var(--violet-border)] hover:bg-[var(--violet-50)] hover:text-[var(--violet-600)]"
-                      aria-label="Clear tools search"
-                    >
-                      <X size={16} />
-                    </button>
-                  ) : null}
-                </label>
+              <h1 className="display-font mt-5 text-[2.35rem] font-semibold leading-[1.13] tracking-[-0.04em] text-[var(--text-primary)] sm:text-[3rem] lg:text-[3.55rem]">
+                Choose the PDF tool you need.
+              </h1>
 
-                <div className="flex flex-wrap gap-2 border-b border-[var(--cream-border)] px-5 py-4 sm:px-6">
-                  {QUICK_SEARCHES.map((item) => (
-                    <button
-                      key={item}
-                      type="button"
-                      onClick={() => setQuery(item)}
-                      className="rounded-full border border-[var(--violet-border)] bg-[var(--violet-50)] px-3 py-2 text-[12px] font-medium text-[var(--violet-600)] transition hover:bg-[var(--violet-100)]"
-                    >
-                      {item}
-                    </button>
-                  ))}
-                </div>
+              <p className="mx-auto mt-4 max-w-2xl text-[15px] font-normal leading-7 text-[var(--text-secondary)] sm:text-base">
+                Search or browse the tools that are available now. PDF upload starts inside each selected tool.
+              </p>
+            </div>
 
-                <div className="grid grid-cols-3 divide-x divide-[var(--cream-border)] text-center">
-                  <div className="px-4 py-4">
-                    <div className="text-[1.35rem] font-semibold tracking-[-0.03em] text-[var(--text-primary)]">{tools.length}</div>
-                    <div className="mt-1 text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--text-caption)]">Tools</div>
-                  </div>
-                  <div className="px-4 py-4">
-                    <div className="text-[1.35rem] font-semibold tracking-[-0.03em] text-[var(--text-primary)]">{WORKING_TOOLS.length}</div>
-                    <div className="mt-1 text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--text-caption)]">Live</div>
-                  </div>
-                  <div className="px-4 py-4">
-                    <div className="text-[1.35rem] font-semibold tracking-[-0.03em] text-[var(--text-primary)]">{BACKEND_TOOLS.length}</div>
-                    <div className="mt-1 text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--text-caption)]">Backend</div>
-                  </div>
-                </div>
-              </div>
+            <div className="mx-auto mt-8 max-w-4xl overflow-hidden rounded-2xl border border-[var(--cream-border)] bg-white shadow-[var(--shadow-soft)]">
+              <label className="flex min-h-[72px] items-center gap-4 px-5 sm:px-6">
+                <Search size={20} className="shrink-0 text-[var(--violet-600)]" />
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Search merge, split, compress, sign, watermark..."
+                  className="w-full bg-transparent text-[15px] font-medium text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
+                />
+                {normalizedQuery ? (
+                  <button
+                    type="button"
+                    onClick={() => setQuery("")}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--cream-border)] bg-white text-[var(--text-muted)] transition hover:border-[var(--violet-border)] hover:bg-[var(--violet-50)] hover:text-[var(--violet-600)]"
+                    aria-label="Clear tools search"
+                  >
+                    <X size={16} />
+                  </button>
+                ) : null}
+              </label>
+            </div>
+
+            <div className="mx-auto mt-4 flex max-w-4xl flex-wrap justify-center gap-2.5">
+              {QUICK_SEARCHES.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => setQuery(item)}
+                  className="rounded-full border border-[var(--violet-border)] bg-[var(--violet-50)] px-3 py-2 text-[12px] font-semibold text-[var(--violet-600)] transition hover:bg-[var(--violet-100)]"
+                >
+                  {item}
+                </button>
+              ))}
             </div>
           </div>
         </section>
 
         <section className="border-b border-[var(--cream-border)] bg-[var(--cream-secondary)]">
-          <div className="mx-auto max-w-7xl px-4 py-11 sm:px-6 lg:px-8 lg:py-14">
-            <div className="grid gap-5 lg:grid-cols-[0.85fr_1.15fr] lg:items-end">
+          <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-12">
+            <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
               <div>
-                <p className="section-eyebrow">Quick view</p>
+                <p className="section-eyebrow">Popular tools</p>
                 <h2 className="display-font mt-3 text-[2rem] font-semibold leading-[1.15] tracking-[-0.03em] text-[var(--text-primary)] sm:text-[2.55rem]">
-                  Popular PDF workflows
+                  Start with common PDF tasks
                 </h2>
               </div>
               <p className="max-w-2xl text-sm font-normal leading-7 text-[var(--text-secondary)] sm:text-[15px] lg:justify-self-end">
-                Start with the flows people use most, then move into the full categorized directory.
+                These are the tools most users need first. Every tool shown here opens an available PDFMantra tool.
               </p>
             </div>
 
-            <div className="mt-7 overflow-hidden rounded-2xl border border-[var(--cream-border)] bg-[var(--cream-base)] shadow-[var(--shadow-soft)]">
-              <div className="grid border-l border-t border-[var(--cream-border)] md:grid-cols-2 xl:grid-cols-4">
-                {POPULAR_TOOLS.map((tool) => (
-                  <ToolGridCell key={`popular-${tool.id}`} tool={tool} />
-                ))}
-              </div>
+            <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {POPULAR_TOOLS.map((tool) => (
+                <ToolTile key={`popular-${tool.id}`} tool={tool} showCategory={false} />
+              ))}
             </div>
           </div>
         </section>
 
         <section className="border-b border-[var(--cream-border)] bg-[var(--cream-base)]">
-          <div className="mx-auto max-w-7xl px-4 py-11 sm:px-6 lg:px-8 lg:py-14">
-            <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
-              <div>
-                <p className="section-eyebrow">Refine the directory</p>
-                <h2 className="display-font mt-3 text-[2rem] font-semibold leading-[1.15] tracking-[-0.03em] text-[var(--text-primary)] sm:text-[2.55rem]">
-                  Filter without clutter
-                </h2>
-              </div>
-
-              {activeFilterCount > 0 ? (
-                <button
-                  type="button"
-                  onClick={resetFilters}
-                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-[var(--cream-border)] bg-[var(--cream-base)] px-4 text-[13px] font-medium text-[var(--text-secondary)] transition hover:border-[var(--violet-border)] hover:bg-[var(--violet-50)] hover:text-[var(--violet-600)]"
-                >
-                  Reset {activeFilterCount} filter{activeFilterCount === 1 ? "" : "s"}
-                  <X size={15} />
-                </button>
-              ) : null}
-            </div>
-
-            <div className="mt-7 space-y-5 rounded-2xl border border-[var(--cream-border)] bg-[var(--cream-base)] px-5 py-5 shadow-[var(--shadow-soft)] sm:px-6">
-              <div>
-                <div className="mb-3 flex items-center gap-2 text-[12px] font-medium uppercase tracking-[0.08em] text-[var(--text-caption)]">
-                  <Filter size={14} className="text-[var(--violet-600)]" />
-                  Category
-                </div>
-                <div className="flex flex-wrap gap-2.5">
-                  <FilterChip active={categoryFilter === "all"} label="All Categories" onClick={() => setCategoryFilter("all")} />
-                  {TOOL_CATEGORIES.map((category) => (
-                    <FilterChip
-                      key={category.id}
-                      active={categoryFilter === category.id}
-                      label={category.menuLabel}
-                      onClick={() => setCategoryFilter(category.id)}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid gap-5 lg:grid-cols-2">
-                <div>
-                  <div className="mb-3 text-[12px] font-medium uppercase tracking-[0.08em] text-[var(--text-caption)]">
-                    Status
-                  </div>
-                  <div className="flex flex-wrap gap-2.5">
-                    {STATUS_FILTERS.map((status) => (
-                      <FilterChip key={status.id} active={statusFilter === status.id} label={status.label} onClick={() => setStatusFilter(status.id)} />
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="mb-3 text-[12px] font-medium uppercase tracking-[0.08em] text-[var(--text-caption)]">
-                    Processing
-                  </div>
-                  <div className="flex flex-wrap gap-2.5">
-                    {PROCESSING_FILTERS.map((processing) => (
-                      <FilterChip
-                        key={processing.id}
-                        active={processingFilter === processing.id}
-                        label={processing.label}
-                        onClick={() => setProcessingFilter(processing.id)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </div>
+          <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+            <div className="flex flex-wrap gap-2.5">
+              <FilterChip
+                active={categoryFilter === "all"}
+                label="All tools"
+                count={AVAILABLE_TOOLS.length}
+                onClick={() => setCategoryFilter("all")}
+              />
+              {categoryCounts.map((category) => (
+                <FilterChip
+                  key={category.id}
+                  active={categoryFilter === category.id}
+                  label={category.menuLabel}
+                  count={category.count}
+                  onClick={() => setCategoryFilter(category.id)}
+                />
+              ))}
             </div>
           </div>
         </section>
 
         <section className="bg-[var(--cream-secondary)]">
-          <div className="mx-auto max-w-7xl px-4 py-11 sm:px-6 lg:px-8 lg:py-14">
+          <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-12">
             <div className="mb-7 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
               <div>
-                <p className="section-eyebrow">{normalizedQuery ? "Search results" : "Tool directory"}</p>
+                <p className="section-eyebrow">{normalizedQuery ? "Search results" : "Available tools"}</p>
                 <h2 className="display-font mt-3 text-[2rem] font-semibold leading-[1.15] tracking-[-0.03em] text-[var(--text-primary)] sm:text-[2.55rem]">
-                  {filteredTools.length} tool{filteredTools.length === 1 ? "" : "s"} matched
+                  {filteredTools.length} tool{filteredTools.length === 1 ? "" : "s"} available
                 </h2>
               </div>
 
-              <div className="soft-pill">
-                <CheckCircle2 size={14} />
-                {activeFilterCount === 0 ? "Showing full directory" : `${activeFilterCount} active filter${activeFilterCount === 1 ? "" : "s"}`}
-              </div>
+              {normalizedQuery || categoryFilter !== "all" ? (
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-[var(--cream-border)] bg-white px-4 text-[13px] font-semibold text-[var(--text-secondary)] transition hover:border-[var(--violet-border)] hover:bg-[var(--violet-50)] hover:text-[var(--violet-600)]"
+                >
+                  Reset view
+                  <X size={15} />
+                </button>
+              ) : null}
             </div>
 
             {filteredTools.length === 0 ? (
               <EmptyResults onReset={resetFilters} />
-            ) : normalizedQuery ? (
-              <div className="overflow-hidden rounded-2xl border border-[var(--cream-border)] bg-[var(--cream-base)] shadow-[var(--shadow-soft)]">
-                <div className="grid border-l border-t border-[var(--cream-border)] md:grid-cols-2 xl:grid-cols-3">
-                  {filteredTools.map((tool) => (
-                    <ToolGridCell key={`search-${tool.id}`} tool={tool} showCategory />
-                  ))}
-                </div>
-              </div>
             ) : (
-              <div className="space-y-7">
-                {groupedTools.map((group) => (
-                  <section
-                    key={group.category.id}
-                    className="overflow-hidden rounded-2xl border border-[var(--cream-border)] bg-[var(--cream-base)] shadow-[var(--shadow-soft)]"
-                  >
-                    <div className="flex flex-col justify-between gap-4 border-b border-[var(--cream-border)] bg-[var(--cream-base)] px-5 py-5 sm:flex-row sm:items-end sm:px-6">
-                      <div>
-                        <p className="section-eyebrow !text-[11px]">{group.category.menuLabel}</p>
-                        <h3 className="mt-2 text-[1.55rem] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
-                          {group.category.label}
-                        </h3>
-                      </div>
-                      <span className="status-soon">{group.tools.length} tools</span>
-                    </div>
-
-                    <div className="grid border-l border-t border-[var(--cream-border)] md:grid-cols-2 xl:grid-cols-3">
-                      {group.tools.map((tool) => (
-                        <ToolGridCell key={tool.id} tool={tool} />
-                      ))}
-                    </div>
-                  </section>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {filteredTools.map((tool) => (
+                  <ToolTile key={tool.id} tool={tool} />
                 ))}
               </div>
             )}
