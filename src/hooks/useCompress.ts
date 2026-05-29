@@ -15,4 +15,5 @@ export interface CompressResult {
 
 export function useCompress() {
   async function compress(): Promise<CompressResult | null> {
-    return
+    return null;
+  }
