@@ -3,41 +3,8 @@ import { Footer } from "@/components/Footer";
 import { GitaWisdomSpotlight } from "@/components/GitaWisdomSpotlight";
 import { Header } from "@/components/Header";
 import { ToolGlyph, type ToolGlyphTone } from "@/components/ToolGlyph";
-import {
-  ArrowRight,
-  BadgeCheck,
-  Combine,
-  Copy,
-  Crop,
-  Download,
-  FileArchive,
-  FileImage,
-  FileText,
-  Hash,
-  Highlighter,
-  Image,
-  Layers,
-  Lock,
-  MoveUpRight,
-  PenLine,
-  RotateCw,
-  Scissors,
-  Search,
-  ShieldCheck,
-  ShieldOff,
-  Stamp,
-  Trash2,
-  Wand2,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
-
-interface HomeToolCard {
-  readonly title: string;
-  readonly description: string;
-  readonly href: string;
-  readonly icon: LucideIcon;
-  readonly tone: ToolGlyphTone;
-}
+import { tools } from "@/lib/tools";
+import { ArrowRight, BadgeCheck, MoveUpRight } from "lucide-react";
 
 const heroCategories = [
   "All",
@@ -49,155 +16,13 @@ const heroCategories = [
   "PDF Security",
 ] as const;
 
-const homeTools: readonly HomeToolCard[] = [
-  {
-    title: "Merge PDF",
-    description: "Combine PDFs into one polished document.",
-    href: "/tools/merge",
-    icon: Combine,
-    tone: "indigo",
-  },
-  {
-    title: "Split PDF",
-    description: "Separate pages into cleaner outputs.",
-    href: "/tools/split",
-    icon: Scissors,
-    tone: "violet",
-  },
-  {
-    title: "Compress PDF",
-    description: "Reduce file size through a guided flow.",
-    href: "/tools/compress",
-    icon: FileArchive,
-    tone: "mint",
-  },
-  {
-    title: "PDF to Word",
-    description: "Turn documents into editable files.",
-    href: "/tools/pdf-to-word",
-    icon: Wand2,
-    tone: "mint",
-  },
-  {
-    title: "PDF to Images",
-    description: "Export PDF pages as image files.",
-    href: "/tools/pdf-to-images",
-    icon: Image,
-    tone: "mint",
-  },
-  {
-    title: "Images to PDF",
-    description: "Create PDFs from scans and photos.",
-    href: "/tools/images-to-pdf",
-    icon: FileImage,
-    tone: "indigo",
-  },
-  {
-    title: "Edit PDF",
-    description: "Add text, images, notes, and signatures.",
-    href: "/editor",
-    icon: FileText,
-    tone: "violet",
-  },
-  {
-    title: "Highlight PDF",
-    description: "Mark key content with cleaner precision.",
-    href: "/tools/highlight-pdf",
-    icon: Highlighter,
-    tone: "violet",
-  },
-  {
-    title: "Rotate Pages",
-    description: "Fix document orientation in seconds.",
-    href: "/tools/rotate",
-    icon: RotateCw,
-    tone: "indigo",
-  },
-  {
-    title: "Delete Pages",
-    description: "Remove pages you no longer need.",
-    href: "/tools/delete-pages",
-    icon: Trash2,
-    tone: "indigo",
-  },
-  {
-    title: "Extract Pages",
-    description: "Pull the exact pages you want.",
-    href: "/tools/extract",
-    icon: Copy,
-    tone: "indigo",
-  },
-  {
-    title: "Organize PDF",
-    description: "Reorder and manage document pages.",
-    href: "/tools/organize",
-    icon: Layers,
-    tone: "indigo",
-  },
-  {
-    title: "Watermark PDF",
-    description: "Add branding and document overlays.",
-    href: "/tools/watermark",
-    icon: Stamp,
-    tone: "violet",
-  },
-  {
-    title: "Page Numbers",
-    description: "Number documents with cleaner output.",
-    href: "/tools/page-numbers",
-    icon: Hash,
-    tone: "violet",
-  },
-  {
-    title: "Protect PDF",
-    description: "Secure important files with purpose.",
-    href: "/tools/protect",
-    icon: ShieldCheck,
-    tone: "violet",
-  },
-  {
-    title: "Unlock PDF",
-    description: "Open protected files through a clear flow.",
-    href: "/tools/unlock",
-    icon: ShieldOff,
-    tone: "violet",
-  },
-  {
-    title: "Redact PDF",
-    description: "Hide sensitive information permanently.",
-    href: "/tools/redact",
-    icon: Lock,
-    tone: "violet",
-  },
-  {
-    title: "OCR PDF",
-    description: "Make scanned content easier to search.",
-    href: "/tools/ocr",
-    icon: Search,
-    tone: "mint",
-  },
-  {
-    title: "Sign PDF",
-    description: "Place signatures directly on documents.",
-    href: "/editor",
-    icon: PenLine,
-    tone: "violet",
-  },
-  {
-    title: "Crop PDF",
-    description: "Trim page boundaries more precisely.",
-    href: "/tools",
-    icon: Crop,
-    tone: "indigo",
-  },
-  {
-    title: "Download Ready",
-    description: "Finish each workflow with clean exports.",
-    href: "/tools",
-    icon: Download,
-    tone: "mint",
-  },
-] as const;
+function toneForCategory(category: string): ToolGlyphTone {
+  if (category === "organize" || category === "optimize") return "indigo";
+  if (category === "convert") return "mint";
+  return "violet";
+}
+
+const homeTools = tools.filter((tool) => tool.status === "working");
 
 const premiumBenefits = [
   "Sharper document workflows across editing, organizing, and conversion",
@@ -205,14 +30,14 @@ const premiumBenefits = [
   "A premium interface that keeps power tools easy to discover",
 ] as const;
 
-function ToolCard({ tool }: { readonly tool: HomeToolCard }) {
+function ToolCard({ tool }: { readonly tool: (typeof homeTools)[number] }) {
   return (
     <Link
       href={tool.href}
       className="group relative flex min-h-[238px] flex-col rounded-[1.35rem] border border-[var(--border-light)] bg-[var(--bg-card)] p-5 shadow-[var(--shadow-soft)] transition duration-200 hover:-translate-y-1 hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] hover:shadow-[var(--shadow-card-hover)]"
     >
       <div className="flex items-start justify-between gap-4">
-        <ToolGlyph icon={tool.icon} tone={tool.tone} size="lg" />
+        <ToolGlyph icon={tool.icon} tone={toneForCategory(tool.category)} size="lg" />
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--violet-border)] bg-[var(--violet-50)] text-[var(--violet-600)] transition duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:border-[var(--border-focus)] group-hover:bg-[var(--violet-600)] group-hover:text-white">
           <MoveUpRight size={18} />
         </span>
@@ -223,7 +48,7 @@ function ToolCard({ tool }: { readonly tool: HomeToolCard }) {
       </h3>
 
       <p className="mt-2 text-[13px] font-normal leading-6 text-[var(--text-secondary)]">
-        {tool.description}
+        {tool.menuDescription || tool.description}
       </p>
     </Link>
   );
@@ -347,7 +172,7 @@ export default function HomePage() {
 
             <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7">
               {homeTools.map((tool) => (
-                <ToolCard key={tool.title} tool={tool} />
+                <ToolCard key={tool.id} tool={tool} />
               ))}
             </div>
           </div>
