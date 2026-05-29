@@ -4,29 +4,20 @@ import { useRef, useState } from "react";
 import { CheckCircle2, Download, FileArchive, Loader2, Upload, X } from "lucide-react";
 
 import { Header } from "@/components/Header";
-import {
-  PdfEngineError,
-  downloadBlob,
-  formatFileSize,
-  optimizePdfStructure,
-  validatePdfFile,
-  type PdfProcessingResult,
-} from "@/lib/pdf-engine";
+import { formatFileSize, validatePdfFile } from "@/lib/pdf-engine";
+import { useCompress } from "@/hooks/useCompress";
 
-function getErrorMessage(error: unknown) {
-  if (error instanceof PdfEngineError) {
-    return error.message;
-  }
-
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
   return "Compression failed. This PDF may be encrypted, damaged, or unsupported.";
 }
 
 export default function CompressPage() {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [file, setFile] = useState<File | null>(null);
-  const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("Upload a PDF to optimize and download.");
-  const [result, setResult] = useState<PdfProcessingResult | null>(null);
+
+  const { compress, download, reset, isLoading, result, error } = useCompress();
 
   function handleFile(selectedFile?: File) {
     if (!selectedFile) return;
@@ -34,47 +25,48 @@ export default function CompressPage() {
     try {
       validatePdfFile(selectedFile);
       setFile(selectedFile);
-      setResult(null);
+      reset();
       setStatus(`Ready to optimize ${selectedFile.name}.`);
-    } catch (error) {
+    } catch (err) {
       setFile(null);
-      setResult(null);
-      setStatus(getErrorMessage(error));
+      reset();
+      setStatus(getErrorMessage(err));
     }
   }
 
   function clearFile() {
     setFile(null);
-    setResult(null);
+    reset();
     setStatus("Upload a PDF to optimize and download.");
   }
 
   async function handleCompress() {
-    if (!file || busy) return;
+    if (!file || isLoading) return;
 
-    setBusy(true);
     setStatus("Optimizing PDF with PDFMantra engine...");
 
-    try {
-      const optimized = await optimizePdfStructure(file);
-      setResult(optimized);
-      downloadBlob(optimized.blob, optimized.fileName);
+    const res = await compress(file, "medium");
+
+    if (res) {
+      download(res);
+
+      const methodNote =
+        res.method === "fallback"
+          ? " Structural optimisation applied (full image recompression requires backend)."
+          : "";
 
       setStatus(
-        optimized.outputSize < optimized.originalSize
-          ? `Optimized successfully. Reduced by ${optimized.reductionPercent}%. Download started.`
-          : "PDF processed and downloaded. This file was already compact, so size reduction may be minimal.",
+        res.savedBytes > 0
+          ? `Optimized successfully. Reduced by ${res.savedPercent}%.${methodNote} Download started.`
+          : `PDF processed and downloaded. This file was already compact, so size reduction may be minimal.${methodNote}`,
       );
-    } catch (error) {
-      console.error(error);
-      setResult(null);
-      setStatus(getErrorMessage(error));
-    } finally {
-      setBusy(false);
+    } else {
+      setStatus("Compression failed. This PDF may be encrypted, damaged, or unsupported.");
     }
   }
 
   const statusLooksLikeError =
+    !!error ||
     status.toLowerCase().includes("failed") ||
     status.toLowerCase().includes("invalid") ||
     status.toLowerCase().includes("unsupported") ||
@@ -99,7 +91,7 @@ export default function CompressPage() {
               </h1>
 
               <p className="mt-5 max-w-2xl text-base font-medium leading-8 text-indigo-50/95">
-                Upload a PDF, optimize its document structure with PDFMantra&apos;s shared browser engine, and download the processed file instantly.
+                Upload a PDF, optimize its document structure with PDFMantra&apos;s engine, and download the processed file instantly.
               </p>
             </section>
 
@@ -168,25 +160,31 @@ export default function CompressPage() {
                   <div className="mt-4 grid gap-3">
                     <div className="rounded-2xl bg-white p-4">
                       <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Original</div>
-                      <div className="mt-1 text-xl font-semibold text-slate-950">{file ? formatFileSize(file.size) : "-"}</div>
+                      <div className="mt-1 text-xl font-semibold text-slate-950">
+                        {file ? formatFileSize(file.size) : "-"}
+                      </div>
                     </div>
                     <div className="rounded-2xl bg-white p-4">
                       <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Output</div>
-                      <div className="mt-1 text-xl font-semibold text-slate-950">{result ? formatFileSize(result.outputSize) : "-"}</div>
+                      <div className="mt-1 text-xl font-semibold text-slate-950">
+                        {result ? formatFileSize(result.compressedSize) : "-"}
+                      </div>
                     </div>
                     <div className="rounded-2xl bg-white p-4">
                       <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Reduction</div>
-                      <div className="mt-1 text-xl font-semibold text-slate-950">{result ? `${result.reductionPercent}%` : "-"}</div>
+                      <div className="mt-1 text-xl font-semibold text-slate-950">
+                        {result ? `${result.savedPercent}%` : "-"}
+                      </div>
                     </div>
                   </div>
 
                   <button
                     type="button"
                     onClick={handleCompress}
-                    disabled={!file || busy}
+                    disabled={!file || isLoading}
                     className="btn-primary mt-5 w-full"
                   >
-                    {busy ? (
+                    {isLoading ? (
                       <>
                         <Loader2 className="animate-spin" size={18} />
                         Processing
