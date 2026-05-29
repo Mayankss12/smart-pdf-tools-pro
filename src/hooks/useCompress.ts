@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 export type CompressionLevel = "low" | "medium" | "high";
 
@@ -15,5 +15,15 @@ export interface CompressResult {
   readonly method: string;
 }
 
-function readNumberHeader(headers: Headers, name: string, fallback: number) {
-  const value = Number(headers.get
+function numberHeader(headers: Headers, name: string, fallback: number) {
+  const value = Number(headers.get(name));
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function textHeader(headers: Headers, name: string, fallback: string) {
+  return headers.get(name) || fallback;
+}
+
+function outputName(fileName: string) {
+  return fileName.toLowerCase().endsWith(".pdf")
+    ? fileName
