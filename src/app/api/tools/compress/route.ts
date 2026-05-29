@@ -10,4 +10,4 @@ type CompressionMethod = "backend" | "fallback" | "original";
 const PROCESSING_API_BASE = process.env.PDFMANTRA_PROCESSING_API_BASE_URL;
 const SECRET_KEY = process.env.PDFMANTRA_SECRET_KEY;
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
-const VALID_LEVELS: readonly
+const VALID_LEVELS: readonly CompressionLevel[] = ["low",
