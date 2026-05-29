@@ -5,4 +5,5 @@ export function useCompress() {
   async function compress(): Promise<CompressResult | null> { return null; }
   function download() {}
   function reset() {}
-  return { compress, download, reset, isLoading: false, progress: 0, result: null, error: null
+  return { compress, download, reset, isLoading: false, progress: 0, result: null, error: null };
+}
