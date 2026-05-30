@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -56,11 +56,26 @@ function getPagePreviewNumbers(pageCount: number) {
 export default function SplitPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [pageInput, setPageInput] = useState("1-4,5-8");
   const [pageCount, setPageCount] = useState(0);
   const [status, setStatus] = useState("Upload one PDF and define split groups.");
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<PdfProcessingResult[]>([]);
+
+  useEffect(() => {
+    if (!file) {
+      setPreviewUrl(null);
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    setPreviewUrl(objectUrl);
+
+    return () => {
+      URL.revokeObjectURL(objectUrl);
+    };
+  }, [file]);
 
   const groups = useMemo(() => {
     if (!file || pageCount <= 0) return [];
@@ -178,7 +193,7 @@ export default function SplitPage() {
             icon={Scissors}
             eyebrow="PDFMantra Engine Tool"
             title="Split PDFs into controlled page groups."
-            description="Upload one PDF, define exact page ranges like 1-4,5-8, and export each group as a separate PDF. Multiple outputs download together as one ZIP."
+            description="Upload one PDF, preview the file, define exact page ranges like 1-4,5-8, and export each group as a separate PDF. Multiple outputs download together as one ZIP."
             meta={
               <div className="grid min-w-[260px] grid-cols-3 divide-x divide-[var(--border-light)] text-center">
                 <div className="px-3">
@@ -242,6 +257,33 @@ export default function SplitPage() {
                   Choose PDF
                 </div>
               </div>
+
+              {previewUrl ? (
+                <div className="mt-5 overflow-hidden rounded-[1.5rem] border border-[var(--border-light)] bg-[var(--bg-card)] shadow-[var(--shadow-soft)]">
+                  <div className="flex flex-col justify-between gap-3 border-b border-[var(--border-light)] px-5 py-4 sm:flex-row sm:items-center">
+                    <div>
+                      <h2 className="display-font text-[1.6rem] font-bold tracking-[-0.02em] text-[var(--text-primary)]">PDF Preview</h2>
+                      <p className="mt-1 text-sm font-normal text-[var(--text-secondary)]">Preview the uploaded PDF before creating split groups.</p>
+                    </div>
+                    <a
+                      href={previewUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center justify-center gap-2 rounded-full border border-[var(--violet-border)] bg-[var(--violet-50)] px-4 py-2 text-sm font-semibold text-[var(--violet-600)] transition hover:bg-[var(--violet-100)]"
+                    >
+                      <FileText size={16} />
+                      Open preview
+                    </a>
+                  </div>
+                  <div className="h-[520px] bg-slate-100">
+                    <iframe
+                      title="Uploaded PDF preview"
+                      src={`${previewUrl}#toolbar=0&navpanes=0&view=FitH`}
+                      className="h-full w-full border-0 bg-white"
+                    />
+                  </div>
+                </div>
+              ) : null}
 
               <div className="mt-5 rounded-[1.5rem] border border-[var(--border-light)] bg-[var(--bg-card)] p-5 shadow-[var(--shadow-soft)]">
                 <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
