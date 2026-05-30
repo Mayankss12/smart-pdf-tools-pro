@@ -9,11 +9,28 @@ import { loginVerifyPasswordAction, type ActionResult } from "@/app/actions/auth
 import { AuthButton } from "./AuthButton";
 import { AuthInput } from "./AuthInput";
 
+function getSafeRedirectPath(value: string | null): string {
+  const rawValue = value?.trim() ?? "";
+
+  if (!rawValue || !rawValue.startsWith("/") || rawValue.startsWith("//")) {
+    return "/dashboard";
+  }
+
+  const blockedPrefixes = ["/login", "/signup", "/logout", "/auth"];
+
+  if (blockedPrefixes.some((prefix) => rawValue === prefix || rawValue.startsWith(`${prefix}/`))) {
+    return "/dashboard";
+  }
+
+  return rawValue;
+}
+
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const accountCreated = searchParams.get("message") === "account-created";
   const passwordReset = searchParams.get("message") === "password-reset";
+  const redirectTo = getSafeRedirectPath(searchParams.get("redirectTo") ?? searchParams.get("next"));
 
   const [state, action, isPending] = useActionState<ActionResult | null, FormData>(
     loginVerifyPasswordAction,
@@ -22,9 +39,14 @@ export function LoginForm() {
 
   useEffect(() => {
     if (state?.success && state.message) {
-      router.push(`/login/verify-otp?email=${encodeURIComponent(state.message)}`);
+      const params = new URLSearchParams({
+        email: state.message,
+        redirectTo,
+      });
+
+      router.push(`/login/verify-otp?${params.toString()}`);
     }
-  }, [state, router]);
+  }, [state, router, redirectTo]);
 
   return (
     <form action={action} className="space-y-4">
