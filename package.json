@@ -18,6 +18,7 @@
     "pdfjs-dist": "4.10.38",
     "react": "19.0.1",
     "react-dom": "19.0.1",
+    "react-pdf-highlighter-plus": "^1.1.4",
     "sortablejs": "1.15.6",
     "tesseract.js": "6.0.0",
     "zod": "3.24.1",
