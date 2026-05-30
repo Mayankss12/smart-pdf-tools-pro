@@ -3,9 +3,10 @@ export type ZipFileInput = {
   blob: Blob;
 };
 
+const ZIP_MIME_TYPE = "application/zip";
 const CRC_TABLE = new Uint32Array(256);
 
-for (let index = 0; index < 256; index += 1) {
+for (let index = 0; index < CRC_TABLE.length; index += 1) {
   let value = index;
 
   for (let bit = 0; bit < 8; bit += 1) {
@@ -59,17 +60,28 @@ function getDosDateTime(date = new Date()) {
 }
 
 function safeZipEntryName(fileName: string) {
-  return fileName
-    .replace(/\\/g, "/")
-    .split("/")
-    .filter(Boolean)
-    .join("/")
-    .replace(/[\u0000-\u001f]/g, "") || "file.pdf";
+  const cleanedName =
+    fileName
+      .replace(/\\/g, "/")
+      .split("/")
+      .filter(Boolean)
+      .join("/")
+      .replace(/[\u0000-\u001f]/g, "") || "file.pdf";
+
+  return cleanedName.toLowerCase().endsWith(".pdf") ? cleanedName : `${cleanedName}.pdf`;
+}
+
+function getBlobPartSize(part: BlobPart) {
+  if (typeof part === "string") return new TextEncoder().encode(part).byteLength;
+  if (part instanceof ArrayBuffer) return part.byteLength;
+  if (ArrayBuffer.isView(part)) return part.byteLength;
+  if (part instanceof Blob) return part.size;
+  return 0;
 }
 
 export async function createZipBlob(files: ZipFileInput[]) {
   if (files.length === 0) {
-    return new Blob([], { type: "application/zip" });
+    return new Blob([], { type: ZIP_MIME_TYPE });
   }
 
   const encoder = new TextEncoder();
@@ -125,13 +137,7 @@ export async function createZipBlob(files: ZipFileInput[]) {
     centralDirectoryParts.push(centralHeader, nameBytes);
   }
 
-  const centralDirectorySize = centralDirectoryParts.reduce((sum, part) => {
-    if (typeof part === "string") return sum + part.length;
-    if (part instanceof ArrayBuffer) return sum + part.byteLength;
-    if (part instanceof Uint8Array) return sum + part.byteLength;
-    if (part instanceof Blob) return sum + part.size;
-    return sum;
-  }, 0);
+  const centralDirectorySize = centralDirectoryParts.reduce((sum, part) => sum + getBlobPartSize(part), 0);
   const centralDirectoryOffset = offset;
 
   const endOfCentralDirectory = createLittleEndianBytes([
@@ -146,6 +152,6 @@ export async function createZipBlob(files: ZipFileInput[]) {
   ]);
 
   return new Blob([...parts, ...centralDirectoryParts, endOfCentralDirectory], {
-    type: "application/zip",
+    type: ZIP_MIME_TYPE,
   });
 }
