@@ -1,21 +1,21 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
-function getSiteUrl(): string {
-  return process.env.NEXT_PUBLIC_SITE_URL?.trim() || "http://localhost:3000";
-}
-
-export async function POST() {
+async function logout(request: NextRequest) {
   const supabase = await createServerSupabaseClient();
 
   if (supabase) {
     await supabase.auth.signOut();
   }
 
-  return NextResponse.redirect(new URL("/login", getSiteUrl()));
+  return NextResponse.redirect(new URL("/login", request.nextUrl.origin));
 }
 
-export async function GET() {
-  return POST();
+export async function POST(request: NextRequest) {
+  return logout(request);
+}
+
+export async function GET(request: NextRequest) {
+  return logout(request);
 }
