@@ -78,7 +78,7 @@ export default async function DashboardPage() {
                 </h1>
 
                 <p className="mt-4 max-w-3xl text-[15px] font-normal leading-7 text-[var(--text-secondary)] sm:text-base">
-                  Your account session is now connected. This dashboard is ready for saved documents, annotation projects, signatures, usage tracking, and backend-assisted processing.
+                  Your account session is connected for this visit. Saved documents, annotation projects, signatures, usage tracking, and backend-assisted processing will be added after the auth flow is fully verified.
                 </p>
 
                 <div className="mt-7 flex flex-col gap-3 sm:flex-row">
@@ -115,14 +115,14 @@ export default async function DashboardPage() {
         <section className="mx-auto max-w-7xl px-4 py-11 sm:px-6 lg:px-8 lg:py-14">
           <div className="grid gap-6 lg:grid-cols-[0.82fr_1.18fr] lg:items-end">
             <div>
-              <p className="section-eyebrow">Backend ready</p>
+              <p className="section-eyebrow">Backend foundation</p>
               <h2 className="display-font mt-3 text-[2rem] font-bold leading-[1.16] tracking-[-0.02em] text-[var(--text-primary)] sm:text-[2.55rem]">
                 Account workspace foundation
               </h2>
             </div>
 
             <p className="max-w-2xl text-sm font-normal leading-7 text-[var(--text-secondary)] sm:text-[15px] lg:justify-self-end">
-              Auth is now active. Next we can connect real saved annotation projects, saved signatures, document history, and processing jobs one module at a time.
+              Auth wiring is in place, but the full signup, login, OTP, refresh persistence, header state, and logout flow must be verified before marking auth stable.
             </p>
           </div>
 
@@ -160,10 +160,10 @@ export default async function DashboardPage() {
                   <BadgeCheck size={20} />
                 </div>
                 <h3 className="display-font text-[1.55rem] font-bold tracking-[-0.02em] text-[var(--text-primary)]">
-                  Auth active
+                  Auth foundation
                 </h3>
                 <p className="mt-2 text-sm font-normal leading-7 text-[var(--text-secondary)]">
-                  Supabase Auth is connected for account sessions and protected dashboard access.
+                  Supabase Auth wiring is connected for account sessions and protected dashboard access, pending full production-flow verification.
                 </p>
               </div>
 
@@ -172,10 +172,10 @@ export default async function DashboardPage() {
                   <ShieldCheck size={20} />
                 </div>
                 <h3 className="display-font text-[1.55rem] font-bold tracking-[-0.02em] text-[var(--text-primary)]">
-                  Storage ready
+                  Storage foundation
                 </h3>
                 <p className="mt-2 text-sm font-normal leading-7 text-[var(--text-secondary)]">
-                  Private buckets and RLS policies are ready for documents, outputs, and signature assets.
+                  Private buckets and RLS policies are prepared for documents, outputs, and signature assets, pending tool-specific verification.
                 </p>
               </div>
 
@@ -187,7 +187,7 @@ export default async function DashboardPage() {
                   Save modules next
                 </h3>
                 <p className="mt-2 text-sm font-normal leading-7 text-[var(--text-secondary)]">
-                  The next practical feature is saving and reopening Annotate PDF projects.
+                  The next practical feature is saving and reopening Annotate PDF projects after auth and tool flows are verified.
                 </p>
               </div>
             </div>
