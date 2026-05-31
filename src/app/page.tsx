@@ -240,7 +240,7 @@ export default function HomePage() {
         </section>
 
         <section className="bg-white px-4 pb-16 sm:px-6 lg:px-8 lg:pb-24">
-          <div className="mx-auto max-w-[1320px] overflow-hidden rounded-[2rem] border border-[var(--border-light)] bg-[linear-gradient(135deg,#fff5d8_0%,#fff8ea_52%,#f4efff_100%)] shadow-[0_28px_90px_rgba(101,80,232,0.10)]">
+          <div className="mx-auto max-w-[1320px] overflow-hidden rounded-[2rem] border border-[var(--border-light)] bg-gradient-to-br from-violet-50 via-white to-indigo-50 shadow-[0_28px_90px_rgba(101,80,232,0.10)]">
             <div className="grid gap-8 px-6 py-8 sm:px-8 sm:py-10 lg:grid-cols-[0.92fr_1.08fr] lg:px-12 lg:py-12">
               <div className="flex flex-col justify-center">
                 <p className="section-eyebrow">PDFMantra Premium</p>

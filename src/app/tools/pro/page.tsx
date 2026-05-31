@@ -26,7 +26,7 @@ export default function ProToolsPage() {
                 PDFMantra Pro
               </div>
 
-              <h1 className="mt-5 max-w-3xl text-4xl font-semibold leading-[1.08] tracking-[-0.04em] sm:text-5xl">
+              <h1 className="mt-5 max-w-3xl text-4xl font-semibold leading-[1.08] tracking-[-0.04em] text-white sm:text-5xl">
                 Advanced PDF workflows for paid backend processing.
               </h1>
 

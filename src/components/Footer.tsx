@@ -29,8 +29,6 @@ const footerGroups = [
       { label: "Security", href: "/security" },
       { label: "About us", href: "/about" },
       { label: "Desktop", href: "/desktop" },
-      { label: "Protect PDF", href: "/tools/protect" },
-      { label: "OCR PDF", href: "/tools/ocr" },
     ],
   },
   {

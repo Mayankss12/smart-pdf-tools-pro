@@ -268,6 +268,34 @@ export const tools: Tool[] = [
     capabilities: browserTool("workspace", "editor"),
   },
   {
+    id: "fill-sign",
+    title: "Fill & Sign PDF",
+    description: "Add text or image signatures, place on any page, resize, and export.",
+    menuDescription: "Place typed or image signatures on any PDF page and export.",
+    category: "edit",
+    href: "/tools/fill-sign",
+    icon: PenLine,
+    status: "working",
+    isClientOnly: true,
+    search: searchMeta(["fill sign pdf", "sign pdf", "add signature"], ["signature", "text sign", "image sign"], ["sign a pdf document", "add signature to pdf"], 100),
+    visibility: directoryOnly,
+    capabilities: browserTool("workspace"),
+  },
+  {
+    id: "annotate-pdf",
+    title: "Annotate PDF",
+    description: "Draw, mark, add arrows, notes, and shapes directly on PDF pages.",
+    menuDescription: "Pen, marker, shapes, arrows and notes on your PDF.",
+    category: "edit",
+    href: "/tools/annotate-pdf",
+    icon: PenLine,
+    status: "working",
+    isClientOnly: true,
+    search: searchMeta(["annotate pdf", "draw on pdf", "mark pdf"], ["pen", "marker", "arrow", "shapes", "notes"], ["draw on a pdf", "add annotations", "mark up document"], 95),
+    visibility: directoryOnly,
+    capabilities: browserTool("workspace"),
+  },
+  {
     id: "highlight-pdf",
     title: "Highlight PDF",
     description: "Apply marker-style highlights to selected text in your PDF.",
@@ -459,7 +487,7 @@ export const tools: Tool[] = [
     popular: true,
     featured: true,
     search: searchMeta(["pdf to doc", "pdf to docx", "convert pdf to word"], ["document workflow", "docx", "editable document", "backend"], ["prepare pdf for word workflow", "convert document through backend"], 112),
-    visibility: everywhere,
+    visibility: directoryOnly,
     capabilities: backendWorkflow("guided-processing"),
   },
   {
@@ -491,7 +519,7 @@ export const tools: Tool[] = [
     popular: true,
     featured: true,
     search: searchMeta(["scan text", "make pdf searchable", "ocr scan"], ["searchable pdf", "selectable text", "scanned document", "backend"], ["prepare searchable pdf workflow", "read image-based pdf"], 114),
-    visibility: everywhere,
+    visibility: directoryOnly,
     capabilities: backendWorkflow("guided-processing"),
   },
   {
@@ -697,7 +725,7 @@ export function getToolsByCategory(category: ToolCategory): Tool[] {
 }
 
 export function getWorkingTools(): Tool[] {
-  return tools.filter((tool) => tool.status === "working" || tool.status === "beta").sort(sortToolsForDiscovery);
+  return tools.filter((tool) => tool.status === "working").sort(sortToolsForDiscovery);
 }
 
 export function getComingSoonTools(): Tool[] {
