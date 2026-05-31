@@ -34,20 +34,15 @@ function ToolCard({ tool }: { readonly tool: (typeof homeTools)[number] }) {
   return (
     <Link
       href={tool.href}
-      className="group relative flex min-h-[238px] flex-col rounded-[1.35rem] border border-[var(--border-light)] bg-[var(--bg-card)] p-5 shadow-[var(--shadow-soft)] transition duration-200 hover:-translate-y-1 hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] hover:shadow-[var(--shadow-card-hover)]"
+      className="group mx-auto grid min-h-[154px] w-full max-w-[172px] justify-items-center rounded-[1.35rem] border border-[var(--border-light)] bg-[var(--bg-card)] px-3 py-4 text-center shadow-[var(--shadow-soft)] transition duration-200 hover:-translate-y-1 hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] hover:shadow-[var(--shadow-card-hover)]"
     >
-      <div className="flex items-start justify-between gap-4">
-        <ToolGlyph icon={tool.icon} tone={toneForCategory(tool.category)} size="lg" />
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--violet-border)] bg-[var(--violet-50)] text-[var(--violet-600)] transition duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:border-[var(--border-focus)] group-hover:bg-[var(--violet-600)] group-hover:text-white">
-          <MoveUpRight size={18} />
-        </span>
-      </div>
+      <ToolGlyph icon={tool.icon} tone={toneForCategory(tool.category)} size="sm" />
 
-      <h3 className="display-font mt-5 text-[1.18rem] font-bold tracking-[-0.02em] text-[var(--text-primary)] transition group-hover:text-[var(--violet-600)]">
+      <h3 className="display-font mt-2 text-[1.02rem] font-bold tracking-[-0.02em] text-[var(--text-primary)] transition group-hover:text-[var(--violet-600)] text-center">
         {tool.title}
       </h3>
 
-      <p className="mt-2 text-[13px] font-normal leading-6 text-[var(--text-secondary)]">
+      <p className="mx-auto mt-2 max-w-[150px] text-center text-[12.25px] font-normal leading-5 text-[var(--text-secondary)]">
         {tool.menuDescription || tool.description}
       </p>
     </Link>
@@ -170,7 +165,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7">
+            <div className="mx-auto mt-10 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 2xl:grid-cols-7 max-w-[1320px] justify-items-center gap-3">
               {homeTools.map((tool) => (
                 <ToolCard key={tool.id} tool={tool} />
               ))}
