@@ -39,6 +39,7 @@ const otpSchema = z.object({
     .string()
     .length(6, "OTP must be 6 digits")
     .regex(/^\d+$/, "OTP must contain only digits"),
+  redirectTo: z.string().optional(),
 });
 
 const resetPasswordSchema = z
@@ -62,6 +63,22 @@ function getFirstValidationError(error: z.ZodError): { message: string; field?: 
 
 function getSiteUrl(): string {
   return process.env.NEXT_PUBLIC_SITE_URL?.trim() || "http://localhost:3000";
+}
+
+function getSafeRedirectPath(value: FormDataEntryValue | string | null | undefined): string {
+  const rawValue = typeof value === "string" ? value.trim() : "";
+
+  if (!rawValue || !rawValue.startsWith("/") || rawValue.startsWith("//")) {
+    return "/dashboard";
+  }
+
+  const blockedPrefixes = ["/login", "/signup", "/logout", "/auth"];
+
+  if (blockedPrefixes.some((prefix) => rawValue === prefix || rawValue.startsWith(`${prefix}/`))) {
+    return "/dashboard";
+  }
+
+  return rawValue;
 }
 
 async function getConfiguredServerClient(): Promise<Awaited<ReturnType<typeof createServerSupabaseClient>>> {
@@ -193,6 +210,7 @@ export async function verifyOtpAction(
   const raw = {
     email: formData.get("email"),
     token: formData.get("token"),
+    redirectTo: formData.get("redirectTo") || undefined,
   };
 
   const parsed = otpSchema.safeParse(raw);
@@ -202,7 +220,8 @@ export async function verifyOtpAction(
     return { success: false, error: firstError.message, field: firstError.field };
   }
 
-  const { email, token } = parsed.data;
+  const { email, token, redirectTo } = parsed.data;
+  const safeRedirectTo = getSafeRedirectPath(redirectTo);
 
   try {
     const supabase = await getConfiguredServerClient();
@@ -226,12 +245,12 @@ export async function verifyOtpAction(
       return { success: false, error: "Verification failed. Please try again." };
     }
 
-    revalidatePath("/dashboard");
+    revalidatePath(safeRedirectTo);
   } catch {
     return { success: false, error: "Authentication service is not configured yet." };
   }
 
-  redirect("/dashboard");
+  redirect(safeRedirectTo);
 }
 
 export async function resendOtpAction(
@@ -305,33 +324,4 @@ export async function resetPasswordAction(
 
   if (!parsed.success) {
     const firstError = getFirstValidationError(parsed.error);
-    return { success: false, error: firstError.message, field: firstError.field };
-  }
-
-  try {
-    const supabase = await getConfiguredServerClient();
-
-    const { error } = await supabase.auth.updateUser({
-      password: parsed.data.password,
-    });
-
-    if (error) {
-      return { success: false, error: "Failed to update password. Your reset link may have expired." };
-    }
-
-    await supabase.auth.signOut();
-    return { success: true, message: "Password updated successfully. Please log in with your new password." };
-  } catch {
-    return { success: false, error: "Authentication service is not configured yet." };
-  }
-}
-
-export async function logoutAction(): Promise<void> {
-  const supabase = await createServerSupabaseClient();
-
-  if (supabase) {
-    await supabase.auth.signOut();
-  }
-
-  redirect("/login");
-}
+    return { success: false, error: firstError.message, field: first
