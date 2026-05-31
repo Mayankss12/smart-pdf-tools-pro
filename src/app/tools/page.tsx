@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ArrowRight, Search, Sparkles, X } from "lucide-react";
+import { Search, Sparkles, X } from "lucide-react";
 
 import { Header } from "@/components/Header";
 import { ToolGlyph, type ToolGlyphTone } from "@/components/ToolGlyph";
@@ -68,18 +68,12 @@ function ToolTile({ tool, showCategory = true }: { readonly tool: Tool; readonly
   return (
     <Link
       href={tool.href}
-      className="group flex min-h-[190px] flex-col rounded-[1.35rem] border border-[var(--cream-border)] bg-white p-5 shadow-[var(--shadow-soft)] transition duration-200 hover:-translate-y-1 hover:border-[var(--violet-border)] hover:bg-[var(--violet-50)] hover:shadow-[var(--shadow-card-hover)]"
+      className="group mx-auto grid w-full max-w-[190px] min-h-[168px] justify-items-center rounded-[1.35rem] border border-[var(--cream-border)] bg-white p-5 shadow-[var(--shadow-soft)] transition duration-200 hover:-translate-y-1 hover:border-[var(--violet-border)] hover:bg-[var(--violet-50)] hover:shadow-[var(--shadow-card-hover)]"
     >
-      <div className="flex items-start justify-between gap-4">
-        <ToolGlyph icon={Icon} tone={tone} size="md" />
-        <ArrowRight
-          size={17}
-          className="text-[var(--text-caption)] transition duration-200 group-hover:translate-x-1 group-hover:text-[var(--violet-600)]"
-        />
-      </div>
+      <ToolGlyph icon={Icon} tone={tone} size="md" />
 
-      <div className="mt-5 min-w-0">
-        <h2 className="truncate text-[1.05rem] font-bold tracking-[-0.02em] text-[var(--text-primary)] transition group-hover:text-[var(--violet-600)]">
+      <div className="mt-5 min-w-0 text-center">
+        <h2 className="text-[1.02rem] font-semibold leading-snug tracking-[-0.025em] text-[var(--text-primary)] transition group-hover:text-[var(--violet-600)]">
           {tool.title}
         </h2>
         <p className="mt-2 line-clamp-2 text-sm font-normal leading-6 text-[var(--text-secondary)]">
@@ -88,7 +82,7 @@ function ToolTile({ tool, showCategory = true }: { readonly tool: Tool; readonly
       </div>
 
       {showCategory ? (
-        <div className="mt-auto pt-5 text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--text-caption)]">
+        <div className="mt-auto pt-5 text-center text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--text-caption)]">
           {categoryLabel(tool.category)}
         </div>
       ) : null}
@@ -224,7 +218,7 @@ export default function ToolsPage() {
               </p>
             </div>
 
-            <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mx-auto mt-7 grid max-w-[1180px] justify-center justify-items-center gap-4 [grid-template-columns:repeat(auto-fit,minmax(175px,190px))]">
               {POPULAR_TOOLS.map((tool) => (
                 <ToolTile key={`popular-${tool.id}`} tool={tool} showCategory={false} />
               ))}
@@ -279,7 +273,7 @@ export default function ToolsPage() {
             {filteredTools.length === 0 ? (
               <EmptyResults onReset={resetFilters} />
             ) : (
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="mx-auto grid max-w-[1180px] justify-center justify-items-center gap-4 [grid-template-columns:repeat(auto-fit,minmax(175px,190px))]">
                 {filteredTools.map((tool) => (
                   <ToolTile key={tool.id} tool={tool} />
                 ))}
