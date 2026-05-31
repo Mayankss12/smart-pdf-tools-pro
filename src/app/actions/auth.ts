@@ -324,4 +324,33 @@ export async function resetPasswordAction(
 
   if (!parsed.success) {
     const firstError = getFirstValidationError(parsed.error);
-    return { success: false, error: firstError.message, field: first
+    return { success: false, error: firstError.message, field: firstError.field };
+  }
+
+  try {
+    const supabase = await getConfiguredServerClient();
+
+    const { error } = await supabase.auth.updateUser({
+      password: parsed.data.password,
+    });
+
+    if (error) {
+      return { success: false, error: "Failed to update password. Your reset link may have expired." };
+    }
+
+    await supabase.auth.signOut();
+    return { success: true, message: "Password updated successfully. Please log in with your new password." };
+  } catch {
+    return { success: false, error: "Authentication service is not configured yet." };
+  }
+}
+
+export async function logoutAction(): Promise<void> {
+  const supabase = await createServerSupabaseClient();
+
+  if (supabase) {
+    await supabase.auth.signOut();
+  }
+
+  redirect("/login");
+}
