@@ -10,13 +10,31 @@ const OTP_LENGTH = 6;
 
 interface OtpVerifyFormProps {
   readonly email: string;
+  readonly redirectTo?: string;
 }
 
 function normalizeOtp(value: string) {
   return value.replace(/\D/g, "").slice(0, OTP_LENGTH);
 }
 
-export function OtpVerifyForm({ email }: OtpVerifyFormProps) {
+function getSafeRedirectPath(value: string | undefined): string {
+  const rawValue = value?.trim() ?? "";
+
+  if (!rawValue || !rawValue.startsWith("/") || rawValue.startsWith("//")) {
+    return "/dashboard";
+  }
+
+  const blockedPrefixes = ["/login", "/signup", "/logout", "/auth"];
+
+  if (blockedPrefixes.some((prefix) => rawValue === prefix || rawValue.startsWith(`${prefix}/`))) {
+    return "/dashboard";
+  }
+
+  return rawValue;
+}
+
+export function OtpVerifyForm({ email, redirectTo }: OtpVerifyFormProps) {
+  const safeRedirectTo = getSafeRedirectPath(redirectTo);
   const [otp, setOtp] = useState("");
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const [verifyState, verifyAction, isVerifying] = useActionState<ActionResult | null, FormData>(
@@ -136,6 +154,7 @@ export function OtpVerifyForm({ email }: OtpVerifyFormProps) {
       <form action={verifyAction} id="verify-otp-form">
         <input type="hidden" name="email" value={email} />
         <input type="hidden" name="token" value={otp} />
+        <input type="hidden" name="redirectTo" value={safeRedirectTo} />
       </form>
 
       {verifyState?.success === false ? (
