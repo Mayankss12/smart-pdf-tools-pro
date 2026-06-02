@@ -15,25 +15,23 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
+  ChevronDown,
   CheckCircle2,
+  CircleHelp,
   Download,
   FileText,
   GripVertical,
-  Keyboard,
-  Layers3,
   Loader2,
   MousePointer2,
   Redo2,
   RotateCcw,
   Shuffle,
-  Sparkles,
   Upload,
   Undo2,
   X,
 } from "lucide-react";
 
 import { Header } from "@/components/Header";
-import { ToolPageHeader } from "@/components/ToolPageHeader";
 import {
   PdfEngineError,
   downloadBlob,
@@ -614,40 +612,60 @@ export default function ReorderPagesPage() {
       <Header />
 
       <main className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)]">
-        <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
-          <ToolPageHeader
-            icon={ArrowUpDown}
-            eyebrow="PDFMantra Page Engine"
-            title="Reorder PDF pages visually."
-            description="Upload one PDF, preview real page thumbnails, drag pages into the perfect order, then export a clean reordered copy."
-            meta={
-              <div className="grid min-w-[270px] grid-cols-3 divide-x divide-[var(--border-light)] text-center">
+        <section className="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8 lg:py-8">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/pdf"
+            className="hidden"
+            onChange={(event) => handleFile(event.target.files?.[0])}
+          />
+
+          <section className="relative overflow-hidden rounded-[1.5rem] border border-[var(--border-light)] bg-[var(--bg-panel)] px-4 py-5 shadow-[var(--shadow-soft)] sm:px-5 sm:py-6 lg:px-6">
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-[radial-gradient(circle,rgba(101,80,232,0.14)_0%,rgba(101,80,232,0.05)_38%,transparent_72%)]"
+            />
+
+            <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div className="flex gap-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--violet-600)] text-white shadow-[0_14px_34px_rgba(101,80,232,0.18)]">
+                  <ArrowUpDown size={20} />
+                </div>
+
+                <div>
+                  <h1 className="display-font max-w-4xl text-[2rem] font-bold leading-[1.12] tracking-[-0.025em] text-[var(--text-primary)] sm:text-[2.45rem] lg:text-[2.8rem]">
+                    Reorder PDF pages visually.
+                  </h1>
+                  <p className="mt-3 max-w-3xl text-[15px] font-normal leading-7 text-[var(--text-secondary)]">
+                    Upload one PDF, preview real page thumbnails, drag pages into order, and export a clean reordered copy.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid min-w-[270px] grid-cols-3 divide-x divide-[var(--border-light)] rounded-[1.25rem] border border-[var(--border-light)] bg-white/92 p-3 text-center shadow-[var(--shadow-soft)] backdrop-blur">
                 <div className="px-3">
-                  <div className="text-[1.35rem] font-bold tracking-[-0.03em] text-[var(--text-primary)]">{pageCount || "-"}</div>
+                  <div className="text-[1.25rem] font-bold tracking-[-0.03em] text-[var(--text-primary)]">{pageCount || "-"}</div>
                   <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">Pages</div>
                 </div>
                 <div className="px-3">
-                  <div className="text-[1.35rem] font-bold tracking-[-0.03em] text-[var(--text-primary)]">{selectedPages.length || "-"}</div>
+                  <div className="text-[1.25rem] font-bold tracking-[-0.03em] text-[var(--text-primary)]">{selectedPages.length || "-"}</div>
                   <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">Selected</div>
                 </div>
                 <div className="px-3">
-                  <div className="text-[1.35rem] font-bold tracking-[-0.03em] text-[var(--text-primary)]">{result ? formatFileSize(result.outputSize) : hasChangedOrder ? "Yes" : "No"}</div>
-                  <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">{result ? "Output" : "Changed"}</div>
+                  <div className="text-[1.25rem] font-bold tracking-[-0.03em] text-[var(--text-primary)]">
+                    {result ? formatFileSize(result.outputSize) : hasChangedOrder ? "Yes" : "No"}
+                  </div>
+                  <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                    {result ? "Output" : "Changed"}
+                  </div>
                 </div>
               </div>
-            }
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="application/pdf"
-              className="hidden"
-              onChange={(event) => handleFile(event.target.files?.[0])}
-            />
-          </ToolPageHeader>
+            </div>
+          </section>
 
-          <div className="mt-6 grid overflow-hidden rounded-[1.75rem] border border-[var(--border-light)] bg-[var(--bg-card)] shadow-[var(--shadow-card)] lg:grid-cols-[1fr_390px]">
-            <section className="min-h-[660px] border-r border-[var(--border-light)] bg-[var(--bg-base)] p-5 sm:p-6">
+          <div className="mt-4 overflow-hidden rounded-[1.5rem] border border-[var(--border-light)] bg-[var(--bg-card)] shadow-[var(--shadow-card)]">
+            <section className="min-h-[660px] bg-[var(--bg-base)] p-3 sm:p-4">
               <div
                 onClick={() => {
                   if (!busy) fileInputRef.current?.click();
@@ -660,10 +678,10 @@ export default function ReorderPagesPage() {
                 role="button"
                 tabIndex={0}
                 aria-disabled={busy}
-                className="cursor-pointer rounded-[1.5rem] border-2 border-dashed border-[var(--violet-border)] bg-[var(--bg-card)] p-6 text-center shadow-[var(--shadow-soft)] transition hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] focus:border-[var(--border-focus)] focus:outline-none focus:ring-4 focus:ring-violet-100 aria-disabled:cursor-not-allowed aria-disabled:opacity-70"
+                className="cursor-pointer rounded-[1.25rem] border-2 border-dashed border-[var(--violet-border)] bg-[var(--bg-card)] p-4 text-center shadow-[var(--shadow-soft)] transition hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] focus:border-[var(--border-focus)] focus:outline-none focus:ring-4 focus:ring-violet-100 aria-disabled:cursor-not-allowed aria-disabled:opacity-70"
               >
-                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--violet-600)] text-white">
-                  {busyMode === "reading" || busyMode === "rendering" ? <Loader2 className="animate-spin" size={22} /> : <Upload size={22} />}
+                <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--violet-600)] text-white">
+                  {busyMode === "reading" || busyMode === "rendering" ? <Loader2 className="animate-spin" size={20} /> : <Upload size={20} />}
                 </div>
                 <div className="text-[15px] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
                   {file ? file.name : "Drop PDF here"}
@@ -673,7 +691,7 @@ export default function ReorderPagesPage() {
                 </div>
 
                 {busyMode === "rendering" ? (
-                  <div className="mx-auto mt-4 max-w-md">
+                  <div className="mx-auto mt-3 max-w-md">
                     <ProgressBar value={thumbnailPercent} />
                     <div className="mt-2 text-xs font-bold uppercase tracking-[0.08em] text-[var(--violet-600)]">
                       Rendering thumbnails {thumbnailProgress.done}/{thumbnailProgress.total}
@@ -682,60 +700,147 @@ export default function ReorderPagesPage() {
                 ) : null}
               </div>
 
-              <div className="mt-5 rounded-[1.5rem] border border-[var(--border-light)] bg-[var(--bg-card)] p-5 shadow-[var(--shadow-soft)]">
-                <div className="flex flex-col justify-between gap-4 xl:flex-row xl:items-start">
-                  <div>
-                    <div className="inline-flex items-center gap-2 rounded-full border border-[var(--violet-border)] bg-[var(--violet-50)] px-3 py-1 text-xs font-bold uppercase tracking-[0.08em] text-[var(--violet-600)]">
-                      <Layers3 size={14} />
-                      Visual page board
-                    </div>
-                    <h2 className="display-font mt-3 text-[1.75rem] font-bold tracking-[-0.02em] text-[var(--text-primary)]">Page Order</h2>
-                    <p className="mt-1 text-sm font-normal text-[var(--text-secondary)]">
-                      Drag pages, use arrow controls, or select multiple pages with Ctrl/Shift for batch movement.
-                    </p>
-                  </div>
+              <div className="mt-4 rounded-[1.25rem] border border-[var(--border-light)] bg-[var(--bg-card)] p-3 shadow-[var(--shadow-soft)] sm:p-4">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <p className="text-sm font-normal text-[var(--text-secondary)]">
+                    Drag pages into order. Use Ctrl/Shift for multi-select.
+                  </p>
 
-                  {file ? (
-                    <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={resetOrder}
+                      disabled={!file || busy}
+                      className="inline-flex items-center justify-center gap-2 rounded-full border border-[var(--border-light)] bg-white px-3 py-2 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <RotateCcw size={15} />
+                      Reset
+                    </button>
+                    <button
+                      type="button"
+                      onClick={reverseOrder}
+                      disabled={!file || busy}
+                      className="inline-flex items-center justify-center gap-2 rounded-full border border-[var(--border-light)] bg-white px-3 py-2 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <Shuffle size={15} />
+                      Reverse
+                    </button>
+                    <button
+                      type="button"
+                      onClick={undoOrder}
+                      disabled={!file || busy || !canUndo}
+                      className="inline-flex items-center justify-center gap-2 rounded-full border border-[var(--border-light)] bg-white px-3 py-2 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <Undo2 size={15} />
+                      Undo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={redoOrder}
+                      disabled={!file || busy || !canRedo}
+                      className="inline-flex items-center justify-center gap-2 rounded-full border border-[var(--border-light)] bg-white px-3 py-2 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <Redo2 size={15} />
+                      Redo
+                    </button>
+
+                    <details className="group relative">
+                      <summary className="inline-flex cursor-pointer list-none items-center justify-center gap-2 rounded-full border border-[var(--border-light)] bg-white px-3 py-2 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] [&::-webkit-details-marker]:hidden">
+                        More options
+                        <ChevronDown size={15} className="transition group-open:rotate-180" />
+                      </summary>
+
+                      <div className="absolute right-0 z-30 mt-2 w-52 rounded-2xl border border-[var(--border-light)] bg-white p-2 shadow-[var(--shadow-card)]">
+                        <button
+                          type="button"
+                          onClick={oddFirstOrder}
+                          disabled={!file || busy}
+                          className="w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          Odd First
+                        </button>
+                        <button
+                          type="button"
+                          onClick={evenFirstOrder}
+                          disabled={!file || busy}
+                          className="w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          Even First
+                        </button>
+                        <button
+                          type="button"
+                          onClick={selectAllPages}
+                          disabled={busy || !pageOrder.length}
+                          className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <MousePointer2 size={15} />
+                          Select All
+                        </button>
+                        <button
+                          type="button"
+                          onClick={clearFile}
+                          disabled={!file || busy}
+                          className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <X size={15} />
+                          Remove PDF
+                        </button>
+                      </div>
+                    </details>
+
+                    <div className="group relative">
                       <button
                         type="button"
-                        onClick={selectAllPages}
-                        disabled={busy || !pageOrder.length}
-                        className="inline-flex items-center justify-center gap-2 rounded-full border border-[var(--border-light)] bg-white px-4 py-2 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border-light)] bg-white text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)]"
+                        aria-label="Keyboard shortcuts"
                       >
-                        <MousePointer2 size={15} />
-                        Select All
+                        <CircleHelp size={17} />
                       </button>
-                      <button
-                        type="button"
-                        onClick={clearSelection}
-                        disabled={busy || !selectedPages.length}
-                        className="inline-flex items-center justify-center gap-2 rounded-full border border-[var(--border-light)] bg-white px-4 py-2 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        Clear
-                      </button>
-                      <button
-                        type="button"
-                        onClick={clearFile}
-                        disabled={busy}
-                        className="inline-flex items-center justify-center gap-2 rounded-full border border-red-100 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <X size={15} />
-                        Remove PDF
-                      </button>
+                      <div className="pointer-events-none absolute right-0 z-30 mt-2 w-64 rounded-2xl border border-[var(--border-light)] bg-white p-3 text-xs font-semibold leading-5 text-[var(--text-secondary)] opacity-0 shadow-[var(--shadow-card)] transition group-hover:opacity-100">
+                        Ctrl Z / Ctrl Y · Undo / Redo<br />
+                        ↑ / ↓ · Move selected<br />
+                        Home / End · Send start/end<br />
+                        Ctrl / Shift click · Multi select<br />
+                        Sequence: {sequencePreview}
+                      </div>
                     </div>
-                  ) : null}
+
+                    <button type="button" onClick={handleExport} disabled={!file || busy} className="btn-primary px-4 py-2">
+                      {busyMode === "exporting" ? (
+                        <><Loader2 className="animate-spin" size={18} /><span>Exporting</span></>
+                      ) : (
+                        <><Download size={18} /><span>Export</span></>
+                      )}
+                    </button>
+                  </div>
                 </div>
 
+                {busyMode === "exporting" ? (
+                  <div className="mt-3 rounded-2xl border border-[var(--violet-border)] bg-[var(--violet-50)] p-3">
+                    <div className="mb-2 flex items-center justify-between gap-3 text-sm font-bold text-[var(--violet-600)]">
+                      <span>Exporting</span>
+                      <span>{exportProgress}%</span>
+                    </div>
+                    <ProgressBar value={exportProgress} />
+                  </div>
+                ) : null}
+
+                {result ? (
+                  <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
+                    <CheckCircle2 size={16} />
+                    Reordered PDF: {formatFileSize(result.outputSize)}
+                  </div>
+                ) : null}
+
                 {busyMode === "reading" ? (
-                  <div className="mt-5 flex min-h-80 items-center justify-center rounded-[1.35rem] border border-[var(--violet-border)] bg-[var(--violet-50)]">
+                  <div className="mt-4 flex min-h-80 items-center justify-center rounded-[1.25rem] border border-[var(--violet-border)] bg-[var(--violet-50)]">
                     <div className="flex items-center gap-2 rounded-full border border-[var(--violet-border)] bg-white px-4 py-3 text-sm font-semibold text-[var(--violet-600)] shadow-[var(--shadow-soft)]">
                       <Loader2 className="animate-spin" size={18} />
                       Reading PDF
                     </div>
                   </div>
                 ) : pageOrder.length > 0 ? (
-                  <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
                     {pageOrder.map((pageNumber, index) => {
                       const isSelected = selectedPageSet.has(pageNumber);
                       const isDropTarget = dragOverIndex === index && draggedIndex !== index;
@@ -770,13 +875,13 @@ export default function ReorderPagesPage() {
                             handleCardDrop(index);
                           }}
                           onDragEnd={resetDragState}
-                          className={`group cursor-grab rounded-[1.35rem] border bg-white p-3 shadow-sm outline-none transition active:cursor-grabbing ${
+                          className={`group cursor-grab rounded-[1.25rem] border bg-white p-3 shadow-sm outline-none transition active:cursor-grabbing ${
                             isSelected
                               ? "border-[var(--violet-600)] ring-4 ring-violet-100"
                               : "border-[var(--border-light)] hover:border-[var(--violet-border)]"
                           } ${isDropTarget ? "scale-[0.985] border-[var(--border-focus)] bg-[var(--violet-50)]" : ""}`}
                         >
-                          <div className="flex items-center justify-between gap-2 pb-3">
+                          <div className="flex items-center justify-between gap-2 pb-2">
                             <div className="flex items-center gap-2">
                               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--violet-50)] text-xs font-bold text-[var(--violet-600)]">
                                 {index + 1}
@@ -823,7 +928,7 @@ export default function ReorderPagesPage() {
                             </div>
                           </div>
 
-                          <div className="mt-3 grid grid-cols-2 gap-2">
+                          <div className="mt-2 grid grid-cols-2 gap-2 opacity-0 transition group-focus-within:opacity-100 group-hover:opacity-100">
                             <button
                               type="button"
                               onClick={(event) => {
@@ -856,7 +961,7 @@ export default function ReorderPagesPage() {
                     })}
                   </div>
                 ) : (
-                  <div className="mt-5 flex min-h-80 items-center justify-center rounded-[1.35rem] border border-dashed border-[var(--violet-border)] bg-[var(--violet-50)]/52 text-center">
+                  <div className="mt-4 flex min-h-80 items-center justify-center rounded-[1.25rem] border border-dashed border-[var(--violet-border)] bg-[var(--violet-50)]/52 text-center">
                     <div>
                       <FileText className="mx-auto text-[var(--violet-400)]" size={42} />
                       <div className="mt-3 text-[15px] font-semibold text-[var(--text-primary)]">No PDF loaded</div>
@@ -866,161 +971,22 @@ export default function ReorderPagesPage() {
                 )}
               </div>
             </section>
-
-            <aside className="bg-[var(--bg-card)] p-5 sm:p-6">
-              <div className="rounded-[1.5rem] border border-[var(--border-light)] bg-[var(--bg-panel)] p-5 shadow-[var(--shadow-soft)]">
-                <h2 className="display-font text-[1.75rem] font-bold tracking-[-0.02em] text-[var(--text-primary)]">Reorder Controls</h2>
-                <p className="mt-2 text-sm font-normal leading-6 text-[var(--text-secondary)]">
-                  Use presets, batch movement, undo/redo, and keyboard shortcuts for fast page organization.
-                </p>
-
-                <div className="mt-5 rounded-2xl border border-[var(--violet-border)] bg-[var(--violet-50)] p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-bold text-[var(--violet-600)]">Selection</div>
-                      <div className="mt-1 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">{selectedSummary}</div>
-                    </div>
-                    <MousePointer2 className="text-[var(--violet-600)]" size={21} />
-                  </div>
-
-                  <div className="mt-4 grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => moveSelectedPages(-1)}
-                      disabled={!file || busy || !selectedPages.length}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[var(--border-light)] bg-white px-3 py-3 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      <ArrowUp size={16} />
-                      Move Up
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => moveSelectedPages(1)}
-                      disabled={!file || busy || !selectedPages.length}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[var(--border-light)] bg-white px-3 py-3 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      <ArrowDown size={16} />
-                      Move Down
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => moveSelectedToEdge("start")}
-                      disabled={!file || busy || !selectedPages.length}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[var(--border-light)] bg-white px-3 py-3 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      To Start
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => moveSelectedToEdge("end")}
-                      disabled={!file || busy || !selectedPages.length}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[var(--border-light)] bg-white px-3 py-3 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      To End
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mt-5">
-                  <div className="mb-2 flex items-center gap-2 text-sm font-bold text-[var(--text-primary)]">
-                    <Sparkles size={16} className="text-[var(--violet-600)]" />
-                    Smart presets
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button type="button" onClick={reverseOrder} disabled={!file || busy} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[var(--border-light)] bg-white px-3 py-3 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40">
-                      <Shuffle size={16} /> Reverse
-                    </button>
-                    <button type="button" onClick={resetOrder} disabled={!file || busy} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[var(--border-light)] bg-white px-3 py-3 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40">
-                      <RotateCcw size={16} /> Reset
-                    </button>
-                    <button type="button" onClick={oddFirstOrder} disabled={!file || busy} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[var(--border-light)] bg-white px-3 py-3 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40">
-                      Odd First
-                    </button>
-                    <button type="button" onClick={evenFirstOrder} disabled={!file || busy} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[var(--border-light)] bg-white px-3 py-3 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40">
-                      Even First
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mt-5">
-                  <div className="mb-2 flex items-center gap-2 text-sm font-bold text-[var(--text-primary)]">
-                    <Undo2 size={16} className="text-[var(--violet-600)]" />
-                    History
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={undoOrder}
-                      disabled={!file || busy || !canUndo}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[var(--border-light)] bg-white px-3 py-3 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      <Undo2 size={16} />
-                      Undo
-                    </button>
-                    <button
-                      type="button"
-                      onClick={redoOrder}
-                      disabled={!file || busy || !canRedo}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[var(--border-light)] bg-white px-3 py-3 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      <Redo2 size={16} />
-                      Redo
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mt-5 rounded-2xl border border-[var(--violet-border)] bg-[var(--violet-50)] p-4">
-                  <div className="text-sm font-semibold text-[var(--violet-600)]">Current sequence</div>
-                  <div className="mt-2 max-h-28 overflow-auto text-sm font-medium leading-6 text-[var(--text-secondary)]">
-                    {sequencePreview}
-                  </div>
-                </div>
-
-                <div className="mt-5 rounded-2xl border border-[var(--border-light)] bg-white p-4">
-                  <div className="mb-2 flex items-center gap-2 text-sm font-bold text-[var(--text-primary)]">
-                    <Keyboard size={16} className="text-[var(--violet-600)]" />
-                    Shortcuts
-                  </div>
-                  <div className="grid gap-2 text-xs font-semibold text-[var(--text-secondary)]">
-                    <div className="flex justify-between gap-3"><span>Undo / Redo</span><span>Ctrl Z / Ctrl Y</span></div>
-                    <div className="flex justify-between gap-3"><span>Move selected</span><span>↑ / ↓</span></div>
-                    <div className="flex justify-between gap-3"><span>Send start/end</span><span>Home / End</span></div>
-                    <div className="flex justify-between gap-3"><span>Multi select</span><span>Ctrl / Shift click</span></div>
-                  </div>
-                </div>
-
-                {busyMode === "exporting" ? (
-                  <div className="mt-5 rounded-2xl border border-[var(--violet-border)] bg-[var(--violet-50)] p-4">
-                    <div className="mb-2 flex items-center justify-between gap-3 text-sm font-bold text-[var(--violet-600)]">
-                      <span>Export progress</span>
-                      <span>{exportProgress}%</span>
-                    </div>
-                    <ProgressBar value={exportProgress} />
-                  </div>
-                ) : null}
-
-                {result ? (
-                  <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm font-medium leading-6 text-emerald-800">
-                    <div className="mb-1 flex items-center gap-2 font-semibold"><CheckCircle2 size={16} /> Last output</div>
-                    Reordered PDF: {formatFileSize(result.outputSize)}.
-                  </div>
-                ) : null}
-
-                <button type="button" onClick={handleExport} disabled={!file || busy} className="btn-primary mt-5 w-full">
-                  {busyMode === "exporting" ? (
-                    <><Loader2 className="animate-spin" size={18} /><span>Exporting</span></>
-                  ) : (
-                    <><Download size={18} /><span>Export Reordered PDF</span></>
-                  )}
-                </button>
-              </div>
-
-              <div className={`mt-5 rounded-[1.5rem] border p-4 text-sm font-medium leading-6 shadow-[var(--shadow-soft)] ${statusLooksLikeError ? "border-red-100 bg-red-50 text-red-700" : "border-[var(--violet-border)] bg-[var(--violet-50)] text-[var(--violet-600)]"}`}>
-                <div className="mb-1 flex items-center gap-2 font-semibold"><CheckCircle2 size={16} /> Status</div>
-                {status}
-              </div>
-            </aside>
           </div>
+
+          <div className={`mt-3 px-1 text-sm font-medium ${statusLooksLikeError ? "text-red-600" : "text-[var(--text-secondary)]"}`}>
+            {status}
+          </div>
+
+          {selectedPages.length > 0 ? (
+            <div className="fixed inset-x-0 bottom-5 z-40 mx-auto flex w-[calc(100%-2rem)] max-w-2xl flex-wrap items-center justify-center gap-2 rounded-full border border-[var(--violet-border)] bg-white/95 px-3 py-2 text-sm font-semibold text-[var(--text-secondary)] shadow-[var(--shadow-card)] backdrop-blur">
+              <span className="px-2 text-[var(--violet-600)]">{selectedSummary}</span>
+              <button type="button" onClick={() => moveSelectedPages(-1)} disabled={busy} className="rounded-full px-3 py-1.5 transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40">↑ Up</button>
+              <button type="button" onClick={() => moveSelectedPages(1)} disabled={busy} className="rounded-full px-3 py-1.5 transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40">↓ Down</button>
+              <button type="button" onClick={() => moveSelectedToEdge("start")} disabled={busy} className="rounded-full px-3 py-1.5 transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40">⤒ Start</button>
+              <button type="button" onClick={() => moveSelectedToEdge("end")} disabled={busy} className="rounded-full px-3 py-1.5 transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40">⤓ End</button>
+              <button type="button" onClick={clearSelection} disabled={busy} className="rounded-full px-3 py-1.5 text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40">✕ Clear</button>
+            </div>
+          ) : null}
         </section>
       </main>
     </>
