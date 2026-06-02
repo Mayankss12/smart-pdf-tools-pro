@@ -288,8 +288,8 @@ export default function SplitPage() {
               <div className="mt-5 rounded-[1.5rem] border border-[var(--border-light)] bg-[var(--bg-card)] p-5 shadow-[var(--shadow-soft)]">
                 <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
                   <div>
-                    <h2 className="display-font text-[1.75rem] font-bold tracking-[-0.02em] text-[var(--text-primary)]">Page Selection Map</h2>
-                    <p className="mt-1 text-sm font-normal text-[var(--text-secondary)]">Selected pages are highlighted. Up to 40 pages are shown in this fast browser map.</p>
+                    <h2 className="display-font text-[1.75rem] font-bold tracking-[-0.02em] text-[var(--text-primary)]">Visual Page Grid</h2>
+                    <p className="mt-1 text-sm font-normal text-[var(--text-secondary)]">Selected pages are based on the current page groups. Up to 40 pages are shown in this fast browser map.</p>
                   </div>
 
                   {file ? (
@@ -320,13 +320,14 @@ export default function SplitPage() {
                       return (
                         <div
                           key={pageNumber}
-                          className={`rounded-2xl border px-3 py-4 text-center text-sm font-bold transition ${
+                          className={`rounded-[1.5rem] border px-3 py-4 text-center text-sm font-semibold transition shadow-sm ${
                             isSelected
-                              ? "border-[var(--border-focus)] bg-[var(--violet-50)] text-[var(--violet-600)] ring-4 ring-[rgba(101,80,232,0.12)]"
-                              : "border-[var(--border-light)] bg-white text-[var(--text-secondary)]"
+                              ? "border-transparent bg-[var(--violet-50)] text-[var(--violet-700)] shadow-[0_12px_30px_rgba(101,80,232,0.12)] ring-1 ring-[rgba(101,80,232,0.20)]"
+                              : "border-[var(--border-light)] bg-white text-[var(--text-secondary)] shadow-[0_4px_10px_rgba(15,23,42,0.04)]"
                           }`}
                         >
-                          {pageNumber}
+                          <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-muted)]">Page</div>
+                          <div className="mt-2 text-[1rem] font-bold">{pageNumber}</div>
                         </div>
                       );
                     })}
