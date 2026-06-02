@@ -11,24 +11,22 @@ import {
 import * as pdfjsLib from "pdfjs-dist";
 import {
   CheckCircle2,
+  ChevronDown,
+  CircleHelp,
   Download,
-  Eye,
   FileText,
   Grip,
   Hash,
-  ListFilter,
   Loader2,
   MousePointer2,
   RotateCcw,
   Settings2,
-  Sparkles,
   Upload,
   X,
 } from "lucide-react";
 import { StandardFonts, rgb } from "pdf-lib";
 
 import { Header } from "@/components/Header";
-import { ToolPageHeader } from "@/components/ToolPageHeader";
 import {
   PdfEngineError,
   createPdfFileName,
@@ -389,6 +387,11 @@ export default function PageNumbersPage() {
     return `${targetPlan.pages.length} of ${pageCount} pages will receive numbers`;
   }, [file, pageCount, targetPlan.error, targetPlan.pages.length]);
 
+  const previewText = useMemo(() => {
+    if (!targetPlan.pages.length) return "-";
+    return buildNumberText(startNumber, targetPlan.pages.length, prefix, suffix);
+  }, [prefix, startNumber, suffix, targetPlan.pages.length]);
+
   useEffect(() => {
     configurePdfWorker();
   }, []);
@@ -631,40 +634,56 @@ export default function PageNumbersPage() {
       <Header />
 
       <main className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)]">
-        <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
-          <ToolPageHeader
-            icon={Hash}
-            eyebrow="PDFMantra Number Engine"
-            title="Add page numbers with live preview."
-            description="Upload one PDF, choose exact page-number placement, target only the pages you want, and export a numbered PDF."
-            meta={
-              <div className="grid min-w-[270px] grid-cols-3 divide-x divide-[var(--border-light)] text-center">
+        <section className="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8 lg:py-8">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/pdf"
+            className="hidden"
+            onChange={(event) => handleFile(event.target.files?.[0])}
+          />
+
+          <section className="relative overflow-hidden rounded-[1.5rem] border border-[var(--border-light)] bg-[var(--bg-panel)] px-4 py-5 shadow-[var(--shadow-soft)] sm:px-5 sm:py-6 lg:px-6">
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-[radial-gradient(circle,rgba(101,80,232,0.14)_0%,rgba(101,80,232,0.05)_38%,transparent_72%)]"
+            />
+
+            <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div className="flex gap-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--violet-600)] text-white shadow-[0_14px_34px_rgba(101,80,232,0.18)]">
+                  <Hash size={20} />
+                </div>
+
+                <div>
+                  <h1 className="display-font max-w-4xl text-[2rem] font-bold leading-[1.12] tracking-[-0.025em] text-[var(--text-primary)] sm:text-[2.45rem] lg:text-[2.8rem]">
+                    Add page numbers with live preview.
+                  </h1>
+                  <p className="mt-3 max-w-3xl text-[15px] font-normal leading-7 text-[var(--text-secondary)]">
+                    Upload one PDF, place numbers visually, target exact pages, and export a numbered copy.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid min-w-[270px] grid-cols-3 divide-x divide-[var(--border-light)] rounded-[1.25rem] border border-[var(--border-light)] bg-white/92 p-3 text-center shadow-[var(--shadow-soft)] backdrop-blur">
                 <div className="px-3">
-                  <div className="text-[1.35rem] font-bold tracking-[-0.03em] text-[var(--text-primary)]">{pageCount || "-"}</div>
+                  <div className="text-[1.25rem] font-bold tracking-[-0.03em] text-[var(--text-primary)]">{pageCount || "-"}</div>
                   <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">Pages</div>
                 </div>
                 <div className="px-3">
-                  <div className="text-[1.35rem] font-bold tracking-[-0.03em] text-[var(--text-primary)]">{file ? targetPlan.pages.length : "-"}</div>
+                  <div className="text-[1.25rem] font-bold tracking-[-0.03em] text-[var(--text-primary)]">{file ? targetPlan.pages.length : "-"}</div>
                   <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">Numbered</div>
                 </div>
                 <div className="px-3">
-                  <div className="text-[1.35rem] font-bold tracking-[-0.03em] text-[var(--text-primary)]">{result ? formatFileSize(result.outputSize) : "-"}</div>
+                  <div className="text-[1.25rem] font-bold tracking-[-0.03em] text-[var(--text-primary)]">{result ? formatFileSize(result.outputSize) : "-"}</div>
                   <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">Output</div>
                 </div>
               </div>
-            }
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="application/pdf"
-              className="hidden"
-              onChange={(event) => handleFile(event.target.files?.[0])}
-            />
-          </ToolPageHeader>
+            </div>
+          </section>
 
-          <div className="mt-6 grid overflow-hidden rounded-[1.75rem] border border-[var(--border-light)] bg-[var(--bg-card)] shadow-[var(--shadow-card)] lg:grid-cols-[1fr_390px]">
-            <section className="min-h-[680px] border-r border-[var(--border-light)] bg-[var(--bg-base)] p-5 sm:p-6">
+          <div className="mt-4 overflow-hidden rounded-[1.5rem] border border-[var(--border-light)] bg-[var(--bg-card)] shadow-[var(--shadow-card)]">
+            <section className="min-h-[660px] bg-[var(--bg-base)] p-3 sm:p-4">
               <div
                 onClick={() => {
                   if (!busy) fileInputRef.current?.click();
@@ -677,10 +696,10 @@ export default function PageNumbersPage() {
                 role="button"
                 tabIndex={0}
                 aria-disabled={busy}
-                className="cursor-pointer rounded-[1.5rem] border-2 border-dashed border-[var(--violet-border)] bg-[var(--bg-card)] p-6 text-center shadow-[var(--shadow-soft)] transition hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] focus:border-[var(--border-focus)] focus:outline-none focus:ring-4 focus:ring-violet-100 aria-disabled:cursor-not-allowed aria-disabled:opacity-70"
+                className="cursor-pointer rounded-[1.25rem] border-2 border-dashed border-[var(--violet-border)] bg-[var(--bg-card)] p-4 text-center shadow-[var(--shadow-soft)] transition hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] focus:border-[var(--border-focus)] focus:outline-none focus:ring-4 focus:ring-violet-100 aria-disabled:cursor-not-allowed aria-disabled:opacity-70"
               >
-                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--violet-600)] text-white">
-                  {busyMode === "rendering" ? <Loader2 className="animate-spin" size={22} /> : <Upload size={22} />}
+                <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--violet-600)] text-white">
+                  {busyMode === "rendering" ? <Loader2 className="animate-spin" size={20} /> : <Upload size={20} />}
                 </div>
                 <div className="text-[15px] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
                   {file ? file.name : "Drop PDF here"}
@@ -690,7 +709,7 @@ export default function PageNumbersPage() {
                 </div>
 
                 {busyMode === "rendering" ? (
-                  <div className="mx-auto mt-4 max-w-md">
+                  <div className="mx-auto mt-3 max-w-md">
                     <ProgressBar value={renderPercent} />
                     <div className="mt-2 text-xs font-bold uppercase tracking-[0.08em] text-[var(--violet-600)]">
                       Rendering previews {renderProgress.done}/{renderProgress.total}
@@ -699,54 +718,288 @@ export default function PageNumbersPage() {
                 ) : null}
               </div>
 
-              <div className="mt-5 rounded-[1.5rem] border border-[var(--border-light)] bg-[var(--bg-card)] p-5 shadow-[var(--shadow-soft)]">
-                <div className="flex flex-col justify-between gap-4 xl:flex-row xl:items-start">
-                  <div>
-                    <div className="inline-flex items-center gap-2 rounded-full border border-[var(--violet-border)] bg-[var(--violet-50)] px-3 py-1 text-xs font-bold uppercase tracking-[0.08em] text-[var(--violet-600)]">
-                      <Eye size={14} />
-                      Live preview board
-                    </div>
-                    <h2 className="display-font mt-3 text-[1.75rem] font-bold tracking-[-0.02em] text-[var(--text-primary)]">
-                      Preview & Placement
-                    </h2>
-                    <p className="mt-1 text-sm font-normal text-[var(--text-secondary)]">
-                      Drag any visible number for fine placement. The same relative position is applied during export.
-                    </p>
-                  </div>
+              <div className="mt-4 rounded-[1.25rem] border border-[var(--border-light)] bg-[var(--bg-card)] p-3 shadow-[var(--shadow-soft)] sm:p-4">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <p className="text-sm font-normal text-[var(--text-secondary)]">
+                    Drag any visible number for exact placement. Export applies the same position.
+                  </p>
 
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <details className="group relative">
+                      <summary className="inline-flex cursor-pointer list-none items-center justify-center gap-2 rounded-full border border-[var(--border-light)] bg-white px-3 py-2 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] [&::-webkit-details-marker]:hidden">
+                        Position
+                        <ChevronDown size={15} className="transition group-open:rotate-180" />
+                      </summary>
+
+                      <div className="absolute left-0 z-30 mt-2 w-64 rounded-2xl border border-[var(--border-light)] bg-white p-3 shadow-[var(--shadow-card)]">
+                        <div className="grid grid-cols-3 gap-2">
+                          {POSITION_PRESETS.map((preset) => (
+                            <button
+                              key={preset.id}
+                              type="button"
+                              onClick={() => setPresetPosition(preset)}
+                              disabled={busy}
+                              className={`rounded-xl border px-2 py-2 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                                positionPresetId === preset.id
+                                  ? "border-[var(--violet-600)] bg-[var(--violet-50)] text-[var(--violet-600)]"
+                                  : "border-[var(--border-light)] bg-white text-[var(--text-secondary)] hover:bg-[var(--violet-50)]"
+                              }`}
+                              title={preset.label}
+                            >
+                              {preset.shortLabel}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="mt-3 text-xs font-semibold leading-5 text-[var(--text-secondary)]">
+                          X {position.xPercent.toFixed(1)}% · Y {position.yPercent.toFixed(1)}%
+                        </div>
+                      </div>
+                    </details>
+
+                    <details className="group relative">
+                      <summary className="inline-flex cursor-pointer list-none items-center justify-center gap-2 rounded-full border border-[var(--border-light)] bg-white px-3 py-2 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] [&::-webkit-details-marker]:hidden">
+                        {targetMode === "all" ? "All pages" : targetMode === "odd" ? "Odd pages" : targetMode === "even" ? "Even pages" : "Custom range"}
+                        <ChevronDown size={15} className="transition group-open:rotate-180" />
+                      </summary>
+
+                      <div className="absolute left-0 z-30 mt-2 w-56 rounded-2xl border border-[var(--border-light)] bg-white p-2 shadow-[var(--shadow-card)]">
+                        {[
+                          { id: "all", label: "All Pages" },
+                          { id: "odd", label: "Odd Pages" },
+                          { id: "even", label: "Even Pages" },
+                          { id: "custom", label: "Custom Range" },
+                        ].map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => {
+                              setTargetMode(item.id as TargetMode);
+                              setResult(null);
+                            }}
+                            disabled={busy}
+                            className={`w-full rounded-xl px-3 py-2 text-left text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                              targetMode === item.id
+                                ? "bg-[var(--violet-50)] text-[var(--violet-600)]"
+                                : "text-[var(--text-secondary)] hover:bg-[var(--violet-50)]"
+                            }`}
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+
+                        <label className="mt-2 flex items-start gap-3 rounded-xl border border-[var(--border-light)] bg-[var(--bg-base)] p-3">
+                          <input
+                            type="checkbox"
+                            checked={skipFirstPage}
+                            disabled={busy}
+                            onChange={(event) => {
+                              setSkipFirstPage(event.target.checked);
+                              setResult(null);
+                            }}
+                            className="mt-1 h-4 w-4 rounded border-[var(--border-light)] text-[var(--violet-600)]"
+                          />
+                          <span className="text-xs font-semibold leading-5 text-[var(--text-secondary)]">
+                            Skip first page
+                          </span>
+                        </label>
+                      </div>
+                    </details>
+
+                    {targetMode === "custom" ? (
+                      <input
+                        value={customRange}
+                        onChange={(event) => {
+                          setCustomRange(event.target.value);
+                          setResult(null);
+                        }}
+                        placeholder="1-5, 8, 10-12"
+                        disabled={busy}
+                        className="h-10 w-52 rounded-full border border-[var(--border-light)] bg-white px-4 text-sm font-semibold text-[var(--text-secondary)] outline-none transition focus:border-[var(--border-focus)] focus:ring-4 focus:ring-violet-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      />
+                    ) : null}
+
+                    <details className="group relative">
+                      <summary className="inline-flex cursor-pointer list-none items-center justify-center gap-2 rounded-full border border-[var(--border-light)] bg-white px-3 py-2 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] [&::-webkit-details-marker]:hidden">
+                        Style
+                        <ChevronDown size={15} className="transition group-open:rotate-180" />
+                      </summary>
+
+                      <div className="absolute right-0 z-30 mt-2 w-72 rounded-2xl border border-[var(--border-light)] bg-white p-3 shadow-[var(--shadow-card)]">
+                        <label className="block">
+                          <span className="text-xs font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">Start number</span>
+                          <input
+                            type="number"
+                            min={0}
+                            value={startNumber}
+                            onChange={(event) => {
+                              const nextValue = Number(event.target.value);
+                              setStartNumber(Number.isFinite(nextValue) ? nextValue : 1);
+                              setResult(null);
+                            }}
+                            disabled={busy}
+                            className="input-premium mt-2"
+                          />
+                        </label>
+
+                        <label className="mt-3 block">
+                          <span className="flex justify-between text-xs font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                            Font size <span>{fontSize}px</span>
+                          </span>
+                          <input
+                            type="range"
+                            min={8}
+                            max={36}
+                            value={fontSize}
+                            onChange={(event) => {
+                              setFontSize(Number(event.target.value));
+                              setResult(null);
+                            }}
+                            disabled={busy}
+                            className="mt-2 w-full"
+                          />
+                        </label>
+
+                        <div className="mt-3 grid grid-cols-2 gap-3">
+                          <label className="block">
+                            <span className="text-xs font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">Prefix</span>
+                            <input
+                              value={prefix}
+                              onChange={(event) => {
+                                setPrefix(event.target.value);
+                                setResult(null);
+                              }}
+                              placeholder="Page "
+                              disabled={busy}
+                              className="input-premium mt-2"
+                            />
+                          </label>
+
+                          <label className="block">
+                            <span className="text-xs font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">Suffix</span>
+                            <input
+                              value={suffix}
+                              onChange={(event) => {
+                                setSuffix(event.target.value);
+                                setResult(null);
+                              }}
+                              placeholder=" / {total}"
+                              disabled={busy}
+                              className="input-premium mt-2"
+                            />
+                          </label>
+                        </div>
+
+                        <div className="mt-3 grid grid-cols-2 gap-2">
+                          {NUMBER_COLORS.map((color) => (
+                            <button
+                              key={color.id}
+                              type="button"
+                              onClick={() => {
+                                setColorId(color.id);
+                                setResult(null);
+                              }}
+                              disabled={busy}
+                              className={`rounded-xl border px-3 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                                colorId === color.id
+                                  ? "border-[var(--violet-600)] bg-[var(--violet-50)] text-[var(--violet-600)]"
+                                  : "border-[var(--border-light)] bg-white text-[var(--text-secondary)] hover:bg-[var(--violet-50)]"
+                              }`}
+                            >
+                              {color.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </details>
+
                     <button
                       type="button"
                       onClick={resetSettings}
                       disabled={busy}
-                      className="inline-flex items-center justify-center gap-2 rounded-full border border-[var(--violet-border)] bg-[var(--violet-50)] px-4 py-2 text-sm font-semibold text-[var(--violet-600)] transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex items-center justify-center gap-2 rounded-full border border-[var(--border-light)] bg-white px-3 py-2 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <RotateCcw size={15} />
                       Reset
                     </button>
+
+                    <div className="group relative">
+                      <button
+                        type="button"
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border-light)] bg-white text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)]"
+                        aria-label="Help"
+                      >
+                        <CircleHelp size={17} />
+                      </button>
+                      <div className="pointer-events-none absolute right-0 z-30 mt-2 w-72 rounded-2xl border border-[var(--border-light)] bg-white p-3 text-xs font-semibold leading-5 text-[var(--text-secondary)] opacity-0 shadow-[var(--shadow-card)] transition group-hover:opacity-100">
+                        Drag number chip to adjust placement.<br />
+                        Use suffix <strong>/ {"{total}"}</strong> for total numbered pages.<br />
+                        Custom range example: 1-5, 8, 10-12.<br />
+                        {targetSummary}
+                      </div>
+                    </div>
+
+                    <button type="button" onClick={handleExport} disabled={busy || !file} className="btn-primary px-4 py-2">
+                      {busyMode === "exporting" ? (
+                        <><Loader2 className="animate-spin" size={18} /><span>Exporting</span></>
+                      ) : (
+                        <><Download size={18} /><span>Export</span></>
+                      )}
+                    </button>
+
                     {file ? (
                       <button
                         type="button"
                         onClick={clearFile}
                         disabled={busy}
-                        className="inline-flex items-center justify-center gap-2 rounded-full border border-red-100 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="inline-flex items-center justify-center gap-2 rounded-full border border-red-100 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <X size={15} />
-                        Remove PDF
+                        Remove
                       </button>
                     ) : null}
                   </div>
                 </div>
 
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold">
+                  <span className={`rounded-full border px-3 py-1.5 ${targetPlan.error ? "border-red-100 bg-red-50 text-red-700" : "border-[var(--violet-border)] bg-[var(--violet-50)] text-[var(--violet-600)]"}`}>
+                    {targetSummary}
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-light)] bg-white px-3 py-1.5 text-[var(--text-secondary)]">
+                    <Settings2 size={13} />
+                    Preview: {previewText}
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-light)] bg-white px-3 py-1.5 text-[var(--text-secondary)]">
+                    <MousePointer2 size={13} />
+                    X {position.xPercent.toFixed(1)}% · Y {position.yPercent.toFixed(1)}%
+                  </span>
+                </div>
+
+                {busyMode === "exporting" ? (
+                  <div className="mt-3 rounded-2xl border border-[var(--violet-border)] bg-[var(--violet-50)] p-3">
+                    <div className="mb-2 flex items-center justify-between gap-3 text-sm font-bold text-[var(--violet-600)]">
+                      <span>Exporting</span>
+                      <span>{exportProgress}%</span>
+                    </div>
+                    <ProgressBar value={exportProgress} />
+                  </div>
+                ) : null}
+
+                {result ? (
+                  <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
+                    <CheckCircle2 size={16} />
+                    Numbered PDF: {formatFileSize(result.outputSize)}
+                  </div>
+                ) : null}
+
                 {busyMode === "rendering" && previews.length === 0 ? (
-                  <div className="mt-5 flex min-h-80 items-center justify-center rounded-[1.35rem] border border-[var(--violet-border)] bg-[var(--violet-50)]">
+                  <div className="mt-4 flex min-h-80 items-center justify-center rounded-[1.25rem] border border-[var(--violet-border)] bg-[var(--violet-50)]">
                     <div className="flex items-center gap-2 rounded-full border border-[var(--violet-border)] bg-white px-4 py-3 text-sm font-semibold text-[var(--violet-600)] shadow-[var(--shadow-soft)]">
                       <Loader2 className="animate-spin" size={18} />
                       Rendering previews
                     </div>
                   </div>
                 ) : previews.length === 0 ? (
-                  <div className="mt-5 flex min-h-80 items-center justify-center rounded-[1.35rem] border border-dashed border-[var(--violet-border)] bg-[var(--violet-50)]/52 text-center">
+                  <div className="mt-4 flex min-h-80 items-center justify-center rounded-[1.25rem] border border-dashed border-[var(--violet-border)] bg-[var(--violet-50)]/52 text-center">
                     <div>
                       <FileText className="mx-auto text-[var(--violet-400)]" size={42} />
                       <div className="mt-3 text-[15px] font-semibold text-[var(--text-primary)]">No PDF selected</div>
@@ -754,35 +1007,41 @@ export default function PageNumbersPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
                     {previews.map((preview) => {
                       const isNumbered = targetPageSet.has(preview.pageNumber);
-                      const previewText = getPreviewText(preview.pageNumber);
+                      const numberText = getPreviewText(preview.pageNumber);
 
                       return (
                         <div
                           key={preview.pageNumber}
-                          className={`overflow-hidden rounded-[1.35rem] border bg-white shadow-sm transition ${
+                          className={`group overflow-hidden rounded-[1.25rem] border bg-white p-3 shadow-sm transition ${
                             isNumbered ? "border-[var(--violet-border)]" : "border-[var(--border-light)] opacity-75"
                           }`}
                         >
-                          <div className="flex items-center justify-between border-b border-[var(--border-light)] bg-[var(--bg-base)] px-4 py-3">
-                            <div>
-                              <div className="text-sm font-bold text-[var(--text-primary)]">Page {preview.pageNumber}</div>
-                              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                                {isNumbered ? "Numbered" : "Skipped"}
+                          <div className="flex items-center justify-between gap-2 pb-2">
+                            <div className="flex items-center gap-2">
+                              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--violet-50)] text-xs font-bold text-[var(--violet-600)]">
+                                {preview.pageNumber}
+                              </div>
+                              <div>
+                                <div className="text-sm font-bold text-[var(--text-primary)]">Page {preview.pageNumber}</div>
+                                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                                  {isNumbered ? "Numbered" : "Skipped"}
+                                </div>
                               </div>
                             </div>
+
                             {isNumbered ? (
-                              <div className="rounded-full bg-[var(--violet-50)] px-3 py-1 text-xs font-bold text-[var(--violet-600)]">
-                                {previewText}
-                              </div>
+                              <span className="rounded-full bg-[var(--violet-50)] px-2 py-1 text-[10px] font-bold text-[var(--violet-600)]">
+                                {numberText}
+                              </span>
                             ) : null}
                           </div>
 
                           <div
                             data-page-preview="true"
-                            className="relative flex aspect-[3/4] items-center justify-center overflow-hidden bg-[var(--bg-base)] p-4"
+                            className="relative flex aspect-[3/4] items-center justify-center overflow-hidden rounded-2xl border border-[var(--border-light)] bg-[var(--bg-base)] p-3"
                           >
                             <img
                               src={preview.previewUrl}
@@ -806,7 +1065,7 @@ export default function PageNumbersPage() {
                                 title="Drag page number position"
                               >
                                 <Grip size={12} />
-                                {previewText}
+                                {numberText}
                               </div>
                             ) : null}
                           </div>
@@ -817,267 +1076,10 @@ export default function PageNumbersPage() {
                 )}
               </div>
             </section>
+          </div>
 
-            <aside className="bg-[var(--bg-card)] p-5 sm:p-6">
-              <div className="rounded-[1.5rem] border border-[var(--border-light)] bg-[var(--bg-panel)] p-5 shadow-[var(--shadow-soft)]">
-                <h2 className="display-font text-[1.75rem] font-bold tracking-[-0.02em] text-[var(--text-primary)]">
-                  Number Settings
-                </h2>
-                <p className="mt-2 text-sm font-normal leading-6 text-[var(--text-secondary)]">
-                  Control placement, page range, starting number, styling, and output behavior.
-                </p>
-
-                <div className="mt-5 rounded-2xl border border-[var(--violet-border)] bg-[var(--violet-50)] p-4">
-                  <div className="mb-3 flex items-center gap-2 text-sm font-bold text-[var(--violet-600)]">
-                    <MousePointer2 size={16} />
-                    Position picker
-                  </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    {POSITION_PRESETS.map((preset) => (
-                      <button
-                        key={preset.id}
-                        type="button"
-                        onClick={() => setPresetPosition(preset)}
-                        disabled={busy}
-                        className={`rounded-xl border px-2 py-2 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-40 ${
-                          positionPresetId === preset.id
-                            ? "border-[var(--violet-600)] bg-white text-[var(--violet-600)] ring-4 ring-violet-100"
-                            : "border-[var(--violet-border)] bg-white/80 text-[var(--text-secondary)] hover:bg-white"
-                        }`}
-                        title={preset.label}
-                      >
-                        {preset.shortLabel}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="mt-3 text-xs font-semibold leading-5 text-[var(--text-secondary)]">
-                    Current: X {position.xPercent.toFixed(1)}% • Y {position.yPercent.toFixed(1)}%
-                  </div>
-                </div>
-
-                <div className="mt-5 rounded-2xl border border-[var(--border-light)] bg-white p-4">
-                  <div className="mb-3 flex items-center gap-2 text-sm font-bold text-[var(--text-primary)]">
-                    <ListFilter size={16} className="text-[var(--violet-600)]" />
-                    Target pages
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    {[
-                      { id: "all", label: "All Pages" },
-                      { id: "odd", label: "Odd Pages" },
-                      { id: "even", label: "Even Pages" },
-                      { id: "custom", label: "Custom" },
-                    ].map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => {
-                          setTargetMode(item.id as TargetMode);
-                          setResult(null);
-                        }}
-                        disabled={busy}
-                        className={`rounded-2xl border px-3 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
-                          targetMode === item.id
-                            ? "border-[var(--violet-600)] bg-[var(--violet-50)] text-[var(--violet-600)]"
-                            : "border-[var(--border-light)] bg-white text-[var(--text-secondary)] hover:bg-[var(--violet-50)]"
-                        }`}
-                      >
-                        {item.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  {targetMode === "custom" ? (
-                    <label className="mt-4 block">
-                      <span className="text-sm font-semibold text-[var(--text-primary)]">Custom range</span>
-                      <input
-                        value={customRange}
-                        onChange={(event) => {
-                          setCustomRange(event.target.value);
-                          setResult(null);
-                        }}
-                        placeholder="1-5, 8, 10-12"
-                        disabled={busy}
-                        className="input-premium mt-2"
-                      />
-                    </label>
-                  ) : null}
-
-                  <label className="mt-4 flex items-start gap-3 rounded-2xl border border-[var(--border-light)] bg-[var(--bg-base)] p-3">
-                    <input
-                      type="checkbox"
-                      checked={skipFirstPage}
-                      disabled={busy}
-                      onChange={(event) => {
-                        setSkipFirstPage(event.target.checked);
-                        setResult(null);
-                      }}
-                      className="mt-1 h-4 w-4 rounded border-[var(--border-light)] text-[var(--violet-600)]"
-                    />
-                    <span>
-                      <span className="block text-sm font-bold text-[var(--text-primary)]">Skip first page</span>
-                      <span className="block text-xs font-medium leading-5 text-[var(--text-secondary)]">
-                        Useful when page 1 is a cover page.
-                      </span>
-                    </span>
-                  </label>
-
-                  <div className={`mt-4 rounded-2xl border p-3 text-sm font-semibold leading-6 ${
-                    targetPlan.error ? "border-red-100 bg-red-50 text-red-700" : "border-[var(--violet-border)] bg-[var(--violet-50)] text-[var(--violet-600)]"
-                  }`}>
-                    {targetSummary}
-                  </div>
-                </div>
-
-                <div className="mt-5 rounded-2xl border border-[var(--border-light)] bg-white p-4">
-                  <div className="mb-3 flex items-center gap-2 text-sm font-bold text-[var(--text-primary)]">
-                    <Settings2 size={16} className="text-[var(--violet-600)]" />
-                    Text style
-                  </div>
-
-                  <label className="block">
-                    <span className="text-sm font-semibold text-[var(--text-primary)]">Start number</span>
-                    <input
-                      type="number"
-                      min={0}
-                      value={startNumber}
-                      onChange={(event) => {
-                        const nextValue = Number(event.target.value);
-                        setStartNumber(Number.isFinite(nextValue) ? nextValue : 1);
-                        setResult(null);
-                      }}
-                      disabled={busy}
-                      className="input-premium mt-2"
-                    />
-                  </label>
-
-                  <label className="mt-4 block">
-                    <span className="flex justify-between text-sm font-semibold text-[var(--text-primary)]">
-                      Font size <span>{fontSize}px</span>
-                    </span>
-                    <input
-                      type="range"
-                      min={8}
-                      max={36}
-                      value={fontSize}
-                      onChange={(event) => {
-                        setFontSize(Number(event.target.value));
-                        setResult(null);
-                      }}
-                      disabled={busy}
-                      className="mt-2 w-full"
-                    />
-                  </label>
-
-                  <div className="mt-4 grid grid-cols-2 gap-3">
-                    <label className="block">
-                      <span className="text-sm font-semibold text-[var(--text-primary)]">Prefix</span>
-                      <input
-                        value={prefix}
-                        onChange={(event) => {
-                          setPrefix(event.target.value);
-                          setResult(null);
-                        }}
-                        placeholder="Page "
-                        disabled={busy}
-                        className="input-premium mt-2"
-                      />
-                    </label>
-
-                    <label className="block">
-                      <span className="text-sm font-semibold text-[var(--text-primary)]">Suffix</span>
-                      <input
-                        value={suffix}
-                        onChange={(event) => {
-                          setSuffix(event.target.value);
-                          setResult(null);
-                        }}
-                        placeholder=" / {total}"
-                        disabled={busy}
-                        className="input-premium mt-2"
-                      />
-                    </label>
-                  </div>
-
-                  <div className="mt-4">
-                    <div className="mb-2 text-sm font-semibold text-[var(--text-primary)]">Number color</div>
-                    <div className="grid grid-cols-2 gap-2">
-                      {NUMBER_COLORS.map((color) => (
-                        <button
-                          key={color.id}
-                          type="button"
-                          onClick={() => {
-                            setColorId(color.id);
-                            setResult(null);
-                          }}
-                          disabled={busy}
-                          className={`rounded-2xl border px-3 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
-                            colorId === color.id
-                              ? "border-[var(--violet-600)] bg-[var(--violet-50)] text-[var(--violet-600)]"
-                              : "border-[var(--border-light)] bg-white text-[var(--text-secondary)] hover:bg-[var(--violet-50)]"
-                          }`}
-                        >
-                          {color.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-5 grid gap-3">
-                  <div className="rounded-2xl border border-[var(--violet-border)] bg-[var(--violet-50)] p-4">
-                    <div className="text-xs font-bold uppercase tracking-[0.08em] text-[var(--violet-600)]">Preview text</div>
-                    <div className="mt-1 truncate text-xl font-bold tracking-[-0.03em] text-[var(--text-primary)]">
-                      {targetPlan.pages.length ? getPreviewText(targetPlan.pages[0]) : "-"}
-                    </div>
-                  </div>
-
-                  {busyMode === "exporting" ? (
-                    <div className="rounded-2xl border border-[var(--violet-border)] bg-[var(--violet-50)] p-4">
-                      <div className="mb-2 flex items-center justify-between gap-3 text-sm font-bold text-[var(--violet-600)]">
-                        <span>Export progress</span>
-                        <span>{exportProgress}%</span>
-                      </div>
-                      <ProgressBar value={exportProgress} />
-                    </div>
-                  ) : null}
-
-                  {result ? (
-                    <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm font-medium leading-6 text-emerald-800">
-                      <div className="mb-1 flex items-center gap-2 font-semibold"><CheckCircle2 size={16} /> Last output</div>
-                      Numbered PDF: {formatFileSize(result.outputSize)}.
-                    </div>
-                  ) : null}
-                </div>
-
-                <button type="button" onClick={handleExport} disabled={busy || !file} className="btn-primary mt-5 w-full">
-                  {busyMode === "exporting" ? (
-                    <><Loader2 className="animate-spin" size={18} /><span>Exporting</span></>
-                  ) : (
-                    <><Download size={18} /><span>Export Numbered PDF</span></>
-                  )}
-                </button>
-              </div>
-
-              <div className={`mt-5 rounded-[1.5rem] border p-4 text-sm font-medium leading-6 shadow-[var(--shadow-soft)] ${
-                statusLooksLikeError ? "border-red-100 bg-red-50 text-red-700" : "border-[var(--violet-border)] bg-[var(--violet-50)] text-[var(--violet-600)]"
-              }`}>
-                <div className="mb-1 flex items-center gap-2 font-semibold"><CheckCircle2 size={16} /> Status</div>
-                {status}
-              </div>
-
-              <div className="mt-5 rounded-[1.5rem] border border-[var(--border-light)] bg-white p-4 shadow-[var(--shadow-soft)]">
-                <div className="mb-2 flex items-center gap-2 text-sm font-bold text-[var(--text-primary)]">
-                  <Sparkles size={16} className="text-[var(--violet-600)]" />
-                  Smart tips
-                </div>
-                <div className="grid gap-2 text-xs font-semibold leading-5 text-[var(--text-secondary)]">
-                  <div>Use suffix <span className="font-bold text-[var(--text-primary)]">/ {"{total}"}</span> to show total numbered pages.</div>
-                  <div>Use Custom range for selected pages like <span className="font-bold text-[var(--text-primary)]">2-5, 8, 10-12</span>.</div>
-                  <div>Drag any visible number on preview for precise placement.</div>
-                </div>
-              </div>
-            </aside>
+          <div className={`mt-3 px-1 text-sm font-medium ${statusLooksLikeError ? "text-red-600" : "text-[var(--text-secondary)]"}`}>
+            {status}
           </div>
         </section>
       </main>
