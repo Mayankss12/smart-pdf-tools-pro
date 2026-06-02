@@ -33,11 +33,11 @@ function ToolCard({ tool }: { readonly tool: (typeof homeTools)[number] }) {
   return (
     <Link
       href={tool.href}
-      className="group mx-auto grid min-h-[154px] w-full max-w-[172px] justify-items-center rounded-[1.35rem] border border-[var(--border-light)] bg-[var(--bg-card)] px-3 py-4 text-center shadow-[var(--shadow-soft)] transition duration-200 hover:-translate-y-1 hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] hover:shadow-[var(--shadow-card-hover)]"
+      className="group mx-auto grid min-h-[160px] w-full max-w-[172px] justify-items-center rounded-[1.35rem] border border-[var(--border-light)] bg-[var(--bg-card)] px-3 py-4 text-center shadow-[var(--shadow-soft)] transition duration-200 hover:-translate-y-1 hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] hover:shadow-[var(--shadow-card-hover)] sm:min-h-[154px]"
     >
       <ToolGlyph icon={tool.icon} tone={toneForCategory(tool.category)} size="sm" />
 
-      <h3 className="display-font mt-2 text-[1.02rem] font-bold tracking-[-0.02em] text-[var(--text-primary)] transition group-hover:text-[var(--violet-600)] text-center">
+      <h3 className="display-font mt-2 text-center text-[1.02rem] font-bold tracking-[-0.02em] text-[var(--text-primary)] transition group-hover:text-[var(--violet-600)]">
         {tool.title}
       </h3>
 
@@ -50,7 +50,7 @@ function ToolCard({ tool }: { readonly tool: (typeof homeTools)[number] }) {
 
 function DesktopVisual() {
   return (
-    <div className="relative h-[212px] overflow-hidden rounded-t-[1.5rem] bg-[linear-gradient(180deg,#f1eeff_0%,#faf8ff_100%)] px-5 pt-5">
+    <div className="relative h-[180px] overflow-hidden rounded-t-[1.5rem] bg-[linear-gradient(180deg,#f1eeff_0%,#faf8ff_100%)] px-5 pt-5 sm:h-[212px]">
       <div className="h-full rounded-t-[1.2rem] border border-[var(--violet-border)] bg-white shadow-[0_18px_42px_rgba(101,80,232,0.10)]">
         <div className="flex h-8 items-center gap-2 border-b border-[var(--border-light)] px-4">
           <span className="h-2 w-2 rounded-full bg-rose-300" />
@@ -82,7 +82,7 @@ function DesktopVisual() {
 
 function MobileVisual() {
   return (
-    <div className="relative h-[212px] overflow-hidden rounded-t-[1.5rem] bg-[linear-gradient(180deg,#f1eeff_0%,#faf8ff_100%)] px-5 pt-5">
+    <div className="relative h-[180px] overflow-hidden rounded-t-[1.5rem] bg-[linear-gradient(180deg,#f1eeff_0%,#faf8ff_100%)] px-5 pt-5 sm:h-[212px]">
       <div className="mx-auto h-[196px] w-[118px] rounded-[1.7rem] border-[6px] border-white bg-white shadow-[0_18px_42px_rgba(101,80,232,0.12)]">
         <div className="h-full overflow-hidden rounded-[1.28rem] border border-[var(--border-light)] bg-[var(--bg-card)]">
           <div className="flex h-7 items-center justify-center border-b border-[var(--border-light)] text-[10px] font-bold text-[var(--text-muted)]">
@@ -107,7 +107,7 @@ function MobileVisual() {
 
 function BusinessVisual() {
   return (
-    <div className="relative h-[212px] overflow-hidden rounded-t-[1.5rem] bg-[linear-gradient(180deg,#f1eeff_0%,#faf8ff_100%)] px-5 pt-5">
+    <div className="relative h-[180px] overflow-hidden rounded-t-[1.5rem] bg-[linear-gradient(180deg,#f1eeff_0%,#faf8ff_100%)] px-5 pt-5 sm:h-[212px]">
       <div className="absolute left-7 top-7 h-36 w-32 rounded-[1.2rem] border border-[var(--border-light)] bg-white p-4 shadow-[0_16px_38px_rgba(101,80,232,0.10)]">
         <div className="h-3 w-3/5 rounded bg-[var(--violet-100)]" />
         <div className="mt-4 h-2.5 w-full rounded bg-slate-100" />
@@ -131,12 +131,17 @@ export default function HomePage() {
     <>
       <Header />
 
-      <main className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)]">
+      <main
+        className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)]"
+        style={{
+          paddingLeft: "max(1rem, env(safe-area-inset-left))",
+          paddingRight: "max(1rem, env(safe-area-inset-right))",
+        }}
+      >
         <section className="hero-aurora overflow-hidden border-b border-[var(--border-light)]">
           <div className="mx-auto max-w-[1600px] px-4 pb-12 pt-12 sm:px-6 lg:px-8 lg:pb-16 lg:pt-16">
             <div className="mx-auto max-w-6xl text-center">
-
-              <h1 className="display-font mx-auto mt-5 max-w-4xl text-[1.9rem] font-bold leading-[1.08] tracking-[-0.03em] text-[var(--text-primary)] sm:text-[2.45rem] lg:text-[2.95rem]">
+              <h1 className="display-font mx-auto mt-5 max-w-4xl text-[clamp(1.75rem,5vw,2.95rem)] font-bold leading-[1.08] tracking-[-0.03em] text-[var(--text-primary)]">
                 Every PDF task,
                 <span className="brand-gradient-text block">one clear workspace.</span>
               </h1>
@@ -151,7 +156,7 @@ export default function HomePage() {
                     key={item}
                     href="/tools"
                     className={[
-                      "inline-flex min-h-10 items-center rounded-full border px-4 py-2 text-[13px] font-semibold transition duration-200",
+                      "inline-flex min-h-11 items-center rounded-full border px-4 py-2.5 text-[13px] font-semibold transition duration-200 sm:text-sm",
                       index === 0
                         ? "border-[var(--violet-600)] bg-[var(--violet-600)] text-white shadow-[0_14px_30px_rgba(101,80,232,0.18)]"
                         : "border-[var(--border-light)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] hover:text-[var(--violet-600)]",
@@ -163,7 +168,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="mx-auto mt-10 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 2xl:grid-cols-7 max-w-[1320px] justify-items-center gap-3">
+            <div className="mx-auto mt-10 grid max-w-[1320px] grid-cols-2 place-items-center justify-items-center gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
               {homeTools.map((tool) => (
                 <ToolCard key={tool.id} tool={tool} />
               ))}
@@ -180,7 +185,7 @@ export default function HomePage() {
               </h2>
             </div>
 
-            <div className="mt-10 grid gap-6 lg:grid-cols-3">
+            <div className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               <article className="overflow-hidden rounded-[1.75rem] border border-[var(--border-light)] bg-[var(--bg-card)] shadow-[var(--shadow-card)] transition hover:-translate-y-1 hover:shadow-[var(--shadow-card-hover)]">
                 <DesktopVisual />
                 <div className="p-6">
@@ -260,18 +265,18 @@ export default function HomePage() {
                 </div>
               </div>
 
-              <div className="relative min-h-[360px] rounded-[1.8rem] border border-white/80 bg-white/68 p-5 shadow-[0_22px_60px_rgba(101,80,232,0.12)] backdrop-blur">
+              <div className="relative min-h-[320px] rounded-[1.8rem] border border-white/80 bg-white/68 p-5 shadow-[0_22px_60px_rgba(101,80,232,0.12)] backdrop-blur sm:min-h-[360px]">
                 <div className="absolute right-5 top-5 rounded-full border border-amber-200 bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-700">
                   Premium workspace
                 </div>
-                <div className="absolute left-8 top-10 h-60 w-48 rotate-[-3deg] rounded-[1.2rem] border border-[var(--border-light)] bg-white p-5 shadow-[0_18px_42px_rgba(101,80,232,0.12)]">
+                <div className="absolute left-8 top-10 hidden h-60 w-48 rotate-[-3deg] rounded-[1.2rem] border border-[var(--border-light)] bg-white p-5 shadow-[0_18px_42px_rgba(101,80,232,0.12)] sm:block">
                   <div className="h-3 w-3/5 rounded bg-rose-300" />
                   <div className="mt-4 h-2.5 w-full rounded bg-slate-100" />
                   <div className="mt-2 h-2.5 w-11/12 rounded bg-slate-100" />
                   <div className="mt-2 h-2.5 w-4/5 rounded bg-slate-100" />
                   <div className="mt-8 h-24 rounded-xl bg-[var(--violet-50)]" />
                 </div>
-                <div className="absolute bottom-8 right-8 h-48 w-60 rounded-[1.35rem] border border-[var(--violet-border)] bg-[var(--bg-panel)] p-5 shadow-[0_20px_48px_rgba(101,80,232,0.14)]">
+                <div className="absolute bottom-8 right-8 hidden h-48 w-60 rounded-[1.35rem] border border-[var(--violet-border)] bg-[var(--bg-panel)] p-5 shadow-[0_20px_48px_rgba(101,80,232,0.14)] sm:block">
                   <div className="flex items-center justify-between">
                     <div className="h-10 w-10 rounded-2xl bg-[var(--violet-600)]/90" />
                     <div className="rounded-full bg-white px-3 py-1 text-[11px] font-bold text-[var(--violet-600)]">Aa</div>
