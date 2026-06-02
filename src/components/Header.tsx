@@ -86,11 +86,11 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 border-b border-violet-100 bg-white/96 backdrop-blur-xl">
       <div className="mx-auto max-w-[1480px] px-4 sm:px-6 lg:px-8">
-        <div className="flex min-h-[64px] items-center justify-between gap-4 sm:min-h-[72px]">
-          <Link href="/" className="group flex min-w-0 items-center gap-3">
+        <div className="flex min-h-[64px] items-center justify-between gap-3 sm:min-h-[72px]">
+          <Link href="/" className="group flex min-w-0 items-center gap-2.5">
             <BrandMark className="h-9 w-9 shrink-0 transition duration-200 group-hover:-translate-y-0.5 sm:h-10 sm:w-10" />
             <div className="min-w-0">
-              <div className="display-font truncate text-[1.35rem] font-semibold leading-none tracking-[-0.035em] text-slate-950 transition duration-200 group-hover:text-violet-700 sm:text-[1.58rem]">
+              <div className="display-font truncate text-[1.3rem] font-semibold leading-none tracking-[-0.035em] text-slate-950 transition duration-200 group-hover:text-violet-700 sm:text-[1.5rem]">
                 PDFMantra
               </div>
               <div className="mt-1 hidden items-center gap-2 whitespace-nowrap text-[8px] font-semibold uppercase tracking-[0.18em] text-slate-500 min-[390px]:flex sm:text-[9px] sm:tracking-[0.22em]">
@@ -100,7 +100,7 @@ export function Header() {
             </div>
           </Link>
 
-          <nav className="hidden min-w-0 flex-1 items-center justify-center gap-7 xl:flex">
+          <nav className="hidden min-w-0 flex-1 items-center justify-center gap-7 2xl:flex">
             {PRIMARY_NAV.map((item) => (
               <Link
                 key={item.href}
@@ -166,7 +166,7 @@ export function Header() {
             </div>
           </nav>
 
-          <div className="hidden shrink-0 items-center gap-3 xl:flex">
+          <div className="hidden shrink-0 items-center gap-3 2xl:flex">
             <HeaderAuthLinks />
             <div className="inline-flex h-11 w-11 items-center justify-center rounded-full text-slate-800">
               <DotGridIcon />
@@ -176,7 +176,7 @@ export function Header() {
           <button
             type="button"
             onClick={() => setMobileOpen((current) => !current)}
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-violet-100 bg-white text-slate-950 transition hover:border-violet-200 hover:text-violet-700 sm:h-11 sm:w-11 xl:hidden"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-violet-100 bg-white text-slate-950 transition hover:border-violet-200 hover:text-violet-700 sm:h-11 sm:w-11 2xl:hidden"
             aria-label="Toggle navigation menu"
             aria-expanded={mobileOpen}
           >
@@ -186,14 +186,14 @@ export function Header() {
       </div>
 
       {mobileOpen ? (
-        <div className="fixed inset-x-0 top-[65px] z-40 h-[calc(100vh-65px)] overflow-y-auto border-t border-violet-100 bg-[var(--bg-base)] px-4 py-5 sm:top-[73px] sm:h-[calc(100vh-73px)] xl:hidden">
-          <div className="mx-auto max-w-3xl space-y-4">
+        <div className="fixed inset-x-0 top-[65px] z-40 h-[calc(100vh-65px)] overflow-y-auto border-t border-violet-100 bg-[var(--bg-base)] px-5 py-6 sm:top-[73px] sm:h-[calc(100vh-73px)] sm:px-6 2xl:hidden">
+          <div className="mx-auto max-w-3xl space-y-5">
             <div className="overflow-hidden rounded-[1.5rem] border border-violet-100 bg-white sm:rounded-[1.8rem]">
               {PRIMARY_NAV.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="flex items-center justify-between border-b border-violet-100 px-4 py-4 text-base font-bold text-slate-950 transition hover:bg-violet-50 hover:text-violet-700 last:border-b-0"
+                  className="flex items-center justify-between border-b border-violet-100 px-5 py-4 text-base font-bold text-slate-950 transition hover:bg-violet-50 hover:text-violet-700 last:border-b-0"
                 >
                   {item.label}
                 </Link>
@@ -201,7 +201,7 @@ export function Header() {
 
               <Link
                 href="/tools"
-                className="flex items-center justify-between border-b border-violet-100 px-4 py-4 text-base font-bold text-slate-950 transition hover:bg-violet-50 hover:text-violet-700"
+                className="flex items-center justify-between border-b border-violet-100 px-5 py-4 text-base font-bold text-slate-950 transition hover:bg-violet-50 hover:text-violet-700"
               >
                 All PDF Tools
               </Link>
@@ -210,7 +210,7 @@ export function Header() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="flex items-center justify-between border-b border-violet-100 px-4 py-4 text-sm font-bold text-slate-700 transition hover:bg-violet-50 hover:text-violet-700 last:border-b-0"
+                  className="flex items-center justify-between border-b border-violet-100 px-5 py-4 text-sm font-bold text-slate-700 transition hover:bg-violet-50 hover:text-violet-700 last:border-b-0"
                 >
                   {item.label}
                 </Link>
