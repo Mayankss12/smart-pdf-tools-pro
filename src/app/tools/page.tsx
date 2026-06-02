@@ -155,15 +155,15 @@ export default function ToolsPage() {
             <div className="mx-auto max-w-4xl text-center">
               <div className="eyebrow-chip mx-auto">
                 <Sparkles size={13} />
-                PDFMantra Tools
+                PDF tools command center
               </div>
 
               <h1 className="display-font mt-5 text-[2.35rem] font-semibold leading-[1.13] tracking-[-0.04em] text-[var(--text-primary)] sm:text-[3rem] lg:text-[3.55rem]">
-                Choose the PDF tool you need.
+                Choose the right PDF tool fast.
               </h1>
 
               <p className="mx-auto mt-4 max-w-2xl text-[15px] font-normal leading-7 text-[var(--text-secondary)] sm:text-base">
-                Search or browse the tools that are available now. PDF upload starts inside each selected tool.
+                Browse a premium library of PDF tools and start your task in seconds.
               </p>
             </div>
 
