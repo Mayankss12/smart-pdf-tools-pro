@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { Footer } from "@/components/Footer";
-import { GitaWisdomSpotlight } from "@/components/GitaWisdomSpotlight";
 import { Header } from "@/components/Header";
 import { ToolGlyph, type ToolGlyphTone } from "@/components/ToolGlyph";
 import { tools } from "@/lib/tools";
@@ -8,7 +7,7 @@ import { ArrowRight, BadgeCheck, MoveUpRight } from "lucide-react";
 
 const heroCategories = [
   "All",
-  "Workflows",
+  "Tools",
   "Organize PDF",
   "Optimize PDF",
   "Convert PDF",
@@ -25,7 +24,7 @@ function toneForCategory(category: string): ToolGlyphTone {
 const homeTools = tools.filter((tool) => tool.status === "working");
 
 const premiumBenefits = [
-  "Sharper document workflows across editing, organizing, and conversion",
+  "Sharper document tools across editing, organizing, and conversion",
   "Focused PDF actions designed to feel cleaner from upload to export",
   "A premium interface that keeps power tools easy to discover",
 ] as const;
@@ -136,7 +135,6 @@ export default function HomePage() {
         <section className="hero-aurora overflow-hidden border-b border-[var(--border-light)]">
           <div className="mx-auto max-w-[1600px] px-4 pb-12 pt-12 sm:px-6 lg:px-8 lg:pb-16 lg:pt-16">
             <div className="mx-auto max-w-6xl text-center">
-              <GitaWisdomSpotlight />
 
               <h1 className="display-font mx-auto mt-5 max-w-4xl text-[1.9rem] font-bold leading-[1.08] tracking-[-0.03em] text-[var(--text-primary)] sm:text-[2.45rem] lg:text-[2.95rem]">
                 Every PDF task,
@@ -144,7 +142,7 @@ export default function HomePage() {
               </h1>
 
               <p className="mx-auto mt-4 max-w-3xl text-[15px] font-normal leading-7 text-[var(--text-secondary)] sm:text-base sm:leading-7">
-                Merge, edit, convert, organize, and secure PDFs through a faster, cleaner workflow.
+                Merge, edit, convert, organize, and secure PDFs through faster, cleaner tools.
               </p>
 
               <div className="mt-8 flex flex-wrap justify-center gap-2.5">
@@ -190,10 +188,10 @@ export default function HomePage() {
                     Work with focused tools
                   </h3>
                   <p className="mt-3 text-sm font-normal leading-7 text-[var(--text-secondary)]">
-                    Open a task-specific PDF workflow, upload your file, and finish the job without wandering through a busy dashboard.
+                    Open a task-specific PDF tool, upload your file, and finish the job without wandering through a busy dashboard.
                   </p>
                   <Link href="/tools" className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-[var(--violet-600)] transition hover:text-[var(--violet-500)]">
-                    Browse workflows
+                    Browse tools
                     <MoveUpRight size={16} />
                   </Link>
                 </div>
@@ -240,7 +238,7 @@ export default function HomePage() {
               <div className="flex flex-col justify-center">
                 <p className="section-eyebrow">PDFMantra Premium</p>
                 <h2 className="display-font mt-3 text-[2rem] font-bold leading-[1.14] tracking-[-0.02em] text-[var(--text-primary)] sm:text-[2.65rem]">
-                  Get more from every PDF workflow.
+                  Get more from every PDF tool.
                 </h2>
                 <div className="mt-6 space-y-3.5">
                   {premiumBenefits.map((item) => (
