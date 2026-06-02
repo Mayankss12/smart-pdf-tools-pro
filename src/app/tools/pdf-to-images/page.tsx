@@ -11,25 +11,22 @@ import {
 import * as pdfjsLib from "pdfjs-dist";
 import {
   CheckCircle2,
+  ChevronDown,
+  CircleHelp,
   Download,
   FileArchive,
   FileImage,
   FileText,
   Grid2X2,
   Image as ImageIcon,
-  Layers,
-  ListFilter,
   Loader2,
   MousePointer2,
-  RotateCcw,
   Settings2,
-  Sparkles,
   Upload,
   X,
 } from "lucide-react";
 
 import { Header } from "@/components/Header";
-import { ToolPageHeader } from "@/components/ToolPageHeader";
 import { createZipBlob } from "@/lib/browser-zip";
 import {
   PdfEngineError,
@@ -64,10 +61,10 @@ type TargetPlan = {
 };
 
 const DPI_PRESETS = [
-  { id: 96, label: "96 DPI", description: "Fast preview quality" },
-  { id: 150, label: "150 DPI", description: "Good web quality" },
-  { id: 200, label: "200 DPI", description: "Sharp sharing quality" },
-  { id: 300, label: "300 DPI", description: "Print-ready export" },
+  { id: 96, label: "96 DPI", description: "Fast preview" },
+  { id: 150, label: "150 DPI", description: "Web quality" },
+  { id: 200, label: "200 DPI", description: "Sharp sharing" },
+  { id: 300, label: "300 DPI", description: "Print-ready" },
 ];
 
 const FORMAT_OPTIONS: Array<{ id: ExportFormat; label: string; description: string }> = [
@@ -349,13 +346,6 @@ export default function PdfToImagesPage() {
     configurePdfWorker();
   }, []);
 
-  useEffect(() => {
-    return () => {
-      outputs.forEach((output) => URL.revokeObjectURL(output.previewUrl));
-      thumbnails.forEach((thumbnail) => URL.revokeObjectURL(thumbnail.previewUrl));
-    };
-  }, [outputs, thumbnails]);
-
   function clearOutputs() {
     setOutputs((current) => {
       current.forEach((output) => URL.revokeObjectURL(output.previewUrl));
@@ -628,40 +618,56 @@ export default function PdfToImagesPage() {
       <Header />
 
       <main className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)]">
-        <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
-          <ToolPageHeader
-            icon={FileImage}
-            eyebrow="PDFMantra Render Engine"
-            title="Convert PDF pages to images."
-            description="Upload one PDF, preview real pages, choose DPI and format, export selected pages as PNG, JPEG, or WEBP inside one clean ZIP."
-            meta={
-              <div className="grid min-w-[270px] grid-cols-3 divide-x divide-[var(--border-light)] text-center">
+        <section className="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8 lg:py-8">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/pdf"
+            className="hidden"
+            onChange={(event) => handleFile(event.target.files?.[0])}
+          />
+
+          <section className="relative overflow-hidden rounded-[1.5rem] border border-[var(--border-light)] bg-[var(--bg-panel)] px-4 py-5 shadow-[var(--shadow-soft)] sm:px-5 sm:py-6 lg:px-6">
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-[radial-gradient(circle,rgba(101,80,232,0.14)_0%,rgba(101,80,232,0.05)_38%,transparent_72%)]"
+            />
+
+            <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div className="flex gap-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--violet-600)] text-white shadow-[0_14px_34px_rgba(101,80,232,0.18)]">
+                  <FileImage size={20} />
+                </div>
+
+                <div>
+                  <h1 className="display-font max-w-4xl text-[2rem] font-bold leading-[1.12] tracking-[-0.025em] text-[var(--text-primary)] sm:text-[2.45rem] lg:text-[2.8rem]">
+                    Convert PDF pages to images.
+                  </h1>
+                  <p className="mt-3 max-w-3xl text-[15px] font-normal leading-7 text-[var(--text-secondary)]">
+                    Preview real PDF pages, choose format and DPI, then export selected pages as PNG, JPEG, or WEBP.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid min-w-[270px] grid-cols-3 divide-x divide-[var(--border-light)] rounded-[1.25rem] border border-[var(--border-light)] bg-white/92 p-3 text-center shadow-[var(--shadow-soft)] backdrop-blur">
                 <div className="px-3">
-                  <div className="text-[1.35rem] font-bold tracking-[-0.03em] text-[var(--text-primary)]">{pageCount || "-"}</div>
+                  <div className="text-[1.25rem] font-bold tracking-[-0.03em] text-[var(--text-primary)]">{pageCount || "-"}</div>
                   <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">Pages</div>
                 </div>
                 <div className="px-3">
-                  <div className="text-[1.35rem] font-bold tracking-[-0.03em] text-[var(--text-primary)]">{file ? targetPlan.pages.length : "-"}</div>
+                  <div className="text-[1.25rem] font-bold tracking-[-0.03em] text-[var(--text-primary)]">{file ? targetPlan.pages.length : "-"}</div>
                   <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">Selected</div>
                 </div>
                 <div className="px-3">
-                  <div className="text-[1.35rem] font-bold tracking-[-0.03em] text-[var(--text-primary)]">{outputs.length ? formatFileSize(outputSize) : "-"}</div>
+                  <div className="text-[1.25rem] font-bold tracking-[-0.03em] text-[var(--text-primary)]">{outputs.length ? formatFileSize(outputSize) : "-"}</div>
                   <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">Output</div>
                 </div>
               </div>
-            }
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="application/pdf"
-              className="hidden"
-              onChange={(event) => handleFile(event.target.files?.[0])}
-            />
-          </ToolPageHeader>
+            </div>
+          </section>
 
-          <div className="mt-6 grid overflow-hidden rounded-[1.75rem] border border-[var(--border-light)] bg-[var(--bg-card)] shadow-[var(--shadow-card)] lg:grid-cols-[1fr_390px]">
-            <section className="min-h-[680px] border-r border-[var(--border-light)] bg-[var(--bg-base)] p-5 sm:p-6">
+          <div className="mt-4 overflow-hidden rounded-[1.5rem] border border-[var(--border-light)] bg-[var(--bg-card)] shadow-[var(--shadow-card)]">
+            <section className="min-h-[660px] bg-[var(--bg-base)] p-3 sm:p-4">
               <div
                 onClick={() => {
                   if (!busy) fileInputRef.current?.click();
@@ -676,10 +682,10 @@ export default function PdfToImagesPage() {
                 role="button"
                 tabIndex={0}
                 aria-disabled={busy}
-                className="cursor-pointer rounded-[1.5rem] border-2 border-dashed border-[var(--violet-border)] bg-[var(--bg-card)] p-6 text-center shadow-[var(--shadow-soft)] transition hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] focus:border-[var(--border-focus)] focus:outline-none focus:ring-4 focus:ring-violet-100 aria-disabled:cursor-not-allowed aria-disabled:opacity-70"
+                className="cursor-pointer rounded-[1.25rem] border-2 border-dashed border-[var(--violet-border)] bg-[var(--bg-card)] p-4 text-center shadow-[var(--shadow-soft)] transition hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] focus:border-[var(--border-focus)] focus:outline-none focus:ring-4 focus:ring-violet-100 aria-disabled:cursor-not-allowed aria-disabled:opacity-70"
               >
-                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--violet-600)] text-white">
-                  {busyMode === "reading" || busyMode === "rendering" ? <Loader2 className="animate-spin" size={22} /> : <Upload size={22} />}
+                <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--violet-600)] text-white">
+                  {busyMode === "reading" || busyMode === "rendering" ? <Loader2 className="animate-spin" size={20} /> : <Upload size={20} />}
                 </div>
 
                 <div className="text-[15px] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
@@ -691,7 +697,7 @@ export default function PdfToImagesPage() {
                 </div>
 
                 {busyMode === "rendering" ? (
-                  <div className="mx-auto mt-4 max-w-md">
+                  <div className="mx-auto mt-3 max-w-md">
                     <ProgressBar value={renderPercent} />
                     <div className="mt-2 text-xs font-bold uppercase tracking-[0.08em] text-[var(--violet-600)]">
                       Rendering thumbnails {renderProgress.done}/{renderProgress.total}
@@ -700,62 +706,300 @@ export default function PdfToImagesPage() {
                 ) : null}
               </div>
 
-              <div className="mt-5 rounded-[1.5rem] border border-[var(--border-light)] bg-[var(--bg-card)] p-5 shadow-[var(--shadow-soft)]">
-                <div className="flex flex-col justify-between gap-4 xl:flex-row xl:items-start">
-                  <div>
-                    <div className="inline-flex items-center gap-2 rounded-full border border-[var(--violet-border)] bg-[var(--violet-50)] px-3 py-1 text-xs font-bold uppercase tracking-[0.08em] text-[var(--violet-600)]">
-                      <Grid2X2 size={14} />
-                      Visual export board
-                    </div>
-                    <h2 className="display-font mt-3 text-[1.75rem] font-bold tracking-[-0.02em] text-[var(--text-primary)]">
-                      Page Thumbnails
-                    </h2>
-                    <p className="mt-1 text-sm font-normal text-[var(--text-secondary)]">
-                      Click pages to export visually. Use Shift for page ranges and Ctrl for multi-select.
-                    </p>
-                  </div>
+              <div className="mt-4 rounded-[1.25rem] border border-[var(--border-light)] bg-[var(--bg-card)] p-3 shadow-[var(--shadow-soft)] sm:p-4">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <p className="text-sm font-normal text-[var(--text-secondary)]">
+                    Click pages to export visually. Shift selects ranges, Ctrl toggles pages.
+                  </p>
 
-                  {file ? (
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={selectAllPages}
-                        disabled={busy || !pageCount}
-                        className="inline-flex items-center justify-center gap-2 rounded-full border border-[var(--border-light)] bg-white px-4 py-2 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        <MousePointer2 size={15} />
-                        Select All
-                      </button>
-                      <button
-                        type="button"
-                        onClick={clearSelection}
-                        disabled={busy || !selectedPages.length}
-                        className="inline-flex items-center justify-center gap-2 rounded-full border border-[var(--border-light)] bg-white px-4 py-2 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        Clear
-                      </button>
-                      <button
-                        type="button"
-                        onClick={clearFile}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <details className="group relative">
+                      <summary className="inline-flex cursor-pointer list-none items-center justify-center gap-2 rounded-full border border-[var(--border-light)] bg-white px-3 py-2 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] [&::-webkit-details-marker]:hidden">
+                        {format.toUpperCase()}
+                        <ChevronDown size={15} className="transition group-open:rotate-180" />
+                      </summary>
+
+                      <div className="absolute left-0 z-30 mt-2 w-64 rounded-2xl border border-[var(--border-light)] bg-white p-2 shadow-[var(--shadow-card)]">
+                        {FORMAT_OPTIONS.map((option) => (
+                          <button
+                            key={option.id}
+                            type="button"
+                            onClick={() => {
+                              setFormat(option.id);
+                              clearOutputs();
+                            }}
+                            disabled={busy}
+                            className={`w-full rounded-xl px-3 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                              format === option.id
+                                ? "bg-[var(--violet-50)] text-[var(--violet-600)]"
+                                : "text-[var(--text-secondary)] hover:bg-[var(--violet-50)]"
+                            }`}
+                          >
+                            <div className="text-sm font-bold">{option.label}</div>
+                            <div className="text-xs font-medium">{option.description}</div>
+                          </button>
+                        ))}
+                      </div>
+                    </details>
+
+                    <details className="group relative">
+                      <summary className="inline-flex cursor-pointer list-none items-center justify-center gap-2 rounded-full border border-[var(--border-light)] bg-white px-3 py-2 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] [&::-webkit-details-marker]:hidden">
+                        {dpi} DPI
+                        <ChevronDown size={15} className="transition group-open:rotate-180" />
+                      </summary>
+
+                      <div className="absolute left-0 z-30 mt-2 w-72 rounded-2xl border border-[var(--border-light)] bg-white p-3 shadow-[var(--shadow-card)]">
+                        <div className="grid grid-cols-2 gap-2">
+                          {DPI_PRESETS.map((preset) => (
+                            <button
+                              key={preset.id}
+                              type="button"
+                              onClick={() => {
+                                setDpi(preset.id);
+                                clearOutputs();
+                              }}
+                              disabled={busy}
+                              className={`rounded-xl border px-3 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                                dpi === preset.id
+                                  ? "border-[var(--violet-600)] bg-[var(--violet-50)] text-[var(--violet-600)]"
+                                  : "border-[var(--border-light)] bg-white text-[var(--text-secondary)] hover:bg-[var(--violet-50)]"
+                              }`}
+                            >
+                              <div className="text-sm font-bold">{preset.label}</div>
+                              <div className="text-[11px] font-medium">{preset.description}</div>
+                            </button>
+                          ))}
+                        </div>
+
+                        <label className="mt-3 block">
+                          <span className="flex justify-between text-xs font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                            Custom DPI <span>{dpi}</span>
+                          </span>
+                          <input
+                            type="range"
+                            min={72}
+                            max={450}
+                            step={6}
+                            value={dpi}
+                            onChange={(event) => {
+                              setDpi(Number(event.target.value));
+                              clearOutputs();
+                            }}
+                            disabled={busy}
+                            className="mt-2 w-full"
+                          />
+                          <span className="mt-1 block text-xs font-semibold text-[var(--text-muted)]">{estimatedPixelText}</span>
+                        </label>
+
+                        {format !== "png" ? (
+                          <label className="mt-3 block">
+                            <span className="flex justify-between text-xs font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                              Quality <span>{Math.round(quality * 100)}%</span>
+                            </span>
+                            <input
+                              type="range"
+                              min={40}
+                              max={100}
+                              value={Math.round(quality * 100)}
+                              onChange={(event) => {
+                                setQuality(Number(event.target.value) / 100);
+                                clearOutputs();
+                              }}
+                              disabled={busy}
+                              className="mt-2 w-full"
+                            />
+                          </label>
+                        ) : null}
+                      </div>
+                    </details>
+
+                    <details className="group relative">
+                      <summary className="inline-flex cursor-pointer list-none items-center justify-center gap-2 rounded-full border border-[var(--border-light)] bg-white px-3 py-2 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] [&::-webkit-details-marker]:hidden">
+                        {targetMode === "all"
+                          ? "All pages"
+                          : targetMode === "odd"
+                            ? "Odd pages"
+                            : targetMode === "even"
+                              ? "Even pages"
+                              : targetMode === "visual"
+                                ? "Visual pick"
+                                : "Custom range"}
+                        <ChevronDown size={15} className="transition group-open:rotate-180" />
+                      </summary>
+
+                      <div className="absolute right-0 z-30 mt-2 w-56 rounded-2xl border border-[var(--border-light)] bg-white p-2 shadow-[var(--shadow-card)]">
+                        {[
+                          { id: "all", label: "All Pages" },
+                          { id: "odd", label: "Odd Pages" },
+                          { id: "even", label: "Even Pages" },
+                          { id: "custom", label: "Custom Range" },
+                          { id: "visual", label: "Visual Pick" },
+                        ].map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => {
+                              setTargetMode(item.id as TargetMode);
+                              clearOutputs();
+                            }}
+                            disabled={busy}
+                            className={`w-full rounded-xl px-3 py-2 text-left text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                              targetMode === item.id
+                                ? "bg-[var(--violet-50)] text-[var(--violet-600)]"
+                                : "text-[var(--text-secondary)] hover:bg-[var(--violet-50)]"
+                            }`}
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+
+                        <button
+                          type="button"
+                          onClick={() => applyFirstPagesPreset(5)}
+                          disabled={busy || !file}
+                          className="mt-2 w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          First 5
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => applyLastPagesPreset(5)}
+                          disabled={busy || !file}
+                          className="w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          Last 5
+                        </button>
+                      </div>
+                    </details>
+
+                    {targetMode === "custom" ? (
+                      <input
+                        value={pageInput}
+                        onChange={(event) => {
+                          setPageInput(event.target.value);
+                          clearOutputs();
+                        }}
+                        placeholder="1-5, 8, 10-12"
                         disabled={busy}
-                        className="inline-flex items-center justify-center gap-2 rounded-full border border-red-100 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="h-10 w-52 rounded-full border border-[var(--border-light)] bg-white px-4 text-sm font-semibold text-[var(--text-secondary)] outline-none transition focus:border-[var(--border-focus)] focus:ring-4 focus:ring-violet-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      />
+                    ) : null}
+
+                    <details className="group relative">
+                      <summary className="inline-flex cursor-pointer list-none items-center justify-center gap-2 rounded-full border border-[var(--border-light)] bg-white px-3 py-2 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] [&::-webkit-details-marker]:hidden">
+                        More options
+                        <ChevronDown size={15} className="transition group-open:rotate-180" />
+                      </summary>
+
+                      <div className="absolute right-0 z-30 mt-2 w-56 rounded-2xl border border-[var(--border-light)] bg-white p-2 shadow-[var(--shadow-card)]">
+                        <button
+                          type="button"
+                          onClick={selectAllPages}
+                          disabled={busy || !pageCount}
+                          className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <MousePointer2 size={15} />
+                          Select all visually
+                        </button>
+                        <button
+                          type="button"
+                          onClick={clearSelection}
+                          disabled={busy || !selectedPages.length}
+                          className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <X size={15} />
+                          Clear selection
+                        </button>
+                        <label className="mt-2 flex items-start gap-3 rounded-xl border border-[var(--border-light)] bg-[var(--bg-base)] p-3">
+                          <input
+                            type="checkbox"
+                            checked={downloadAsZip}
+                            onChange={(event) => setDownloadAsZip(event.target.checked)}
+                            disabled={busy}
+                            className="mt-1 h-4 w-4 rounded border-[var(--border-light)] text-[var(--violet-600)]"
+                          />
+                          <span className="text-xs font-semibold leading-5 text-[var(--text-secondary)]">
+                            Package as one ZIP
+                          </span>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={clearFile}
+                          disabled={!file || busy}
+                          className="mt-2 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <X size={15} />
+                          Remove PDF
+                        </button>
+                      </div>
+                    </details>
+
+                    <div className="group relative">
+                      <button
+                        type="button"
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border-light)] bg-white text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)]"
+                        aria-label="Help"
                       >
-                        <X size={15} />
-                        Remove PDF
+                        <CircleHelp size={17} />
                       </button>
+                      <div className="pointer-events-none absolute right-0 z-30 mt-2 w-72 rounded-2xl border border-[var(--border-light)] bg-white p-3 text-xs font-semibold leading-5 text-[var(--text-secondary)] opacity-0 shadow-[var(--shadow-card)] transition group-hover:opacity-100">
+                        PNG is best for sharp text.<br />
+                        JPEG/WEBP are better for smaller files.<br />
+                        Use 300 DPI for print and 150 DPI for sharing.<br />
+                        Custom range example: 1-5, 8, 10-12.
+                      </div>
                     </div>
-                  ) : null}
+
+                    <button type="button" onClick={handleExport} disabled={busy || !file} className="btn-primary px-4 py-2">
+                      {busyMode === "exporting" ? (
+                        <><Loader2 className="animate-spin" size={18} /><span>Exporting</span></>
+                      ) : (
+                        <><Download size={18} /><span>Export</span></>
+                      )}
+                    </button>
+                  </div>
                 </div>
 
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold">
+                  <span className={`rounded-full border px-3 py-1.5 ${targetPlan.error ? "border-red-100 bg-red-50 text-red-700" : "border-[var(--violet-border)] bg-[var(--violet-50)] text-[var(--violet-600)]"}`}>
+                    {targetSummary}
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-light)] bg-white px-3 py-1.5 text-[var(--text-secondary)]">
+                    <Settings2 size={13} />
+                    {format.toUpperCase()} · {dpi} DPI
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-light)] bg-white px-3 py-1.5 text-[var(--text-secondary)]">
+                    <FileArchive size={13} />
+                    {downloadAsZip ? "ZIP" : "Single direct download"}
+                  </span>
+                </div>
+
+                {busyMode === "exporting" ? (
+                  <div className="mt-3 rounded-2xl border border-[var(--violet-border)] bg-[var(--violet-50)] p-3">
+                    <div className="mb-2 flex items-center justify-between gap-3 text-sm font-bold text-[var(--violet-600)]">
+                      <span>Exporting</span>
+                      <span>{exportProgress}%</span>
+                    </div>
+                    <ProgressBar value={exportProgress} />
+                  </div>
+                ) : null}
+
+                {outputs.length > 0 ? (
+                  <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
+                    <CheckCircle2 size={16} />
+                    {outputs.length} image{outputs.length > 1 ? "s" : ""} exported · {formatFileSize(outputSize)}
+                  </div>
+                ) : null}
+
                 {busyMode === "reading" ? (
-                  <div className="mt-5 flex min-h-80 items-center justify-center rounded-[1.35rem] border border-[var(--violet-border)] bg-[var(--violet-50)]">
+                  <div className="mt-4 flex min-h-80 items-center justify-center rounded-[1.25rem] border border-[var(--violet-border)] bg-[var(--violet-50)]">
                     <div className="flex items-center gap-2 rounded-full border border-[var(--violet-border)] bg-white px-4 py-3 text-sm font-semibold text-[var(--violet-600)] shadow-[var(--shadow-soft)]">
                       <Loader2 className="animate-spin" size={18} />
                       Reading PDF
                     </div>
                   </div>
                 ) : thumbnails.length > 0 ? (
-                  <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
                     {thumbnails.map((thumbnail) => {
                       const isTargeted = targetPageSet.has(thumbnail.pageNumber);
                       const isSelected = selectedPageSet.has(thumbnail.pageNumber);
@@ -766,7 +1010,7 @@ export default function PdfToImagesPage() {
                           type="button"
                           onClick={(event) => handlePageSelect(thumbnail.pageNumber, event)}
                           disabled={busy}
-                          className={`overflow-hidden rounded-[1.35rem] border bg-white text-left shadow-sm outline-none transition hover:border-[var(--violet-border)] focus:ring-4 focus:ring-violet-100 disabled:cursor-not-allowed disabled:opacity-70 ${
+                          className={`group overflow-hidden rounded-[1.25rem] border bg-white p-3 text-left shadow-sm outline-none transition hover:border-[var(--violet-border)] focus:ring-4 focus:ring-violet-100 disabled:cursor-not-allowed disabled:opacity-70 ${
                             isSelected
                               ? "border-[var(--violet-600)] ring-4 ring-violet-100"
                               : isTargeted
@@ -774,35 +1018,42 @@ export default function PdfToImagesPage() {
                                 : "border-[var(--border-light)] opacity-75"
                           }`}
                         >
-                          <div className="flex items-center justify-between gap-2 border-b border-[var(--border-light)] bg-[var(--bg-base)] px-4 py-3">
-                            <div>
-                              <div className="text-sm font-bold text-[var(--text-primary)]">Page {thumbnail.pageNumber}</div>
-                              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                                {isTargeted ? "Will export" : "Skipped"}
+                          <div className="flex items-center justify-between gap-2 pb-2">
+                            <div className="flex items-center gap-2">
+                              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--violet-50)] text-xs font-bold text-[var(--violet-600)]">
+                                {thumbnail.pageNumber}
+                              </div>
+                              <div>
+                                <div className="text-sm font-bold text-[var(--text-primary)]">Page {thumbnail.pageNumber}</div>
+                                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                                  {isTargeted ? "Will export" : "Skipped"}
+                                </div>
                               </div>
                             </div>
 
                             {isTargeted ? (
-                              <span className="rounded-full bg-[var(--violet-50)] px-3 py-1 text-xs font-bold text-[var(--violet-600)]">
+                              <span className="rounded-full bg-[var(--violet-50)] px-2 py-1 text-[10px] font-bold text-[var(--violet-600)]">
                                 {format.toUpperCase()}
                               </span>
                             ) : null}
                           </div>
 
-                          <div className="flex aspect-[3/4] items-center justify-center bg-[var(--bg-base)] p-4">
-                            <img
-                              src={thumbnail.previewUrl}
-                              alt={`PDF page ${thumbnail.pageNumber}`}
-                              className="h-full w-full rounded border border-[var(--border-light)] bg-white object-contain shadow-sm"
-                              draggable={false}
-                            />
+                          <div className="overflow-hidden rounded-2xl border border-[var(--border-light)] bg-[var(--bg-base)]">
+                            <div className="flex aspect-[3/4] items-center justify-center p-3">
+                              <img
+                                src={thumbnail.previewUrl}
+                                alt={`PDF page ${thumbnail.pageNumber}`}
+                                className="h-full w-full rounded border border-[var(--border-light)] bg-white object-contain shadow-sm"
+                                draggable={false}
+                              />
+                            </div>
                           </div>
                         </button>
                       );
                     })}
                   </div>
                 ) : thumbnailStatus === "error" && file ? (
-                  <div className="mt-5 flex min-h-80 items-center justify-center rounded-[1.35rem] border border-amber-200 bg-amber-50 text-center">
+                  <div className="mt-4 flex min-h-80 items-center justify-center rounded-[1.25rem] border border-amber-200 bg-amber-50 text-center">
                     <div>
                       <FileText className="mx-auto text-amber-500" size={42} />
                       <div className="mt-3 text-[15px] font-semibold text-amber-950">Preview unavailable</div>
@@ -810,9 +1061,9 @@ export default function PdfToImagesPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="mt-5 flex min-h-80 items-center justify-center rounded-[1.35rem] border border-dashed border-[var(--violet-border)] bg-[var(--violet-50)]/52 text-center">
+                  <div className="mt-4 flex min-h-80 items-center justify-center rounded-[1.25rem] border border-dashed border-[var(--violet-border)] bg-[var(--violet-50)]/52 text-center">
                     <div>
-                      <FileText className="mx-auto text-[var(--violet-400)]" size={42} />
+                      <ImageIcon className="mx-auto text-[var(--violet-400)]" size={42} />
                       <div className="mt-3 text-[15px] font-semibold text-[var(--text-primary)]">No PDF loaded</div>
                       <p className="mt-1 text-sm font-normal text-[var(--text-secondary)]">Upload a PDF to preview and export pages as images.</p>
                     </div>
@@ -820,298 +1071,23 @@ export default function PdfToImagesPage() {
                 )}
 
                 {outputs.length > 0 ? (
-                  <div className="mt-5 rounded-[1.5rem] border border-[var(--border-light)] bg-white p-5 shadow-sm">
-                    <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-                      <div>
-                        <h2 className="display-font text-[1.55rem] font-bold tracking-[-0.02em] text-[var(--text-primary)]">Last Export Preview</h2>
-                        <p className="mt-1 text-sm font-medium text-[var(--text-secondary)]">
-                          {outputs.length} image{outputs.length > 1 ? "s" : ""} • {formatFileSize(outputSize)}
-                        </p>
-                      </div>
-                      <div className="rounded-full bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700">
-                        Ready
-                      </div>
-                    </div>
-
-                    <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
-                      {outputs.slice(0, 12).map((output) => (
-                        <div key={output.fileName} className="overflow-hidden rounded-2xl border border-[var(--border-light)] bg-[var(--bg-base)]">
-                          <img src={output.previewUrl} alt={`Exported page ${output.pageNumber}`} className="aspect-[3/4] w-full object-contain" />
-                          <div className="border-t border-[var(--border-light)] bg-white px-3 py-2 text-xs font-semibold text-[var(--text-secondary)]">
-                            Page {output.pageNumber}
-                          </div>
+                  <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+                    {outputs.slice(0, 12).map((output) => (
+                      <div key={output.fileName} className="overflow-hidden rounded-2xl border border-[var(--border-light)] bg-white shadow-sm">
+                        <img src={output.previewUrl} alt={`Exported page ${output.pageNumber}`} className="aspect-[3/4] w-full object-contain" />
+                        <div className="border-t border-[var(--border-light)] bg-[var(--bg-base)] px-3 py-2 text-xs font-semibold text-[var(--text-secondary)]">
+                          Page {output.pageNumber}
                         </div>
-                      ))}
-                    </div>
+                      </div>
+                    ))}
                   </div>
                 ) : null}
               </div>
             </section>
+          </div>
 
-            <aside className="bg-[var(--bg-card)] p-5 sm:p-6">
-              <div className="rounded-[1.5rem] border border-[var(--border-light)] bg-[var(--bg-panel)] p-5 shadow-[var(--shadow-soft)]">
-                <h2 className="display-font text-[1.75rem] font-bold tracking-[-0.02em] text-[var(--text-primary)]">
-                  Image Export Settings
-                </h2>
-                <p className="mt-2 text-sm font-normal leading-6 text-[var(--text-secondary)]">
-                  Choose output format, target pages, render DPI, quality, and download packaging.
-                </p>
-
-                <div className="mt-5 rounded-2xl border border-[var(--border-light)] bg-white p-4">
-                  <div className="mb-3 flex items-center gap-2 text-sm font-bold text-[var(--text-primary)]">
-                    <ImageIcon size={16} className="text-[var(--violet-600)]" />
-                    Format
-                  </div>
-
-                  <div className="grid gap-2">
-                    {FORMAT_OPTIONS.map((option) => (
-                      <button
-                        key={option.id}
-                        type="button"
-                        onClick={() => {
-                          setFormat(option.id);
-                          clearOutputs();
-                        }}
-                        disabled={busy}
-                        className={`rounded-2xl border px-4 py-3 text-left transition disabled:cursor-not-allowed disabled:opacity-40 ${
-                          format === option.id
-                            ? "border-[var(--violet-600)] bg-[var(--violet-50)] text-[var(--violet-600)]"
-                            : "border-[var(--border-light)] bg-white text-[var(--text-secondary)] hover:bg-[var(--violet-50)]"
-                        }`}
-                      >
-                        <div className="text-sm font-bold">{option.label}</div>
-                        <div className="mt-0.5 text-xs font-medium">{option.description}</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="mt-5 rounded-2xl border border-[var(--border-light)] bg-white p-4">
-                  <div className="mb-3 flex items-center gap-2 text-sm font-bold text-[var(--text-primary)]">
-                    <Settings2 size={16} className="text-[var(--violet-600)]" />
-                    Render quality
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    {DPI_PRESETS.map((preset) => (
-                      <button
-                        key={preset.id}
-                        type="button"
-                        onClick={() => {
-                          setDpi(preset.id);
-                          clearOutputs();
-                        }}
-                        disabled={busy}
-                        className={`rounded-2xl border px-3 py-3 text-left transition disabled:cursor-not-allowed disabled:opacity-40 ${
-                          dpi === preset.id
-                            ? "border-[var(--violet-600)] bg-[var(--violet-50)] text-[var(--violet-600)]"
-                            : "border-[var(--border-light)] bg-white text-[var(--text-secondary)] hover:bg-[var(--violet-50)]"
-                        }`}
-                      >
-                        <div className="text-sm font-bold">{preset.label}</div>
-                        <div className="mt-0.5 text-[11px] font-medium">{preset.description}</div>
-                      </button>
-                    ))}
-                  </div>
-
-                  <label className="mt-4 block">
-                    <span className="flex justify-between text-sm font-semibold text-[var(--text-primary)]">
-                      Custom DPI <span>{dpi} DPI</span>
-                    </span>
-                    <input
-                      type="range"
-                      min={72}
-                      max={450}
-                      step={6}
-                      value={dpi}
-                      onChange={(event) => {
-                        setDpi(Number(event.target.value));
-                        clearOutputs();
-                      }}
-                      disabled={busy}
-                      className="mt-2 w-full"
-                    />
-                    <span className="mt-1 block text-xs font-semibold text-[var(--text-muted)]">{estimatedPixelText}</span>
-                  </label>
-
-                  {format !== "png" ? (
-                    <label className="mt-4 block">
-                      <span className="flex justify-between text-sm font-semibold text-[var(--text-primary)]">
-                        Compression quality <span>{Math.round(quality * 100)}%</span>
-                      </span>
-                      <input
-                        type="range"
-                        min={40}
-                        max={100}
-                        value={Math.round(quality * 100)}
-                        onChange={(event) => {
-                          setQuality(Number(event.target.value) / 100);
-                          clearOutputs();
-                        }}
-                        disabled={busy}
-                        className="mt-2 w-full"
-                      />
-                    </label>
-                  ) : null}
-                </div>
-
-                <div className="mt-5 rounded-2xl border border-[var(--border-light)] bg-white p-4">
-                  <div className="mb-3 flex items-center gap-2 text-sm font-bold text-[var(--text-primary)]">
-                    <ListFilter size={16} className="text-[var(--violet-600)]" />
-                    Target pages
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    {[
-                      { id: "all", label: "All Pages" },
-                      { id: "odd", label: "Odd Pages" },
-                      { id: "even", label: "Even Pages" },
-                      { id: "custom", label: "Custom" },
-                      { id: "visual", label: "Visual Pick" },
-                    ].map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => {
-                          setTargetMode(item.id as TargetMode);
-                          clearOutputs();
-                        }}
-                        disabled={busy}
-                        className={`rounded-2xl border px-3 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
-                          targetMode === item.id
-                            ? "border-[var(--violet-600)] bg-[var(--violet-50)] text-[var(--violet-600)]"
-                            : "border-[var(--border-light)] bg-white text-[var(--text-secondary)] hover:bg-[var(--violet-50)]"
-                        } ${item.id === "visual" ? "col-span-2" : ""}`}
-                      >
-                        {item.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  {targetMode === "custom" ? (
-                    <label className="mt-4 block">
-                      <span className="text-sm font-semibold text-[var(--text-primary)]">Custom range</span>
-                      <input
-                        value={pageInput}
-                        onChange={(event) => {
-                          setPageInput(event.target.value);
-                          clearOutputs();
-                        }}
-                        placeholder="1-5, 8, 10-12"
-                        disabled={busy}
-                        className="input-premium mt-2"
-                      />
-                    </label>
-                  ) : null}
-
-                  <div className="mt-4 grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => applyFirstPagesPreset(5)}
-                      disabled={busy || !file}
-                      className="rounded-2xl border border-[var(--border-light)] bg-white px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      First 5
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => applyLastPagesPreset(5)}
-                      disabled={busy || !file}
-                      className="rounded-2xl border border-[var(--border-light)] bg-white px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      Last 5
-                    </button>
-                  </div>
-
-                  <div className={`mt-4 rounded-2xl border p-3 text-sm font-semibold leading-6 ${
-                    targetPlan.error ? "border-red-100 bg-red-50 text-red-700" : "border-[var(--violet-border)] bg-[var(--violet-50)] text-[var(--violet-600)]"
-                  }`}>
-                    {targetSummary}
-                  </div>
-
-                  {targetMode === "visual" && selectedPages.length > 0 ? (
-                    <div className="mt-3 rounded-2xl border border-[var(--border-light)] bg-[var(--bg-base)] p-3 text-xs font-semibold leading-5 text-[var(--text-secondary)]">
-                      Selected: {formatPagesAsRange(selectedPages)}
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className="mt-5 rounded-2xl border border-[var(--border-light)] bg-white p-4">
-                  <div className="mb-3 flex items-center gap-2 text-sm font-bold text-[var(--text-primary)]">
-                    <FileArchive size={16} className="text-[var(--violet-600)]" />
-                    Download mode
-                  </div>
-
-                  <label className="flex items-start gap-3 rounded-2xl border border-[var(--border-light)] bg-[var(--bg-base)] p-3">
-                    <input
-                      type="checkbox"
-                      checked={downloadAsZip}
-                      onChange={(event) => setDownloadAsZip(event.target.checked)}
-                      disabled={busy}
-                      className="mt-1 h-4 w-4 rounded border-[var(--border-light)] text-[var(--violet-600)]"
-                    />
-                    <span>
-                      <span className="block text-sm font-bold text-[var(--text-primary)]">Package as one ZIP</span>
-                      <span className="block text-xs font-medium leading-5 text-[var(--text-secondary)]">
-                        Recommended for multiple exported pages.
-                      </span>
-                    </span>
-                  </label>
-                </div>
-
-                {busyMode === "exporting" ? (
-                  <div className="mt-5 rounded-2xl border border-[var(--violet-border)] bg-[var(--violet-50)] p-4">
-                    <div className="mb-2 flex items-center justify-between gap-3 text-sm font-bold text-[var(--violet-600)]">
-                      <span>Export progress</span>
-                      <span>{exportProgress}%</span>
-                    </div>
-                    <ProgressBar value={exportProgress} />
-                  </div>
-                ) : null}
-
-                {outputs.length > 0 ? (
-                  <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm font-medium leading-6 text-emerald-800">
-                    <div className="mb-1 flex items-center gap-2 font-semibold"><CheckCircle2 size={16} /> Last output</div>
-                    {outputs.length} image{outputs.length > 1 ? "s" : ""} exported • {formatFileSize(outputSize)}.
-                  </div>
-                ) : null}
-
-                <button type="button" onClick={handleExport} disabled={busy || !file} className="btn-primary mt-5 w-full">
-                  {busyMode === "exporting" ? (
-                    <><Loader2 className="animate-spin" size={18} /><span>Exporting</span></>
-                  ) : (
-                    <><Download size={18} /><span>Export Images</span></>
-                  )}
-                </button>
-              </div>
-
-              <div className={`mt-5 rounded-[1.5rem] border p-4 text-sm font-medium leading-6 shadow-[var(--shadow-soft)] ${
-                statusLooksLikeError ? "border-red-100 bg-red-50 text-red-700" : "border-[var(--violet-border)] bg-[var(--violet-50)] text-[var(--violet-600)]"
-              }`}>
-                <div className="mb-1 flex items-center gap-2 font-semibold"><CheckCircle2 size={16} /> Status</div>
-                {status}
-              </div>
-
-              <div className="mt-5 rounded-[1.5rem] border border-[var(--border-light)] bg-white p-4 shadow-[var(--shadow-soft)]">
-                <div className="mb-2 flex items-center gap-2 text-sm font-bold text-[var(--text-primary)]">
-                  <Sparkles size={16} className="text-[var(--violet-600)]" />
-                  Smart tips
-                </div>
-                <div className="grid gap-2 text-xs font-semibold leading-5 text-[var(--text-secondary)]">
-                  <div>Use PNG for sharp text-heavy pages.</div>
-                  <div>Use JPEG or WEBP for smaller image-heavy exports.</div>
-                  <div>Use 300 DPI for print-ready exports and 150 DPI for fast sharing.</div>
-                </div>
-              </div>
-
-              <div className="mt-5 rounded-[1.5rem] border border-[var(--border-light)] bg-[var(--bg-card)] p-4 text-sm font-medium leading-6 text-[var(--text-secondary)] shadow-[var(--shadow-soft)]">
-                <div className="mb-1 flex items-center gap-2 font-semibold text-[var(--text-primary)]">
-                  <Layers size={16} />
-                  Browser-side rendering
-                </div>
-                PDF pages are rendered locally in your browser. No upload to a server is required.
-              </div>
-            </aside>
+          <div className={`mt-3 px-1 text-sm font-medium ${statusLooksLikeError ? "text-red-600" : "text-[var(--text-secondary)]"}`}>
+            {status}
           </div>
         </section>
       </main>
