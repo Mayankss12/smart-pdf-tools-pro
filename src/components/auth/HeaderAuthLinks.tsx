@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
+import { useEffect, useRef, useState, useCallback } from "react";
 import {
   ArrowRight,
   ChevronDown,
@@ -11,6 +12,8 @@ import {
   LayoutDashboard,
   LogOut,
 } from "lucide-react";
+
+import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 type HeaderAuthState = {
   isLoaded: boolean;
@@ -65,7 +68,24 @@ function getAccountLabel(displayName: string | null, email: string | null) {
   return "PDFMantra User";
 }
 
+function getDisplayNameFromMetadata(metadata: Record<string, unknown> | null | undefined) {
+  const fullName = metadata?.full_name;
+  const name = metadata?.name;
+
+  if (typeof fullName === "string" && fullName.trim()) {
+    return fullName.trim();
+  }
+
+  if (typeof name === "string" && name.trim()) {
+    return name.trim();
+  }
+
+  return null;
+}
+
 function useHeaderAuthState(): HeaderAuthState {
+  const pathname = usePathname();
+
   const [authState, setAuthState] = useState<HeaderAuthState>({
     isLoaded: false,
     isSignedIn: false,
@@ -73,58 +93,87 @@ function useHeaderAuthState(): HeaderAuthState {
     displayName: null,
   });
 
+  const refreshAuthState = useCallback(async () => {
+    try {
+      const supabase = createSupabaseBrowserClient();
+
+      if (supabase) {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (user) {
+          setAuthState({
+            isLoaded: true,
+            isSignedIn: true,
+            email: user.email ?? null,
+            displayName: getDisplayNameFromMetadata(user.user_metadata),
+          });
+
+          return;
+        }
+      }
+
+      const response = await fetch("/api/auth/session", {
+        cache: "no-store",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error("Unable to read session");
+      }
+
+      const data = (await response.json()) as SessionResponse;
+
+      setAuthState({
+        isLoaded: true,
+        isSignedIn: Boolean(data.isSignedIn),
+        email: data.email ?? null,
+        displayName: data.displayName ?? null,
+      });
+    } catch {
+      setAuthState({
+        isLoaded: true,
+        isSignedIn: false,
+        email: null,
+        displayName: null,
+      });
+    }
+  }, []);
+
   useEffect(() => {
-    let isMounted = true;
-    const controller = new AbortController();
+    void refreshAuthState();
+  }, [pathname, refreshAuthState]);
 
-    async function loadSession() {
-      try {
-        const response = await fetch("/api/auth/session", {
-          cache: "no-store",
-          credentials: "include",
-          signal: controller.signal,
-        });
+  useEffect(() => {
+    const supabase = createSupabaseBrowserClient();
 
-        if (!response.ok) {
-          throw new Error("Unable to read session");
-        }
+    const {
+      data: { subscription },
+    } =
+      supabase?.auth.onAuthStateChange(() => {
+        void refreshAuthState();
+      }) ?? { data: { subscription: null } };
 
-        const data = (await response.json()) as SessionResponse;
+    function handleFocus() {
+      void refreshAuthState();
+    }
 
-        if (isMounted) {
-          setAuthState({
-            isLoaded: true,
-            isSignedIn: Boolean(data.isSignedIn),
-            email: data.email ?? null,
-            displayName: data.displayName ?? null,
-          });
-        }
-      } catch {
-        if (isMounted) {
-          setAuthState({
-            isLoaded: true,
-            isSignedIn: false,
-            email: null,
-            displayName: null,
-          });
-        }
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        void refreshAuthState();
       }
     }
 
-    loadSession();
-
-    function handleFocus() {
-      loadSession();
-    }
-
     window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
-      isMounted = false;
-      controller.abort();
+      subscription?.unsubscribe();
       window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, []);
+  }, [refreshAuthState]);
 
   return authState;
 }
