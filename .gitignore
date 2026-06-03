@@ -7,3 +7,5 @@ out
 *.log
 .DS_Store
 .vercel
+
+supabase/.temp/
