@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 
 import { Header } from "@/components/Header";
+import { useEntitlement } from "@/hooks/useEntitlement";
 import { PdfEngineError, downloadBlob, formatFileSize, type PdfProcessingResult } from "@/lib/pdf-engine";
 import {
   convertImagesToPdfEngine,
@@ -90,6 +91,8 @@ export default function ImagesToPdfPage() {
   const draggedIndexRef = useRef<number | null>(null);
   const draggedImageIdsRef = useRef<string[]>([]);
 
+  const { recordExport } = useEntitlement();
+
   const [images, setImages] = useState<ImageQueueItem[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
@@ -121,7 +124,9 @@ export default function ImagesToPdfPage() {
     status.toLowerCase().includes("unsupported") ||
     status.toLowerCase().includes("too large") ||
     status.toLowerCase().includes("empty") ||
-    status.toLowerCase().includes("no supported");
+    status.toLowerCase().includes("no supported") ||
+    status.toLowerCase().includes("limit") ||
+    status.toLowerCase().includes("unable");
 
   function addImages(selectedFiles?: FileList | File[]) {
     if (!selectedFiles || selectedFiles.length === 0 || busy) return;
@@ -406,7 +411,29 @@ export default function ImagesToPdfPage() {
       setExportProgress(32);
       const output = await convertImagesToPdfEngine(images.map((image) => image.file));
 
-      setExportProgress(86);
+      setExportProgress(82);
+      setStatus("Checking export allowance...");
+
+      const exportRecord = await recordExport({
+        toolKey: "images-to-pdf",
+        exportKind: "clean",
+      });
+
+      if (!exportRecord.allowed) {
+        setResult(null);
+        setExportProgress(0);
+
+        const limitMessage =
+          exportRecord.error ||
+          (exportRecord.identityType === "guest"
+            ? "Guest clean export limit reached for today. Sign in to get 5 clean exports/day."
+            : `${exportRecord.planLabel} clean export limit reached for today.`);
+
+        setStatus(limitMessage);
+        return;
+      }
+
+      setExportProgress(92);
       setResult(output);
       downloadBlob(output.blob, output.fileName);
 
