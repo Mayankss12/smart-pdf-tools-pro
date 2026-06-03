@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 import { Header } from "@/components/Header";
+import { useEntitlement } from "@/hooks/useEntitlement";
 import {
   PdfEngineError,
   downloadBlob,
@@ -39,6 +40,9 @@ function getPreviewPages(pageCount: number) {
 
 export default function RotatePage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const { recordExport } = useEntitlement();
+
   const [file, setFile] = useState<File | null>(null);
   const [pageCount, setPageCount] = useState(0);
   const [rotationMap, setRotationMap] = useState<RotationMap>({});
@@ -194,10 +198,31 @@ export default function RotatePage() {
     }
 
     setBusy(true);
+    setResult(null);
     setStatus("Applying rotations with PDFMantra engine...");
 
     try {
       const output = await rotatePdfWithMap(file, rotationMap);
+
+      setStatus("Checking export allowance...");
+
+      const exportRecord = await recordExport({
+        toolKey: "rotate-pdf",
+        exportKind: "clean",
+      });
+
+      if (!exportRecord.allowed) {
+        setResult(null);
+
+        const limitMessage =
+          exportRecord.error ||
+          (exportRecord.identityType === "guest"
+            ? "Guest clean export limit reached for today. Sign in to get 5 clean exports/day."
+            : `${exportRecord.planLabel} clean export limit reached for today.`);
+
+        setStatus(limitMessage);
+        return;
+      }
 
       setResult(output);
       downloadBlob(output.blob, output.fileName);
@@ -215,6 +240,8 @@ export default function RotatePage() {
     status.toLowerCase().includes("invalid") ||
     status.toLowerCase().includes("unsupported") ||
     status.toLowerCase().includes("too large") ||
+    status.toLowerCase().includes("unable") ||
+    status.toLowerCase().includes("limit") ||
     status.toLowerCase().includes("empty");
 
   return (
