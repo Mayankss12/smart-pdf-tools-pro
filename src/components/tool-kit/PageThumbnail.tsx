@@ -41,7 +41,11 @@ function classNames(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
-function getModeStyles(mode: PageThumbnailMode, isSelected: boolean) {
+function getModeStyles(
+  mode: PageThumbnailMode,
+  isSelected: boolean,
+  rotation = 0,
+) {
   if (mode === "delete") {
     return {
       ring: isSelected
@@ -78,7 +82,7 @@ function getModeStyles(mode: PageThumbnailMode, isSelected: boolean) {
       badge: isSelected
         ? "border-[var(--violet-border)] bg-[var(--violet-600)] text-white"
         : "border-slate-200 bg-white text-slate-500",
-      badgeLabel: `${rotation ?? 0}°`,
+      badgeLabel: `${rotation}°`,
       badgeIcon: <RotateCw size={13} />,
       number: isSelected ? "bg-[var(--violet-600)] text-white" : "bg-white text-slate-600",
     };
@@ -112,7 +116,7 @@ export function PageThumbnail({
   showHoverActions = false,
   hoverActions,
 }: PageThumbnailProps) {
-  const styles = getModeStyles(mode, isSelected);
+  const styles = getModeStyles(mode, isSelected, rotation);
   const displayPosition = position ?? pageNumber;
   const canInteract = Boolean(onClick);
 
