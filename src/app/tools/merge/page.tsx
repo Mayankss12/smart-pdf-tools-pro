@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 
 import { Header } from "@/components/Header";
+import { useEntitlement } from "@/hooks/useEntitlement";
 import {
   PdfEngineError,
   downloadBlob,
@@ -91,6 +92,8 @@ export default function MergePage() {
   const draggedIndexRef = useRef<number | null>(null);
   const draggedIdsRef = useRef<string[]>([]);
 
+  const { recordExport } = useEntitlement();
+
   const [items, setItems] = useState<MergeQueueItem[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
@@ -123,7 +126,9 @@ export default function MergePage() {
     status.toLowerCase().includes("rejected") ||
     status.toLowerCase().includes("unsupported") ||
     status.toLowerCase().includes("too large") ||
-    status.toLowerCase().includes("empty");
+    status.toLowerCase().includes("empty") ||
+    status.toLowerCase().includes("limit") ||
+    status.toLowerCase().includes("unable");
 
   function addFiles(selectedFiles?: FileList | File[]) {
     if (!selectedFiles || selectedFiles.length === 0 || busy) return;
@@ -412,7 +417,29 @@ export default function MergePage() {
       setExportProgress(35);
       const output = await mergePdfFiles(items.map((item) => item.file));
 
-      setExportProgress(86);
+      setExportProgress(82);
+      setStatus("Checking export allowance...");
+
+      const exportRecord = await recordExport({
+        toolKey: "merge",
+        exportKind: "clean",
+      });
+
+      if (!exportRecord.allowed) {
+        setResult(null);
+        setExportProgress(0);
+
+        const limitMessage =
+          exportRecord.error ||
+          (exportRecord.identityType === "guest"
+            ? "Guest clean export limit reached for today. Sign in to get 5 clean exports/day."
+            : `${exportRecord.planLabel} clean export limit reached for today.`);
+
+        setStatus(limitMessage);
+        return;
+      }
+
+      setExportProgress(92);
       setResult(output);
       downloadBlob(output.blob, output.fileName);
 
