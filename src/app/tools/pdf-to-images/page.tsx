@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 
 import { Header } from "@/components/Header";
+import { useEntitlement } from "@/hooks/useEntitlement";
 import { createZipBlob } from "@/lib/browser-zip";
 import {
   PdfEngineError,
@@ -288,6 +289,8 @@ function ProgressBar({ value }: { value: number }) {
 export default function PdfToImagesPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const renderTokenRef = useRef(0);
+
+  const { recordExport } = useEntitlement();
 
   const [file, setFile] = useState<File | null>(null);
   const [pageCount, setPageCount] = useState(0);
@@ -572,10 +575,33 @@ export default function PdfToImagesPage() {
 
         rendered.push(image);
         setOutputs([...rendered]);
-        setExportProgress(Math.round(((index + 1) / pages.length) * 74) + 12);
+        setExportProgress(Math.round(((index + 1) / pages.length) * 70) + 12);
+      }
+
+      setExportProgress(86);
+      setStatus("Checking export allowance...");
+
+      const exportRecord = await recordExport({
+        toolKey: "pdf-to-images",
+        exportKind: "clean",
+      });
+
+      if (!exportRecord.allowed) {
+        clearOutputs();
+        setExportProgress(0);
+
+        const limitMessage =
+          exportRecord.error ||
+          (exportRecord.identityType === "guest"
+            ? "Guest clean export limit reached for today. Sign in to get 5 clean exports/day."
+            : `${exportRecord.planLabel} clean export limit reached for today.`);
+
+        setStatus(limitMessage);
+        return;
       }
 
       if (rendered.length === 1 && !downloadAsZip) {
+        setExportProgress(94);
         downloadBlob(rendered[0].blob, rendered[0].fileName);
         setExportProgress(100);
         setStatus("Exported 1 image. Download started.");
@@ -611,6 +637,7 @@ export default function PdfToImagesPage() {
     status.toLowerCase().includes("too large") ||
     status.toLowerCase().includes("empty") ||
     status.toLowerCase().includes("unable") ||
+    status.toLowerCase().includes("limit") ||
     status.toLowerCase().includes("select pages");
 
   return (
