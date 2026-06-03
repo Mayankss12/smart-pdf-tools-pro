@@ -38,6 +38,7 @@ import {
 } from "pdf-lib";
 
 import { Header } from "@/components/Header";
+import { useEntitlement } from "@/hooks/useEntitlement";
 import {
   PdfEngineError,
   createPdfFileName,
