@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 
 import { Header } from "@/components/Header";
+import { useEntitlement } from "@/hooks/useEntitlement";
 import {
   PdfEngineError,
   downloadBlob,
@@ -118,6 +119,8 @@ export default function ReorderPagesPage() {
   const renderTokenRef = useRef(0);
   const draggedIndexRef = useRef<number | null>(null);
   const draggedPagesRef = useRef<number[]>([]);
+
+  const { recordExport } = useEntitlement();
 
   const [file, setFile] = useState<File | null>(null);
   const [pageCount, setPageCount] = useState(0);
@@ -585,6 +588,28 @@ export default function ReorderPagesPage() {
       const output = await reorderPdfPages(file, pageOrder);
 
       setExportProgress(82);
+      setStatus("Checking export allowance...");
+
+      const exportRecord = await recordExport({
+        toolKey: "reorder-pages",
+        exportKind: "clean",
+      });
+
+      if (!exportRecord.allowed) {
+        setResult(null);
+        setExportProgress(0);
+
+        const limitMessage =
+          exportRecord.error ||
+          (exportRecord.identityType === "guest"
+            ? "Guest clean export limit reached for today. Sign in to get 5 clean exports/day."
+            : `${exportRecord.planLabel} clean export limit reached for today.`);
+
+        setStatus(limitMessage);
+        return;
+      }
+
+      setExportProgress(92);
       setResult(output);
       downloadBlob(output.blob, output.fileName);
 
@@ -605,6 +630,8 @@ export default function ReorderPagesPage() {
     status.toLowerCase().includes("unsupported") ||
     status.toLowerCase().includes("too large") ||
     status.toLowerCase().includes("empty") ||
+    status.toLowerCase().includes("unable") ||
+    status.toLowerCase().includes("limit") ||
     status.toLowerCase().includes("could not");
 
   return (
