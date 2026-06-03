@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { CheckCircle2, Download, FileArchive, Loader2, Upload, X } from "lucide-react";
 
 import { Header } from "@/components/Header";
+import { useEntitlement } from "@/hooks/useEntitlement";
 import { formatFileSize, validatePdfFile } from "@/lib/pdf-engine";
 import { useCompress, type CompressionLevel } from "@/hooks/useCompress";
 
@@ -29,6 +30,7 @@ export default function CompressPage() {
   const [targetBytes, setTargetBytes] = useState<number | null>(null);
   const [status,  setStatus]  = useState("Upload a PDF to compress and download.");
 
+  const { recordExport } = useEntitlement();
   const { compress, download, reset, isLoading, progress, result, error } = useCompress();
 
   function handleFile(f?: File) {
@@ -60,26 +62,49 @@ export default function CompressPage() {
         : "Compressing…"
     );
 
-    const res = await compress(file, level, targetBytes);
+    try {
+      const res = await compress(file, level, targetBytes);
 
-    if (res) {
-      download(res);
+      if (res) {
+        setStatus("Checking export allowance...");
 
-      if (targetBytes) {
-        setStatus(
-          res.targetMet
-            ? `Target reached. Output: ${formatFileSize(res.compressedSize)} (${res.savedPercent}% saved). Download started.`
-            : `Best achievable: ${formatFileSize(res.compressedSize)} — target size too aggressive for this PDF. Download started.`
-        );
+        const exportRecord = await recordExport({
+          toolKey: "compress",
+          exportKind: "clean",
+        });
+
+        if (!exportRecord.allowed) {
+          const limitMessage =
+            exportRecord.error ||
+            (exportRecord.identityType === "guest"
+              ? "Guest clean export limit reached for today. Sign in to get 5 clean exports/day."
+              : `${exportRecord.planLabel} clean export limit reached for today.`);
+
+          setStatus(limitMessage);
+          return;
+        }
+
+        download(res);
+
+        if (targetBytes) {
+          setStatus(
+            res.targetMet
+              ? `Target reached. Output: ${formatFileSize(res.compressedSize)} (${res.savedPercent}% saved). Download started.`
+              : `Best achievable: ${formatFileSize(res.compressedSize)} — target size too aggressive for this PDF. Download started.`
+          );
+        } else {
+          setStatus(
+            res.savedBytes > 0
+              ? `Compressed by ${res.savedPercent}% — saved ${formatFileSize(res.savedBytes)}. Download started.`
+              : "PDF already optimised — minimal reduction possible. Download started."
+          );
+        }
       } else {
-        setStatus(
-          res.savedBytes > 0
-            ? `Compressed by ${res.savedPercent}% — saved ${formatFileSize(res.savedBytes)}. Download started.`
-            : "PDF already optimised — minimal reduction possible. Download started."
-        );
+        setStatus(error ?? "Compression failed. Please try a different file.");
       }
-    } else {
-      setStatus(error ?? "Compression failed. Please try a different file.");
+    } catch (err) {
+      console.error(err);
+      setStatus("Unable to verify export allowance. Please try again.");
     }
   }
 
@@ -87,7 +112,9 @@ export default function CompressPage() {
     !!error ||
     status.toLowerCase().includes("failed") ||
     status.toLowerCase().includes("invalid") ||
-    status.toLowerCase().includes("unsupported");
+    status.toLowerCase().includes("unsupported") ||
+    status.toLowerCase().includes("limit") ||
+    status.toLowerCase().includes("unable");
 
   return (
     <>
