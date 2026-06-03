@@ -16,19 +16,18 @@ import {
   CircleHelp,
   Download,
   FileText,
-  Grid2X2,
   Layers,
   ListPlus,
   Loader2,
   MousePointer2,
   Package,
-  RotateCcw,
   Scissors,
   Upload,
   X,
 } from "lucide-react";
 
 import { Header } from "@/components/Header";
+import { useEntitlement } from "@/hooks/useEntitlement";
 import { createZipBlob } from "@/lib/browser-zip";
 import {
   PdfEngineError,
@@ -227,6 +226,8 @@ function ProgressBar({ value }: { value: number }) {
 export default function SplitPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const renderTokenRef = useRef(0);
+
+  const { recordExport } = useEntitlement();
 
   const [file, setFile] = useState<File | null>(null);
   const [pageInput, setPageInput] = useState("1-4,5-8");
@@ -539,15 +540,38 @@ export default function SplitPage() {
     try {
       setExportProgress(30);
       const outputs = await splitPdfIntoGroups(file, groups);
+
+      setExportProgress(72);
+      setStatus("Checking export allowance...");
+
+      const exportRecord = await recordExport({
+        toolKey: "split",
+        exportKind: "clean",
+      });
+
+      if (!exportRecord.allowed) {
+        setResults([]);
+        setExportProgress(0);
+
+        const limitMessage =
+          exportRecord.error ||
+          (exportRecord.identityType === "guest"
+            ? "Guest clean export limit reached for today. Sign in to get 5 clean exports/day."
+            : `${exportRecord.planLabel} clean export limit reached for today.`);
+
+        setStatus(limitMessage);
+        return;
+      }
+
       setResults(outputs);
 
       if (outputs.length === 1) {
-        setExportProgress(82);
+        setExportProgress(86);
         downloadBlob(outputs[0].blob, outputs[0].fileName);
         setExportProgress(100);
         setStatus("Split completed. Downloaded 1 PDF.");
       } else {
-        setExportProgress(72);
+        setExportProgress(80);
         setStatus(`Packaging ${outputs.length} PDFs into one ZIP...`);
 
         const zipBlob = await createZipBlob(
@@ -557,7 +581,7 @@ export default function SplitPage() {
           })),
         );
 
-        setExportProgress(92);
+        setExportProgress(94);
         downloadBlob(zipBlob, `PDFMantra-split-${safeFileBaseName(file.name)}.zip`);
         setExportProgress(100);
         setStatus(`Split completed. Downloaded 1 ZIP containing ${outputs.length} PDFs.`);
@@ -579,6 +603,8 @@ export default function SplitPage() {
     status.toLowerCase().includes("too large") ||
     status.toLowerCase().includes("empty") ||
     status.toLowerCase().includes("range") ||
+    status.toLowerCase().includes("unable") ||
+    status.toLowerCase().includes("limit") ||
     status.toLowerCase().includes("valid split");
 
   return (
