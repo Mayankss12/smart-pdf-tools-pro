@@ -27,6 +27,7 @@ import {
 import { StandardFonts, rgb } from "pdf-lib";
 
 import { Header } from "@/components/Header";
+import { useEntitlement } from "@/hooks/useEntitlement";
 import {
   PdfEngineError,
   createPdfFileName,
@@ -332,6 +333,8 @@ export default function PageNumbersPage() {
   const dragRectRef = useRef<DOMRect | null>(null);
   const renderTokenRef = useRef(0);
 
+  const { recordExport } = useEntitlement();
+
   const [file, setFile] = useState<File | null>(null);
   const [pageCount, setPageCount] = useState(0);
   const [previews, setPreviews] = useState<PdfPagePreview[]>([]);
@@ -604,6 +607,27 @@ export default function PageNumbersPage() {
       });
 
       setExportProgress(84);
+      setStatus("Checking export allowance...");
+
+      const exportRecord = await recordExport({
+        toolKey: "page-numbers",
+        exportKind: "clean",
+      });
+
+      if (!exportRecord.allowed) {
+        setResult(null);
+        setExportProgress(0);
+
+        const limitMessage =
+          exportRecord.error ||
+          (exportRecord.identityType === "guest"
+            ? "Guest clean export limit reached for today. Sign in to get 5 clean exports/day."
+            : `${exportRecord.planLabel} clean export limit reached for today.`);
+
+        setStatus(limitMessage);
+        return;
+      }
+
       setResult(output);
       downloadBlob(output.blob, output.fileName);
 
@@ -627,6 +651,8 @@ export default function PageNumbersPage() {
     status.toLowerCase().includes("empty") ||
     status.toLowerCase().includes("select at least") ||
     status.toLowerCase().includes("no pages") ||
+    status.toLowerCase().includes("unable") ||
+    status.toLowerCase().includes("limit") ||
     status.toLowerCase().includes("range");
 
   return (
