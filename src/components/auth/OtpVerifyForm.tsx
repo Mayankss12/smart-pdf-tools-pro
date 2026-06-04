@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 
 import { resendOtpAction, type ActionResult } from "@/app/actions/auth";
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 const OTP_LENGTH = 6;
 
