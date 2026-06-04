@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { getAnonymousId } from "@/lib/anonymous-identity";
 import { getEntitlementPlan, type UserTier } from "@/lib/entitlements";
+import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 export type ExportKind = "clean" | "watermarked" | "blocked";
 
@@ -87,6 +88,7 @@ export function useEntitlement() {
       const response = await fetch(buildStatusUrl(anonymousId), {
         method: "GET",
         cache: "no-store",
+        credentials: "include",
       });
 
       const payload = await parseJsonResponse<EntitlementStatus>(response);
@@ -133,6 +135,7 @@ export function useEntitlement() {
             "Content-Type": "application/json",
           },
           cache: "no-store",
+          credentials: "include",
           body: JSON.stringify({
             anonymousId,
             toolKey,
@@ -186,6 +189,36 @@ export function useEntitlement() {
 
   useEffect(() => {
     void refresh();
+  }, [refresh]);
+
+  useEffect(() => {
+    const supabase = createSupabaseBrowserClient();
+
+    const {
+      data: { subscription },
+    } =
+      supabase?.auth.onAuthStateChange(() => {
+        void refresh();
+      }) ?? { data: { subscription: null } };
+
+    function handleFocus() {
+      void refresh();
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        void refresh();
+      }
+    }
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      subscription?.unsubscribe();
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [refresh]);
 
   return {
