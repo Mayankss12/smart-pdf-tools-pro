@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
   ChevronDown,
@@ -13,7 +13,7 @@ import {
   LogOut,
 } from "lucide-react";
 
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type HeaderAuthState = {
   isLoaded: boolean;
@@ -68,7 +68,9 @@ function getAccountLabel(displayName: string | null, email: string | null) {
   return "PDFMantra User";
 }
 
-function getDisplayNameFromMetadata(metadata: Record<string, unknown> | null | undefined) {
+function getDisplayNameFromMetadata(
+  metadata: Record<string, unknown> | null | undefined,
+) {
   const fullName = metadata?.full_name;
   const name = metadata?.name;
 
@@ -233,7 +235,9 @@ function AccountAvatarMenu({
         </span>
         <ChevronDown
           size={15}
-          className={`hidden text-slate-500 transition sm:block ${menuOpen ? "rotate-180 text-violet-700" : ""}`}
+          className={`hidden text-slate-500 transition sm:block ${
+            menuOpen ? "rotate-180 text-violet-700" : ""
+          }`}
         />
       </button>
 
@@ -248,7 +252,9 @@ function AccountAvatarMenu({
                 {initial}
               </div>
               <div className="min-w-0">
-                <p className="truncate text-sm font-black text-slate-950">{accountLabel}</p>
+                <p className="truncate text-sm font-black text-slate-950">
+                  {accountLabel}
+                </p>
                 <p className="mt-0.5 truncate text-xs font-medium text-slate-500">
                   PDFMantra account
                 </p>
@@ -312,7 +318,10 @@ export function HeaderAuthLinks() {
 
   return (
     <div className="flex items-center gap-3">
-      <Link href="/login" className="text-[13px] font-bold text-slate-800 transition hover:text-violet-700">
+      <Link
+        href="/login"
+        className="text-[13px] font-bold text-slate-800 transition hover:text-violet-700"
+      >
         Login
       </Link>
       <Link href="/signup" className="header-cta min-h-10 px-4 text-[13px]">
