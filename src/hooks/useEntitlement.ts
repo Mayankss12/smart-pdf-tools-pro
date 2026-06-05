@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { getAnonymousId } from "@/lib/anonymous-identity";
 import { getEntitlementPlan, type UserTier } from "@/lib/entitlements";
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export type ExportKind = "clean" | "watermarked" | "blocked";
 
