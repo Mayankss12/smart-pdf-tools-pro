@@ -17,7 +17,6 @@ import {
 } from "lucide-react";
 
 import { resendOtpAction, type ActionResult } from "@/app/actions/auth";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 const OTP_LENGTH = 6;
 
@@ -25,6 +24,12 @@ interface OtpVerifyFormProps {
   readonly email: string;
   readonly redirectTo?: string;
 }
+
+type VerifyOtpApiResponse = {
+  success?: boolean;
+  error?: string;
+  redirectTo?: string;
+};
 
 function normalizeOtp(value: string) {
   return value.replace(/\D/g, "").slice(0, OTP_LENGTH);
@@ -50,14 +55,15 @@ function getSafeRedirectPath(value: string | undefined): string {
   return rawValue;
 }
 
-function getOtpErrorMessage(message: string) {
-  const lowerMessage = message.toLowerCase();
-
-  if (lowerMessage.includes("expired") || lowerMessage.includes("invalid")) {
-    return "Code is incorrect or has expired. Request a new code and try again.";
+async function parseVerifyOtpResponse(response: Response) {
+  try {
+    return (await response.json()) as VerifyOtpApiResponse;
+  } catch {
+    return {
+      success: false,
+      error: "Verification failed. Please try again.",
+    };
   }
-
-  return "Verification failed. Please try again.";
 }
 
 export function OtpVerifyForm({ email, redirectTo }: OtpVerifyFormProps) {
@@ -148,34 +154,29 @@ export function OtpVerifyForm({ email, redirectTo }: OtpVerifyFormProps) {
     setVerifyError(null);
 
     try {
-      const supabase = createSupabaseBrowserClient();
-
-      if (!supabase) {
-        setVerifyError("Authentication service is not configured yet.");
-        return;
-      }
-
-      const { error } = await supabase.auth.verifyOtp({
-        email,
-        token: otp,
-        type: "email",
-      });
-
-      if (error) {
-        setVerifyError(getOtpErrorMessage(error.message));
-        return;
-      }
-
-      await supabase.auth.getUser();
-
-      await fetch("/api/auth/session", {
-        method: "GET",
+      const response = await fetch("/api/auth/verify-otp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
         cache: "no-store",
         credentials: "include",
+        body: JSON.stringify({
+          email,
+          token: otp,
+          redirectTo: safeRedirectTo,
+        }),
       });
 
+      const payload = await parseVerifyOtpResponse(response);
+
+      if (!response.ok || !payload.success) {
+        setVerifyError(payload.error || "Verification failed. Please try again.");
+        return;
+      }
+
       router.refresh();
-      router.replace(safeRedirectTo);
+      router.replace(payload.redirectTo || safeRedirectTo);
     } catch {
       setVerifyError("Verification failed. Please try again.");
     } finally {
@@ -255,7 +256,7 @@ export function OtpVerifyForm({ email, redirectTo }: OtpVerifyFormProps) {
           {isVerifying ? (
             <>
               <Loader2 className="animate-spin" size={18} />
-              Verifying secure login
+              Verifying code
             </>
           ) : (
             <>
