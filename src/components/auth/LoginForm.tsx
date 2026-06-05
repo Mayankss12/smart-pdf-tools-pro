@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useActionState, useEffect } from "react";
-import { AlertCircle, CheckCircle2, KeyRound, MailCheck } from "lucide-react";
+import { AlertCircle, CheckCircle2 } from "lucide-react";
 
 import { loginVerifyPasswordAction, type ActionResult } from "@/app/actions/auth";
 import { AuthButton } from "./AuthButton";
@@ -18,7 +18,11 @@ function getSafeRedirectPath(value: string | null): string {
 
   const blockedPrefixes = ["/login", "/signup", "/logout", "/auth"];
 
-  if (blockedPrefixes.some((prefix) => rawValue === prefix || rawValue.startsWith(`${prefix}/`))) {
+  if (
+    blockedPrefixes.some(
+      (prefix) => rawValue === prefix || rawValue.startsWith(`${prefix}/`),
+    )
+  ) {
     return "/dashboard";
   }
 
@@ -28,9 +32,12 @@ function getSafeRedirectPath(value: string | null): string {
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+
   const accountCreated = searchParams.get("message") === "account-created";
   const passwordReset = searchParams.get("message") === "password-reset";
-  const redirectTo = getSafeRedirectPath(searchParams.get("redirectTo") ?? searchParams.get("next"));
+  const redirectTo = getSafeRedirectPath(
+    searchParams.get("redirectTo") ?? searchParams.get("next"),
+  );
 
   const [state, action, isPending] = useActionState<ActionResult | null, FormData>(
     loginVerifyPasswordAction,
@@ -53,7 +60,7 @@ export function LoginForm() {
       {accountCreated ? (
         <div className="flex gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-medium leading-6 text-emerald-800">
           <CheckCircle2 className="mt-0.5 shrink-0" size={17} />
-          <span>Account created successfully. Sign in below to receive your verification code.</span>
+          <span>Account created successfully. Sign in below to continue.</span>
         </div>
       ) : null}
 
@@ -64,20 +71,6 @@ export function LoginForm() {
         </div>
       ) : null}
 
-      <div className="rounded-[1.35rem] border border-violet-100 bg-violet-50/70 p-4">
-        <div className="flex gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-violet-700 shadow-sm">
-            <KeyRound size={20} />
-          </div>
-          <div>
-            <div className="text-sm font-bold text-slate-950">Two-step secure login</div>
-            <p className="mt-1 text-sm leading-6 text-slate-600">
-              First verify your password, then enter the 6-digit email code.
-            </p>
-          </div>
-        </div>
-      </div>
-
       <AuthInput
         name="email"
         label="Email address"
@@ -87,6 +80,7 @@ export function LoginForm() {
         required
         error={state?.success === false && state.field === "email" ? state.error : undefined}
       />
+
       <AuthInput
         name="password"
         label="Password"
@@ -97,12 +91,11 @@ export function LoginForm() {
         error={state?.success === false && state.field === "password" ? state.error : undefined}
       />
 
-      <div className="flex items-center justify-between gap-3">
-        <div className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500">
-          <MailCheck size={14} />
-          Code sent after password check
-        </div>
-        <Link href="/forgot-password" className="text-sm font-semibold text-[var(--violet-600)] hover:underline">
+      <div className="flex items-center justify-end">
+        <Link
+          href="/forgot-password"
+          className="text-sm font-semibold text-[var(--violet-600)] hover:underline"
+        >
           Forgot password?
         </Link>
       </div>
@@ -122,7 +115,11 @@ export function LoginForm() {
         </div>
       ) : null}
 
-      <AuthButton isPending={isPending} label="Continue to email code" pendingLabel="Checking password" />
+      <AuthButton
+        isPending={isPending}
+        label="Continue"
+        pendingLabel="Checking password"
+      />
     </form>
   );
 }
