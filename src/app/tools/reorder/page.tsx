@@ -6,8 +6,8 @@ import {
   useMemo,
   useRef,
   useState,
-  type DragEvent as ReactDragEvent,
   type ChangeEvent,
+  type DragEvent as ReactDragEvent,
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import {
@@ -16,7 +16,6 @@ import {
   CheckSquare,
   Download,
   Eraser,
-  FileText,
   GripVertical,
   HelpCircle,
   ListRestart,
@@ -26,6 +25,7 @@ import {
   Undo2,
   UploadCloud,
   X,
+  type LucideIcon,
 } from "lucide-react";
 
 import { Header } from "@/components/Header";
@@ -112,25 +112,6 @@ function getStatusClass(message: string, result: PdfProcessingResult | null) {
   return "text-slate-500";
 }
 
-function CompactStat({
-  label,
-  value,
-}: {
-  readonly label: string;
-  readonly value: string | number;
-}) {
-  return (
-    <div className="rounded-2xl border border-violet-100 bg-white/75 px-4 py-3 shadow-sm">
-      <div className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-400">
-        {label}
-      </div>
-      <div className="mt-1 text-xl font-black tracking-[-0.04em] text-slate-950">
-        {value}
-      </div>
-    </div>
-  );
-}
-
 function ToolbarButton({
   label,
   icon: Icon,
@@ -139,7 +120,7 @@ function ToolbarButton({
   primary = false,
 }: {
   readonly label: string;
-  readonly icon: typeof RotateCcw;
+  readonly icon: LucideIcon;
   readonly onClick: () => void;
   readonly disabled?: boolean;
   readonly primary?: boolean;
@@ -158,13 +139,173 @@ function ToolbarButton({
           : "border border-[var(--border-light)] bg-white text-slate-700 shadow-sm hover:border-[var(--violet-border)] hover:bg-[var(--violet-50)] hover:text-[var(--violet-700)]",
       )}
     >
-      <Icon size={16} />
+      <Icon size={16} className={label === "Processing" ? "animate-spin" : undefined} />
       {label}
     </button>
   );
 }
 
-function CompactDropzone({
+function ReorderLandingState({
+  loading,
+  progress,
+  statusMessage,
+  statusClass,
+  onFile,
+}: {
+  readonly loading: boolean;
+  readonly progress: number;
+  readonly statusMessage: string;
+  readonly statusClass: string;
+  readonly onFile: (file: File) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+
+  function openPicker() {
+    inputRef.current?.click();
+  }
+
+  function handleInputChange(event: ChangeEvent<HTMLInputElement>) {
+    const selectedFile = event.target.files?.[0];
+
+    if (selectedFile) {
+      onFile(selectedFile);
+    }
+
+    event.target.value = "";
+  }
+
+  function handleDragOver(event: ReactDragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setIsDraggingOver(true);
+  }
+
+  function handleDragLeave(event: ReactDragEvent<HTMLDivElement>) {
+    const nextTarget = event.relatedTarget;
+
+    if (
+      nextTarget instanceof Node &&
+      event.currentTarget.contains(nextTarget)
+    ) {
+      return;
+    }
+
+    setIsDraggingOver(false);
+  }
+
+  function handleDrop(event: ReactDragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setIsDraggingOver(false);
+
+    const selectedFile = event.dataTransfer.files?.[0];
+
+    if (selectedFile) {
+      onFile(selectedFile);
+    }
+  }
+
+  const showStatus =
+    statusMessage &&
+    statusMessage !== "Upload a PDF and rearrange pages before exporting.";
+
+  return (
+    <>
+      <Header />
+
+      <main className="relative flex min-h-[calc(100vh-80px)] items-center justify-center overflow-hidden bg-[var(--bg-base)] px-4 py-12 text-[var(--text-primary)] lg:py-20">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(101,80,232,0.13),transparent_38%),radial-gradient(circle_at_15%_80%,rgba(124,58,237,0.08),transparent_34%)]" />
+
+        <section className="relative w-full max-w-3xl">
+          <div className="mb-8 text-center">
+            <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-100 text-[var(--violet-600)] shadow-sm">
+              <GripVertical size={24} />
+            </div>
+
+            <h1 className="text-2xl font-black tracking-[-0.04em] text-slate-950 sm:text-3xl">
+              Reorder PDF Pages
+            </h1>
+
+            <p className="mx-auto mt-2 max-w-xl text-sm font-semibold leading-6 text-slate-500 sm:text-base">
+              Drag pages into the perfect order and export a clean PDF.
+            </p>
+          </div>
+
+          <input
+            ref={inputRef}
+            type="file"
+            accept="application/pdf,.pdf"
+            className="hidden"
+            onChange={handleInputChange}
+          />
+
+          <div
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={classNames(
+              "flex min-h-[420px] flex-col items-center justify-center rounded-[2rem] border-2 border-dashed p-8 text-center shadow-[0_24px_70px_rgba(44,31,95,0.08)] transition sm:min-h-[480px]",
+              isDraggingOver
+                ? "border-[var(--violet-600)] bg-violet-50/90 ring-4 ring-violet-100"
+                : "border-violet-200 bg-gradient-to-br from-violet-50/50 via-white to-white hover:border-violet-400 hover:bg-violet-50/80",
+            )}
+          >
+            <div className="flex h-24 w-24 items-center justify-center rounded-[1.75rem] bg-white text-[var(--violet-600)] shadow-[0_22px_55px_rgba(101,80,232,0.18)]">
+              <UploadCloud size={60} strokeWidth={1.8} />
+            </div>
+
+            <h2 className="mt-7 text-2xl font-black tracking-[-0.04em] text-slate-950 sm:text-3xl">
+              Drop your PDF here
+            </h2>
+
+            <p className="mt-2 max-w-md text-sm font-semibold leading-6 text-slate-500">
+              Upload one PDF file to start rearranging pages visually.
+            </p>
+
+            <button
+              type="button"
+              onClick={openPicker}
+              disabled={loading}
+              className="mt-7 inline-flex min-h-13 items-center justify-center rounded-full bg-[var(--violet-600)] px-8 text-sm font-black text-white shadow-[0_20px_44px_rgba(101,80,232,0.26)] transition hover:bg-[var(--violet-700)] disabled:cursor-not-allowed disabled:opacity-60 sm:text-base"
+            >
+              {loading ? "Reading PDF..." : "Select PDF file"}
+            </button>
+
+            <p className="mt-3 text-xs font-semibold text-slate-400">
+              or drop here
+            </p>
+
+            {loading ? (
+              <div className="mt-7 w-full max-w-md">
+                <div className="mb-2 flex items-center justify-between text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+                  <span>Rendering thumbnails</span>
+                  <span>{progress}%</span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-white">
+                  <div
+                    className="h-full rounded-full bg-[var(--violet-600)] transition-all"
+                    style={{ width: `${Math.max(4, Math.min(progress, 100))}%` }}
+                  />
+                </div>
+              </div>
+            ) : null}
+
+            {showStatus ? (
+              <p className={classNames("mt-6 text-sm font-semibold", statusClass)}>
+                {statusMessage}
+              </p>
+            ) : null}
+          </div>
+
+          <p className="mt-6 text-center text-xs font-semibold leading-5 text-slate-400">
+            Drag pages to reorder · Shift+click for range · Ctrl+Z to undo
+          </p>
+        </section>
+      </main>
+    </>
+  );
+}
+
+function CompactFileStrip({
   file,
   pageCount,
   loading,
@@ -172,7 +313,7 @@ function CompactDropzone({
   onFile,
   onClear,
 }: {
-  readonly file: File | null;
+  readonly file: File;
   readonly pageCount: number;
   readonly loading: boolean;
   readonly progress: number;
@@ -231,10 +372,10 @@ function CompactDropzone({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       className={classNames(
-        "rounded-[1.5rem] border border-dashed bg-white/90 p-4 shadow-sm transition",
+        "rounded-[1.35rem] border bg-white/90 p-4 shadow-sm transition",
         isDraggingOver
           ? "border-[var(--violet-600)] ring-4 ring-violet-100"
-          : "border-violet-200",
+          : "border-violet-100",
       )}
     >
       <input
@@ -246,50 +387,34 @@ function CompactDropzone({
       />
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <button
-          type="button"
-          onClick={openPicker}
-          disabled={loading}
-          className="flex min-w-0 flex-1 items-center gap-4 text-left disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[var(--violet-600)] text-white shadow-[0_16px_34px_rgba(101,80,232,0.20)]">
-            {file ? <FileText size={22} /> : <UploadCloud size={22} />}
-          </span>
+        <div className="min-w-0">
+          <div className="truncate text-base font-black tracking-[-0.02em] text-slate-950">
+            {file.name}
+          </div>
+          <div className="mt-1 text-sm font-semibold text-slate-500">
+            {pageCount || "-"} pages · {formatFileSize(file.size)}
+            {loading ? ` · Reading ${progress}%` : ""}
+          </div>
+        </div>
 
-          <span className="min-w-0">
-            <span className="block truncate text-base font-black tracking-[-0.02em] text-slate-950">
-              {file ? file.name : "Drop your PDF here"}
-            </span>
-            <span className="mt-1 block text-sm font-semibold leading-6 text-slate-500">
-              {loading
-                ? `Reading PDF... ${progress}%`
-                : file
-                  ? `${pageCount || "-"} pages · ${formatFileSize(file.size)} · Click or drop another file to replace it.`
-                  : "Click to browse, or drag and drop your PDF file."}
-            </span>
-          </span>
-        </button>
-
-        <div className="flex items-center gap-2">
-          {file ? (
-            <button
-              type="button"
-              onClick={onClear}
-              disabled={loading}
-              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-red-100 bg-red-50 px-4 text-sm font-black text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <X size={15} />
-              Remove
-            </button>
-          ) : null}
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={onClear}
+            disabled={loading}
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-red-100 bg-red-50 px-4 text-sm font-black text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <X size={15} />
+            Remove
+          </button>
 
           <button
             type="button"
             onClick={openPicker}
             disabled={loading}
-            className="inline-flex min-h-10 items-center justify-center rounded-full bg-[var(--violet-600)] px-5 text-sm font-black text-white shadow-[0_16px_34px_rgba(101,80,232,0.20)] transition hover:bg-[var(--violet-700)] disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex min-h-10 items-center justify-center rounded-full bg-[var(--violet-600)] px-5 text-sm font-black text-white shadow-[0_14px_30px_rgba(101,80,232,0.18)] transition hover:bg-[var(--violet-700)] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {file ? "Replace" : "Browse"}
+            Replace
           </button>
         </div>
       </div>
@@ -314,6 +439,7 @@ function ReorderPageCard({
   isDragging,
   isDropTarget,
   aspectRatio,
+  isLast,
   onClick,
   onDragStart,
   onDragOver,
@@ -331,6 +457,7 @@ function ReorderPageCard({
   readonly isDragging: boolean;
   readonly isDropTarget: boolean;
   readonly aspectRatio: string;
+  readonly isLast: boolean;
   readonly onClick: (event: ReactMouseEvent<HTMLDivElement>) => void;
   readonly onDragStart: (event: ReactDragEvent<HTMLDivElement>) => void;
   readonly onDragOver: (event: ReactDragEvent<HTMLDivElement>) => void;
@@ -393,6 +520,7 @@ function ReorderPageCard({
               event.stopPropagation();
               onMoveDown();
             }}
+            disabled={isLast}
             className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-500 transition hover:bg-violet-50 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-35"
             aria-label={`Move page ${page.pageNumber} down`}
           >
@@ -488,7 +616,6 @@ export default function ReorderPagesPage() {
 
   const statusMessage = pdfError || status;
   const statusClass = getStatusClass(statusMessage, result);
-
   const canDrag = pageOrder.length > 1 && !isBusy;
 
   const commitOrder = useCallback(
@@ -891,41 +1018,25 @@ export default function ReorderPagesPage() {
     }
   }
 
+  if (!file) {
+    return (
+      <ReorderLandingState
+        loading={pdfLoading}
+        progress={progress}
+        statusMessage={statusMessage}
+        statusClass={statusClass}
+        onFile={handleFile}
+      />
+    );
+  }
+
   return (
     <>
       <Header />
 
       <main className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)]">
-        <section className="mx-auto max-w-7xl space-y-5 px-4 py-7 sm:px-6 lg:px-8">
-          <section className="rounded-[1.65rem] border border-violet-100 bg-white/90 p-5 shadow-sm">
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex min-w-0 items-start gap-4">
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[var(--violet-600)] text-white shadow-[0_18px_40px_rgba(101,80,232,0.22)]">
-                  <GripVertical size={26} />
-                </div>
-
-                <div className="min-w-0">
-                  <div className="text-xs font-black uppercase tracking-[0.18em] text-[var(--violet-700)]">
-                    PDFMantra Tool
-                  </div>
-                  <h1 className="mt-1 text-4xl font-black tracking-[-0.055em] text-slate-950 md:text-5xl">
-                    Reorder PDF Pages
-                  </h1>
-                  <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500 md:text-base">
-                    Drag pages into order, move selected pages with shortcuts, and export a clean reordered PDF.
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2 lg:w-[360px]">
-                <CompactStat label="Pages" value={pageCount || "-"} />
-                <CompactStat label="Selected" value={selectedPages.length || "-"} />
-                <CompactStat label="Changed" value={hasChangedOrder ? "Yes" : file ? "No" : "-"} />
-              </div>
-            </div>
-          </section>
-
-          <CompactDropzone
+        <section className="mx-auto max-w-7xl space-y-4 px-4 py-6 sm:px-6 lg:px-8">
+          <CompactFileStrip
             file={file}
             pageCount={pageCount}
             loading={pdfLoading}
@@ -934,20 +1045,20 @@ export default function ReorderPagesPage() {
             onClear={clearFile}
           />
 
-          <section className="rounded-[1.4rem] border border-violet-100 bg-white/90 p-3 shadow-sm">
+          <section className="rounded-[1.35rem] border border-violet-100 bg-white/90 p-3 shadow-sm">
             <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
               <div className="flex flex-wrap items-center gap-2">
                 <ToolbarButton
                   label="Reset"
                   icon={RotateCcw}
                   onClick={handleResetOrder}
-                  disabled={!file || isBusy || !hasChangedOrder}
+                  disabled={isBusy || !hasChangedOrder}
                 />
                 <ToolbarButton
                   label="Reverse"
                   icon={Shuffle}
                   onClick={handleReverseOrder}
-                  disabled={!file || isBusy || pageOrder.length <= 1}
+                  disabled={isBusy || pageOrder.length <= 1}
                 />
                 <ToolbarButton
                   label="Undo"
@@ -974,25 +1085,25 @@ export default function ReorderPagesPage() {
                         label: "Odd Pages First",
                         icon: ListRestart,
                         onClick: handleOddFirst,
-                        disabled: !file || isBusy || pageOrder.length <= 1,
+                        disabled: isBusy || pageOrder.length <= 1,
                       },
                       {
                         label: "Even Pages First",
                         icon: ListRestart,
                         onClick: handleEvenFirst,
-                        disabled: !file || isBusy || pageOrder.length <= 1,
+                        disabled: isBusy || pageOrder.length <= 1,
                       },
                       {
                         label: "Select All",
                         icon: CheckSquare,
                         onClick: handleSelectAll,
-                        disabled: !file || isBusy,
+                        disabled: isBusy,
                       },
                       {
                         label: "Clear Selection",
                         icon: Eraser,
                         onClick: handleClearSelection,
-                        disabled: !file || isBusy || selectedPages.length === 0,
+                        disabled: isBusy || selectedPages.length === 0,
                       },
                     ].map((item) => {
                       const Icon = item.icon;
@@ -1052,69 +1163,49 @@ export default function ReorderPagesPage() {
                 label={exporting ? "Processing" : "Export"}
                 icon={exporting ? RotateCcw : Download}
                 onClick={handleExport}
-                disabled={isBusy || !file || pageOrder.length === 0}
+                disabled={isBusy || pageOrder.length === 0}
                 primary
               />
             </div>
           </section>
 
           <section className="rounded-[1.5rem] border border-violet-100 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-2xl font-black tracking-[-0.045em] text-slate-950">
-                  Visual Page Grid
-                </h2>
-                <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
-                  Drag pages to reorder. Click pages to select. Hold Shift to select a range.
-                </p>
-              </div>
+            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm font-semibold leading-6 text-slate-500">
+                Drag to reorder · Shift+click range · Ctrl+Z undo
+              </p>
 
-              {file ? (
-                <div className="rounded-full border border-violet-100 bg-[var(--violet-50)] px-4 py-2 text-xs font-black uppercase tracking-[0.12em] text-[var(--violet-700)]">
-                  {hasChangedOrder ? "Order changed" : "Original order"}
-                </div>
-              ) : null}
+              <div className="rounded-full border border-violet-100 bg-[var(--violet-50)] px-4 py-2 text-xs font-black uppercase tracking-[0.12em] text-[var(--violet-700)]">
+                {hasChangedOrder ? "Order changed" : "Original order"}
+              </div>
             </div>
 
-            {orderedPages.length > 0 ? (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {orderedPages.map((page, index) => (
-                  <ReorderPageCard
-                    key={`${page.pageNumber}-${page.position}`}
-                    page={page}
-                    index={index}
-                    selected={selectedPageSet.has(page.pageNumber)}
-                    canDrag={canDrag}
-                    isDragging={draggedIndex === index}
-                    isDropTarget={dropTargetIndex === index}
-                    aspectRatio={aspectRatioMap[page.pageNumber] ?? "3 / 4"}
-                    onClick={(event) => handlePageClick(page.pageNumber, event)}
-                    onDragStart={(event) => handleDragStart(event, index)}
-                    onDragOver={(event) => handleDragOver(event, index)}
-                    onDragLeave={(event) => handleDragLeave(event, index)}
-                    onDrop={(event) => handleDrop(event, index)}
-                    onDragEnd={handleDragEnd}
-                    onMoveUp={() => handleReorder(index, Math.max(0, index - 1))}
-                    onMoveDown={() => handleReorder(index, Math.min(pageOrder.length - 1, index + 1))}
-                    onAspectRatio={(width, height) =>
-                      handleThumbnailAspectRatio(page.pageNumber, width, height)
-                    }
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-[1.35rem] border border-dashed border-violet-200 bg-violet-50/40 p-8 text-center">
-                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-[var(--violet-700)] shadow-sm">
-                  <FileText size={22} />
-                </div>
-                <p className="text-sm font-black text-slate-800">
-                  Upload a PDF to reorder pages.
-                </p>
-                <p className="mt-1 text-xs font-semibold text-slate-400">
-                  Page thumbnails will appear here.
-                </p>
-              </div>
-            )}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {orderedPages.map((page, index) => (
+                <ReorderPageCard
+                  key={`${page.pageNumber}-${page.position}`}
+                  page={page}
+                  index={index}
+                  selected={selectedPageSet.has(page.pageNumber)}
+                  canDrag={canDrag}
+                  isDragging={draggedIndex === index}
+                  isDropTarget={dropTargetIndex === index}
+                  aspectRatio={aspectRatioMap[page.pageNumber] ?? "3 / 4"}
+                  isLast={index === pageOrder.length - 1}
+                  onClick={(event) => handlePageClick(page.pageNumber, event)}
+                  onDragStart={(event) => handleDragStart(event, index)}
+                  onDragOver={(event) => handleDragOver(event, index)}
+                  onDragLeave={(event) => handleDragLeave(event, index)}
+                  onDrop={(event) => handleDrop(event, index)}
+                  onDragEnd={handleDragEnd}
+                  onMoveUp={() => handleReorder(index, Math.max(0, index - 1))}
+                  onMoveDown={() => handleReorder(index, Math.min(pageOrder.length - 1, index + 1))}
+                  onAspectRatio={(width, height) =>
+                    handleThumbnailAspectRatio(page.pageNumber, width, height)
+                  }
+                />
+              ))}
+            </div>
           </section>
 
           <p className={classNames("px-1 text-sm font-semibold leading-6", statusClass)}>
