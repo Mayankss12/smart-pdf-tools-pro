@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 
 import { Header } from "@/components/Header";
+import { ToolLandingState } from "@/components/tool-kit/ToolLandingState";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import { createZipBlob } from "@/lib/browser-zip";
 import {
@@ -606,6 +607,22 @@ export default function SplitPage() {
     status.toLowerCase().includes("unable") ||
     status.toLowerCase().includes("limit") ||
     status.toLowerCase().includes("valid split");
+
+  if (!file) {
+    return (
+      <>
+        <Header />
+        <ToolLandingState
+          icon={Scissors}
+          title="Split PDF"
+          description="Split a PDF into multiple files by pages or ranges."
+          ctaLabel="Select PDF file"
+          tips={["Choose page groups", "ZIP download for multiple", "Browser-side processing"]}
+          onFileSelect={(selected) => handleFile(Array.isArray(selected) ? selected[0] : selected)}
+        />
+      </>
+    );
+  }
 
   return (
     <>
