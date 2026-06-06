@@ -14,6 +14,7 @@ import {
   ChevronDown,
   CheckCircle2,
   CircleHelp,
+  Combine,
   Download,
   FileStack,
   FileText,
@@ -27,6 +28,7 @@ import {
 } from "lucide-react";
 
 import { Header } from "@/components/Header";
+import { ToolLandingState } from "@/components/tool-kit/ToolLandingState";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import {
   PdfEngineError,
@@ -453,6 +455,23 @@ export default function MergePage() {
     } finally {
       setBusy(false);
     }
+  }
+
+  if (items.length === 0) {
+    return (
+      <>
+        <Header />
+        <ToolLandingState
+          icon={Combine}
+          title="Merge PDF Files"
+          description="Combine multiple PDFs into one ordered document."
+          ctaLabel="Select PDF files"
+          multiple
+          tips={["Drag to reorder files", "Toggle pages individually", "Export as one PDF"]}
+          onFileSelect={(selected) => addFiles(Array.isArray(selected) ? selected : [selected])}
+        />
+      </>
+    );
   }
 
   return (
