@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 import { Header } from "@/components/Header";
+import { ToolLandingState } from "@/components/tool-kit/ToolLandingState";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import {
   PdfEngineError,
@@ -243,6 +244,22 @@ export default function RotatePage() {
     status.toLowerCase().includes("unable") ||
     status.toLowerCase().includes("limit") ||
     status.toLowerCase().includes("empty");
+
+  if (!file) {
+    return (
+      <>
+        <Header />
+        <ToolLandingState
+          icon={RotateCw}
+          title="Rotate PDF Pages"
+          description="Rotate individual pages or all pages together."
+          ctaLabel="Select PDF file"
+          tips={["Multi-select pages", "Batch rotate 90/180/270", "Selective control"]}
+          onFileSelect={(selected) => handleFile(Array.isArray(selected) ? selected[0] : selected)}
+        />
+      </>
+    );
+  }
 
   return (
     <>
