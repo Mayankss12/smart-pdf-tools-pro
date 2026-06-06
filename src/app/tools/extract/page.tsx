@@ -20,6 +20,7 @@ import { PdfDropzone } from "@/components/tool-kit/PdfDropzone";
 import { SelectionToolbar } from "@/components/tool-kit/SelectionToolbar";
 import { StatusBar, type StatusBarType } from "@/components/tool-kit/StatusBar";
 import { ToolHero } from "@/components/tool-kit/ToolHero";
+import { ToolLandingState } from "@/components/tool-kit/ToolLandingState";
 import { ToolToolbar } from "@/components/tool-kit/ToolToolbar";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import { usePdfPages } from "@/hooks/usePdfPages";
@@ -265,6 +266,22 @@ export default function ExtractPagesPage() {
     } finally {
       setExporting(false);
     }
+  }
+
+  if (!file) {
+    return (
+      <>
+        <Header />
+        <ToolLandingState
+          icon={Copy}
+          title="Extract PDF Pages"
+          description="Pull out specific pages into a new PDF."
+          ctaLabel="Select PDF file"
+          tips={["Pick pages to extract", "Smart presets", "Shift+click for range"]}
+          onFileSelect={(selected) => handleFile(Array.isArray(selected) ? selected[0] : selected)}
+        />
+      </>
+    );
   }
 
   return (
