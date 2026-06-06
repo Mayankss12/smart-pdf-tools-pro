@@ -61,10 +61,59 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let response = NextResponse.json({
-    success: false,
-    error: "Verification failed. Please try again.",
-  });
+  let body: {
+    email?: unknown;
+    token?: unknown;
+    redirectTo?: unknown;
+  };
+
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Verification failed. Please try again.",
+      },
+      { status: 400 },
+    );
+  }
+
+  const email = typeof body.email === "string" ? body.email.trim() : "";
+  const token = typeof body.token === "string" ? body.token.trim() : "";
+  const redirectTo = getSafeRedirectPath(body.redirectTo);
+
+  if (!email || !email.includes("@")) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Please enter a valid email address.",
+      },
+      { status: 400 },
+    );
+  }
+
+  if (!/^\d{6}$/.test(token)) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "OTP must be 6 digits.",
+      },
+      { status: 400 },
+    );
+  }
+
+  const response = NextResponse.json(
+    {
+      success: true,
+      redirectTo,
+    },
+    {
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    },
+  );
 
   const supabase = createServerClient(config.url, config.publishableKey, {
     cookies: {
@@ -76,11 +125,6 @@ export async function POST(request: NextRequest) {
           request.cookies.set(name, value);
         });
 
-        response = NextResponse.json({
-          success: true,
-          redirectTo: "/dashboard",
-        });
-
         cookiesToSet.forEach(({ name, value, options }) => {
           response.cookies.set(name, value, options);
         });
@@ -89,36 +133,6 @@ export async function POST(request: NextRequest) {
   });
 
   try {
-    const body = (await request.json()) as {
-      email?: unknown;
-      token?: unknown;
-      redirectTo?: unknown;
-    };
-
-    const email = typeof body.email === "string" ? body.email.trim() : "";
-    const token = typeof body.token === "string" ? body.token.trim() : "";
-    const redirectTo = getSafeRedirectPath(body.redirectTo);
-
-    if (!email || !email.includes("@")) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Please enter a valid email address.",
-        },
-        { status: 400 },
-      );
-    }
-
-    if (!/^\d{6}$/.test(token)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "OTP must be 6 digits.",
-        },
-        { status: 400 },
-      );
-    }
-
     const { data, error } = await supabase.auth.verifyOtp({
       email,
       token,
@@ -158,11 +172,6 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
-
-    response = NextResponse.json({
-      success: true,
-      redirectTo,
-    });
 
     return response;
   } catch {
