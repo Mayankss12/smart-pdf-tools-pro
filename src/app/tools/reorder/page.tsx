@@ -13,6 +13,7 @@ import {
 import {
   ArrowDown,
   ArrowUp,
+  ArrowUpDown,
   CheckSquare,
   Download,
   Eraser,
@@ -23,13 +24,13 @@ import {
   RotateCcw,
   Shuffle,
   Undo2,
-  UploadCloud,
   X,
   type LucideIcon,
 } from "lucide-react";
 
 import { Header } from "@/components/Header";
 import { SelectionToolbar } from "@/components/tool-kit/SelectionToolbar";
+import { ToolLandingState } from "@/components/tool-kit/ToolLandingState";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import { usePdfPages } from "@/hooks/usePdfPages";
 import {
@@ -142,166 +143,6 @@ function ToolbarButton({
       <Icon size={16} className={label === "Processing" ? "animate-spin" : undefined} />
       {label}
     </button>
-  );
-}
-
-function ReorderLandingState({
-  loading,
-  progress,
-  statusMessage,
-  statusClass,
-  onFile,
-}: {
-  readonly loading: boolean;
-  readonly progress: number;
-  readonly statusMessage: string;
-  readonly statusClass: string;
-  readonly onFile: (file: File) => void;
-}) {
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  const [isDraggingOver, setIsDraggingOver] = useState(false);
-
-  function openPicker() {
-    inputRef.current?.click();
-  }
-
-  function handleInputChange(event: ChangeEvent<HTMLInputElement>) {
-    const selectedFile = event.target.files?.[0];
-
-    if (selectedFile) {
-      onFile(selectedFile);
-    }
-
-    event.target.value = "";
-  }
-
-  function handleDragOver(event: ReactDragEvent<HTMLDivElement>) {
-    event.preventDefault();
-    setIsDraggingOver(true);
-  }
-
-  function handleDragLeave(event: ReactDragEvent<HTMLDivElement>) {
-    const nextTarget = event.relatedTarget;
-
-    if (
-      nextTarget instanceof Node &&
-      event.currentTarget.contains(nextTarget)
-    ) {
-      return;
-    }
-
-    setIsDraggingOver(false);
-  }
-
-  function handleDrop(event: ReactDragEvent<HTMLDivElement>) {
-    event.preventDefault();
-    setIsDraggingOver(false);
-
-    const selectedFile = event.dataTransfer.files?.[0];
-
-    if (selectedFile) {
-      onFile(selectedFile);
-    }
-  }
-
-  const showStatus =
-    statusMessage &&
-    statusMessage !== "Upload a PDF and rearrange pages before exporting.";
-
-  return (
-    <>
-      <Header />
-
-      <main className="relative flex min-h-[calc(100vh-80px)] items-center justify-center overflow-hidden bg-[var(--bg-base)] px-4 py-12 text-[var(--text-primary)] lg:py-20">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(101,80,232,0.13),transparent_38%),radial-gradient(circle_at_15%_80%,rgba(124,58,237,0.08),transparent_34%)]" />
-
-        <section className="relative w-full max-w-3xl">
-          <div className="mb-8 text-center">
-            <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-100 text-[var(--violet-600)] shadow-sm">
-              <GripVertical size={24} />
-            </div>
-
-            <h1 className="text-2xl font-black tracking-[-0.04em] text-slate-950 sm:text-3xl">
-              Reorder PDF Pages
-            </h1>
-
-            <p className="mx-auto mt-2 max-w-xl text-sm font-semibold leading-6 text-slate-500 sm:text-base">
-              Drag pages into the perfect order and export a clean PDF.
-            </p>
-          </div>
-
-          <input
-            ref={inputRef}
-            type="file"
-            accept="application/pdf,.pdf"
-            className="hidden"
-            onChange={handleInputChange}
-          />
-
-          <div
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            className={classNames(
-              "flex min-h-[420px] flex-col items-center justify-center rounded-[2rem] border-2 border-dashed p-8 text-center shadow-[0_24px_70px_rgba(44,31,95,0.08)] transition sm:min-h-[480px]",
-              isDraggingOver
-                ? "border-[var(--violet-600)] bg-violet-50/90 ring-4 ring-violet-100"
-                : "border-violet-200 bg-gradient-to-br from-violet-50/50 via-white to-white hover:border-violet-400 hover:bg-violet-50/80",
-            )}
-          >
-            <div className="flex h-24 w-24 items-center justify-center rounded-[1.75rem] bg-white text-[var(--violet-600)] shadow-[0_22px_55px_rgba(101,80,232,0.18)]">
-              <UploadCloud size={60} strokeWidth={1.8} />
-            </div>
-
-            <h2 className="mt-7 text-2xl font-black tracking-[-0.04em] text-slate-950 sm:text-3xl">
-              Drop your PDF here
-            </h2>
-
-            <p className="mt-2 max-w-md text-sm font-semibold leading-6 text-slate-500">
-              Upload one PDF file to start rearranging pages visually.
-            </p>
-
-            <button
-              type="button"
-              onClick={openPicker}
-              disabled={loading}
-              className="mt-7 inline-flex min-h-13 items-center justify-center rounded-full bg-[var(--violet-600)] px-8 text-sm font-black text-white shadow-[0_20px_44px_rgba(101,80,232,0.26)] transition hover:bg-[var(--violet-700)] disabled:cursor-not-allowed disabled:opacity-60 sm:text-base"
-            >
-              {loading ? "Reading PDF..." : "Select PDF file"}
-            </button>
-
-            <p className="mt-3 text-xs font-semibold text-slate-400">
-              or drop here
-            </p>
-
-            {loading ? (
-              <div className="mt-7 w-full max-w-md">
-                <div className="mb-2 flex items-center justify-between text-xs font-black uppercase tracking-[0.14em] text-slate-400">
-                  <span>Rendering thumbnails</span>
-                  <span>{progress}%</span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-white">
-                  <div
-                    className="h-full rounded-full bg-[var(--violet-600)] transition-all"
-                    style={{ width: `${Math.max(4, Math.min(progress, 100))}%` }}
-                  />
-                </div>
-              </div>
-            ) : null}
-
-            {showStatus ? (
-              <p className={classNames("mt-6 text-sm font-semibold", statusClass)}>
-                {statusMessage}
-              </p>
-            ) : null}
-          </div>
-
-          <p className="mt-6 text-center text-xs font-semibold leading-5 text-slate-400">
-            Drag pages to reorder · Shift+click for range · Ctrl+Z to undo
-          </p>
-        </section>
-      </main>
-    </>
   );
 }
 
@@ -1020,13 +861,17 @@ export default function ReorderPagesPage() {
 
   if (!file) {
     return (
-      <ReorderLandingState
-        loading={pdfLoading}
-        progress={progress}
-        statusMessage={statusMessage}
-        statusClass={statusClass}
-        onFile={handleFile}
-      />
+      <>
+        <Header />
+        <ToolLandingState
+          icon={ArrowUpDown}
+          title="Reorder PDF Pages"
+          description="Drag pages into the perfect order and export."
+          ctaLabel="Select PDF file"
+          tips={["Drag pages to reorder", "Shift+click for range", "Ctrl+Z to undo"]}
+          onFileSelect={(selected) => handleFile(Array.isArray(selected) ? selected[0] : selected)}
+        />
+      </>
     );
   }
 
