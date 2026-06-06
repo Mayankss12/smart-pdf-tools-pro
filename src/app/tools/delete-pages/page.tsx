@@ -20,6 +20,7 @@ import { PdfDropzone } from "@/components/tool-kit/PdfDropzone";
 import { SelectionToolbar } from "@/components/tool-kit/SelectionToolbar";
 import { StatusBar, type StatusBarType } from "@/components/tool-kit/StatusBar";
 import { ToolHero } from "@/components/tool-kit/ToolHero";
+import { ToolLandingState } from "@/components/tool-kit/ToolLandingState";
 import { ToolToolbar } from "@/components/tool-kit/ToolToolbar";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import { usePdfPages } from "@/hooks/usePdfPages";
@@ -256,6 +257,22 @@ export default function DeletePagesPage() {
     } finally {
       setExporting(false);
     }
+  }
+
+  if (!file) {
+    return (
+      <>
+        <Header />
+        <ToolLandingState
+          icon={Trash2}
+          title="Delete PDF Pages"
+          description="Remove unwanted pages from your PDF visually."
+          ctaLabel="Select PDF file"
+          tips={["Click pages to mark for deletion", "Range input supported", "Invert selection"]}
+          onFileSelect={(selected) => handleFile(Array.isArray(selected) ? selected[0] : selected)}
+        />
+      </>
+    );
   }
 
   return (
