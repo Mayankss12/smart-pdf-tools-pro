@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import {
   useMemo,
@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 
 import { Header } from "@/components/Header";
+import { ToolLandingState } from "@/components/tool-kit/ToolLandingState";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import { PdfEngineError, downloadBlob, formatFileSize, type PdfProcessingResult } from "@/lib/pdf-engine";
 import {
@@ -805,4 +806,5 @@ export default function ImagesToPdfPage() {
     </>
   );
 }
+
 
