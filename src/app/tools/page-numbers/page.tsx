@@ -27,6 +27,7 @@ import {
 import { StandardFonts, rgb } from "pdf-lib";
 
 import { Header } from "@/components/Header";
+import { ToolLandingState } from "@/components/tool-kit/ToolLandingState";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import {
   PdfEngineError,
@@ -654,6 +655,22 @@ export default function PageNumbersPage() {
     status.toLowerCase().includes("unable") ||
     status.toLowerCase().includes("limit") ||
     status.toLowerCase().includes("range");
+
+  if (!file) {
+    return (
+      <>
+        <Header />
+        <ToolLandingState
+          icon={Hash}
+          title="Add Page Numbers"
+          description="Insert page numbers with custom position and style."
+          ctaLabel="Select PDF file"
+          tips={["Custom position", "Style options", "Live preview"]}
+          onFileSelect={(selected) => handleFile(Array.isArray(selected) ? selected[0] : selected)}
+        />
+      </>
+    );
+  }
 
   return (
     <>
