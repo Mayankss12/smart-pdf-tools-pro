@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import {
   useMemo,
@@ -448,6 +448,24 @@ export default function ImagesToPdfPage() {
     }
   }
 
+  if (images.length === 0) {
+    return (
+      <>
+        <Header />
+        <ToolLandingState
+          icon={FileImage}
+          title="Images to PDF"
+          description="Convert JPG, PNG, or WebP images into a single PDF."
+          ctaLabel="Select images"
+          accept="image/*"
+          multiple
+          tips={["Drag to reorder", "Multiple formats supported", "Single PDF output"]}
+          onFileSelect={(selected) => addImages(Array.isArray(selected) ? selected : [selected])}
+        />
+      </>
+    );
+  }
+
   return (
     <>
       <Header />
@@ -609,7 +627,7 @@ export default function ImagesToPdfPage() {
                       </button>
                       <div className="pointer-events-none absolute right-0 z-30 mt-2 w-72 rounded-2xl border border-[var(--border-light)] bg-white p-3 text-xs font-semibold leading-5 text-[var(--text-secondary)] opacity-0 shadow-[var(--shadow-card)] transition group-hover:opacity-100">
                         Drag cards to reorder.<br />
-                        Ctrl / Shift click · Multi select<br />
+                        Ctrl / Shift click Â· Multi select<br />
                         PDF output follows visible image order.<br />
                         WebP is handled by the image engine before PDF export.
                       </div>
@@ -774,11 +792,11 @@ export default function ImagesToPdfPage() {
           {selectedIds.length > 0 ? (
             <div className="fixed inset-x-0 bottom-5 z-40 mx-auto flex w-[calc(100%-2rem)] max-w-3xl flex-wrap items-center justify-center gap-2 rounded-full border border-[var(--violet-border)] bg-white/95 px-3 py-2 text-sm font-semibold text-[var(--text-secondary)] shadow-[var(--shadow-card)] backdrop-blur">
               <span className="px-2 text-[var(--violet-600)]">{selectedSummary}</span>
-              <button type="button" onClick={() => moveSelectedImages(-1)} disabled={busy} className="rounded-full px-3 py-1.5 transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40">↑ Up</button>
-              <button type="button" onClick={() => moveSelectedImages(1)} disabled={busy} className="rounded-full px-3 py-1.5 transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40">↓ Down</button>
-              <button type="button" onClick={() => moveSelectedToEdge("start")} disabled={busy} className="rounded-full px-3 py-1.5 transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40">⤒ Start</button>
-              <button type="button" onClick={() => moveSelectedToEdge("end")} disabled={busy} className="rounded-full px-3 py-1.5 transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40">⤓ End</button>
-              <button type="button" onClick={removeSelectedImages} disabled={busy} className="rounded-full px-3 py-1.5 text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40">✕ Remove</button>
+              <button type="button" onClick={() => moveSelectedImages(-1)} disabled={busy} className="rounded-full px-3 py-1.5 transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40">â†‘ Up</button>
+              <button type="button" onClick={() => moveSelectedImages(1)} disabled={busy} className="rounded-full px-3 py-1.5 transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40">â†“ Down</button>
+              <button type="button" onClick={() => moveSelectedToEdge("start")} disabled={busy} className="rounded-full px-3 py-1.5 transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40">â¤’ Start</button>
+              <button type="button" onClick={() => moveSelectedToEdge("end")} disabled={busy} className="rounded-full px-3 py-1.5 transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40">â¤“ End</button>
+              <button type="button" onClick={removeSelectedImages} disabled={busy} className="rounded-full px-3 py-1.5 text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40">âœ• Remove</button>
               <button type="button" onClick={clearSelection} disabled={busy} className="rounded-full px-3 py-1.5 transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40">Clear</button>
             </div>
           ) : null}
@@ -787,3 +805,4 @@ export default function ImagesToPdfPage() {
     </>
   );
 }
+
