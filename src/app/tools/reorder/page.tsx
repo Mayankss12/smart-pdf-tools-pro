@@ -4,11 +4,8 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
-  type ChangeEvent,
-  type DragEvent as ReactDragEvent,
-  type MouseEvent as ReactMouseEvent,
+  type MouseEvent,
 } from "react";
 import {
   ArrowDown,
@@ -17,20 +14,24 @@ import {
   CheckSquare,
   Download,
   Eraser,
-  GripVertical,
-  HelpCircle,
+  FileText,
   ListRestart,
+  Loader2,
   Redo2,
   RotateCcw,
   Shuffle,
   Undo2,
   X,
-  type LucideIcon,
 } from "lucide-react";
 
 import { Header } from "@/components/Header";
+import { PageGrid, type PageGridData } from "@/components/tool-kit/PageGrid";
+import { PdfDropzone } from "@/components/tool-kit/PdfDropzone";
 import { SelectionToolbar } from "@/components/tool-kit/SelectionToolbar";
+import { StatusBar, type StatusBarType } from "@/components/tool-kit/StatusBar";
+import { ToolHero } from "@/components/tool-kit/ToolHero";
 import { ToolLandingState } from "@/components/tool-kit/ToolLandingState";
+import { ToolToolbar } from "@/components/tool-kit/ToolToolbar";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import { usePdfPages } from "@/hooks/usePdfPages";
 import {
@@ -40,17 +41,6 @@ import {
   type PdfProcessingResult,
 } from "@/lib/pdf-engine";
 import { reorderPdfPages } from "@/lib/pdf-page-engine";
-
-type OrderedPage = {
-  pageNumber: number;
-  position: number;
-  thumbnailUrl: string;
-  isMoved: boolean;
-};
-
-function classNames(...classes: Array<string | false | null | undefined>) {
-  return classes.filter(Boolean).join(" ");
-}
 
 function getErrorMessage(error: unknown) {
   if (error instanceof PdfEngineError) return error.message;
@@ -89,12 +79,10 @@ function pluralizePage(count: number) {
   return `${count} page${count === 1 ? "" : "s"}`;
 }
 
-function getStatusClass(message: string, result: PdfProcessingResult | null) {
+function getStatusType(message: string, result: PdfProcessingResult | null): StatusBarType {
   const lowerMessage = message.toLowerCase();
 
-  if (result || lowerMessage.includes("download started")) {
-    return "text-emerald-700";
-  }
+  if (result || lowerMessage.includes("download started")) return "success";
 
   if (
     lowerMessage.includes("failed") ||
@@ -105,296 +93,23 @@ function getStatusClass(message: string, result: PdfProcessingResult | null) {
     lowerMessage.includes("too large") ||
     lowerMessage.includes("empty") ||
     lowerMessage.includes("unable") ||
-    lowerMessage.includes("limit")
+    lowerMessage.includes("limit") ||
+    lowerMessage.includes("no pages")
   ) {
-    return "text-red-600";
+    return "error";
   }
 
-  return "text-slate-500";
+  return "info";
 }
 
-function ToolbarButton({
-  label,
-  icon: Icon,
-  onClick,
-  disabled,
-  primary = false,
-}: {
-  readonly label: string;
-  readonly icon: LucideIcon;
-  readonly onClick: () => void;
-  readonly disabled?: boolean;
-  readonly primary?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={classNames(
-        "inline-flex min-h-10 items-center justify-center gap-2 rounded-full px-4 text-sm font-black transition",
-        "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-100",
-        disabled ? "cursor-not-allowed opacity-45" : "",
-        primary
-          ? "bg-[var(--violet-600)] text-white shadow-[0_16px_34px_rgba(101,80,232,0.22)] hover:bg-[var(--violet-700)]"
-          : "border border-[var(--border-light)] bg-white text-slate-700 shadow-sm hover:border-[var(--violet-border)] hover:bg-[var(--violet-50)] hover:text-[var(--violet-700)]",
-      )}
-    >
-      <Icon size={16} className={label === "Processing" ? "animate-spin" : undefined} />
-      {label}
-    </button>
-  );
-}
+function getSelectedPagesLabel(selectedPages: number[], pageOrder: number[]) {
+  if (selectedPages.length === 0) return "No pages selected";
 
-function CompactFileStrip({
-  file,
-  pageCount,
-  loading,
-  progress,
-  onFile,
-  onClear,
-}: {
-  readonly file: File;
-  readonly pageCount: number;
-  readonly loading: boolean;
-  readonly progress: number;
-  readonly onFile: (file: File) => void;
-  readonly onClear: () => void;
-}) {
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const selectedSet = new Set(selectedPages);
+  const selectedInOrder = pageOrder.filter((pageNumber) => selectedSet.has(pageNumber));
 
-  function openPicker() {
-    inputRef.current?.click();
-  }
-
-  function handleInputChange(event: ChangeEvent<HTMLInputElement>) {
-    const selectedFile = event.target.files?.[0];
-
-    if (selectedFile) {
-      onFile(selectedFile);
-    }
-
-    event.target.value = "";
-  }
-
-  function handleDragOver(event: ReactDragEvent<HTMLDivElement>) {
-    event.preventDefault();
-    setIsDraggingOver(true);
-  }
-
-  function handleDragLeave(event: ReactDragEvent<HTMLDivElement>) {
-    const nextTarget = event.relatedTarget;
-
-    if (
-      nextTarget instanceof Node &&
-      event.currentTarget.contains(nextTarget)
-    ) {
-      return;
-    }
-
-    setIsDraggingOver(false);
-  }
-
-  function handleDrop(event: ReactDragEvent<HTMLDivElement>) {
-    event.preventDefault();
-    setIsDraggingOver(false);
-
-    const selectedFile = event.dataTransfer.files?.[0];
-
-    if (selectedFile) {
-      onFile(selectedFile);
-    }
-  }
-
-  return (
-    <div
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-      className={classNames(
-        "rounded-[1.35rem] border bg-white/90 p-4 shadow-sm transition",
-        isDraggingOver
-          ? "border-[var(--violet-600)] ring-4 ring-violet-100"
-          : "border-violet-100",
-      )}
-    >
-      <input
-        ref={inputRef}
-        type="file"
-        accept="application/pdf,.pdf"
-        className="hidden"
-        onChange={handleInputChange}
-      />
-
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <div className="truncate text-base font-black tracking-[-0.02em] text-slate-950">
-            {file.name}
-          </div>
-          <div className="mt-1 text-sm font-semibold text-slate-500">
-            {pageCount || "-"} pages · {formatFileSize(file.size)}
-            {loading ? ` · Reading ${progress}%` : ""}
-          </div>
-        </div>
-
-        <div className="flex shrink-0 items-center gap-2">
-          <button
-            type="button"
-            onClick={onClear}
-            disabled={loading}
-            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-red-100 bg-red-50 px-4 text-sm font-black text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <X size={15} />
-            Remove
-          </button>
-
-          <button
-            type="button"
-            onClick={openPicker}
-            disabled={loading}
-            className="inline-flex min-h-10 items-center justify-center rounded-full bg-[var(--violet-600)] px-5 text-sm font-black text-white shadow-[0_14px_30px_rgba(101,80,232,0.18)] transition hover:bg-[var(--violet-700)] disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            Replace
-          </button>
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="mt-4 h-2 overflow-hidden rounded-full bg-violet-50">
-          <div
-            className="h-full rounded-full bg-[var(--violet-600)] transition-all"
-            style={{ width: `${Math.max(4, Math.min(progress, 100))}%` }}
-          />
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function ReorderPageCard({
-  page,
-  index,
-  selected,
-  canDrag,
-  isDragging,
-  isDropTarget,
-  aspectRatio,
-  isLast,
-  onClick,
-  onDragStart,
-  onDragOver,
-  onDragLeave,
-  onDrop,
-  onDragEnd,
-  onMoveUp,
-  onMoveDown,
-  onAspectRatio,
-}: {
-  readonly page: OrderedPage;
-  readonly index: number;
-  readonly selected: boolean;
-  readonly canDrag: boolean;
-  readonly isDragging: boolean;
-  readonly isDropTarget: boolean;
-  readonly aspectRatio: string;
-  readonly isLast: boolean;
-  readonly onClick: (event: ReactMouseEvent<HTMLDivElement>) => void;
-  readonly onDragStart: (event: ReactDragEvent<HTMLDivElement>) => void;
-  readonly onDragOver: (event: ReactDragEvent<HTMLDivElement>) => void;
-  readonly onDragLeave: (event: ReactDragEvent<HTMLDivElement>) => void;
-  readonly onDrop: (event: ReactDragEvent<HTMLDivElement>) => void;
-  readonly onDragEnd: () => void;
-  readonly onMoveUp: () => void;
-  readonly onMoveDown: () => void;
-  readonly onAspectRatio: (width: number, height: number) => void;
-}) {
-  return (
-    <div
-      draggable={canDrag}
-      onClick={onClick}
-      onDragStart={onDragStart}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={onDrop}
-      onDragEnd={onDragEnd}
-      className={classNames(
-        "group min-w-[220px] cursor-pointer rounded-[1.35rem] border bg-white p-3 shadow-sm transition duration-200",
-        selected
-          ? "border-[var(--violet-600)] ring-4 ring-violet-100"
-          : "border-violet-100 hover:border-[var(--violet-border)] hover:shadow-[0_18px_45px_rgba(101,80,232,0.10)]",
-        isDropTarget && !isDragging ? "scale-[1.015] ring-4 ring-violet-100" : "",
-        isDragging ? "scale-[0.98] opacity-45" : "",
-      )}
-    >
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-violet-100 bg-violet-50 text-violet-700">
-            <GripVertical size={15} />
-          </span>
-          <span className="flex h-8 min-w-8 items-center justify-center rounded-full border border-violet-100 bg-white px-2 text-sm font-black text-slate-800">
-            {page.position}
-          </span>
-          {page.isMoved ? (
-            <span className="rounded-full border border-amber-100 bg-amber-50 px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-amber-700">
-              Page {page.pageNumber}
-            </span>
-          ) : null}
-        </div>
-
-        <div className="flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              onMoveUp();
-            }}
-            disabled={index === 0}
-            className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-500 transition hover:bg-violet-50 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-35"
-            aria-label={`Move page ${page.pageNumber} up`}
-          >
-            <ArrowUp size={15} />
-          </button>
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              onMoveDown();
-            }}
-            disabled={isLast}
-            className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-500 transition hover:bg-violet-50 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-35"
-            aria-label={`Move page ${page.pageNumber} down`}
-          >
-            <ArrowDown size={15} />
-          </button>
-        </div>
-      </div>
-
-      <div
-        className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50"
-        style={{ aspectRatio }}
-      >
-        {page.thumbnailUrl ? (
-          <img
-            src={page.thumbnailUrl}
-            alt={`Page ${page.pageNumber}`}
-            draggable={false}
-            onLoad={(event) => {
-              const image = event.currentTarget;
-              if (image.naturalWidth > 0 && image.naturalHeight > 0) {
-                onAspectRatio(image.naturalWidth, image.naturalHeight);
-              }
-            }}
-            className="h-full w-full object-contain"
-          />
-        ) : (
-          <div className="flex h-full w-full animate-pulse items-center justify-center text-xs font-black uppercase tracking-[0.16em] text-slate-300">
-            Loading
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  if (selectedInOrder.length <= 24) return selectedInOrder.join(", ");
+  return `${selectedInOrder.slice(0, 24).join(", ")}, +${selectedInOrder.length - 24} more`;
 }
 
 export default function ReorderPagesPage() {
@@ -418,10 +133,6 @@ export default function ReorderPagesPage() {
   const [historyPast, setHistoryPast] = useState<number[][]>([]);
   const [historyFuture, setHistoryFuture] = useState<number[][]>([]);
 
-  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
-  const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
-  const [aspectRatioMap, setAspectRatioMap] = useState<Record<number, string>>({});
-
   const [status, setStatus] = useState("Upload a PDF and rearrange pages before exporting.");
   const [exporting, setExporting] = useState(false);
   const [result, setResult] = useState<PdfProcessingResult | null>(null);
@@ -434,15 +145,15 @@ export default function ReorderPagesPage() {
     return new Map(pages.map((page) => [page.pageNumber, page]));
   }, [pages]);
 
-  const orderedPages = useMemo<OrderedPage[]>(() => {
+  const orderedPages = useMemo<PageGridData[]>(() => {
     return pageOrder.map((pageNumber, index) => {
       const page = pageMap.get(pageNumber);
-      const thumbnailUrl = page?.thumbnailUrl || page?.thumbnail || "";
 
       return {
         pageNumber,
         position: index + 1,
-        thumbnailUrl,
+        thumbnailUrl: page?.thumbnailUrl || page?.thumbnail || "",
+        thumbnail: page?.thumbnail || page?.thumbnailUrl || "",
         isMoved: pageNumber !== index + 1,
       };
     });
@@ -455,9 +166,13 @@ export default function ReorderPagesPage() {
     [pageOrder],
   );
 
+  const selectedPagesLabel = useMemo(
+    () => getSelectedPagesLabel(selectedPages, pageOrder),
+    [pageOrder, selectedPages],
+  );
+
   const statusMessage = pdfError || status;
-  const statusClass = getStatusClass(statusMessage, result);
-  const canDrag = pageOrder.length > 1 && !isBusy;
+  const statusType = getStatusType(statusMessage, result);
 
   const commitOrder = useCallback(
     (nextOrder: number[], message: string) => {
@@ -478,7 +193,10 @@ export default function ReorderPagesPage() {
   const undoOrder = useCallback(() => {
     const previous = historyPast[historyPast.length - 1];
 
-    if (!previous) return;
+    if (!previous) {
+      setStatus("No order change to undo.");
+      return;
+    }
 
     setHistoryPast((current) => current.slice(0, -1));
     setHistoryFuture((current) => [pageOrder, ...current].slice(0, 25));
@@ -490,7 +208,10 @@ export default function ReorderPagesPage() {
   const redoOrder = useCallback(() => {
     const next = historyFuture[0];
 
-    if (!next) return;
+    if (!next) {
+      setStatus("No order change to redo.");
+      return;
+    }
 
     setHistoryFuture((current) => current.slice(1));
     setHistoryPast((current) => [...current.slice(-24), pageOrder]);
@@ -569,7 +290,9 @@ export default function ReorderPagesPage() {
       setSelectedPages([]);
       setLastSelectedPage(null);
       setResult(null);
-      setStatus(`PDF loaded with ${pageCount} page${pageCount > 1 ? "s" : ""}. Drag pages into the right order.`);
+      setStatus(
+        `PDF loaded with ${pageCount} page${pageCount > 1 ? "s" : ""}. Drag pages into the right order.`,
+      );
     }
   }, [file, pageCount, pageOrder.length, pdfError, pdfLoading]);
 
@@ -636,9 +359,6 @@ export default function ReorderPagesPage() {
     setLastSelectedPage(null);
     setHistoryPast([]);
     setHistoryFuture([]);
-    setDraggedIndex(null);
-    setDropTargetIndex(null);
-    setAspectRatioMap({});
     setResult(null);
     setStatus("Reading PDF and rendering page thumbnails...");
 
@@ -652,17 +372,11 @@ export default function ReorderPagesPage() {
     setLastSelectedPage(null);
     setHistoryPast([]);
     setHistoryFuture([]);
-    setDraggedIndex(null);
-    setDropTargetIndex(null);
-    setAspectRatioMap({});
     setResult(null);
     setStatus("Upload a PDF and rearrange pages before exporting.");
   }
 
-  function handlePageClick(
-    pageNumber: number,
-    event: ReactMouseEvent<HTMLDivElement>,
-  ) {
+  function handlePageClick(pageNumber: number, event: MouseEvent<HTMLDivElement>) {
     setResult(null);
 
     if (event.shiftKey && lastSelectedPage !== null) {
@@ -700,60 +414,30 @@ export default function ReorderPagesPage() {
 
   function handleReorder(fromIndex: number, toIndex: number) {
     const movedPage = pageOrder[fromIndex];
-    const nextOrder = moveItem(pageOrder, fromIndex, toIndex);
 
-    commitOrder(nextOrder, `Page ${movedPage} moved to position ${toIndex + 1}.`);
-  }
+    if (selectedPageSet.has(movedPage) && selectedPages.length > 1) {
+      const movingSet = new Set(selectedPages);
+      const movingPages = pageOrder.filter((pageNumber) => movingSet.has(pageNumber));
+      const remainingPages = pageOrder.filter((pageNumber) => !movingSet.has(pageNumber));
+      const targetPage = pageOrder[toIndex];
+      const targetIndex = remainingPages.indexOf(targetPage);
+      const insertIndex = targetIndex === -1 ? remainingPages.length : targetIndex;
+      const nextOrder = [
+        ...remainingPages.slice(0, insertIndex),
+        ...movingPages,
+        ...remainingPages.slice(insertIndex),
+      ];
 
-  function handleDragStart(event: ReactDragEvent<HTMLDivElement>, index: number) {
-    if (!canDrag) return;
-
-    setDraggedIndex(index);
-    setDropTargetIndex(index);
-
-    event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("text/plain", String(index));
-  }
-
-  function handleDragOver(event: ReactDragEvent<HTMLDivElement>, index: number) {
-    if (!canDrag) return;
-
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "move";
-    setDropTargetIndex(index);
-  }
-
-  function handleDragLeave(event: ReactDragEvent<HTMLDivElement>, index: number) {
-    if (!canDrag) return;
-
-    const nextTarget = event.relatedTarget;
-
-    if (
-      nextTarget instanceof Node &&
-      event.currentTarget.contains(nextTarget)
-    ) {
+      commitOrder(
+        nextOrder,
+        `${pluralizePage(movingPages.length)} moved to position ${insertIndex + 1}.`,
+      );
       return;
     }
 
-    setDropTargetIndex((currentIndex) => (currentIndex === index ? null : currentIndex));
-  }
+    const nextOrder = moveItem(pageOrder, fromIndex, toIndex);
 
-  function handleDrop(event: ReactDragEvent<HTMLDivElement>, index: number) {
-    if (!canDrag || draggedIndex === null) return;
-
-    event.preventDefault();
-
-    if (draggedIndex !== index) {
-      handleReorder(draggedIndex, index);
-    }
-
-    setDraggedIndex(null);
-    setDropTargetIndex(null);
-  }
-
-  function handleDragEnd() {
-    setDraggedIndex(null);
-    setDropTargetIndex(null);
+    commitOrder(nextOrder, `Page ${movedPage} moved to position ${toIndex + 1}.`);
   }
 
   function handleSelectAll() {
@@ -791,23 +475,6 @@ export default function ReorderPagesPage() {
     const odds = pageOrder.filter((pageNumber) => pageNumber % 2 === 1);
 
     commitOrder([...evens, ...odds], "Even pages moved first.");
-  }
-
-  function handleThumbnailAspectRatio(pageNumber: number, width: number, height: number) {
-    if (width <= 0 || height <= 0) return;
-
-    setAspectRatioMap((current) => {
-      const nextRatio = `${width} / ${height}`;
-
-      if (current[pageNumber] === nextRatio) {
-        return current;
-      }
-
-      return {
-        ...current,
-        [pageNumber]: nextRatio,
-      };
-    });
   }
 
   async function handleExport() {
@@ -880,52 +547,142 @@ export default function ReorderPagesPage() {
       <Header />
 
       <main className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)]">
-        <section className="mx-auto max-w-7xl space-y-4 px-4 py-6 sm:px-6 lg:px-8">
-          <CompactFileStrip
-            file={file}
-            pageCount={pageCount}
-            loading={pdfLoading}
-            progress={progress}
-            onFile={handleFile}
-            onClear={clearFile}
+        <section className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+          <ToolHero
+            icon={ArrowUpDown}
+            title="Reorder PDF Pages"
+            description="Drag PDF pages into the correct order, use smart rearrange actions, and export one clean reordered PDF."
+            stats={[
+              { label: "Pages", value: pageCount || "-" },
+              { label: "Selected", value: selectedPages.length || "-" },
+              { label: "Output", value: result ? formatFileSize(result.outputSize) : "-" },
+            ]}
           />
 
-          <section className="rounded-[1.35rem] border border-violet-100 bg-white/90 p-3 shadow-sm">
-            <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-              <div className="flex flex-wrap items-center gap-2">
-                <ToolbarButton
-                  label="Reset"
-                  icon={RotateCcw}
-                  onClick={handleResetOrder}
-                  disabled={isBusy || !hasChangedOrder}
-                />
-                <ToolbarButton
-                  label="Reverse"
-                  icon={Shuffle}
-                  onClick={handleReverseOrder}
-                  disabled={isBusy || pageOrder.length <= 1}
-                />
-                <ToolbarButton
-                  label="Undo"
-                  icon={Undo2}
-                  onClick={undoOrder}
-                  disabled={isBusy || !canUndo}
-                />
-                <ToolbarButton
-                  label="Redo"
-                  icon={Redo2}
-                  onClick={redoOrder}
-                  disabled={isBusy || !canRedo}
-                />
+          <section className="grid gap-6 lg:grid-cols-[1fr_390px]">
+            <div className="space-y-5">
+              <PdfDropzone
+                onFile={handleFile}
+                loading={pdfLoading}
+                loadingLabel="Reading PDF..."
+                progress={progress}
+                currentFileName={file?.name}
+                pageCount={pageCount || undefined}
+                fileSize={file?.size}
+              />
 
-                <details className="group relative">
-                  <summary className="inline-flex min-h-10 cursor-pointer list-none items-center justify-center gap-2 rounded-full border border-[var(--border-light)] bg-white px-4 text-sm font-black text-slate-700 shadow-sm transition hover:border-[var(--violet-border)] hover:bg-[var(--violet-50)] hover:text-[var(--violet-700)] [&::-webkit-details-marker]:hidden">
-                    More
-                    <span className="transition group-open:rotate-180">⌄</span>
-                  </summary>
+              {file ? (
+                <div className="rounded-[1.5rem] border border-[var(--border-light)] bg-white p-5 shadow-sm">
+                  <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+                    <div className="min-w-0">
+                      <div className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+                        Selected file
+                      </div>
+                      <div className="mt-1 truncate text-lg font-black tracking-[-0.03em] text-slate-950">
+                        {file.name}
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-slate-500">
+                        Original size: {formatFileSize(file.size)}
+                      </div>
+                    </div>
 
-                  <div className="absolute left-0 z-30 mt-2 w-56 rounded-2xl border border-violet-100 bg-white p-2 shadow-[0_24px_70px_rgba(44,31,95,0.16)]">
-                    {[
+                    <button
+                      type="button"
+                      onClick={clearFile}
+                      disabled={isBusy}
+                      className="inline-flex items-center justify-center gap-2 rounded-full border border-red-100 bg-red-50 px-4 py-2 text-sm font-black text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <X size={15} />
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
+              <section className="rounded-[1.5rem] border border-[var(--border-light)] bg-white p-5 shadow-sm">
+                <div className="mb-5 flex flex-col justify-between gap-3 md:flex-row md:items-center">
+                  <div>
+                    <h2 className="text-[1.75rem] font-black tracking-[-0.04em] text-slate-950">
+                      Visual Reorder Grid
+                    </h2>
+                    <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
+                      Drag pages to reorder. Click to select pages, then use the floating toolbar for batch movement.
+                    </p>
+                  </div>
+
+                  {file ? (
+                    <div className="rounded-full border border-[var(--violet-border)] bg-[var(--violet-50)] px-4 py-2 text-xs font-black uppercase tracking-[0.12em] text-[var(--violet-700)]">
+                      {hasChangedOrder ? "Order changed" : "Original order"}
+                    </div>
+                  ) : null}
+                </div>
+
+                <PageGrid
+                  pages={orderedPages}
+                  selectedPages={selectedPages}
+                  mode="reorder"
+                  onPageClick={handlePageClick}
+                  draggable={!isBusy}
+                  onReorder={handleReorder}
+                  loading={pdfLoading}
+                  emptyMessage="Upload a PDF to rearrange pages."
+                  columns={{ sm: 2, md: 3, lg: 4, xl: 5 }}
+                  renderHoverActions={(page, index) => (
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleReorder(index, Math.max(0, index - 1));
+                        }}
+                        disabled={isBusy || index === 0}
+                        className="inline-flex items-center justify-center gap-1 rounded-xl border border-[var(--border-light)] bg-white px-2 py-2 text-xs font-black text-slate-700 transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <ArrowUp size={13} />
+                        Up
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleReorder(index, Math.min(pageOrder.length - 1, index + 1));
+                        }}
+                        disabled={isBusy || index === pageOrder.length - 1}
+                        className="inline-flex items-center justify-center gap-1 rounded-xl border border-[var(--border-light)] bg-white px-2 py-2 text-xs font-black text-slate-700 transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <ArrowDown size={13} />
+                        Down
+                      </button>
+                    </div>
+                  )}
+                />
+              </section>
+            </div>
+
+            <aside className="space-y-5">
+              <div className="rounded-[1.75rem] border border-[var(--border-light)] bg-white p-5 shadow-sm">
+                <h2 className="text-xl font-black tracking-[-0.03em] text-slate-950">
+                  Reorder Settings
+                </h2>
+
+                <div className="mt-5 space-y-4">
+                  <ToolToolbar
+                    description="Order actions"
+                    actions={[
+                      {
+                        label: "Reverse",
+                        icon: Shuffle,
+                        onClick: handleReverseOrder,
+                        disabled: isBusy || pageOrder.length <= 1,
+                      },
+                      {
+                        label: "Reset",
+                        icon: RotateCcw,
+                        onClick: handleResetOrder,
+                        disabled: isBusy || !hasChangedOrder,
+                      },
+                    ]}
+                    moreOptions={[
                       {
                         label: "Odd Pages First",
                         icon: ListRestart,
@@ -938,130 +695,140 @@ export default function ReorderPagesPage() {
                         onClick: handleEvenFirst,
                         disabled: isBusy || pageOrder.length <= 1,
                       },
+                    ]}
+                  />
+
+                  <ToolToolbar
+                    description="Selection actions"
+                    actions={[
                       {
                         label: "Select All",
                         icon: CheckSquare,
                         onClick: handleSelectAll,
-                        disabled: isBusy,
+                        disabled: isBusy || pageOrder.length === 0,
                       },
                       {
-                        label: "Clear Selection",
+                        label: "Clear",
                         icon: Eraser,
                         onClick: handleClearSelection,
                         disabled: isBusy || selectedPages.length === 0,
                       },
-                    ].map((item) => {
-                      const Icon = item.icon;
+                    ]}
+                    moreOptions={[
+                      {
+                        label: "Move Up",
+                        icon: ArrowUp,
+                        onClick: () => moveSelectedPages(-1),
+                        disabled: isBusy || selectedPages.length === 0,
+                      },
+                      {
+                        label: "Move Down",
+                        icon: ArrowDown,
+                        onClick: () => moveSelectedPages(1),
+                        disabled: isBusy || selectedPages.length === 0,
+                      },
+                      {
+                        label: "Move To Start",
+                        icon: ArrowUp,
+                        onClick: () => moveSelectedToEdge("start"),
+                        disabled: isBusy || selectedPages.length === 0,
+                      },
+                      {
+                        label: "Move To End",
+                        icon: ArrowDown,
+                        onClick: () => moveSelectedToEdge("end"),
+                        disabled: isBusy || selectedPages.length === 0,
+                      },
+                    ]}
+                  />
 
-                      return (
-                        <button
-                          key={item.label}
-                          type="button"
-                          onClick={item.onClick}
-                          disabled={item.disabled}
-                          className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-violet-50 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          <Icon size={15} />
-                          {item.label}
-                        </button>
-                      );
-                    })}
+                  <ToolToolbar
+                    description="History and export"
+                    actions={[
+                      {
+                        label: "Undo",
+                        icon: Undo2,
+                        onClick: undoOrder,
+                        disabled: isBusy || !canUndo,
+                      },
+                      {
+                        label: "Redo",
+                        icon: Redo2,
+                        onClick: redoOrder,
+                        disabled: isBusy || !canRedo,
+                      },
+                    ]}
+                    primaryAction={{
+                      label: exporting ? "Processing" : "Export PDF",
+                      icon: exporting ? Loader2 : Download,
+                      onClick: handleExport,
+                      disabled: isBusy || !file || pageOrder.length === 0,
+                      loading: exporting,
+                    }}
+                  />
+                </div>
+
+                <div className="mt-5 grid grid-cols-2 gap-3">
+                  <div className="rounded-2xl bg-slate-50 p-4">
+                    <div className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+                      Total pages
+                    </div>
+                    <div className="mt-1 text-3xl font-black tracking-[-0.04em] text-slate-950">
+                      {pageCount || "-"}
+                    </div>
                   </div>
-                </details>
 
-                <div className="group relative">
-                  <button
-                    type="button"
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border-light)] bg-white text-slate-500 shadow-sm transition hover:border-[var(--violet-border)] hover:bg-[var(--violet-50)] hover:text-[var(--violet-700)]"
-                    aria-label="Show reorder shortcuts"
-                  >
-                    <HelpCircle size={16} />
-                  </button>
+                  <div className="rounded-2xl bg-[var(--violet-50)] p-4">
+                    <div className="text-xs font-black uppercase tracking-[0.14em] text-[var(--violet-700)]">
+                      Selected
+                    </div>
+                    <div className="mt-1 text-3xl font-black tracking-[-0.04em] text-[var(--violet-700)]">
+                      {selectedPages.length || "-"}
+                    </div>
+                  </div>
+                </div>
 
-                  <div className="pointer-events-none absolute left-0 top-12 z-30 w-72 translate-y-1 rounded-2xl border border-violet-100 bg-white p-3 opacity-0 shadow-[0_24px_70px_rgba(44,31,95,0.16)] transition group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100">
-                    <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
-                      Shortcuts
-                    </div>
-                    <div className="mt-2 space-y-2 text-xs font-semibold text-slate-600">
-                      <div className="flex justify-between gap-4">
-                        <span>Undo order change</span>
-                        <kbd>Ctrl/⌘ + Z</kbd>
-                      </div>
-                      <div className="flex justify-between gap-4">
-                        <span>Redo order change</span>
-                        <kbd>Ctrl/⌘ + Y</kbd>
-                      </div>
-                      <div className="flex justify-between gap-4">
-                        <span>Move selected pages</span>
-                        <kbd>↑ / ↓</kbd>
-                      </div>
-                      <div className="flex justify-between gap-4">
-                        <span>Move selected to edge</span>
-                        <kbd>Home / End</kbd>
-                      </div>
-                    </div>
+                <div className="mt-3 rounded-2xl bg-slate-50 p-4">
+                  <div className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+                    Selected pages
+                  </div>
+                  <div className="mt-1 max-h-24 overflow-y-auto text-sm font-bold leading-6 text-slate-700">
+                    {selectedPagesLabel}
+                  </div>
+                </div>
+
+                <div className="mt-3 rounded-2xl bg-slate-50 p-4">
+                  <div className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+                    Output
+                  </div>
+                  <div className="mt-1 text-xl font-black tracking-[-0.03em] text-slate-950">
+                    {result ? formatFileSize(result.outputSize) : "-"}
                   </div>
                 </div>
               </div>
 
-              <ToolbarButton
-                label={exporting ? "Processing" : "Export"}
-                icon={exporting ? RotateCcw : Download}
-                onClick={handleExport}
-                disabled={isBusy || pageOrder.length === 0}
-                primary
-              />
-            </div>
-          </section>
-
-          <section className="rounded-[1.5rem] border border-violet-100 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm font-semibold leading-6 text-slate-500">
-                Drag to reorder · Shift+click range · Ctrl+Z undo
-              </p>
-
-              <div className="rounded-full border border-violet-100 bg-[var(--violet-50)] px-4 py-2 text-xs font-black uppercase tracking-[0.12em] text-[var(--violet-700)]">
-                {hasChangedOrder ? "Order changed" : "Original order"}
+              <div className="rounded-[1.5rem] border border-[var(--border-light)] bg-white p-4 shadow-sm">
+                <div className="mb-1 flex items-center gap-2 text-sm font-black text-slate-800">
+                  <FileText size={16} />
+                  Status
+                </div>
+                <StatusBar message={statusMessage} type={statusType} />
               </div>
-            </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {orderedPages.map((page, index) => (
-                <ReorderPageCard
-                  key={`${page.pageNumber}-${page.position}`}
-                  page={page}
-                  index={index}
-                  selected={selectedPageSet.has(page.pageNumber)}
-                  canDrag={canDrag}
-                  isDragging={draggedIndex === index}
-                  isDropTarget={dropTargetIndex === index}
-                  aspectRatio={aspectRatioMap[page.pageNumber] ?? "3 / 4"}
-                  isLast={index === pageOrder.length - 1}
-                  onClick={(event) => handlePageClick(page.pageNumber, event)}
-                  onDragStart={(event) => handleDragStart(event, index)}
-                  onDragOver={(event) => handleDragOver(event, index)}
-                  onDragLeave={(event) => handleDragLeave(event, index)}
-                  onDrop={(event) => handleDrop(event, index)}
-                  onDragEnd={handleDragEnd}
-                  onMoveUp={() => handleReorder(index, Math.max(0, index - 1))}
-                  onMoveDown={() => handleReorder(index, Math.min(pageOrder.length - 1, index + 1))}
-                  onAspectRatio={(width, height) =>
-                    handleThumbnailAspectRatio(page.pageNumber, width, height)
-                  }
-                />
-              ))}
-            </div>
+              <div className="rounded-[1.5rem] border border-indigo-100 bg-indigo-50 p-4 text-sm font-semibold leading-6 text-indigo-800">
+                <div className="font-black">How it works</div>
+                <p className="mt-2">
+                  The visual order shown in the grid is the order used for export. The original uploaded file is not changed.
+                </p>
+              </div>
+            </aside>
           </section>
-
-          <p className={classNames("px-1 text-sm font-semibold leading-6", statusClass)}>
-            {statusMessage}
-          </p>
         </section>
 
         <SelectionToolbar
           visible={selectedPages.length > 0}
           selectedCount={selectedPages.length}
-          selectedLabel={`${pluralizePage(selectedPages.length)} selected`}
+          selectedLabel={`${selectedPages.length} page${selectedPages.length === 1 ? "" : "s"} selected`}
           actions={[
             {
               label: "Up",
@@ -1077,13 +844,13 @@ export default function ReorderPagesPage() {
             },
             {
               label: "Start",
-              icon: "↟",
+              icon: "⤒",
               onClick: () => moveSelectedToEdge("start"),
               disabled: isBusy,
             },
             {
               label: "End",
-              icon: "↡",
+              icon: "⤓",
               onClick: () => moveSelectedToEdge("end"),
               disabled: isBusy,
             },
@@ -1092,6 +859,12 @@ export default function ReorderPagesPage() {
               icon: "×",
               onClick: handleClearSelection,
               disabled: isBusy,
+            },
+            {
+              label: "Export",
+              icon: "↓",
+              onClick: handleExport,
+              disabled: isBusy || !file || pageOrder.length === 0,
             },
           ]}
         />
