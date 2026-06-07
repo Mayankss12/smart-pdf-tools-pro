@@ -14,6 +14,7 @@ import {
   ChevronDown,
   CircleHelp,
   Download,
+  Droplets,
   FileImage,
   FileText,
   Grid2X2,
@@ -38,6 +39,7 @@ import {
 } from "pdf-lib";
 
 import { Header } from "@/components/Header";
+import { ToolLandingState } from "@/components/tool-kit/ToolLandingState";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import {
   PdfEngineError,
@@ -832,6 +834,22 @@ export default function WatermarkPage() {
     status.toLowerCase().includes("select at least") ||
     status.toLowerCase().includes("range") ||
     status.toLowerCase().includes("upload a png");
+
+  if (!file) {
+    return (
+      <>
+        <Header />
+        <ToolLandingState
+          icon={Droplets}
+          title="Add Watermark"
+          description="Stamp text watermarks across PDF pages."
+          ctaLabel="Select PDF file"
+          tips={["Text watermark", "Custom positioning", "Adjust opacity"]}
+          onFileSelect={(selected) => handleFile(Array.isArray(selected) ? selected[0] : selected)}
+        />
+      </>
+    );
+  }
 
   return (
     <>
