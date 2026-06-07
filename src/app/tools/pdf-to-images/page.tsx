@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 
 import { Header } from "@/components/Header";
+import { ToolLandingState } from "@/components/tool-kit/ToolLandingState";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import { createZipBlob } from "@/lib/browser-zip";
 import {
@@ -639,6 +640,22 @@ export default function PdfToImagesPage() {
     status.toLowerCase().includes("unable") ||
     status.toLowerCase().includes("limit") ||
     status.toLowerCase().includes("select pages");
+
+  if (!file) {
+    return (
+      <>
+        <Header />
+        <ToolLandingState
+          icon={ImageIcon}
+          title="PDF to Images"
+          description="Export each PDF page as high-quality JPG or PNG."
+          ctaLabel="Select PDF file"
+          tips={["Choose DPI", "PNG or JPG format", "ZIP download"]}
+          onFileSelect={(selected) => handleFile(Array.isArray(selected) ? selected[0] : selected)}
+        />
+      </>
+    );
+  }
 
   return (
     <>
