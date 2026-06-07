@@ -1,121 +1,215 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import {
-  CheckCircle2,
-  CheckSquare2,
+  CheckSquare,
   Download,
   FileText,
+  ListRestart,
   Loader2,
   RotateCcw,
   RotateCw,
-  Sparkles,
-  Square,
-  Upload,
   X,
 } from "lucide-react";
 
 import { Header } from "@/components/Header";
+import { PageGrid } from "@/components/tool-kit/PageGrid";
+import { PdfDropzone } from "@/components/tool-kit/PdfDropzone";
+import { SelectionToolbar } from "@/components/tool-kit/SelectionToolbar";
+import { StatusBar, type StatusBarType } from "@/components/tool-kit/StatusBar";
+import { ToolHero } from "@/components/tool-kit/ToolHero";
 import { ToolLandingState } from "@/components/tool-kit/ToolLandingState";
+import { ToolToolbar } from "@/components/tool-kit/ToolToolbar";
 import { useEntitlement } from "@/hooks/useEntitlement";
+import { usePdfPages } from "@/hooks/usePdfPages";
+import { useRangeSelection } from "@/hooks/useRangeSelection";
 import {
   PdfEngineError,
   downloadBlob,
   formatFileSize,
-  loadPdfDocument,
   normalizePdfRotation,
   rotatePdfWithMap,
-  validatePdfFile,
   type PdfProcessingResult,
   type RotationMap,
 } from "@/lib/pdf-engine";
 
+type RotationDegree = 90 | 180 | 270;
+
 function getErrorMessage(error: unknown) {
   if (error instanceof PdfEngineError) return error.message;
+  if (error instanceof Error) return error.message;
   return "Rotation export failed. Please check your PDF and try again.";
 }
 
-function getPreviewPages(pageCount: number) {
-  return Array.from({ length: Math.min(pageCount, 60) }, (_, index) => index + 1);
+function getStatusType(message: string, result: PdfProcessingResult | null): StatusBarType {
+  const lowerMessage = message.toLowerCase();
+
+  if (result || lowerMessage.includes("download started")) return "success";
+
+  if (
+    lowerMessage.includes("failed") ||
+    lowerMessage.includes("valid") ||
+    lowerMessage.includes("unsupported") ||
+    lowerMessage.includes("too large") ||
+    lowerMessage.includes("unable") ||
+    lowerMessage.includes("limit") ||
+    lowerMessage.includes("empty") ||
+    lowerMessage.includes("upload a pdf") ||
+    lowerMessage.includes("select pages")
+  ) {
+    return "error";
+  }
+
+  return "info";
+}
+
+function cloneRotationMap(map: RotationMap): RotationMap {
+  return { ...map };
+}
+
+function areRotationMapsEqual(first: RotationMap, second: RotationMap) {
+  const keys = new Set([...Object.keys(first), ...Object.keys(second)]);
+
+  for (const key of keys) {
+    const pageNumber = Number(key);
+    const firstRotation = normalizePdfRotation(first[pageNumber] || 0);
+    const secondRotation = normalizePdfRotation(second[pageNumber] || 0);
+
+    if (firstRotation !== secondRotation) return false;
+  }
+
+  return true;
+}
+
+function getSelectedPagesLabel(selectedPages: number[]) {
+  if (selectedPages.length === 0) return "No pages selected";
+  if (selectedPages.length <= 24) return selectedPages.join(", ");
+  return `${selectedPages.slice(0, 24).join(", ")}, +${selectedPages.length - 24} more`;
 }
 
 export default function RotatePage() {
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-
   const { recordExport } = useEntitlement();
 
-  const [file, setFile] = useState<File | null>(null);
-  const [pageCount, setPageCount] = useState(0);
+  const {
+    file,
+    pages,
+    pageCount,
+    loading: pdfLoading,
+    progress,
+    error: pdfError,
+    loadFile,
+    reset: resetPdf,
+  } = usePdfPages();
+
+  const {
+    selected,
+    selectedSet,
+    togglePage,
+    selectAll,
+    clearSelection,
+    resetSelection,
+    undoSelection,
+    canUndo,
+    lastError,
+  } = useRangeSelection();
+
   const [rotationMap, setRotationMap] = useState<RotationMap>({});
-  const [selectedPages, setSelectedPages] = useState<Set<number>>(new Set());
+  const [rotationPast, setRotationPast] = useState<RotationMap[]>([]);
+  const [rotationFuture, setRotationFuture] = useState<RotationMap[]>([]);
   const [status, setStatus] = useState("Upload a PDF to rotate pages.");
-  const [busy, setBusy] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [result, setResult] = useState<PdfProcessingResult | null>(null);
 
+  const selectedPages = selected;
+  const isBusy = pdfLoading || exporting;
+  const statusType = getStatusType(lastError || pdfError || status, result);
+
   const changedPages = useMemo(
-    () => Object.values(rotationMap).filter((rotation) => normalizePdfRotation(rotation) !== 0).length,
+    () =>
+      Object.values(rotationMap).filter(
+        (rotation) => normalizePdfRotation(rotation) !== 0,
+      ).length,
     [rotationMap],
   );
 
-  const previewPages = useMemo(() => getPreviewPages(pageCount), [pageCount]);
+  const selectedPagesLabel = useMemo(
+    () => getSelectedPagesLabel(selectedPages),
+    [selectedPages],
+  );
 
-  async function handleFile(selectedFile?: File) {
-    if (!selectedFile) return;
+  const canUndoRotation = rotationPast.length > 0;
+  const canRedoRotation = rotationFuture.length > 0;
 
-    setBusy(true);
-    setResult(null);
-    setStatus("Reading PDF with PDFMantra engine...");
-
-    try {
-      validatePdfFile(selectedFile);
-      const pdf = await loadPdfDocument(selectedFile);
-      const totalPages = pdf.getPageCount();
-
-      setFile(selectedFile);
-      setPageCount(totalPages);
-      setRotationMap({});
-      setSelectedPages(new Set());
-      setStatus(`PDF loaded with ${totalPages} page${totalPages > 1 ? "s" : ""}. Rotate pages below.`);
-    } catch (error) {
-      setFile(null);
-      setPageCount(0);
-      setRotationMap({});
-      setSelectedPages(new Set());
-      setResult(null);
-      setStatus(getErrorMessage(error));
-    } finally {
-      setBusy(false);
+  useEffect(() => {
+    if (pdfError) {
+      setStatus(pdfError);
+      return;
     }
+
+    if (file && pageCount > 0 && !pdfLoading) {
+      setStatus(
+        `PDF loaded with ${pageCount} page${pageCount > 1 ? "s" : ""}. Rotate pages visually.`,
+      );
+    }
+  }, [file, pageCount, pdfError, pdfLoading]);
+
+  async function handleFile(selectedFile: File) {
+    setResult(null);
+    setRotationMap({});
+    setRotationPast([]);
+    setRotationFuture([]);
+    resetSelection();
+    setStatus("Reading PDF and rendering page thumbnails...");
+
+    await loadFile(selectedFile);
   }
 
   function clearFile() {
-    setFile(null);
-    setPageCount(0);
+    resetPdf();
+    resetSelection();
     setRotationMap({});
-    setSelectedPages(new Set());
+    setRotationPast([]);
+    setRotationFuture([]);
     setResult(null);
     setStatus("Upload a PDF to rotate pages.");
+  }
+
+  function commitRotationMap(nextMap: RotationMap, nextStatus: string) {
+    if (areRotationMapsEqual(rotationMap, nextMap)) {
+      setStatus(nextStatus);
+      return;
+    }
+
+    setRotationPast((current) => [...current.slice(-19), cloneRotationMap(rotationMap)]);
+    setRotationFuture([]);
+    setRotationMap(cloneRotationMap(nextMap));
+    setResult(null);
+    setStatus(nextStatus);
   }
 
   function rotatePage(pageNumber: number, direction: "left" | "right") {
     const delta = direction === "left" ? -90 : 90;
 
-    setRotationMap((current) => ({
-      ...current,
-      [pageNumber]: normalizePdfRotation((current[pageNumber] || 0) + delta),
-    }));
-
-    setResult(null);
-    setStatus(`Page ${pageNumber} rotation updated.`);
+    commitRotationMap(
+      {
+        ...rotationMap,
+        [pageNumber]: normalizePdfRotation((rotationMap[pageNumber] || 0) + delta),
+      },
+      `Page ${pageNumber} rotation updated.`,
+    );
   }
 
   function resetPage(pageNumber: number) {
-    setRotationMap((current) => ({ ...current, [pageNumber]: 0 }));
-    setResult(null);
-    setStatus(`Page ${pageNumber} rotation reset.`);
+    commitRotationMap(
+      {
+        ...rotationMap,
+        [pageNumber]: 0,
+      },
+      `Page ${pageNumber} rotation reset.`,
+    );
   }
 
-  function rotateAll(degreeValue: 90 | 180 | 270) {
+  function rotateAll(degreeValue: RotationDegree) {
     if (!pageCount) {
       setStatus("Upload a PDF first.");
       return;
@@ -127,78 +221,120 @@ export default function RotatePage() {
       nextMap[pageNumber] = degreeValue;
     }
 
-    setRotationMap(nextMap);
-    setResult(null);
-    setStatus(`All pages set to ${degreeValue}° rotation.`);
+    commitRotationMap(nextMap, `All pages set to ${degreeValue}° rotation.`);
   }
 
   function resetAll() {
-    setRotationMap({});
-    setResult(null);
-    setStatus("All rotations cleared.");
+    commitRotationMap({}, "All rotations cleared.");
   }
 
-  function togglePageSelection(pageNumber: number) {
-    setSelectedPages((current) => {
-      const next = new Set(current);
-
-      if (next.has(pageNumber)) {
-        next.delete(pageNumber);
-      } else {
-        next.add(pageNumber);
-      }
-
-      return next;
-    });
-  }
-
-  function rotateSelectedPages(degreeValue: 90 | 180 | 270) {
-    if (selectedPages.size === 0) {
+  function rotateSelectedPages(degreeValue: RotationDegree) {
+    if (selectedPages.length === 0) {
       setStatus("Select pages first to rotate them.");
       return;
     }
 
-    setRotationMap((current) => {
-      const nextMap: RotationMap = { ...current };
+    const nextMap: RotationMap = { ...rotationMap };
 
-      selectedPages.forEach((pageNumber) => {
-        nextMap[pageNumber] = degreeValue;
-      });
-
-      return nextMap;
+    selectedPages.forEach((pageNumber) => {
+      nextMap[pageNumber] = degreeValue;
     });
 
-    setResult(null);
-    setStatus(`Rotated ${selectedPages.size} selected page${selectedPages.size > 1 ? "s" : ""} to ${degreeValue}°.`);
+    commitRotationMap(
+      nextMap,
+      `Rotated ${selectedPages.length} selected page${selectedPages.length > 1 ? "s" : ""} to ${degreeValue}°.`,
+    );
   }
 
   function resetSelectedPages() {
-    if (selectedPages.size === 0) {
+    if (selectedPages.length === 0) {
       setStatus("Select pages first to reset them.");
       return;
     }
 
-    setRotationMap((current) => {
-      const nextMap: RotationMap = { ...current };
+    const nextMap: RotationMap = { ...rotationMap };
 
-      selectedPages.forEach((pageNumber) => {
-        nextMap[pageNumber] = 0;
-      });
-
-      return nextMap;
+    selectedPages.forEach((pageNumber) => {
+      nextMap[pageNumber] = 0;
     });
 
-    setResult(null);
-    setStatus(`Reset rotation for ${selectedPages.size} selected page${selectedPages.size > 1 ? "s" : ""}.`);
+    commitRotationMap(
+      nextMap,
+      `Reset rotation for ${selectedPages.length} selected page${selectedPages.length > 1 ? "s" : ""}.`,
+    );
   }
 
-  async function handleExport() {
-    if (!file || busy) {
-      setStatus("Please upload a PDF first.");
+  function undoRotation() {
+    const previousMap = rotationPast[rotationPast.length - 1];
+
+    if (!previousMap) {
+      setStatus("No rotation change to undo.");
       return;
     }
 
-    setBusy(true);
+    setRotationPast((current) => current.slice(0, -1));
+    setRotationFuture((current) => [cloneRotationMap(rotationMap), ...current.slice(0, 19)]);
+    setRotationMap(cloneRotationMap(previousMap));
+    setResult(null);
+    setStatus("Rotation change undone.");
+  }
+
+  function redoRotation() {
+    const nextMap = rotationFuture[0];
+
+    if (!nextMap) {
+      setStatus("No rotation change to redo.");
+      return;
+    }
+
+    setRotationFuture((current) => current.slice(1));
+    setRotationPast((current) => [...current.slice(-19), cloneRotationMap(rotationMap)]);
+    setRotationMap(cloneRotationMap(nextMap));
+    setResult(null);
+    setStatus("Rotation change redone.");
+  }
+
+  function handlePageClick(pageNumber: number, event: MouseEvent<HTMLDivElement>) {
+    togglePage(pageNumber, event);
+    setResult(null);
+
+    if (event.shiftKey) {
+      setStatus("Range selection updated.");
+      return;
+    }
+
+    setStatus(
+      selectedSet.has(pageNumber)
+        ? `Page ${pageNumber} removed from rotation selection.`
+        : `Page ${pageNumber} selected for rotation.`,
+    );
+  }
+
+  function handleSelectAll() {
+    selectAll(pageCount);
+    setResult(null);
+    setStatus("All pages selected.");
+  }
+
+  function handleClearSelection() {
+    clearSelection();
+    setResult(null);
+    setStatus("Page selection cleared.");
+  }
+
+  function handleUndoSelection() {
+    undoSelection();
+    setResult(null);
+    setStatus("Selection restored.");
+  }
+
+  async function handleExport() {
+    if (!file || exporting) {
+      setStatus("Upload a PDF first.");
+      return;
+    }
+
+    setExporting(true);
     setResult(null);
     setStatus("Applying rotations with PDFMantra engine...");
 
@@ -232,18 +368,9 @@ export default function RotatePage() {
       setResult(null);
       setStatus(getErrorMessage(error));
     } finally {
-      setBusy(false);
+      setExporting(false);
     }
   }
-
-  const statusLooksLikeError =
-    status.toLowerCase().includes("failed") ||
-    status.toLowerCase().includes("invalid") ||
-    status.toLowerCase().includes("unsupported") ||
-    status.toLowerCase().includes("too large") ||
-    status.toLowerCase().includes("unable") ||
-    status.toLowerCase().includes("limit") ||
-    status.toLowerCase().includes("empty");
 
   if (!file) {
     return (
@@ -266,335 +393,340 @@ export default function RotatePage() {
       <Header />
 
       <main className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)]">
-        <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
-          <div className="overflow-hidden rounded-[2rem] border border-violet-100 bg-white shadow-[0_18px_50px_rgba(91,63,193,0.08)]">
-            <section className="bg-gradient-to-br from-indigo-700 via-violet-700 to-purple-700 px-6 py-12 text-white sm:px-10 lg:px-14">
-              <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-xs font-semibold uppercase tracking-wide ring-1 ring-white/20">
-                <RotateCw size={14} />
-                PDFMantra Engine Tool
-              </div>
+        <section className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+          <ToolHero
+            icon={RotateCw}
+            title="Rotate PDF Pages"
+            description="Rotate individual pages, selected pages, or the full PDF from a visual page grid, then export a clean rotated PDF."
+            stats={[
+              { label: "Pages", value: pageCount || "-" },
+              { label: "Changed", value: changedPages || "-" },
+              { label: "Output", value: result ? formatFileSize(result.outputSize) : "-" },
+            ]}
+          />
 
-              <h1 className="mt-5 max-w-3xl text-4xl font-semibold leading-[1.08] tracking-[-0.04em] sm:text-5xl">
-                Rotate PDF
-              </h1>
+          <section className="grid gap-6 lg:grid-cols-[1fr_390px]">
+            <div className="space-y-5">
+              <PdfDropzone
+                onFile={handleFile}
+                loading={pdfLoading}
+                loadingLabel="Reading PDF..."
+                progress={progress}
+                currentFileName={file?.name}
+                pageCount={pageCount || undefined}
+                fileSize={file?.size}
+              />
 
-              <p className="mt-5 max-w-2xl text-base font-medium leading-8 text-indigo-50/95">
-                Rotate individual pages, selected pages, or all pages together, then export through the shared PDFMantra engine.
-              </p>
-            </section>
+              {file ? (
+                <div className="rounded-[1.5rem] border border-[var(--border-light)] bg-white p-5 shadow-sm">
+                  <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+                    <div className="min-w-0">
+                      <div className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+                        Selected file
+                      </div>
+                      <div className="mt-1 truncate text-lg font-black tracking-[-0.03em] text-slate-950">
+                        {file.name}
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-slate-500">
+                        Original size: {formatFileSize(file.size)}
+                      </div>
+                    </div>
 
-            <section className="grid gap-0 lg:grid-cols-[1fr_360px]">
-              <div className="border-r border-violet-100 bg-slate-50/70 p-5 sm:p-6">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="application/pdf"
-                  className="hidden"
-                  onChange={(event) => handleFile(event.target.files?.[0])}
-                />
-
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    handleFile(event.dataTransfer.files?.[0]);
-                  }}
-                  onDragOver={(event) => event.preventDefault()}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      fileInputRef.current?.click();
-                    }
-                  }}
-                  role="button"
-                  tabIndex={0}
-                  className="cursor-pointer rounded-[1.75rem] border-2 border-dashed border-indigo-200 bg-white p-8 text-center shadow-sm transition hover:border-indigo-400 hover:bg-indigo-50/40 focus:border-indigo-400 focus:outline-none focus:ring-4 focus:ring-indigo-100"
-                >
-                  <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-600 text-white">
-                    <Upload size={24} />
-                  </div>
-
-                  <div className="text-lg font-semibold tracking-[-0.02em] text-slate-950">
-                    {file ? file.name : "Drop PDF here"}
-                  </div>
-
-                  <div className="mt-2 text-sm font-medium text-slate-500">
-                    {file
-                      ? `${pageCount} page${pageCount > 1 ? "s" : ""} loaded • ${formatFileSize(file.size)}`
-                      : "Click here or drag a PDF to begin."}
+                    <button
+                      type="button"
+                      onClick={clearFile}
+                      disabled={isBusy}
+                      className="inline-flex items-center justify-center gap-2 rounded-full border border-red-100 bg-red-50 px-4 py-2 text-sm font-black text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <X size={15} />
+                      Remove
+                    </button>
                   </div>
                 </div>
+              ) : null}
 
-                {file ? (
-                  <div className="mt-5 rounded-[1.5rem] border border-violet-100 bg-white p-5 shadow-sm">
-                    <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-                      <div className="min-w-0">
-                        <div className="text-sm font-bold uppercase tracking-wide text-slate-500">
-                          Selected file
-                        </div>
-                        <div className="mt-1 truncate text-lg font-semibold text-slate-950">{file.name}</div>
-                        <div className="mt-1 text-sm text-slate-500">Original size: {formatFileSize(file.size)}</div>
-                      </div>
+              <section className="rounded-[1.5rem] border border-[var(--border-light)] bg-white p-5 shadow-sm">
+                <div className="mb-5 flex flex-col justify-between gap-3 md:flex-row md:items-center">
+                  <div>
+                    <h2 className="text-[1.75rem] font-black tracking-[-0.04em] text-slate-950">
+                      Visual Rotation Grid
+                    </h2>
+                    <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
+                      Click pages to select them. Hold Shift and click another page to select a range.
+                    </p>
+                  </div>
 
+                  {file ? (
+                    <div className="rounded-full border border-[var(--violet-border)] bg-[var(--violet-50)] px-4 py-2 text-xs font-black uppercase tracking-[0.12em] text-[var(--violet-700)]">
+                      {selectedPages.length} selected
+                    </div>
+                  ) : null}
+                </div>
+
+                <PageGrid
+                  pages={pages}
+                  selectedPages={selectedPages}
+                  mode="rotate"
+                  rotationMap={rotationMap}
+                  onPageClick={handlePageClick}
+                  loading={pdfLoading}
+                  emptyMessage="Upload a PDF to rotate pages visually."
+                  renderHoverActions={(page) => (
+                    <div className="grid grid-cols-3 gap-1.5">
                       <button
                         type="button"
-                        onClick={clearFile}
-                        disabled={busy}
-                        className="inline-flex items-center justify-center gap-2 rounded-full border border-red-100 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          rotatePage(page.pageNumber, "left");
+                        }}
+                        disabled={isBusy}
+                        className="rounded-xl border border-[var(--border-light)] bg-white px-2 py-2 text-xs font-black text-slate-700 transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
                       >
-                        <X size={15} />
-                        Remove
+                        -90°
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          resetPage(page.pageNumber);
+                        }}
+                        disabled={isBusy}
+                        className="rounded-xl border border-[var(--border-light)] bg-white px-2 py-2 text-xs font-black text-slate-700 transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        0°
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          rotatePage(page.pageNumber, "right");
+                        }}
+                        disabled={isBusy}
+                        className="rounded-xl border border-[var(--border-light)] bg-white px-2 py-2 text-xs font-black text-slate-700 transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        +90°
                       </button>
                     </div>
-                  </div>
-                ) : null}
-
-                <div className="mt-5 rounded-[1.5rem] border border-violet-100 bg-white p-5 shadow-sm">
-                  <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
-                    <div>
-                      <h2 className="display-font text-[1.75rem] font-bold tracking-[-0.02em] text-slate-950">
-                        Page Rotation Map
-                      </h2>
-                      <p className="mt-1 text-sm text-slate-600">
-                        Select pages for batch rotation or use the controls on each page card. Up to 60 pages are shown.
-                      </p>
-                    </div>
-                  </div>
-
-                  {busy && !file ? (
-                    <div className="mt-5 flex min-h-72 items-center justify-center rounded-[1.35rem] border border-violet-100 bg-violet-50">
-                      <div className="flex items-center gap-2 rounded-full bg-white px-4 py-3 text-sm font-semibold text-violet-700 shadow-sm">
-                        <Loader2 className="animate-spin" size={18} />
-                        Reading PDF
-                      </div>
-                    </div>
-                  ) : previewPages.length === 0 ? (
-                    <div className="mt-5 flex min-h-72 items-center justify-center rounded-[1.35rem] border border-dashed border-violet-100 bg-violet-50/40 text-center">
-                      <div>
-                        <FileText className="mx-auto text-violet-300" size={38} />
-                        <div className="mt-3 text-[15px] font-semibold text-slate-950">No PDF selected</div>
-                        <p className="mt-1 text-sm text-slate-600">Upload a PDF to build the rotation map.</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                      {previewPages.map((pageNumber) => {
-                        const rotation = normalizePdfRotation(rotationMap[pageNumber] || 0);
-                        const isSelected = selectedPages.has(pageNumber);
-
-                        return (
-                          <div
-                            key={pageNumber}
-                            className={`overflow-hidden rounded-[1.5rem] border shadow-sm transition-all ${
-                              isSelected
-                                ? "border-indigo-400 bg-indigo-50 ring-2 ring-indigo-200"
-                                : "border-violet-100 bg-white"
-                            }`}
-                          >
-                            <div
-                              className={`flex items-center justify-between border-b px-4 py-3 ${
-                                isSelected
-                                  ? "border-indigo-200 bg-indigo-50"
-                                  : "border-violet-100 bg-violet-50/50"
-                              }`}
-                            >
-                              <button
-                                type="button"
-                                onClick={() => togglePageSelection(pageNumber)}
-                                className={`flex items-center gap-1 text-sm font-semibold transition ${
-                                  isSelected ? "text-indigo-700" : "text-slate-700"
-                                }`}
-                                aria-pressed={isSelected}
-                              >
-                                {isSelected ? <CheckSquare2 size={16} /> : <Square size={16} />}
-                                <span>Page {pageNumber}</span>
-                              </button>
-
-                              <div
-                                className={`rounded-full bg-white px-3 py-1 text-xs font-semibold ${
-                                  isSelected ? "text-indigo-700" : "text-violet-700"
-                                }`}
-                              >
-                                {rotation}°
-                              </div>
-                            </div>
-
-                            <div className="flex min-h-32 items-center justify-center bg-slate-50 p-4">
-                              <div
-                                className={`flex h-20 w-16 items-center justify-center rounded-xl border bg-white text-sm font-bold shadow-sm transition-transform ${
-                                  isSelected
-                                    ? "border-indigo-600 text-indigo-700"
-                                    : "border-violet-100 text-violet-700"
-                                }`}
-                                style={{ transform: `rotate(${rotation}deg)` }}
-                              >
-                                {pageNumber}
-                              </div>
-                            </div>
-
-                            <div
-                              className={`grid grid-cols-3 gap-2 border-t bg-white p-3 ${
-                                isSelected ? "border-indigo-200" : "border-violet-100"
-                              }`}
-                            >
-                              <button
-                                type="button"
-                                onClick={() => rotatePage(pageNumber, "left")}
-                                className="inline-flex items-center justify-center gap-1 rounded-xl border border-violet-100 bg-white px-2 py-2 text-xs font-semibold text-slate-700 transition hover:bg-violet-50"
-                              >
-                                <RotateCcw size={14} />
-                                Left
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => resetPage(pageNumber)}
-                                className="inline-flex items-center justify-center rounded-xl border border-violet-100 bg-violet-50 px-2 py-2 text-xs font-semibold text-slate-700 transition hover:bg-violet-100"
-                              >
-                                Reset
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => rotatePage(pageNumber, "right")}
-                                className="inline-flex items-center justify-center gap-1 rounded-xl border border-violet-100 bg-white px-2 py-2 text-xs font-semibold text-slate-700 transition hover:bg-violet-50"
-                              >
-                                Right
-                                <RotateCw size={14} />
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
                   )}
+                />
+              </section>
+            </div>
+
+            <aside className="space-y-5">
+              <div className="rounded-[1.75rem] border border-[var(--border-light)] bg-white p-5 shadow-sm">
+                <h2 className="text-xl font-black tracking-[-0.03em] text-slate-950">
+                  Rotate Settings
+                </h2>
+
+                <div className="mt-5 space-y-4">
+                  <ToolToolbar
+                    description="All Pages"
+                    actions={[
+                      {
+                        label: "90°",
+                        icon: RotateCw,
+                        onClick: () => rotateAll(90),
+                        disabled: !file || isBusy,
+                      },
+                      {
+                        label: "180°",
+                        icon: RotateCw,
+                        onClick: () => rotateAll(180),
+                        disabled: !file || isBusy,
+                      },
+                      {
+                        label: "270°",
+                        icon: RotateCw,
+                        onClick: () => rotateAll(270),
+                        disabled: !file || isBusy,
+                      },
+                    ]}
+                    moreOptions={[
+                      {
+                        label: "Reset All",
+                        icon: ListRestart,
+                        onClick: resetAll,
+                        disabled: !file || isBusy || changedPages === 0,
+                      },
+                    ]}
+                  />
+
+                  <ToolToolbar
+                    description="Selected Pages"
+                    actions={[
+                      {
+                        label: "90°",
+                        icon: RotateCw,
+                        onClick: () => rotateSelectedPages(90),
+                        disabled: !file || isBusy || selectedPages.length === 0,
+                      },
+                      {
+                        label: "180°",
+                        icon: RotateCw,
+                        onClick: () => rotateSelectedPages(180),
+                        disabled: !file || isBusy || selectedPages.length === 0,
+                      },
+                      {
+                        label: "270°",
+                        icon: RotateCw,
+                        onClick: () => rotateSelectedPages(270),
+                        disabled: !file || isBusy || selectedPages.length === 0,
+                      },
+                    ]}
+                    moreOptions={[
+                      {
+                        label: "Reset Selected",
+                        icon: RotateCcw,
+                        onClick: resetSelectedPages,
+                        disabled: !file || isBusy || selectedPages.length === 0,
+                      },
+                      {
+                        label: "Select All",
+                        icon: CheckSquare,
+                        onClick: handleSelectAll,
+                        disabled: !file || isBusy,
+                      },
+                      {
+                        label: "Clear Selection",
+                        icon: X,
+                        onClick: handleClearSelection,
+                        disabled: !file || isBusy || selectedPages.length === 0,
+                      },
+                    ]}
+                  />
+
+                  <ToolToolbar
+                    description="History and export"
+                    actions={[
+                      {
+                        label: "Undo",
+                        icon: RotateCcw,
+                        onClick: undoRotation,
+                        disabled: isBusy || !canUndoRotation,
+                      },
+                      {
+                        label: "Redo",
+                        icon: RotateCw,
+                        onClick: redoRotation,
+                        disabled: isBusy || !canRedoRotation,
+                      },
+                    ]}
+                    primaryAction={{
+                      label: exporting ? "Processing" : "Export PDF",
+                      icon: exporting ? Loader2 : Download,
+                      onClick: handleExport,
+                      disabled: !file || isBusy,
+                      loading: exporting,
+                    }}
+                  />
+                </div>
+
+                <div className="mt-5 grid grid-cols-2 gap-3">
+                  <div className="rounded-2xl bg-slate-50 p-4">
+                    <div className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+                      Total pages
+                    </div>
+                    <div className="mt-1 text-3xl font-black tracking-[-0.04em] text-slate-950">
+                      {pageCount || "-"}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl bg-[var(--violet-50)] p-4">
+                    <div className="text-xs font-black uppercase tracking-[0.14em] text-[var(--violet-700)]">
+                      Changed
+                    </div>
+                    <div className="mt-1 text-3xl font-black tracking-[-0.04em] text-[var(--violet-700)]">
+                      {changedPages || "-"}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-3 rounded-2xl bg-slate-50 p-4">
+                  <div className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+                    Selected pages
+                  </div>
+                  <div className="mt-1 max-h-24 overflow-y-auto text-sm font-bold leading-6 text-slate-700">
+                    {selectedPagesLabel}
+                  </div>
+                </div>
+
+                <div className="mt-3 rounded-2xl bg-slate-50 p-4">
+                  <div className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+                    Output
+                  </div>
+                  <div className="mt-1 text-xl font-black tracking-[-0.03em] text-slate-950">
+                    {result ? formatFileSize(result.outputSize) : "-"}
+                  </div>
                 </div>
               </div>
 
-              <aside className="bg-white p-5 sm:p-6">
-                <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5">
-                  <h2 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">
-                    Rotate Settings
-                  </h2>
-
-                  <div className="mt-4 rounded-2xl border border-indigo-100 bg-indigo-50 p-4">
-                    <div className="text-sm font-semibold text-indigo-900">All Pages</div>
-
-                    <div className="mt-3 grid grid-cols-3 gap-2">
-                      {[90, 180, 270].map((degree) => (
-                        <button
-                          key={`all-${degree}`}
-                          type="button"
-                          onClick={() => rotateAll(degree as 90 | 180 | 270)}
-                          disabled={!file || busy}
-                          className="rounded-2xl bg-indigo-600 px-3 py-3 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-slate-300"
-                        >
-                          All {degree}°
-                        </button>
-                      ))}
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={resetAll}
-                      disabled={!file || busy}
-                      className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-indigo-200 bg-white px-5 py-3 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <RotateCcw size={17} />
-                      Reset All
-                    </button>
-                  </div>
-
-                  <div className="mt-4 rounded-2xl border border-violet-100 bg-white p-4">
-                    <div className="text-sm font-semibold text-slate-950">
-                      Selected Pages ({selectedPages.size})
-                    </div>
-
-                    <div className="mt-3 grid grid-cols-3 gap-2">
-                      {[90, 180, 270].map((degree) => (
-                        <button
-                          key={`selected-${degree}`}
-                          type="button"
-                          onClick={() => rotateSelectedPages(degree as 90 | 180 | 270)}
-                          disabled={selectedPages.size === 0 || busy}
-                          className="rounded-2xl bg-violet-600 px-3 py-3 text-sm font-semibold text-white transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:bg-slate-300"
-                        >
-                          {degree}°
-                        </button>
-                      ))}
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={resetSelectedPages}
-                      disabled={selectedPages.size === 0 || busy}
-                      className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-violet-100 bg-violet-50 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <RotateCcw size={17} />
-                      Reset Selected
-                    </button>
-                  </div>
-
-                  <div className="mt-5 grid gap-3">
-                    <div className="rounded-2xl bg-white p-4">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Pages</div>
-                      <div className="mt-1 text-xl font-semibold text-slate-950">{pageCount || "-"}</div>
-                    </div>
-
-                    <div className="rounded-2xl bg-white p-4">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Changed pages
-                      </div>
-                      <div className="mt-1 text-xl font-semibold text-slate-950">{changedPages || "-"}</div>
-                    </div>
-
-                    <div className="rounded-2xl bg-white p-4">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Output</div>
-                      <div className="mt-1 text-xl font-semibold text-slate-950">
-                        {result ? formatFileSize(result.outputSize) : "-"}
-                      </div>
-                    </div>
-                  </div>
-
-                  <button type="button" onClick={handleExport} disabled={busy || !file} className="btn-primary mt-5 w-full">
-                    {busy ? (
-                      <>
-                        <Loader2 className="animate-spin" size={18} />
-                        Processing
-                      </>
-                    ) : (
-                      <>
-                        <Download size={18} />
-                        Export Rotated PDF
-                      </>
-                    )}
-                  </button>
+              <div className="rounded-[1.5rem] border border-[var(--border-light)] bg-white p-4 shadow-sm">
+                <div className="mb-1 flex items-center gap-2 text-sm font-black text-slate-800">
+                  <FileText size={16} />
+                  Status
                 </div>
+                <StatusBar message={lastError || pdfError || status} type={statusType} />
+              </div>
 
-                <div
-                  className={`mt-5 rounded-[1.5rem] border p-4 text-sm font-medium leading-6 ${
-                    statusLooksLikeError
-                      ? "border-red-100 bg-red-50 text-red-700"
-                      : "border-indigo-100 bg-indigo-50 text-indigo-800"
-                  }`}
-                >
-                  <div className="mb-1 flex items-center gap-2 font-semibold">
-                    <CheckCircle2 size={16} />
-                    Status
-                  </div>
-                  {status}
-                </div>
-
-                <div className="mt-5 rounded-[1.5rem] border border-violet-100 bg-white p-4 text-sm font-medium leading-6 text-slate-600 shadow-sm">
-                  <div className="mb-1 flex items-center gap-2 font-semibold text-slate-900">
-                    <Sparkles size={16} />
-                    Stable rotation flow
-                  </div>
-                  This tool uses the shared PDFMantra engine for actual PDF export while keeping the page map fast and stable.
-                </div>
-              </aside>
-            </section>
-          </div>
+              <div className="rounded-[1.5rem] border border-indigo-100 bg-indigo-50 p-4 text-sm font-semibold leading-6 text-indigo-800">
+                <div className="font-black">How it works</div>
+                <p className="mt-2">
+                  Page thumbnails rotate visually in the grid. The final export uses the existing PDFMantra rotate engine and does not change the original uploaded file.
+                </p>
+              </div>
+            </aside>
+          </section>
         </section>
+
+        <SelectionToolbar
+          visible={selectedPages.length > 0}
+          selectedCount={selectedPages.length}
+          selectedLabel={`${selectedPages.length} page${selectedPages.length === 1 ? "" : "s"} selected`}
+          actions={[
+            {
+              label: "90°",
+              icon: "↻",
+              onClick: () => rotateSelectedPages(90),
+              disabled: isBusy,
+            },
+            {
+              label: "180°",
+              icon: "↻",
+              onClick: () => rotateSelectedPages(180),
+              disabled: isBusy,
+            },
+            {
+              label: "270°",
+              icon: "↻",
+              onClick: () => rotateSelectedPages(270),
+              disabled: isBusy,
+            },
+            {
+              label: "Reset",
+              icon: "0°",
+              onClick: resetSelectedPages,
+              disabled: isBusy,
+            },
+            {
+              label: "Undo Select",
+              icon: "↶",
+              onClick: handleUndoSelection,
+              disabled: isBusy || !canUndo,
+            },
+            {
+              label: "Clear",
+              icon: "×",
+              onClick: handleClearSelection,
+              disabled: isBusy,
+            },
+            {
+              label: "Export",
+              icon: "↓",
+              onClick: handleExport,
+              disabled: isBusy || !file,
+            },
+          ]}
+        />
       </main>
     </>
   );
