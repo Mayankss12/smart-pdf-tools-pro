@@ -3,6 +3,7 @@
 import {
   type DragEvent,
   type MouseEvent,
+  type ReactNode,
   useEffect,
   useMemo,
   useRef,
@@ -11,15 +12,13 @@ import {
 import * as pdfjsLib from "pdfjs-dist";
 import {
   CheckCircle2,
-  ChevronDown,
   CircleHelp,
   Download,
-  FileArchive,
   FileImage,
-  FileText,
   Grid2X2,
   Image as ImageIcon,
   Loader2,
+  MoreHorizontal,
   MousePointer2,
   Settings2,
   Upload,
@@ -27,7 +26,6 @@ import {
 } from "lucide-react";
 
 import { Header } from "@/components/Header";
-import { ToolLandingState } from "@/components/tool-kit/ToolLandingState";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import { createZipBlob } from "@/lib/browser-zip";
 import {
@@ -61,6 +59,9 @@ type TargetPlan = {
   pages: number[];
   error: string | null;
 };
+
+type OpenDropdown = "format" | "dpi" | "pages" | "more" | "help" | null;
+type PerRow = 1 | 2 | 3 | 4 | 5;
 
 const DPI_PRESETS = [
   { id: 96, label: "96 DPI", description: "Fast preview" },
@@ -287,8 +288,54 @@ function ProgressBar({ value }: { value: number }) {
   );
 }
 
+function IconButton({
+  label,
+  icon,
+  onClick,
+  disabled,
+  active,
+  danger,
+}: {
+  label: string;
+  icon: ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  active?: boolean;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      className={`group relative flex h-9 w-9 items-center justify-center rounded-xl border bg-white transition disabled:cursor-not-allowed disabled:opacity-40 ${
+        danger
+          ? "border-red-200 text-red-600 hover:border-red-300 hover:bg-red-50"
+          : active
+            ? "border-violet-300 bg-violet-50 text-violet-700"
+            : "border-slate-200 text-slate-600 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700"
+      }`}
+    >
+      {icon}
+      <span className="pointer-events-none absolute top-full z-50 mt-2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-xs font-semibold text-white opacity-0 shadow-lg transition delay-300 group-hover:opacity-100">
+        {label}
+      </span>
+    </button>
+  );
+}
+
+function getGridClass(perRow: PerRow) {
+  if (perRow === 1) return "grid-cols-1";
+  if (perRow === 2) return "grid-cols-2";
+  if (perRow === 3) return "grid-cols-2 md:grid-cols-3";
+  if (perRow === 4) return "grid-cols-2 lg:grid-cols-4";
+  return "grid-cols-2 lg:grid-cols-5";
+}
+
 export default function PdfToImagesPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const toolbarRef = useRef<HTMLDivElement | null>(null);
   const renderTokenRef = useRef(0);
 
   const { recordExport } = useEntitlement();
@@ -307,6 +354,8 @@ export default function PdfToImagesPage() {
   const [thumbnailStatus, setThumbnailStatus] = useState<ThumbnailStatus>("idle");
   const [selectedPages, setSelectedPages] = useState<number[]>([]);
   const [lastSelectedPage, setLastSelectedPage] = useState<number | null>(null);
+  const [openDropdown, setOpenDropdown] = useState<OpenDropdown>(null);
+  const [perRow, setPerRow] = useState<PerRow>(4);
 
   const [busyMode, setBusyMode] = useState<BusyMode>("idle");
   const [renderProgress, setRenderProgress] = useState({ done: 0, total: 0 });
@@ -349,6 +398,21 @@ export default function PdfToImagesPage() {
   useEffect(() => {
     configurePdfWorker();
   }, []);
+
+  useEffect(() => {
+    function handlePointerDown(event: PointerEvent) {
+      if (!toolbarRef.current) return;
+      if (event.target instanceof Node && toolbarRef.current.contains(event.target)) return;
+      setOpenDropdown(null);
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, []);
+
+  function toggleDropdown(nextDropdown: OpenDropdown) {
+    setOpenDropdown((current) => (current === nextDropdown ? null : nextDropdown));
+  }
 
   function clearOutputs() {
     setOutputs((current) => {
@@ -462,6 +526,7 @@ export default function PdfToImagesPage() {
     setThumbnailStatus("idle");
     setRenderProgress({ done: 0, total: 0 });
     setExportProgress(0);
+    setOpenDropdown(null);
     setBusyMode("idle");
     setStatus("Upload a PDF to export pages as images.");
   }
@@ -641,28 +706,12 @@ export default function PdfToImagesPage() {
     status.toLowerCase().includes("limit") ||
     status.toLowerCase().includes("select pages");
 
-  if (!file) {
-    return (
-      <>
-        <Header />
-        <ToolLandingState
-          icon={ImageIcon}
-          title="PDF to Images"
-          description="Export each PDF page as high-quality JPG or PNG."
-          ctaLabel="Select PDF file"
-          tips={["Choose DPI", "PNG or JPG format", "ZIP download"]}
-          onFileSelect={(selected) => handleFile(Array.isArray(selected) ? selected[0] : selected)}
-        />
-      </>
-    );
-  }
-
   return (
     <>
       <Header />
 
-      <main className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)]">
-        <section className="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8 lg:py-8">
+      <main className="min-h-screen bg-slate-50 text-slate-950">
+        <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
           <input
             ref={fileInputRef}
             type="file"
@@ -671,382 +720,181 @@ export default function PdfToImagesPage() {
             onChange={(event) => handleFile(event.target.files?.[0])}
           />
 
-          <section className="relative overflow-hidden rounded-[1.5rem] border border-[var(--border-light)] bg-[var(--bg-panel)] px-4 py-5 shadow-[var(--shadow-soft)] sm:px-5 sm:py-6 lg:px-6">
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-[radial-gradient(circle,rgba(101,80,232,0.14)_0%,rgba(101,80,232,0.05)_38%,transparent_72%)]"
-            />
+          <div className="mb-6 flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
+              <ImageIcon size={20} />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-slate-900">PDF to Images</h1>
+              <p className="text-sm text-slate-500">Export PDF pages as PNG, JPG, or WebP images.</p>
+            </div>
+          </div>
 
-            <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div className="flex gap-4">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--violet-600)] text-white shadow-[0_14px_34px_rgba(101,80,232,0.18)]">
-                  <FileImage size={20} />
-                </div>
-
-                <div>
-                  <h1 className="display-font max-w-4xl text-[2rem] font-bold leading-[1.12] tracking-[-0.025em] text-[var(--text-primary)] sm:text-[2.45rem] lg:text-[2.8rem]">
-                    Convert PDF pages to images.
-                  </h1>
-                  <p className="mt-3 max-w-3xl text-[15px] font-normal leading-7 text-[var(--text-secondary)]">
-                    Preview real PDF pages, choose format and DPI, then export selected pages as PNG, JPEG, or WEBP.
-                  </p>
-                </div>
+          {file ? (
+            <div ref={toolbarRef} className="relative z-40 mb-4 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">
+                  {pageCount} page{pageCount === 1 ? "" : "s"}
+                </span>
+                <span className="rounded-full bg-violet-100 px-3 py-1.5 text-xs font-bold text-violet-700">
+                  {targetPlan.pages.length} selected
+                </span>
+                <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">
+                  {outputs.length ? `Output ${formatFileSize(outputSize)}` : `${format.toUpperCase()} · ${dpi} DPI`}
+                </span>
               </div>
 
-              <div className="grid min-w-[270px] grid-cols-3 divide-x divide-[var(--border-light)] rounded-[1.25rem] border border-[var(--border-light)] bg-white/92 p-3 text-center shadow-[var(--shadow-soft)] backdrop-blur">
-                <div className="px-3">
-                  <div className="text-[1.25rem] font-bold tracking-[-0.03em] text-[var(--text-primary)]">{pageCount || "-"}</div>
-                  <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">Pages</div>
+              <div className="flex flex-wrap items-center gap-2">
+                <IconButton label="Select all" icon={<MousePointer2 size={16} />} onClick={selectAllPages} disabled={busy || !pageCount} />
+                <IconButton label="Clear selection" icon={<X size={16} />} onClick={clearSelection} disabled={busy || !selectedPages.length} danger={selectedPages.length > 0} />
+
+                <span className="mx-1 hidden h-7 w-px bg-slate-200 sm:inline-block" />
+
+                <button type="button" onClick={() => setFormat(format === "png" ? "jpeg" : format === "jpeg" ? "webp" : "png")} disabled={busy} className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-40">
+                  <FileImage size={15} />
+                  {format.toUpperCase()}
+                </button>
+
+                <button type="button" onClick={() => setDpi(dpi === 96 ? 150 : dpi === 150 ? 200 : dpi === 200 ? 300 : 96)} disabled={busy} className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-40">
+                  <Settings2 size={15} />
+                  {dpi} DPI
+                </button>
+
+                <button type="button" onClick={() => setTargetMode(targetMode === "all" ? "odd" : targetMode === "odd" ? "even" : targetMode === "even" ? "visual" : "all")} disabled={busy} className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-40">
+                  <Grid2X2 size={15} />
+                  {targetMode === "all" ? "All" : targetMode === "odd" ? "Odd" : targetMode === "even" ? "Even" : targetMode === "visual" ? "Visual" : "Range"}
+                </button>
+
+                <div className="relative">
+                  <IconButton label="More" icon={<MoreHorizontal size={17} />} onClick={() => toggleDropdown("more")} active={openDropdown === "more"} />
+
+                  {openDropdown === "more" ? (
+                    <div className="absolute right-0 z-50 mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl">
+                      <label className="block">
+                        <span className="flex justify-between text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
+                          Quality <span>{Math.round(quality * 100)}%</span>
+                        </span>
+                        <input
+                          type="range"
+                          min={40}
+                          max={100}
+                          value={Math.round(quality * 100)}
+                          onChange={(event) => {
+                            setQuality(Number(event.target.value) / 100);
+                            clearOutputs();
+                          }}
+                          disabled={busy || format === "png"}
+                          className="mt-2 w-full"
+                        />
+                      </label>
+
+                      <label className="mt-3 flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                        <input
+                          type="checkbox"
+                          checked={downloadAsZip}
+                          onChange={(event) => setDownloadAsZip(event.target.checked)}
+                          disabled={busy}
+                          className="mt-1 h-4 w-4 rounded border-slate-300 text-violet-600"
+                        />
+                        <span className="text-xs font-semibold leading-5 text-slate-600">Package as one ZIP</span>
+                      </label>
+
+                      <button type="button" onClick={clearFile} disabled={!file || busy} className="mt-2 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40">
+                        <X size={15} />
+                        Remove PDF
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
-                <div className="px-3">
-                  <div className="text-[1.25rem] font-bold tracking-[-0.03em] text-[var(--text-primary)]">{file ? targetPlan.pages.length : "-"}</div>
-                  <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">Selected</div>
-                </div>
-                <div className="px-3">
-                  <div className="text-[1.25rem] font-bold tracking-[-0.03em] text-[var(--text-primary)]">{outputs.length ? formatFileSize(outputSize) : "-"}</div>
-                  <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">Output</div>
-                </div>
+
+                <IconButton label="Help" icon={<CircleHelp size={17} />} onClick={() => setStatus("PNG is best for sharp text. JPG/WebP are better for smaller files. Use 300 DPI for print.")} />
+
+                <button type="button" onClick={handleExport} disabled={busy || !file} className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 text-sm font-bold text-white shadow-[0_12px_26px_rgba(101,80,232,0.22)] transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40">
+                  {busyMode === "exporting" ? <Loader2 className="animate-spin" size={17} /> : <Download size={17} />}
+                  {busyMode === "exporting" ? "Exporting" : outputs.length ? "Export Again" : "Export"}
+                </button>
               </div>
             </div>
-          </section>
+          ) : null}
 
-          <div className="mt-4 overflow-hidden rounded-[1.5rem] border border-[var(--border-light)] bg-[var(--bg-card)] shadow-[var(--shadow-card)]">
-            <section className="min-h-[660px] bg-[var(--bg-base)] p-3 sm:p-4">
-              <div
-                onClick={() => {
-                  if (!busy) fileInputRef.current?.click();
-                }}
-                onDrop={handleUploadDrop}
-                onDragOver={(event) => event.preventDefault()}
-                onKeyDown={(event) => {
-                  if ((event.key === "Enter" || event.key === " ") && !busy) {
-                    fileInputRef.current?.click();
-                  }
-                }}
-                role="button"
-                tabIndex={0}
-                aria-disabled={busy}
-                className="cursor-pointer rounded-[1.25rem] border-2 border-dashed border-[var(--violet-border)] bg-[var(--bg-card)] p-4 text-center shadow-[var(--shadow-soft)] transition hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] focus:border-[var(--border-focus)] focus:outline-none focus:ring-4 focus:ring-violet-100 aria-disabled:cursor-not-allowed aria-disabled:opacity-70"
-              >
-                <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--violet-600)] text-white">
-                  {busyMode === "reading" || busyMode === "rendering" ? <Loader2 className="animate-spin" size={20} /> : <Upload size={20} />}
+          <section onDrop={handleUploadDrop} onDragOver={(event) => event.preventDefault()} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            {!file ? (
+              <button type="button" onClick={() => fileInputRef.current?.click()} disabled={busy} className="flex min-h-[400px] w-full flex-col items-center justify-center rounded-2xl border-2 border-dashed border-violet-200 bg-violet-50/35 text-center transition hover:border-violet-300 hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-50">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-600 text-white shadow-[0_16px_34px_rgba(101,80,232,0.24)]">
+                  {busyMode === "reading" || busyMode === "rendering" ? <Loader2 className="animate-spin" size={24} /> : <Upload size={24} />}
                 </div>
-
-                <div className="text-[15px] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
-                  {file ? file.name : "Drop PDF here"}
+                <div className="mt-5 text-lg font-bold text-slate-900">Drop PDF here</div>
+                <div className="mt-2 text-sm font-medium text-slate-500">Browse file or drag and drop</div>
+                <div className="mt-4 rounded-full bg-white px-4 py-2 text-xs font-bold text-slate-500 shadow-sm">
+                  PDF supported · Browser-side rendering
                 </div>
+              </button>
+            ) : (
+              <>
+                <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                  <button type="button" onClick={() => fileInputRef.current?.click()} disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-violet-200 bg-violet-50/55 px-4 py-3 text-sm font-bold text-violet-700 transition hover:border-violet-300 hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40 sm:w-[160px]">
+                    <Upload size={16} />
+                    Change PDF
+                  </button>
 
-                <div className="mt-1 text-sm font-medium text-[var(--text-secondary)]">
-                  {file ? `${pageCount} page${pageCount > 1 ? "s" : ""} loaded • ${formatFileSize(file.size)}` : "Click here or drag one PDF to begin."}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Per row</span>
+                    <div className="flex rounded-xl border border-slate-200 bg-slate-50 p-1">
+                      {([1, 2, 3, 4, 5] as PerRow[]).map((value) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => setPerRow(value)}
+                          disabled={busy}
+                          className={`h-8 w-8 rounded-lg text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                            perRow === value ? "bg-violet-600 text-white shadow-sm" : "text-slate-500 hover:bg-white hover:text-violet-700"
+                          }`}
+                        >
+                          {value}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
                 {busyMode === "rendering" ? (
-                  <div className="mx-auto mt-3 max-w-md">
-                    <ProgressBar value={renderPercent} />
-                    <div className="mt-2 text-xs font-bold uppercase tracking-[0.08em] text-[var(--violet-600)]">
-                      Rendering thumbnails {renderProgress.done}/{renderProgress.total}
+                  <div className="mb-4 rounded-2xl border border-violet-200 bg-violet-50 p-3">
+                    <div className="mb-2 flex items-center justify-between gap-3 text-sm font-bold text-violet-700">
+                      <span>Rendering thumbnails {renderProgress.done}/{renderProgress.total}</span>
+                      <span>{renderPercent}%</span>
                     </div>
+                    <ProgressBar value={renderPercent} />
                   </div>
                 ) : null}
-              </div>
-
-              <div className="mt-4 rounded-[1.25rem] border border-[var(--border-light)] bg-[var(--bg-card)] p-3 shadow-[var(--shadow-soft)] sm:p-4">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                  <p className="text-sm font-normal text-[var(--text-secondary)]">
-                    Click pages to export visually. Shift selects ranges, Ctrl toggles pages.
-                  </p>
-
-                  <div className="flex flex-wrap items-center gap-2">
-                    <details className="group relative">
-                      <summary className="inline-flex cursor-pointer list-none items-center justify-center gap-2 rounded-full border border-[var(--border-light)] bg-white px-3 py-2 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] [&::-webkit-details-marker]:hidden">
-                        {format.toUpperCase()}
-                        <ChevronDown size={15} className="transition group-open:rotate-180" />
-                      </summary>
-
-                      <div className="absolute left-0 z-30 mt-2 w-64 rounded-2xl border border-[var(--border-light)] bg-white p-2 shadow-[var(--shadow-card)]">
-                        {FORMAT_OPTIONS.map((option) => (
-                          <button
-                            key={option.id}
-                            type="button"
-                            onClick={() => {
-                              setFormat(option.id);
-                              clearOutputs();
-                            }}
-                            disabled={busy}
-                            className={`w-full rounded-xl px-3 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-40 ${
-                              format === option.id
-                                ? "bg-[var(--violet-50)] text-[var(--violet-600)]"
-                                : "text-[var(--text-secondary)] hover:bg-[var(--violet-50)]"
-                            }`}
-                          >
-                            <div className="text-sm font-bold">{option.label}</div>
-                            <div className="text-xs font-medium">{option.description}</div>
-                          </button>
-                        ))}
-                      </div>
-                    </details>
-
-                    <details className="group relative">
-                      <summary className="inline-flex cursor-pointer list-none items-center justify-center gap-2 rounded-full border border-[var(--border-light)] bg-white px-3 py-2 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] [&::-webkit-details-marker]:hidden">
-                        {dpi} DPI
-                        <ChevronDown size={15} className="transition group-open:rotate-180" />
-                      </summary>
-
-                      <div className="absolute left-0 z-30 mt-2 w-72 rounded-2xl border border-[var(--border-light)] bg-white p-3 shadow-[var(--shadow-card)]">
-                        <div className="grid grid-cols-2 gap-2">
-                          {DPI_PRESETS.map((preset) => (
-                            <button
-                              key={preset.id}
-                              type="button"
-                              onClick={() => {
-                                setDpi(preset.id);
-                                clearOutputs();
-                              }}
-                              disabled={busy}
-                              className={`rounded-xl border px-3 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-40 ${
-                                dpi === preset.id
-                                  ? "border-[var(--violet-600)] bg-[var(--violet-50)] text-[var(--violet-600)]"
-                                  : "border-[var(--border-light)] bg-white text-[var(--text-secondary)] hover:bg-[var(--violet-50)]"
-                              }`}
-                            >
-                              <div className="text-sm font-bold">{preset.label}</div>
-                              <div className="text-[11px] font-medium">{preset.description}</div>
-                            </button>
-                          ))}
-                        </div>
-
-                        <label className="mt-3 block">
-                          <span className="flex justify-between text-xs font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                            Custom DPI <span>{dpi}</span>
-                          </span>
-                          <input
-                            type="range"
-                            min={72}
-                            max={450}
-                            step={6}
-                            value={dpi}
-                            onChange={(event) => {
-                              setDpi(Number(event.target.value));
-                              clearOutputs();
-                            }}
-                            disabled={busy}
-                            className="mt-2 w-full"
-                          />
-                          <span className="mt-1 block text-xs font-semibold text-[var(--text-muted)]">{estimatedPixelText}</span>
-                        </label>
-
-                        {format !== "png" ? (
-                          <label className="mt-3 block">
-                            <span className="flex justify-between text-xs font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                              Quality <span>{Math.round(quality * 100)}%</span>
-                            </span>
-                            <input
-                              type="range"
-                              min={40}
-                              max={100}
-                              value={Math.round(quality * 100)}
-                              onChange={(event) => {
-                                setQuality(Number(event.target.value) / 100);
-                                clearOutputs();
-                              }}
-                              disabled={busy}
-                              className="mt-2 w-full"
-                            />
-                          </label>
-                        ) : null}
-                      </div>
-                    </details>
-
-                    <details className="group relative">
-                      <summary className="inline-flex cursor-pointer list-none items-center justify-center gap-2 rounded-full border border-[var(--border-light)] bg-white px-3 py-2 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] [&::-webkit-details-marker]:hidden">
-                        {targetMode === "all"
-                          ? "All pages"
-                          : targetMode === "odd"
-                            ? "Odd pages"
-                            : targetMode === "even"
-                              ? "Even pages"
-                              : targetMode === "visual"
-                                ? "Visual pick"
-                                : "Custom range"}
-                        <ChevronDown size={15} className="transition group-open:rotate-180" />
-                      </summary>
-
-                      <div className="absolute right-0 z-30 mt-2 w-56 rounded-2xl border border-[var(--border-light)] bg-white p-2 shadow-[var(--shadow-card)]">
-                        {[
-                          { id: "all", label: "All Pages" },
-                          { id: "odd", label: "Odd Pages" },
-                          { id: "even", label: "Even Pages" },
-                          { id: "custom", label: "Custom Range" },
-                          { id: "visual", label: "Visual Pick" },
-                        ].map((item) => (
-                          <button
-                            key={item.id}
-                            type="button"
-                            onClick={() => {
-                              setTargetMode(item.id as TargetMode);
-                              clearOutputs();
-                            }}
-                            disabled={busy}
-                            className={`w-full rounded-xl px-3 py-2 text-left text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
-                              targetMode === item.id
-                                ? "bg-[var(--violet-50)] text-[var(--violet-600)]"
-                                : "text-[var(--text-secondary)] hover:bg-[var(--violet-50)]"
-                            }`}
-                          >
-                            {item.label}
-                          </button>
-                        ))}
-
-                        <button
-                          type="button"
-                          onClick={() => applyFirstPagesPreset(5)}
-                          disabled={busy || !file}
-                          className="mt-2 w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          First 5
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => applyLastPagesPreset(5)}
-                          disabled={busy || !file}
-                          className="w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          Last 5
-                        </button>
-                      </div>
-                    </details>
-
-                    {targetMode === "custom" ? (
-                      <input
-                        value={pageInput}
-                        onChange={(event) => {
-                          setPageInput(event.target.value);
-                          clearOutputs();
-                        }}
-                        placeholder="1-5, 8, 10-12"
-                        disabled={busy}
-                        className="h-10 w-52 rounded-full border border-[var(--border-light)] bg-white px-4 text-sm font-semibold text-[var(--text-secondary)] outline-none transition focus:border-[var(--border-focus)] focus:ring-4 focus:ring-violet-100 disabled:cursor-not-allowed disabled:opacity-50"
-                      />
-                    ) : null}
-
-                    <details className="group relative">
-                      <summary className="inline-flex cursor-pointer list-none items-center justify-center gap-2 rounded-full border border-[var(--border-light)] bg-white px-3 py-2 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] [&::-webkit-details-marker]:hidden">
-                        More options
-                        <ChevronDown size={15} className="transition group-open:rotate-180" />
-                      </summary>
-
-                      <div className="absolute right-0 z-30 mt-2 w-56 rounded-2xl border border-[var(--border-light)] bg-white p-2 shadow-[var(--shadow-card)]">
-                        <button
-                          type="button"
-                          onClick={selectAllPages}
-                          disabled={busy || !pageCount}
-                          className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          <MousePointer2 size={15} />
-                          Select all visually
-                        </button>
-                        <button
-                          type="button"
-                          onClick={clearSelection}
-                          disabled={busy || !selectedPages.length}
-                          className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          <X size={15} />
-                          Clear selection
-                        </button>
-                        <label className="mt-2 flex items-start gap-3 rounded-xl border border-[var(--border-light)] bg-[var(--bg-base)] p-3">
-                          <input
-                            type="checkbox"
-                            checked={downloadAsZip}
-                            onChange={(event) => setDownloadAsZip(event.target.checked)}
-                            disabled={busy}
-                            className="mt-1 h-4 w-4 rounded border-[var(--border-light)] text-[var(--violet-600)]"
-                          />
-                          <span className="text-xs font-semibold leading-5 text-[var(--text-secondary)]">
-                            Package as one ZIP
-                          </span>
-                        </label>
-                        <button
-                          type="button"
-                          onClick={clearFile}
-                          disabled={!file || busy}
-                          className="mt-2 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          <X size={15} />
-                          Remove PDF
-                        </button>
-                      </div>
-                    </details>
-
-                    <div className="group relative">
-                      <button
-                        type="button"
-                        className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border-light)] bg-white text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)]"
-                        aria-label="Help"
-                      >
-                        <CircleHelp size={17} />
-                      </button>
-                      <div className="pointer-events-none absolute right-0 z-30 mt-2 w-72 rounded-2xl border border-[var(--border-light)] bg-white p-3 text-xs font-semibold leading-5 text-[var(--text-secondary)] opacity-0 shadow-[var(--shadow-card)] transition group-hover:opacity-100">
-                        PNG is best for sharp text.<br />
-                        JPEG/WEBP are better for smaller files.<br />
-                        Use 300 DPI for print and 150 DPI for sharing.<br />
-                        Custom range example: 1-5, 8, 10-12.
-                      </div>
-                    </div>
-
-                    <button type="button" onClick={handleExport} disabled={busy || !file} className="btn-primary px-4 py-2">
-                      {busyMode === "exporting" ? (
-                        <><Loader2 className="animate-spin" size={18} /><span>Exporting</span></>
-                      ) : (
-                        <><Download size={18} /><span>Export</span></>
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold">
-                  <span className={`rounded-full border px-3 py-1.5 ${targetPlan.error ? "border-red-100 bg-red-50 text-red-700" : "border-[var(--violet-border)] bg-[var(--violet-50)] text-[var(--violet-600)]"}`}>
-                    {targetSummary}
-                  </span>
-                  <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-light)] bg-white px-3 py-1.5 text-[var(--text-secondary)]">
-                    <Settings2 size={13} />
-                    {format.toUpperCase()} · {dpi} DPI
-                  </span>
-                  <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-light)] bg-white px-3 py-1.5 text-[var(--text-secondary)]">
-                    <FileArchive size={13} />
-                    {downloadAsZip ? "ZIP" : "Single direct download"}
-                  </span>
-                </div>
 
                 {busyMode === "exporting" ? (
-                  <div className="mt-3 rounded-2xl border border-[var(--violet-border)] bg-[var(--violet-50)] p-3">
-                    <div className="mb-2 flex items-center justify-between gap-3 text-sm font-bold text-[var(--violet-600)]">
-                      <span>Exporting</span>
+                  <div className="mb-4 rounded-2xl border border-violet-200 bg-violet-50 p-3">
+                    <div className="mb-2 flex items-center justify-between gap-3 text-sm font-bold text-violet-700">
+                      <span>Exporting selected pages...</span>
                       <span>{exportProgress}%</span>
                     </div>
                     <ProgressBar value={exportProgress} />
                   </div>
                 ) : null}
 
-                {outputs.length > 0 ? (
-                  <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
+                {outputs.length ? (
+                  <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
                     <CheckCircle2 size={16} />
-                    {outputs.length} image{outputs.length > 1 ? "s" : ""} exported · {formatFileSize(outputSize)}
+                    {outputs.length} image{outputs.length === 1 ? "" : "s"} created · {formatFileSize(outputSize)}
                   </div>
                 ) : null}
 
-                {busyMode === "reading" ? (
-                  <div className="mt-4 flex min-h-80 items-center justify-center rounded-[1.25rem] border border-[var(--violet-border)] bg-[var(--violet-50)]">
-                    <div className="flex items-center gap-2 rounded-full border border-[var(--violet-border)] bg-white px-4 py-3 text-sm font-semibold text-[var(--violet-600)] shadow-[var(--shadow-soft)]">
-                      <Loader2 className="animate-spin" size={18} />
-                      Reading PDF
-                    </div>
+                {targetPlan.error ? (
+                  <div className="mb-4 rounded-2xl border border-red-100 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
+                    {targetPlan.error}
                   </div>
-                ) : thumbnails.length > 0 ? (
-                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-                    {thumbnails.map((thumbnail) => {
-                      const isTargeted = targetPageSet.has(thumbnail.pageNumber);
+                ) : null}
+
+                <div className={`grid ${getGridClass(perRow)} gap-4`}>
+                  {thumbnails.length ? (
+                    thumbnails.map((thumbnail) => {
                       const isSelected = selectedPageSet.has(thumbnail.pageNumber);
+                      const isTarget = targetPageSet.has(thumbnail.pageNumber);
 
                       return (
                         <button
@@ -1054,84 +902,42 @@ export default function PdfToImagesPage() {
                           type="button"
                           onClick={(event) => handlePageSelect(thumbnail.pageNumber, event)}
                           disabled={busy}
-                          className={`group overflow-hidden rounded-[1.25rem] border bg-white p-3 text-left shadow-sm outline-none transition hover:border-[var(--violet-border)] focus:ring-4 focus:ring-violet-100 disabled:cursor-not-allowed disabled:opacity-70 ${
-                            isSelected
-                              ? "border-[var(--violet-600)] ring-4 ring-violet-100"
-                              : isTargeted
-                                ? "border-[var(--violet-border)]"
-                                : "border-[var(--border-light)] opacity-75"
+                          className={`group rounded-2xl border bg-white p-3 text-left shadow-sm outline-none transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                            isSelected ? "border-violet-500 ring-4 ring-violet-100" : isTarget ? "border-violet-200" : "border-slate-200 hover:border-violet-300"
                           }`}
                         >
-                          <div className="flex items-center justify-between gap-2 pb-2">
-                            <div className="flex items-center gap-2">
-                              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--violet-50)] text-xs font-bold text-[var(--violet-600)]">
-                                {thumbnail.pageNumber}
-                              </div>
-                              <div>
-                                <div className="text-sm font-bold text-[var(--text-primary)]">Page {thumbnail.pageNumber}</div>
-                                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                                  {isTargeted ? "Will export" : "Skipped"}
-                                </div>
-                              </div>
+                          <div className="mb-2 flex items-center justify-between gap-2">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-violet-50 text-xs font-bold text-violet-700">
+                              {thumbnail.pageNumber}
                             </div>
-
-                            {isTargeted ? (
-                              <span className="rounded-full bg-[var(--violet-50)] px-2 py-1 text-[10px] font-bold text-[var(--violet-600)]">
-                                {format.toUpperCase()}
-                              </span>
+                            {isTarget ? (
+                              <span className="rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-bold text-emerald-700">Export</span>
                             ) : null}
                           </div>
 
-                          <div className="overflow-hidden rounded-2xl border border-[var(--border-light)] bg-[var(--bg-base)]">
-                            <div className="flex aspect-[3/4] items-center justify-center p-3">
-                              <img
-                                src={thumbnail.previewUrl}
-                                alt={`PDF page ${thumbnail.pageNumber}`}
-                                className="h-full w-full rounded border border-[var(--border-light)] bg-white object-contain shadow-sm"
-                                draggable={false}
-                              />
+                          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                            <div className={`${perRow === 1 ? "min-h-[520px]" : "aspect-[3/4]"} flex items-center justify-center p-3`}>
+                              <img src={thumbnail.previewUrl} alt={`Page ${thumbnail.pageNumber}`} className="max-h-full max-w-full rounded-xl object-contain shadow-sm" draggable={false} />
                             </div>
                           </div>
                         </button>
                       );
-                    })}
-                  </div>
-                ) : thumbnailStatus === "error" && file ? (
-                  <div className="mt-4 flex min-h-80 items-center justify-center rounded-[1.25rem] border border-amber-200 bg-amber-50 text-center">
-                    <div>
-                      <FileText className="mx-auto text-amber-500" size={42} />
-                      <div className="mt-3 text-[15px] font-semibold text-amber-950">Preview unavailable</div>
-                      <p className="mt-1 text-sm font-medium text-amber-800">Use the range controls to export images.</p>
+                    })
+                  ) : (
+                    <div className="col-span-full flex min-h-[300px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 text-center">
+                      <Loader2 className="animate-spin text-violet-600" size={24} />
+                      <div className="mt-3 text-sm font-bold text-slate-700">Preparing page previews...</div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="mt-4 flex min-h-80 items-center justify-center rounded-[1.25rem] border border-dashed border-[var(--violet-border)] bg-[var(--violet-50)]/52 text-center">
-                    <div>
-                      <ImageIcon className="mx-auto text-[var(--violet-400)]" size={42} />
-                      <div className="mt-3 text-[15px] font-semibold text-[var(--text-primary)]">No PDF loaded</div>
-                      <p className="mt-1 text-sm font-normal text-[var(--text-secondary)]">Upload a PDF to preview and export pages as images.</p>
-                    </div>
-                  </div>
-                )}
+                  )}
+                </div>
+              </>
+            )}
+          </section>
 
-                {outputs.length > 0 ? (
-                  <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-                    {outputs.slice(0, 12).map((output) => (
-                      <div key={output.fileName} className="overflow-hidden rounded-2xl border border-[var(--border-light)] bg-white shadow-sm">
-                        <img src={output.previewUrl} alt={`Exported page ${output.pageNumber}`} className="aspect-[3/4] w-full object-contain" />
-                        <div className="border-t border-[var(--border-light)] bg-[var(--bg-base)] px-3 py-2 text-xs font-semibold text-[var(--text-secondary)]">
-                          Page {output.pageNumber}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            </section>
-          </div>
-
-          <div className={`mt-3 px-1 text-sm font-medium ${statusLooksLikeError ? "text-red-600" : "text-[var(--text-secondary)]"}`}>
-            {status}
+          <div className={`mt-3 truncate px-1 text-sm font-medium ${statusLooksLikeError ? "text-red-600" : "text-slate-500"}`}>
+            {file && !statusLooksLikeError && busyMode === "idle"
+              ? `${targetPlan.pages.length} of ${pageCount} page${pageCount === 1 ? "" : "s"} selected · ${format.toUpperCase()} · ${dpi} DPI`
+              : status}
           </div>
         </section>
       </main>
