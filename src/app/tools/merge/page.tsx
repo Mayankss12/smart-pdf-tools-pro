@@ -1,25 +1,26 @@
 "use client";
 
 import {
+  useEffect,
   useMemo,
   useRef,
   useState,
   type DragEvent,
   type KeyboardEvent,
   type MouseEvent,
+  type ReactNode,
 } from "react";
 import {
   ArrowDown,
   ArrowUp,
-  ChevronDown,
   CheckCircle2,
   CircleHelp,
-  Combine,
   Download,
   FileStack,
   FileText,
   GripVertical,
   Loader2,
+  MoreHorizontal,
   MousePointer2,
   RotateCcw,
   Shuffle,
@@ -28,7 +29,6 @@ import {
 } from "lucide-react";
 
 import { Header } from "@/components/Header";
-import { ToolLandingState } from "@/components/tool-kit/ToolLandingState";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import {
   PdfEngineError,
@@ -44,6 +44,8 @@ type MergeQueueItem = {
   file: File;
 };
 
+type OpenPanel = "order" | "selection" | "more" | "help" | null;
+
 function createQueueId() {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
@@ -52,6 +54,7 @@ function createQueueId() {
 
 function getErrorMessage(error: unknown) {
   if (error instanceof PdfEngineError) return error.message;
+  if (error instanceof Error) return error.message;
   return "Merge failed. Please check your PDFs and try again.";
 }
 
@@ -73,7 +76,45 @@ function moveArrayItem<T>(items: T[], fromIndex: number, toIndex: number) {
   const next = [...items];
   const [item] = next.splice(fromIndex, 1);
   next.splice(toIndex, 0, item);
+
   return next;
+}
+
+function IconButton({
+  label,
+  icon,
+  onClick,
+  disabled,
+  active,
+  danger,
+}: {
+  label: string;
+  icon: ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  active?: boolean;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      className={`group relative flex h-9 w-9 items-center justify-center rounded-xl border bg-white transition disabled:cursor-not-allowed disabled:opacity-40 ${
+        danger
+          ? "border-red-200 text-red-600 hover:border-red-300 hover:bg-red-50"
+          : active
+            ? "border-violet-300 bg-violet-50 text-violet-700"
+            : "border-slate-200 text-slate-600 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700"
+      }`}
+    >
+      {icon}
+      <span className="pointer-events-none absolute top-full z-50 mt-2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-xs font-semibold text-white opacity-0 shadow-lg transition delay-300 group-hover:opacity-100">
+        {label}
+      </span>
+    </button>
+  );
 }
 
 function ProgressBar({ value }: { value: number }) {
@@ -82,7 +123,7 @@ function ProgressBar({ value }: { value: number }) {
   return (
     <div className="h-2 overflow-hidden rounded-full bg-white/75">
       <div
-        className="h-full rounded-full bg-[var(--violet-600)] transition-all duration-300"
+        className="h-full rounded-full bg-violet-600 transition-all duration-300"
         style={{ width: `${safeValue}%` }}
       />
     </div>
@@ -91,6 +132,7 @@ function ProgressBar({ value }: { value: number }) {
 
 export default function MergePage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const toolbarRef = useRef<HTMLDivElement | null>(null);
   const draggedIndexRef = useRef<number | null>(null);
   const draggedIdsRef = useRef<string[]>([]);
 
@@ -107,6 +149,7 @@ export default function MergePage() {
   const [exportProgress, setExportProgress] = useState(0);
   const [status, setStatus] = useState("Upload two or more PDFs to merge.");
   const [result, setResult] = useState<PdfProcessingResult | null>(null);
+  const [openPanel, setOpenPanel] = useState<OpenPanel>(null);
 
   const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
 
@@ -132,6 +175,22 @@ export default function MergePage() {
     status.toLowerCase().includes("limit") ||
     status.toLowerCase().includes("unable");
 
+  useEffect(() => {
+    function handlePointerDown(event: PointerEvent) {
+      if (!toolbarRef.current) return;
+      if (event.target instanceof Node && toolbarRef.current.contains(event.target)) return;
+
+      setOpenPanel(null);
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, []);
+
+  function togglePanel(nextPanel: OpenPanel) {
+    setOpenPanel((current) => (current === nextPanel ? null : nextPanel));
+  }
+
   function addFiles(selectedFiles?: FileList | File[]) {
     if (!selectedFiles || selectedFiles.length === 0 || busy) return;
 
@@ -154,6 +213,7 @@ export default function MergePage() {
       setLastSelectedId(validItems[validItems.length - 1]?.id ?? null);
       setResult(null);
       setExportProgress(0);
+      setOpenPanel(null);
     }
 
     const messages = [];
@@ -266,6 +326,7 @@ export default function MergePage() {
     setLastSelectedId(null);
     setResult(null);
     setExportProgress(0);
+    setOpenPanel(null);
     setStatus("Upload two or more PDFs to merge.");
   }
 
@@ -413,6 +474,7 @@ export default function MergePage() {
     setBusy(true);
     setExportProgress(8);
     setResult(null);
+    setOpenPanel(null);
     setStatus("Merging PDFs with PDFMantra engine...");
 
     try {
@@ -457,29 +519,12 @@ export default function MergePage() {
     }
   }
 
-  if (items.length === 0) {
-    return (
-      <>
-        <Header />
-        <ToolLandingState
-          icon={Combine}
-          title="Merge PDF Files"
-          description="Combine multiple PDFs into one ordered document."
-          ctaLabel="Select PDF files"
-          multiple
-          tips={["Drag to reorder files", "Toggle pages individually", "Export as one PDF"]}
-          onFileSelect={(selected) => addFiles(Array.isArray(selected) ? selected : [selected])}
-        />
-      </>
-    );
-  }
-
   return (
     <>
       <Header />
 
-      <main className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)]">
-        <section className="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8 lg:py-8">
+      <main className="min-h-screen bg-slate-50 text-slate-950">
+        <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
           <input
             ref={fileInputRef}
             type="file"
@@ -492,190 +537,275 @@ export default function MergePage() {
             }}
           />
 
-          <section className="relative overflow-hidden rounded-[1.5rem] border border-[var(--border-light)] bg-[var(--bg-panel)] px-4 py-5 shadow-[var(--shadow-soft)] sm:px-5 sm:py-6 lg:px-6">
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-[radial-gradient(circle,rgba(101,80,232,0.14)_0%,rgba(101,80,232,0.05)_38%,transparent_72%)]"
-            />
-
-            <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div className="flex gap-4">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--violet-600)] text-white shadow-[0_14px_34px_rgba(101,80,232,0.18)]">
-                  <FileStack size={20} />
-                </div>
-
-                <div>
-                  <h1 className="display-font max-w-4xl text-[2rem] font-bold leading-[1.12] tracking-[-0.025em] text-[var(--text-primary)] sm:text-[2.45rem] lg:text-[2.8rem]">
-                    Merge PDFs in a controlled queue.
-                  </h1>
-                  <p className="mt-3 max-w-3xl text-[15px] font-normal leading-7 text-[var(--text-secondary)]">
-                    Upload multiple PDFs, drag them into order, and export one polished document.
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid min-w-[270px] grid-cols-3 divide-x divide-[var(--border-light)] rounded-[1.25rem] border border-[var(--border-light)] bg-white/92 p-3 text-center shadow-[var(--shadow-soft)] backdrop-blur">
-                <div className="px-3">
-                  <div className="text-[1.25rem] font-bold tracking-[-0.03em] text-[var(--text-primary)]">{items.length || "-"}</div>
-                  <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">Files</div>
-                </div>
-                <div className="px-3">
-                  <div className="text-[1.25rem] font-bold tracking-[-0.03em] text-[var(--text-primary)]">{selectedIds.length || "-"}</div>
-                  <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">Selected</div>
-                </div>
-                <div className="px-3">
-                  <div className="text-[1.25rem] font-bold tracking-[-0.03em] text-[var(--text-primary)]">
-                    {result ? formatFileSize(result.outputSize) : items.length ? formatFileSize(totalSize) : "-"}
-                  </div>
-                  <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                    {result ? "Output" : "Input"}
-                  </div>
-                </div>
-              </div>
+          <div className="mb-6 flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
+              <FileStack size={20} />
             </div>
-          </section>
+            <div>
+              <h1 className="text-xl font-bold text-slate-900">Merge PDF Files</h1>
+              <p className="text-sm text-slate-500">
+                Combine multiple PDFs into one ordered document with drag-and-drop control.
+              </p>
+            </div>
+          </div>
 
-          <div className="mt-4 overflow-hidden rounded-[1.5rem] border border-[var(--border-light)] bg-[var(--bg-card)] shadow-[var(--shadow-card)]">
-            <section className="min-h-[620px] bg-[var(--bg-base)] p-3 sm:p-4">
-              <div
-                onClick={() => {
-                  if (!busy) fileInputRef.current?.click();
-                }}
-                onDrop={handleUploadDrop}
-                onDragOver={(event) => event.preventDefault()}
-                onKeyDown={(event) => {
-                  if ((event.key === "Enter" || event.key === " ") && !busy) {
-                    fileInputRef.current?.click();
-                  }
-                }}
-                role="button"
-                tabIndex={0}
-                aria-disabled={busy}
-                className="cursor-pointer rounded-[1.25rem] border-2 border-dashed border-[var(--violet-border)] bg-[var(--bg-card)] p-4 text-center shadow-[var(--shadow-soft)] transition hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] focus:border-[var(--border-focus)] focus:outline-none focus:ring-4 focus:ring-violet-100 aria-disabled:cursor-not-allowed aria-disabled:opacity-70"
-              >
-                <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--violet-600)] text-white">
-                  {busy ? <Loader2 className="animate-spin" size={20} /> : <Upload size={20} />}
-                </div>
-                <div className="text-[15px] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
-                  Drop PDFs here
-                </div>
-                <div className="mt-1 text-sm font-medium text-[var(--text-secondary)]">
-                  Upload two or more PDFs. Final output follows the visible order below.
-                </div>
+          {items.length ? (
+            <div
+              ref={toolbarRef}
+              className="relative z-40 mb-4 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm lg:flex-row lg:items-center lg:justify-between"
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">
+                  {pluralizeFile(items.length)}
+                </span>
+                <span className="rounded-full bg-violet-100 px-3 py-1.5 text-xs font-bold text-violet-700">
+                  {selectedSummary}
+                </span>
+                <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">
+                  Input {formatFileSize(totalSize)}
+                </span>
+                {result ? (
+                  <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">
+                    Output {formatFileSize(result.outputSize)}
+                  </span>
+                ) : null}
               </div>
 
-              <div className="mt-4 rounded-[1.25rem] border border-[var(--border-light)] bg-[var(--bg-card)] p-3 shadow-[var(--shadow-soft)] sm:p-4">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                  <p className="text-sm font-normal text-[var(--text-secondary)]">
-                    Drag PDFs into order. Use Ctrl/Shift for multi-select.
-                  </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <IconButton
+                  label="Select all"
+                  icon={<MousePointer2 size={16} />}
+                  onClick={selectAllItems}
+                  disabled={busy || !items.length}
+                />
 
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={reverseItems}
-                      disabled={!items.length || busy}
-                      className="inline-flex items-center justify-center gap-2 rounded-full border border-[var(--border-light)] bg-white px-3 py-2 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      <Shuffle size={15} />
-                      Reverse
-                    </button>
+                <IconButton
+                  label="Clear selection"
+                  icon={<X size={16} />}
+                  onClick={clearSelection}
+                  disabled={busy || !selectedIds.length}
+                  danger={selectedIds.length > 0}
+                />
 
-                    <button
-                      type="button"
-                      onClick={sortItemsByName}
-                      disabled={!items.length || busy}
-                      className="inline-flex items-center justify-center gap-2 rounded-full border border-[var(--border-light)] bg-white px-3 py-2 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      <RotateCcw size={15} />
-                      Sort A-Z
-                    </button>
+                <span className="mx-1 hidden h-7 w-px bg-slate-200 sm:inline-block" />
 
-                    <details className="group relative">
-                      <summary className="inline-flex cursor-pointer list-none items-center justify-center gap-2 rounded-full border border-[var(--border-light)] bg-white px-3 py-2 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] [&::-webkit-details-marker]:hidden">
-                        More options
-                        <ChevronDown size={15} className="transition group-open:rotate-180" />
-                      </summary>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => togglePanel("order")}
+                    disabled={busy}
+                    className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <Shuffle size={15} />
+                    Order
+                  </button>
 
-                      <div className="absolute right-0 z-30 mt-2 w-52 rounded-2xl border border-[var(--border-light)] bg-white p-2 shadow-[var(--shadow-card)]">
-                        <button
-                          type="button"
-                          onClick={selectAllItems}
-                          disabled={busy || !items.length}
-                          className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          <MousePointer2 size={15} />
-                          Select All
-                        </button>
-                        <button
-                          type="button"
-                          onClick={removeSelectedItems}
-                          disabled={busy || !selectedIds.length}
-                          className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          <X size={15} />
-                          Remove Selected
-                        </button>
-                        <button
-                          type="button"
-                          onClick={clearItems}
-                          disabled={!items.length || busy}
-                          className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          <X size={15} />
-                          Clear All
-                        </button>
-                      </div>
-                    </details>
-
-                    <div className="group relative">
+                  {openPanel === "order" ? (
+                    <div className="absolute right-0 z-50 mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl">
                       <button
                         type="button"
-                        className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border-light)] bg-white text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)]"
-                        aria-label="Help"
+                        onClick={reverseItems}
+                        disabled={!items.length || busy}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40"
                       >
-                        <CircleHelp size={17} />
+                        <Shuffle size={15} />
+                        Reverse order
                       </button>
-                      <div className="pointer-events-none absolute right-0 z-30 mt-2 w-72 rounded-2xl border border-[var(--border-light)] bg-white p-3 text-xs font-semibold leading-5 text-[var(--text-secondary)] opacity-0 shadow-[var(--shadow-card)] transition group-hover:opacity-100">
-                        Drag cards to reorder.<br />
-                        Ctrl / Shift click · Multi select<br />
-                        Final merged PDF follows visible order.<br />
-                        At least 2 PDFs are required.
-                      </div>
-                    </div>
 
-                    <button type="button" onClick={handleMerge} disabled={!canMerge} className="btn-primary px-4 py-2">
-                      {busy ? (
-                        <>
-                          <Loader2 className="animate-spin" size={18} />
-                          <span>Merging</span>
-                        </>
-                      ) : (
-                        <>
-                          <Download size={18} />
-                          <span>Export</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
+                      <button
+                        type="button"
+                        onClick={sortItemsByName}
+                        disabled={!items.length || busy}
+                        className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <RotateCcw size={15} />
+                        Sort A-Z
+                      </button>
+
+                      <p className="mt-3 rounded-xl bg-slate-50 p-3 text-xs font-semibold leading-5 text-slate-500">
+                        Final merged PDF follows the visible order below.
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
 
-                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold">
-                  <span className="rounded-full border border-[var(--violet-border)] bg-[var(--violet-50)] px-3 py-1.5 text-[var(--violet-600)]">
-                    {items.length ? `${items.length} PDF${items.length === 1 ? "" : "s"} in queue` : "No PDFs in queue"}
-                  </span>
-                  <span className="rounded-full border border-[var(--border-light)] bg-white px-3 py-1.5 text-[var(--text-secondary)]">
-                    {items.length ? formatFileSize(totalSize) : "0 KB"}
-                  </span>
-                  <span className="rounded-full border border-[var(--border-light)] bg-white px-3 py-1.5 text-[var(--text-secondary)]">
-                    {items.length >= 2 ? "Ready to merge" : "Need at least 2 PDFs"}
-                  </span>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => togglePanel("selection")}
+                    disabled={busy}
+                    className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <ArrowUp size={15} />
+                    Move
+                  </button>
+
+                  {openPanel === "selection" ? (
+                    <div className="absolute right-0 z-50 mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl">
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => moveSelectedItems(-1)}
+                          disabled={busy || !selectedIds.length}
+                          className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <ArrowUp size={15} />
+                          Up
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => moveSelectedItems(1)}
+                          disabled={busy || !selectedIds.length}
+                          className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <ArrowDown size={15} />
+                          Down
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => moveSelectedToEdge("start")}
+                          disabled={busy || !selectedIds.length}
+                          className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          To start
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => moveSelectedToEdge("end")}
+                          disabled={busy || !selectedIds.length}
+                          className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          To end
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={removeSelectedItems}
+                        disabled={busy || !selectedIds.length}
+                        className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 px-3 py-2 text-sm font-bold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <X size={15} />
+                        Remove selected
+                      </button>
+
+                      <p className="mt-3 rounded-xl bg-slate-50 p-3 text-xs font-semibold leading-5 text-slate-500">
+                        Use Ctrl/Shift click on cards for multi-select.
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="relative">
+                  <IconButton
+                    label="More"
+                    icon={<MoreHorizontal size={17} />}
+                    onClick={() => togglePanel("more")}
+                    active={openPanel === "more"}
+                  />
+
+                  {openPanel === "more" ? (
+                    <div className="absolute right-0 z-50 mt-2 w-56 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={busy}
+                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold text-slate-600 transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <Upload size={15} />
+                        Add more PDFs
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={clearItems}
+                        disabled={!items.length || busy}
+                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <X size={15} />
+                        Clear all
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+
+                <IconButton
+                  label="Help"
+                  icon={<CircleHelp size={16} />}
+                  onClick={() => togglePanel("help")}
+                  active={openPanel === "help"}
+                />
+
+                <button
+                  type="button"
+                  onClick={handleMerge}
+                  disabled={!canMerge}
+                  className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 text-sm font-bold text-white shadow-[0_12px_26px_rgba(101,80,232,0.22)] transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {busy ? <Loader2 className="animate-spin" size={17} /> : <Download size={17} />}
+                  {busy ? "Merging" : result ? "Merge Again" : "Merge"}
+                </button>
+              </div>
+
+              {openPanel === "help" ? (
+                <div className="absolute right-3 top-full z-50 mt-2 w-80 rounded-2xl border border-slate-200 bg-white p-3 text-xs font-semibold leading-5 text-slate-600 shadow-xl">
+                  Drag cards to reorder. Use Ctrl/Shift click for multi-select. At least 2 PDFs are required.
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          <section
+            onDrop={handleUploadDrop}
+            onDragOver={(event) => event.preventDefault()}
+            className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+          >
+            {!items.length ? (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={busy}
+                className="flex min-h-[400px] w-full flex-col items-center justify-center rounded-2xl border-2 border-dashed border-violet-200 bg-violet-50/35 text-center transition hover:border-violet-300 hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-600 text-white shadow-[0_16px_34px_rgba(101,80,232,0.24)]">
+                  {busy ? <Loader2 className="animate-spin" size={24} /> : <Upload size={24} />}
+                </div>
+                <div className="mt-5 text-lg font-bold text-slate-900">Drop PDFs here</div>
+                <div className="mt-2 text-sm font-medium text-slate-500">Browse files or drag and drop</div>
+                <div className="mt-4 rounded-full bg-white px-4 py-2 text-xs font-bold text-slate-500 shadow-sm">
+                  Multi-file queue · Drag order · Clean export
+                </div>
+              </button>
+            ) : (
+              <>
+                <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={busy}
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-violet-200 bg-violet-50/55 px-4 py-3 text-sm font-bold text-violet-700 transition hover:border-violet-300 hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40 sm:w-[170px]"
+                  >
+                    <Upload size={16} />
+                    Add PDFs
+                  </button>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">
+                      Final output follows this order
+                    </span>
+                    <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">
+                      {items.length >= 2 ? "Ready to merge" : "Need at least 2 PDFs"}
+                    </span>
+                  </div>
                 </div>
 
                 {busy ? (
-                  <div className="mt-3 rounded-2xl border border-[var(--violet-border)] bg-[var(--violet-50)] p-3">
-                    <div className="mb-2 flex items-center justify-between gap-3 text-sm font-bold text-[var(--violet-600)]">
-                      <span>Merging</span>
+                  <div className="mb-4 rounded-2xl border border-violet-200 bg-violet-50 p-3">
+                    <div className="mb-2 flex items-center justify-between gap-3 text-sm font-bold text-violet-700">
+                      <span>Merging PDFs...</span>
                       <span>{exportProgress}%</span>
                     </div>
                     <ProgressBar value={exportProgress} />
@@ -683,150 +813,126 @@ export default function MergePage() {
                 ) : null}
 
                 {result ? (
-                  <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
+                  <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
                     <CheckCircle2 size={16} />
-                    Merged PDF: {formatFileSize(result.outputSize)}
+                    Merged PDF created · {formatFileSize(result.outputSize)}
                   </div>
                 ) : null}
 
-                {items.length === 0 ? (
-                  <div className="mt-4 flex min-h-72 items-center justify-center rounded-[1.25rem] border border-dashed border-[var(--violet-border)] bg-[var(--violet-50)]/52 text-center">
-                    <div>
-                      <FileText className="mx-auto text-[var(--violet-400)]" size={42} />
-                      <div className="mt-3 text-[15px] font-semibold text-[var(--text-primary)]">No PDFs in queue</div>
-                      <p className="mt-1 text-sm font-normal text-[var(--text-secondary)]">Add PDFs to build your merge sequence.</p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-                    {items.map((item, index) => {
-                      const isSelected = selectedIdSet.has(item.id);
-                      const isDropTarget = dragOverIndex === index && draggedIndex !== index;
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
+                  {items.map((item, index) => {
+                    const isSelected = selectedIdSet.has(item.id);
+                    const isDropTarget = dragOverIndex === index && draggedIndex !== index;
 
-                      return (
-                        <div
-                          key={item.id}
-                          draggable={!busy}
-                          role="button"
-                          tabIndex={0}
-                          aria-pressed={isSelected}
-                          onClick={(event) => handleItemSelect(item.id, event)}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter" || event.key === " ") {
-                              event.preventDefault();
-                              handleItemSelect(item.id, event);
-                            }
-                          }}
-                          onDragStart={(event) => handleCardDragStart(index, event)}
-                          onDragEnter={() => setDragOverIndex(index)}
-                          onDragOver={(event) => {
+                    return (
+                      <div
+                        key={item.id}
+                        draggable={!busy}
+                        role="button"
+                        tabIndex={0}
+                        aria-pressed={isSelected}
+                        onClick={(event) => handleItemSelect(item.id, event)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
                             event.preventDefault();
-                            event.dataTransfer.dropEffect = "move";
-                            setDragOverIndex(index);
-                          }}
-                          onDragLeave={() => {
-                            if (dragOverIndex === index) setDragOverIndex(null);
-                          }}
-                          onDrop={(event) => {
-                            event.preventDefault();
-                            handleCardDrop(index);
-                          }}
-                          onDragEnd={resetDragState}
-                          className={`group cursor-grab rounded-[1.25rem] border bg-white p-3 shadow-sm outline-none transition active:cursor-grabbing ${
-                            isSelected
-                              ? "border-[var(--violet-600)] ring-4 ring-violet-100"
-                              : "border-[var(--border-light)] hover:border-[var(--violet-border)]"
-                          } ${isDropTarget ? "scale-[0.985] border-[var(--border-focus)] bg-[var(--violet-50)]" : ""}`}
-                        >
-                          <div className="flex items-center justify-between gap-2 pb-2">
-                            <div className="flex min-w-0 items-center gap-2">
-                              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--violet-50)] text-xs font-bold text-[var(--violet-600)]">
-                                {index + 1}
-                              </div>
-                              <div className="min-w-0">
-                                <div className="truncate text-sm font-bold text-[var(--text-primary)]">{item.file.name}</div>
-                                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                                  {formatFileSize(item.file.size)}
-                                </div>
-                              </div>
-                            </div>
-
-                            <GripVertical className="shrink-0 text-[var(--text-muted)] opacity-70 transition group-hover:opacity-100" size={17} />
+                            handleItemSelect(item.id, event);
+                          }
+                        }}
+                        onDragStart={(event) => handleCardDragStart(index, event)}
+                        onDragEnter={() => setDragOverIndex(index)}
+                        onDragOver={(event) => {
+                          event.preventDefault();
+                          event.dataTransfer.dropEffect = "move";
+                          setDragOverIndex(index);
+                        }}
+                        onDragLeave={() => {
+                          if (dragOverIndex === index) setDragOverIndex(null);
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          handleCardDrop(index);
+                        }}
+                        onDragEnd={resetDragState}
+                        className={`group cursor-grab rounded-2xl border bg-white p-3 shadow-sm outline-none transition active:cursor-grabbing ${
+                          isSelected
+                            ? "border-violet-500 ring-4 ring-violet-100"
+                            : "border-slate-200 hover:border-violet-300"
+                        } ${isDropTarget ? "scale-[0.985] border-violet-400 bg-violet-50" : ""}`}
+                      >
+                        <div className="mb-2 flex items-center justify-between gap-2">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-50 text-xs font-bold text-violet-700">
+                            {index + 1}
                           </div>
 
-                          <div className="flex aspect-[3/4] items-center justify-center rounded-2xl border border-[var(--border-light)] bg-[var(--bg-base)]">
-                            <div className="text-center">
-                              <FileText className="mx-auto text-[var(--violet-400)]" size={42} />
-                              <div className="mt-3 rounded-full bg-white px-3 py-1 text-xs font-bold text-[var(--violet-600)] shadow-sm">
-                                Position {index + 1}
-                              </div>
-                            </div>
-                          </div>
+                          <GripVertical className="shrink-0 text-slate-400 opacity-70 transition group-hover:opacity-100" size={17} />
+                        </div>
 
-                          <div className="mt-2 grid grid-cols-3 gap-2 opacity-0 transition group-focus-within:opacity-100 group-hover:opacity-100">
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                moveItem(index, "up");
-                              }}
-                              disabled={index === 0 || busy}
-                              className="inline-flex items-center justify-center gap-1 rounded-xl border border-[var(--border-light)] bg-white px-2 py-2 text-xs font-bold uppercase tracking-[0.06em] text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-35"
-                              title="Move up"
-                            >
-                              <ArrowUp size={13} />
-                              Up
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                moveItem(index, "down");
-                              }}
-                              disabled={index === items.length - 1 || busy}
-                              className="inline-flex items-center justify-center gap-1 rounded-xl border border-[var(--border-light)] bg-white px-2 py-2 text-xs font-bold uppercase tracking-[0.06em] text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-35"
-                              title="Move down"
-                            >
-                              <ArrowDown size={13} />
-                              Down
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                removeItem(item.id);
-                              }}
-                              disabled={busy}
-                              className="inline-flex items-center justify-center rounded-xl border border-red-100 bg-red-50 px-2 py-2 text-xs font-bold uppercase tracking-[0.06em] text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-35"
-                              title="Remove"
-                            >
-                              <X size={13} />
-                            </button>
+                        <div className="flex aspect-[3/4] items-center justify-center rounded-2xl border border-slate-200 bg-slate-50">
+                          <div className="text-center">
+                            <FileText className="mx-auto text-violet-400" size={42} />
+                            <div className="mt-3 rounded-full bg-white px-3 py-1 text-xs font-bold text-violet-600 shadow-sm">
+                              PDF {index + 1}
+                            </div>
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </section>
-          </div>
 
-          <div className={`mt-3 px-1 text-sm font-medium ${statusLooksLikeError ? "text-red-600" : "text-[var(--text-secondary)]"}`}>
-            {status}
-          </div>
+                        <div className="mt-3 min-w-0">
+                          <div className="truncate text-sm font-bold text-slate-900">{item.file.name}</div>
+                          <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">
+                            {formatFileSize(item.file.size)}
+                          </div>
+                        </div>
 
-          {selectedIds.length > 0 ? (
-            <div className="fixed inset-x-0 bottom-5 z-40 mx-auto flex w-[calc(100%-2rem)] max-w-3xl flex-wrap items-center justify-center gap-2 rounded-full border border-[var(--violet-border)] bg-white/95 px-3 py-2 text-sm font-semibold text-[var(--text-secondary)] shadow-[var(--shadow-card)] backdrop-blur">
-              <span className="px-2 text-[var(--violet-600)]">{selectedSummary}</span>
-              <button type="button" onClick={() => moveSelectedItems(-1)} disabled={busy} className="rounded-full px-3 py-1.5 transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40">↑ Up</button>
-              <button type="button" onClick={() => moveSelectedItems(1)} disabled={busy} className="rounded-full px-3 py-1.5 transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40">↓ Down</button>
-              <button type="button" onClick={() => moveSelectedToEdge("start")} disabled={busy} className="rounded-full px-3 py-1.5 transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40">⤒ Start</button>
-              <button type="button" onClick={() => moveSelectedToEdge("end")} disabled={busy} className="rounded-full px-3 py-1.5 transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40">⤓ End</button>
-              <button type="button" onClick={removeSelectedItems} disabled={busy} className="rounded-full px-3 py-1.5 text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40">✕ Remove</button>
-              <button type="button" onClick={clearSelection} disabled={busy} className="rounded-full px-3 py-1.5 transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40">Clear</button>
-            </div>
-          ) : null}
+                        <div className="mt-3 grid grid-cols-3 gap-1.5">
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              moveItem(index, "up");
+                            }}
+                            disabled={busy || index === 0}
+                            className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-bold text-slate-700 transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            Up
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              moveItem(index, "down");
+                            }}
+                            disabled={busy || index === items.length - 1}
+                            className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-bold text-slate-700 transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            Down
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              removeItem(item.id);
+                            }}
+                            disabled={busy}
+                            className="rounded-xl border border-red-200 bg-white px-2 py-2 text-xs font-bold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </section>
+
+          <div className={`mt-3 truncate px-1 text-sm font-medium ${statusLooksLikeError ? "text-red-600" : "text-slate-500"}`}>
+            {items.length && !statusLooksLikeError && !busy
+              ? `${pluralizeFile(items.length)} · ${selectedSummary} · ${formatFileSize(totalSize)}`
+              : status}
+          </div>
         </section>
       </main>
     </>
