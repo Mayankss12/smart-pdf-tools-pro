@@ -66,9 +66,9 @@ function getVisibleTools() {
 function getShortDescription(tool: Tool) {
   const text = tool.menuDescription || tool.description;
 
-  if (text.length <= 74) return text;
+  if (text.length <= 66) return text;
 
-  return `${text.slice(0, 71).trim()}...`;
+  return `${text.slice(0, 63).trim()}...`;
 }
 
 function CategoryPill({
@@ -100,15 +100,15 @@ function ToolCard({ tool }: { readonly tool: Tool }) {
   return (
     <Link
       href={tool.href}
-      className="group mx-auto grid min-h-[160px] w-full max-w-[172px] justify-items-center rounded-[1.35rem] border border-[var(--border-light)] bg-[var(--bg-card)] px-3 py-4 text-center shadow-[var(--shadow-soft)] transition duration-200 hover:-translate-y-1 hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] hover:shadow-[var(--shadow-card-hover)] sm:min-h-[154px]"
+      className="group mx-auto grid h-[172px] w-full max-w-[172px] grid-rows-[auto_auto_1fr] justify-items-center overflow-hidden rounded-[1.35rem] border border-[var(--border-light)] bg-[var(--bg-card)] px-3 py-4 text-center shadow-[var(--shadow-soft)] transition duration-200 hover:-translate-y-1 hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] hover:shadow-[var(--shadow-card-hover)]"
     >
       <ToolGlyph icon={tool.icon} tone={toneForCategory(tool.category)} size="sm" />
 
-      <h3 className="display-font mt-2 text-center text-[1.02rem] font-bold tracking-[-0.02em] text-[var(--text-primary)] transition group-hover:text-[var(--violet-600)]">
+      <h3 className="display-font mt-2 line-clamp-2 min-h-[44px] text-center text-[1.02rem] font-bold leading-[1.22] tracking-[-0.02em] text-[var(--text-primary)] transition group-hover:text-[var(--violet-600)]">
         {tool.title}
       </h3>
 
-      <p className="mx-auto mt-2 max-w-[150px] text-center text-[12.25px] font-normal leading-5 text-[var(--text-secondary)]">
+      <p className="mx-auto mt-1.5 line-clamp-3 max-w-[150px] text-center text-[12px] font-normal leading-5 text-[var(--text-secondary)]">
         {getShortDescription(tool)}
       </p>
     </Link>
