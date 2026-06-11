@@ -1,7 +1,6 @@
 "use client";
 
 import { Header } from "@/components/Header";
-import { useEntitlement } from "@/hooks/useEntitlement";
 import {
   CalendarDays,
   Check,
