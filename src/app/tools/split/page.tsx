@@ -3,6 +3,7 @@
 import {
   type DragEvent,
   type MouseEvent,
+  type ReactNode,
   useEffect,
   useMemo,
   useRef,
@@ -12,22 +13,23 @@ import * as pdfjsLib from "pdfjs-dist";
 import {
   AlertTriangle,
   CheckCircle2,
-  ChevronDown,
   CircleHelp,
   Download,
   FileText,
+  Grid2X2,
   Layers,
   ListPlus,
   Loader2,
+  MoreHorizontal,
   MousePointer2,
   Package,
+  RotateCcw,
   Scissors,
   Upload,
   X,
 } from "lucide-react";
 
 import { Header } from "@/components/Header";
-import { ToolLandingState } from "@/components/tool-kit/ToolLandingState";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import { createZipBlob } from "@/lib/browser-zip";
 import {
@@ -46,6 +48,8 @@ import {
 type BusyMode = "idle" | "reading" | "rendering" | "exporting";
 type ThumbnailStatus = "idle" | "loading" | "ready" | "error";
 type SplitMode = "custom" | "each" | "chunk" | "oddEven";
+type OpenPanel = "mode" | "presets" | "selection" | "help" | null;
+type PerRow = 1 | 2 | 3 | 4 | 5;
 
 type GroupPlan = {
   groups: PageGroup[];
@@ -217,15 +221,61 @@ function ProgressBar({ value }: { value: number }) {
   return (
     <div className="h-2 overflow-hidden rounded-full bg-white/75">
       <div
-        className="h-full rounded-full bg-[var(--violet-600)] transition-all duration-300"
+        className="h-full rounded-full bg-violet-600 transition-all duration-300"
         style={{ width: `${safeValue}%` }}
       />
     </div>
   );
 }
 
+function IconButton({
+  label,
+  icon,
+  onClick,
+  disabled,
+  active,
+  danger,
+}: {
+  label: string;
+  icon: ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  active?: boolean;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      className={`group relative flex h-9 w-9 items-center justify-center rounded-xl border bg-white transition disabled:cursor-not-allowed disabled:opacity-40 ${
+        danger
+          ? "border-red-200 text-red-600 hover:border-red-300 hover:bg-red-50"
+          : active
+            ? "border-violet-300 bg-violet-50 text-violet-700"
+            : "border-slate-200 text-slate-600 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700"
+      }`}
+    >
+      {icon}
+      <span className="pointer-events-none absolute top-full z-50 mt-2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-xs font-semibold text-white opacity-0 shadow-lg transition delay-300 group-hover:opacity-100">
+        {label}
+      </span>
+    </button>
+  );
+}
+
+function getGridClass(perRow: PerRow) {
+  if (perRow === 1) return "grid-cols-1";
+  if (perRow === 2) return "grid-cols-2";
+  if (perRow === 3) return "grid-cols-2 md:grid-cols-3";
+  if (perRow === 4) return "grid-cols-2 lg:grid-cols-4";
+  return "grid-cols-2 lg:grid-cols-5";
+}
+
 export default function SplitPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const toolbarRef = useRef<HTMLDivElement | null>(null);
   const renderTokenRef = useRef(0);
 
   const { recordExport } = useEntitlement();
@@ -247,11 +297,25 @@ export default function SplitPage() {
   const [status, setStatus] = useState("Upload one PDF and define split groups.");
   const [busyMode, setBusyMode] = useState<BusyMode>("idle");
   const [results, setResults] = useState<PdfProcessingResult[]>([]);
+  const [openPanel, setOpenPanel] = useState<OpenPanel>(null);
+  const [perRow, setPerRow] = useState<PerRow>(4);
 
   const busy = busyMode !== "idle";
 
   useEffect(() => {
     configurePdfWorker();
+  }, []);
+
+  useEffect(() => {
+    function handlePointerDown(event: PointerEvent) {
+      if (!toolbarRef.current) return;
+      if (event.target instanceof Node && toolbarRef.current.contains(event.target)) return;
+
+      setOpenPanel(null);
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
   }, []);
 
   const groupPlan = useMemo(
@@ -288,6 +352,10 @@ export default function SplitPage() {
   }, [file, groupPlan.error, groups.length, pageCount, selectedPageSet.size]);
 
   const canSplit = Boolean(file && groups.length > 0 && !groupPlan.error && !busy);
+
+  function togglePanel(nextPanel: OpenPanel) {
+    setOpenPanel((current) => (current === nextPanel ? null : nextPanel));
+  }
 
   async function renderThumbnails(selectedFile: File, totalPages: number) {
     const token = renderTokenRef.current + 1;
@@ -357,6 +425,7 @@ export default function SplitPage() {
     setThumbnailStatus("idle");
     setRenderProgress({ done: 0, total: 0 });
     setExportProgress(0);
+    setOpenPanel(null);
     setStatus("Reading PDF with PDFMantra engine...");
 
     try {
@@ -405,6 +474,7 @@ export default function SplitPage() {
     setThumbnailStatus("idle");
     setRenderProgress({ done: 0, total: 0 });
     setExportProgress(0);
+    setOpenPanel(null);
     setBusyMode("idle");
     setStatus("Upload one PDF and define split groups.");
   }
@@ -419,6 +489,7 @@ export default function SplitPage() {
     setSplitMode("custom");
     setPageInput(preset);
     setResults([]);
+    setOpenPanel(null);
     setStatus(`Preset applied: ${label}.`);
   }
 
@@ -536,6 +607,7 @@ export default function SplitPage() {
     setBusyMode("exporting");
     setExportProgress(8);
     setResults([]);
+    setOpenPanel(null);
     setStatus(`Creating ${groups.length} split PDF${groups.length > 1 ? "s" : ""}...`);
 
     try {
@@ -608,28 +680,12 @@ export default function SplitPage() {
     status.toLowerCase().includes("limit") ||
     status.toLowerCase().includes("valid split");
 
-  if (!file) {
-    return (
-      <>
-        <Header />
-        <ToolLandingState
-          icon={Scissors}
-          title="Split PDF"
-          description="Split a PDF into multiple files by pages or ranges."
-          ctaLabel="Select PDF file"
-          tips={["Choose page groups", "ZIP download for multiple", "Browser-side processing"]}
-          onFileSelect={(selected) => handleFile(Array.isArray(selected) ? selected[0] : selected)}
-        />
-      </>
-    );
-  }
-
   return (
     <>
       <Header />
 
-      <main className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)]">
-        <section className="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8 lg:py-8">
+      <main className="min-h-screen bg-slate-50 text-slate-950">
+        <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
           <input
             ref={fileInputRef}
             type="file"
@@ -638,137 +694,306 @@ export default function SplitPage() {
             onChange={(event) => handleFile(event.target.files?.[0])}
           />
 
-          <section className="relative overflow-hidden rounded-[1.5rem] border border-[var(--border-light)] bg-[var(--bg-panel)] px-4 py-5 shadow-[var(--shadow-soft)] sm:px-5 sm:py-6 lg:px-6">
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-[radial-gradient(circle,rgba(101,80,232,0.14)_0%,rgba(101,80,232,0.05)_38%,transparent_72%)]"
-            />
-
-            <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div className="flex gap-4">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--violet-600)] text-white shadow-[0_14px_34px_rgba(101,80,232,0.18)]">
-                  <Scissors size={20} />
-                </div>
-
-                <div>
-                  <h1 className="display-font max-w-4xl text-[2rem] font-bold leading-[1.12] tracking-[-0.025em] text-[var(--text-primary)] sm:text-[2.45rem] lg:text-[2.8rem]">
-                    Split PDFs into exact page groups.
-                  </h1>
-                  <p className="mt-3 max-w-3xl text-[15px] font-normal leading-7 text-[var(--text-secondary)]">
-                    Upload one PDF, preview real page thumbnails, build groups visually or by range, then export PDFs or one ZIP.
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid min-w-[270px] grid-cols-3 divide-x divide-[var(--border-light)] rounded-[1.25rem] border border-[var(--border-light)] bg-white/92 p-3 text-center shadow-[var(--shadow-soft)] backdrop-blur">
-                <div className="px-3">
-                  <div className="text-[1.25rem] font-bold tracking-[-0.03em] text-[var(--text-primary)]">{pageCount || "-"}</div>
-                  <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">Pages</div>
-                </div>
-                <div className="px-3">
-                  <div className="text-[1.25rem] font-bold tracking-[-0.03em] text-[var(--text-primary)]">{groups.length || "-"}</div>
-                  <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">Outputs</div>
-                </div>
-                <div className="px-3">
-                  <div className="text-[1.25rem] font-bold tracking-[-0.03em] text-[var(--text-primary)]">
-                    {results.length || selectedPageSet.size || "-"}
-                  </div>
-                  <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                    {results.length ? "Created" : "Included"}
-                  </div>
-                </div>
-              </div>
+          <div className="mb-6 flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
+              <Scissors size={20} />
             </div>
-          </section>
+            <div>
+              <h1 className="text-xl font-bold text-slate-900">Split PDF</h1>
+              <p className="text-sm text-slate-500">
+                Split one PDF into exact page groups with visual selection and ZIP export.
+              </p>
+            </div>
+          </div>
 
-          <div className="mt-4 overflow-hidden rounded-[1.5rem] border border-[var(--border-light)] bg-[var(--bg-card)] shadow-[var(--shadow-card)]">
-            <section className="min-h-[660px] bg-[var(--bg-base)] p-3 sm:p-4">
-              <div
-                onClick={() => {
-                  if (!busy) fileInputRef.current?.click();
-                }}
-                onDrop={handleUploadDrop}
-                onDragOver={(event) => event.preventDefault()}
-                onKeyDown={(event) => {
-                  if ((event.key === "Enter" || event.key === " ") && !busy) {
-                    fileInputRef.current?.click();
-                  }
-                }}
-                role="button"
-                tabIndex={0}
-                aria-disabled={busy}
-                className="cursor-pointer rounded-[1.25rem] border-2 border-dashed border-[var(--violet-border)] bg-[var(--bg-card)] p-4 text-center shadow-[var(--shadow-soft)] transition hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] focus:border-[var(--border-focus)] focus:outline-none focus:ring-4 focus:ring-violet-100 aria-disabled:cursor-not-allowed aria-disabled:opacity-70"
-              >
-                <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--violet-600)] text-white">
-                  {busyMode === "reading" || busyMode === "rendering" ? <Loader2 className="animate-spin" size={20} /> : <Upload size={20} />}
-                </div>
-
-                <div className="text-[15px] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
-                  {file ? file.name : "Drop PDF here"}
-                </div>
-
-                <div className="mt-1 text-sm font-medium text-[var(--text-secondary)]">
-                  {file
-                    ? `${pageCount} page${pageCount > 1 ? "s" : ""} loaded • ${formatFileSize(file.size)}`
-                    : "Click here or drag one PDF to begin."}
-                </div>
-
-                {busyMode === "rendering" ? (
-                  <div className="mx-auto mt-3 max-w-md">
-                    <ProgressBar value={renderPercent} />
-                    <div className="mt-2 text-xs font-bold uppercase tracking-[0.08em] text-[var(--violet-600)]">
-                      Rendering thumbnails {renderProgress.done}/{renderProgress.total}
-                    </div>
-                  </div>
+          {file ? (
+            <div
+              ref={toolbarRef}
+              className="relative z-40 mb-4 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm lg:flex-row lg:items-center lg:justify-between"
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">
+                  {pageCount} page{pageCount === 1 ? "" : "s"}
+                </span>
+                <span className="rounded-full bg-violet-100 px-3 py-1.5 text-xs font-bold text-violet-700">
+                  {groups.length} output{groups.length === 1 ? "" : "s"}
+                </span>
+                <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">
+                  {selectedPageSet.size}/{pageCount} included
+                </span>
+                {results.length ? (
+                  <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">
+                    Created {results.length}
+                  </span>
                 ) : null}
               </div>
 
-              <div className="mt-4 rounded-[1.25rem] border border-[var(--border-light)] bg-[var(--bg-card)] p-3 shadow-[var(--shadow-soft)] sm:p-4">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                  <p className="text-sm font-normal text-[var(--text-secondary)]">
-                    Click pages to select. Shift selects ranges, Ctrl toggles pages.
-                  </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <IconButton
+                  label="Select missing"
+                  icon={<MousePointer2 size={16} />}
+                  onClick={selectUnassignedPages}
+                  disabled={busy || !unassignedPages.length}
+                />
 
-                  <div className="flex flex-wrap items-center gap-2">
-                    <details className="group relative">
-                      <summary className="inline-flex cursor-pointer list-none items-center justify-center gap-2 rounded-full border border-[var(--border-light)] bg-white px-3 py-2 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] [&::-webkit-details-marker]:hidden">
-                        {splitMode === "custom"
-                          ? "Custom groups"
-                          : splitMode === "each"
-                            ? "Every page"
-                            : splitMode === "chunk"
-                              ? "Every N pages"
-                              : "Odd / Even"}
-                        <ChevronDown size={15} className="transition group-open:rotate-180" />
-                      </summary>
+                <IconButton
+                  label="Clear selection"
+                  icon={<X size={16} />}
+                  onClick={clearSelection}
+                  disabled={busy || !selectedPages.length}
+                  danger={selectedPages.length > 0}
+                />
 
-                      <div className="absolute left-0 z-30 mt-2 w-56 rounded-2xl border border-[var(--border-light)] bg-white p-2 shadow-[var(--shadow-card)]">
-                        {[
-                          { id: "custom", label: "Custom Groups" },
-                          { id: "each", label: "Every Page" },
-                          { id: "chunk", label: "Every N Pages" },
-                          { id: "oddEven", label: "Odd / Even" },
-                        ].map((mode) => (
-                          <button
-                            key={mode.id}
-                            type="button"
-                            onClick={() => {
-                              setSplitMode(mode.id as SplitMode);
+                <span className="mx-1 hidden h-7 w-px bg-slate-200 sm:inline-block" />
+
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => togglePanel("mode")}
+                    disabled={busy}
+                    className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <Grid2X2 size={15} />
+                    {splitMode === "custom"
+                      ? "Custom"
+                      : splitMode === "each"
+                        ? "Every page"
+                        : splitMode === "chunk"
+                          ? "Every N"
+                          : "Odd/Even"}
+                  </button>
+
+                  {openPanel === "mode" ? (
+                    <div className="absolute right-0 z-50 mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl">
+                      {[
+                        { id: "custom", label: "Custom groups", desc: "Use ranges like 1-4,5-8." },
+                        { id: "each", label: "Every page", desc: "Create one PDF per page." },
+                        { id: "chunk", label: "Every N pages", desc: "Split into equal page chunks." },
+                        { id: "oddEven", label: "Odd / Even", desc: "Create odd and even page files." },
+                      ].map((mode) => (
+                        <button
+                          key={mode.id}
+                          type="button"
+                          onClick={() => {
+                            setSplitMode(mode.id as SplitMode);
+                            setResults([]);
+                            setStatus(`Split mode selected: ${mode.label}.`);
+                          }}
+                          disabled={busy}
+                          className={`w-full rounded-xl p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                            splitMode === mode.id
+                              ? "bg-violet-50 text-violet-700"
+                              : "text-slate-600 hover:bg-violet-50"
+                          }`}
+                        >
+                          <div className="text-sm font-bold">{mode.label}</div>
+                          <div className="mt-1 text-xs font-medium leading-5">{mode.desc}</div>
+                        </button>
+                      ))}
+
+                      {splitMode === "chunk" ? (
+                        <label className="mt-3 block rounded-xl border border-slate-200 bg-slate-50 p-3">
+                          <span className="flex justify-between text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
+                            Split every <span>{splitEveryCount} pages</span>
+                          </span>
+                          <input
+                            type="range"
+                            min={1}
+                            max={Math.max(1, Math.min(pageCount || 20, 20))}
+                            value={splitEveryCount}
+                            onChange={(event) => {
+                              setSplitEveryCount(Number(event.target.value));
                               setResults([]);
-                              setStatus(`Split mode selected: ${mode.label}.`);
                             }}
                             disabled={busy}
-                            className={`w-full rounded-xl px-3 py-2 text-left text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
-                              splitMode === mode.id
-                                ? "bg-[var(--violet-50)] text-[var(--violet-600)]"
-                                : "text-[var(--text-secondary)] hover:bg-[var(--violet-50)]"
-                            }`}
-                          >
-                            {mode.label}
-                          </button>
-                        ))}
+                            className="mt-2 w-full"
+                          />
+                        </label>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => togglePanel("selection")}
+                    disabled={busy}
+                    className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <ListPlus size={15} />
+                    Group
+                  </button>
+
+                  {openPanel === "selection" ? (
+                    <div className="absolute right-0 z-50 mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl">
+                      <div className="rounded-xl bg-slate-50 p-3 text-xs font-semibold leading-5 text-slate-600">
+                        {selectedSummary}
                       </div>
-                    </details>
+
+                      <button
+                        type="button"
+                        onClick={() => addSelectionToGroups(false)}
+                        disabled={busy || !selectedPages.length}
+                        className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-3 py-2 text-sm font-bold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <ListPlus size={15} />
+                        Add as group
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => addSelectionToGroups(true)}
+                        disabled={busy || !selectedPages.length}
+                        className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <Layers size={15} />
+                        Replace groups
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => togglePanel("presets")}
+                    disabled={busy}
+                    className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <MoreHorizontal size={15} />
+                    Presets
+                  </button>
+
+                  {openPanel === "presets" ? (
+                    <div className="absolute right-0 z-50 mt-2 w-64 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+                      <button type="button" onClick={() => applyChunkPreset(2)} disabled={busy} className="w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-slate-600 transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40">
+                        2-page sets
+                      </button>
+                      <button type="button" onClick={() => applyChunkPreset(4)} disabled={busy} className="w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-slate-600 transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40">
+                        4-page sets
+                      </button>
+                      <button type="button" onClick={applyHalfPreset} disabled={busy} className="w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-slate-600 transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40">
+                        First half + second half
+                      </button>
+                      <button type="button" onClick={applyCoverAndRestPreset} disabled={busy} className="w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-slate-600 transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40">
+                        Cover + rest
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={clearFile}
+                        disabled={!file || busy}
+                        className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <X size={15} />
+                        Remove PDF
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+
+                <IconButton
+                  label="Reset groups"
+                  icon={<RotateCcw size={16} />}
+                  onClick={() => applyChunkPreset(Math.min(4, pageCount || 4))}
+                  disabled={busy || !file}
+                />
+
+                <IconButton
+                  label="Help"
+                  icon={<CircleHelp size={16} />}
+                  onClick={() => togglePanel("help")}
+                  active={openPanel === "help"}
+                />
+
+                <button
+                  type="button"
+                  onClick={handleSplit}
+                  disabled={!canSplit}
+                  className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 text-sm font-bold text-white shadow-[0_12px_26px_rgba(101,80,232,0.22)] transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {busyMode === "exporting" ? <Loader2 className="animate-spin" size={17} /> : <Download size={17} />}
+                  {busyMode === "exporting" ? "Splitting" : groups.length > 1 ? "Export ZIP" : "Export"}
+                </button>
+              </div>
+
+              {openPanel === "help" ? (
+                <div className="absolute right-3 top-full z-50 mt-2 w-80 rounded-2xl border border-slate-200 bg-white p-3 text-xs font-semibold leading-5 text-slate-600 shadow-xl">
+                  Custom example: 1-4,5-8. Click pages, then Add Group or Replace. Multiple outputs download as one ZIP.
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          <section
+            onDrop={handleUploadDrop}
+            onDragOver={(event) => event.preventDefault()}
+            className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+          >
+            {!file ? (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={busy}
+                className="flex min-h-[400px] w-full flex-col items-center justify-center rounded-2xl border-2 border-dashed border-violet-200 bg-violet-50/35 text-center transition hover:border-violet-300 hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-600 text-white shadow-[0_16px_34px_rgba(101,80,232,0.24)]">
+                  {busyMode === "reading" || busyMode === "rendering" ? <Loader2 className="animate-spin" size={24} /> : <Upload size={24} />}
+                </div>
+                <div className="mt-5 text-lg font-bold text-slate-900">Drop PDF here</div>
+                <div className="mt-2 text-sm font-medium text-slate-500">Browse file or drag and drop</div>
+                <div className="mt-4 rounded-full bg-white px-4 py-2 text-xs font-bold text-slate-500 shadow-sm">
+                  Visual groups · Range split · ZIP export
+                </div>
+              </button>
+            ) : (
+              <>
+                <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={busy}
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-violet-200 bg-violet-50/55 px-4 py-3 text-sm font-bold text-violet-700 transition hover:border-violet-300 hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40 sm:w-[160px]"
+                  >
+                    <Upload size={16} />
+                    Change PDF
+                  </button>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
+                      Per row
+                    </span>
+                    <div className="flex rounded-xl border border-slate-200 bg-slate-50 p-1">
+                      {([1, 2, 3, 4, 5] as PerRow[]).map((value) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => setPerRow(value)}
+                          disabled={busy}
+                          className={`h-8 w-8 rounded-lg text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                            perRow === value
+                              ? "bg-violet-600 text-white shadow-sm"
+                              : "text-slate-500 hover:bg-white hover:text-violet-700"
+                          }`}
+                        >
+                          {value}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
+                        Split groups
+                      </div>
+                      <div className="mt-1 truncate text-sm font-semibold text-slate-600">
+                        {outputSummary}
+                      </div>
+                    </div>
 
                     {splitMode === "custom" ? (
                       <input
@@ -780,131 +1005,74 @@ export default function SplitPage() {
                         }}
                         placeholder="1-4,5-8"
                         disabled={busy}
-                        className="h-10 w-52 rounded-full border border-[var(--border-light)] bg-white px-4 text-sm font-semibold text-[var(--text-secondary)] outline-none transition focus:border-[var(--border-focus)] focus:ring-4 focus:ring-violet-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100 disabled:cursor-not-allowed disabled:opacity-50 lg:w-80"
                       />
                     ) : null}
+                  </div>
 
-                    {splitMode === "chunk" ? (
-                      <label className="inline-flex h-10 items-center gap-3 rounded-full border border-[var(--border-light)] bg-white px-4 text-sm font-semibold text-[var(--text-secondary)]">
-                        Every {splitEveryCount}
-                        <input
-                          type="range"
-                          min={1}
-                          max={Math.max(1, Math.min(pageCount || 20, 20))}
-                          value={splitEveryCount}
-                          onChange={(event) => {
-                            setSplitEveryCount(Number(event.target.value));
-                            setResults([]);
-                          }}
-                          disabled={busy}
-                          className="w-28"
-                        />
-                      </label>
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold">
+                    {groupPlan.error ? (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-red-100 bg-red-50 px-3 py-1.5 text-red-700">
+                        <AlertTriangle size={13} />
+                        {groupPlan.error}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-emerald-700">
+                        <CheckCircle2 size={13} />
+                        {groups.length} output group{groups.length === 1 ? "" : "s"} ready
+                      </span>
+                    )}
+
+                    {duplicatePages.length ? (
+                      <span className="rounded-full border border-amber-100 bg-amber-50 px-3 py-1.5 text-amber-700">
+                        Duplicate pages: {duplicatePages.join(", ")}
+                      </span>
                     ) : null}
 
-                    <details className="group relative">
-                      <summary className="inline-flex cursor-pointer list-none items-center justify-center gap-2 rounded-full border border-[var(--border-light)] bg-white px-3 py-2 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] [&::-webkit-details-marker]:hidden">
-                        More options
-                        <ChevronDown size={15} className="transition group-open:rotate-180" />
-                      </summary>
+                    {unassignedPages.length ? (
+                      <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-slate-500">
+                        Missing: {unassignedPages.join(", ")}
+                      </span>
+                    ) : null}
 
-                      <div className="absolute right-0 z-30 mt-2 w-56 rounded-2xl border border-[var(--border-light)] bg-white p-2 shadow-[var(--shadow-card)]">
-                        <button type="button" onClick={() => applyChunkPreset(2)} disabled={busy} className="w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40">2-page sets</button>
-                        <button type="button" onClick={() => applyChunkPreset(4)} disabled={busy} className="w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40">4-page sets</button>
-                        <button type="button" onClick={applyHalfPreset} disabled={busy} className="w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40">Halves</button>
-                        <button type="button" onClick={applyCoverAndRestPreset} disabled={busy} className="w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40">Cover + Rest</button>
-                        <button type="button" onClick={selectUnassignedPages} disabled={busy || !unassignedPages.length} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40">
-                          <MousePointer2 size={15} />
-                          Select missing
-                        </button>
-                        <button type="button" onClick={clearFile} disabled={!file || busy} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40">
-                          <X size={15} />
-                          Remove PDF
-                        </button>
-                      </div>
-                    </details>
-
-                    <div className="group relative">
-                      <button
-                        type="button"
-                        className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border-light)] bg-white text-[var(--text-secondary)] transition hover:bg-[var(--violet-50)]"
-                        aria-label="Split help"
-                      >
-                        <CircleHelp size={17} />
-                      </button>
-                      <div className="pointer-events-none absolute right-0 z-30 mt-2 w-72 rounded-2xl border border-[var(--border-light)] bg-white p-3 text-xs font-semibold leading-5 text-[var(--text-secondary)] opacity-0 shadow-[var(--shadow-card)] transition group-hover:opacity-100">
-                        Custom example: 1-4,5-8<br />
-                        Click pages, then Add Group or Replace.<br />
-                        Multiple outputs download as one ZIP.<br />
-                        {outputSummary}
-                      </div>
-                    </div>
-
-                    <button type="button" onClick={handleSplit} disabled={!canSplit} className="btn-primary px-4 py-2">
-                      {busyMode === "exporting" ? (
-                        <>
-                          <Loader2 className="animate-spin" size={18} />
-                          <span>Splitting</span>
-                        </>
-                      ) : (
-                        <>
-                          <Download size={18} />
-                          <span>{groups.length > 1 ? "Export ZIP" : "Export"}</span>
-                        </>
-                      )}
-                    </button>
+                    {thumbnailStatus === "error" ? (
+                      <span className="rounded-full border border-amber-100 bg-amber-50 px-3 py-1.5 text-amber-700">
+                        Thumbnails unavailable
+                      </span>
+                    ) : null}
                   </div>
                 </div>
 
-                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold">
-                  <span className={`rounded-full border px-3 py-1.5 ${groupPlan.error ? "border-red-100 bg-red-50 text-red-700" : "border-[var(--violet-border)] bg-[var(--violet-50)] text-[var(--violet-600)]"}`}>
-                    {outputSummary}
-                  </span>
-
-                  {duplicatePages.length > 0 ? (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-amber-900">
-                      <AlertTriangle size={13} />
-                      Duplicate: {duplicatePages.slice(0, 8).join(", ")}
-                    </span>
-                  ) : null}
-
-                  {unassignedPages.length > 0 ? (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-amber-900">
-                      <AlertTriangle size={13} />
-                      Missing: {unassignedPages.length > 8 ? `${unassignedPages.length} pages` : unassignedPages.join(", ")}
-                    </span>
-                  ) : null}
-                </div>
+                {busyMode === "rendering" ? (
+                  <div className="mb-4 rounded-2xl border border-violet-200 bg-violet-50 p-3">
+                    <div className="mb-2 flex items-center justify-between gap-3 text-sm font-bold text-violet-700">
+                      <span>Rendering thumbnails {renderProgress.done}/{renderProgress.total}</span>
+                      <span>{renderPercent}%</span>
+                    </div>
+                    <ProgressBar value={renderPercent} />
+                  </div>
+                ) : null}
 
                 {busyMode === "exporting" ? (
-                  <div className="mt-3 rounded-2xl border border-[var(--violet-border)] bg-[var(--violet-50)] p-3">
-                    <div className="mb-2 flex items-center justify-between gap-3 text-sm font-bold text-[var(--violet-600)]">
-                      <span>Exporting</span>
+                  <div className="mb-4 rounded-2xl border border-violet-200 bg-violet-50 p-3">
+                    <div className="mb-2 flex items-center justify-between gap-3 text-sm font-bold text-violet-700">
+                      <span>Splitting PDF...</span>
                       <span>{exportProgress}%</span>
                     </div>
                     <ProgressBar value={exportProgress} />
                   </div>
                 ) : null}
 
-                {results.length > 0 ? (
-                  <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
-                    <CheckCircle2 size={16} />
-                    {results.length === 1
-                      ? `1 PDF created • ${formatFileSize(results[0].outputSize)}`
-                      : `${results.length} PDFs packed into ZIP`}
+                {results.length ? (
+                  <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
+                    <Package size={16} />
+                    Created {results.length} output PDF{results.length === 1 ? "" : "s"}
                   </div>
                 ) : null}
 
-                {busyMode === "reading" ? (
-                  <div className="mt-4 flex min-h-80 items-center justify-center rounded-[1.25rem] border border-[var(--violet-border)] bg-[var(--violet-50)]">
-                    <div className="flex items-center gap-2 rounded-full border border-[var(--violet-border)] bg-white px-4 py-3 text-sm font-semibold text-[var(--violet-600)] shadow-[var(--shadow-soft)]">
-                      <Loader2 className="animate-spin" size={18} />
-                      Reading PDF
-                    </div>
-                  </div>
-                ) : pageNumbers.length > 0 ? (
-                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-                    {pageNumbers.map((pageNumber) => {
+                <div className={`grid ${getGridClass(perRow)} gap-4`}>
+                  {pageNumbers.length ? (
+                    pageNumbers.map((pageNumber) => {
                       const isIncluded = selectedPageSet.has(pageNumber);
                       const isBuilderSelected = builderSelectedPageSet.has(pageNumber);
                       const badges = getGroupBadgesForPage(pageNumber, groups);
@@ -915,111 +1083,77 @@ export default function SplitPage() {
                           type="button"
                           onClick={(event) => handlePageSelect(pageNumber, event)}
                           disabled={busy}
-                          className={`group overflow-hidden rounded-[1.25rem] border bg-white p-3 text-left shadow-sm outline-none transition hover:border-[var(--violet-border)] focus:ring-4 focus:ring-violet-100 disabled:cursor-not-allowed disabled:opacity-70 ${
+                          className={`group rounded-2xl border bg-white p-3 text-left shadow-sm outline-none transition disabled:cursor-not-allowed disabled:opacity-60 ${
                             isBuilderSelected
-                              ? "border-[var(--violet-600)] ring-4 ring-violet-100"
+                              ? "border-violet-500 ring-4 ring-violet-100"
                               : isIncluded
-                                ? "border-[var(--violet-border)]"
-                                : "border-[var(--border-light)]"
+                                ? "border-violet-200"
+                                : "border-slate-200 hover:border-violet-300"
                           }`}
                         >
-                          <div className="flex items-center justify-between gap-2 pb-2">
-                            <div className="flex items-center gap-2">
-                              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--violet-50)] text-xs font-bold text-[var(--violet-600)]">
-                                {pageNumber}
-                              </div>
-                              <div>
-                                <div className="text-sm font-bold text-[var(--text-primary)]">Page {pageNumber}</div>
-                                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                                  {isIncluded ? "Included" : "Not included"}
-                                </div>
-                              </div>
+                          <div className="mb-2 flex items-center justify-between gap-2">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-violet-50 text-xs font-bold text-violet-700">
+                              {pageNumber}
                             </div>
 
-                            {badges.length ? (
-                              <div className="flex flex-wrap justify-end gap-1">
-                                {badges.slice(0, 2).map((badge) => (
+                            <div className="flex flex-wrap justify-end gap-1">
+                              {badges.length ? (
+                                badges.slice(0, 3).map((badge) => (
                                   <span
                                     key={badge}
-                                    className="rounded-full bg-[var(--violet-50)] px-2 py-1 text-[10px] font-bold text-[var(--violet-600)]"
+                                    className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700"
                                   >
                                     {badge}
                                   </span>
-                                ))}
-                              </div>
-                            ) : null}
+                                ))
+                              ) : (
+                                <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500">
+                                  Missing
+                                </span>
+                              )}
+                            </div>
                           </div>
 
-                          <div className="overflow-hidden rounded-2xl border border-[var(--border-light)] bg-[var(--bg-base)]">
-                            <div className="flex aspect-[3/4] items-center justify-center">
+                          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                            <div className={`${perRow === 1 ? "min-h-[520px]" : "aspect-[3/4]"} flex items-center justify-center p-3`}>
                               {thumbnailUrls[pageNumber] ? (
                                 <img
                                   src={thumbnailUrls[pageNumber]}
-                                  alt={`PDF page ${pageNumber}`}
-                                  className="h-full w-full object-contain"
+                                  alt={`Page ${pageNumber}`}
+                                  className="max-h-full max-w-full rounded-xl object-contain shadow-sm"
                                   draggable={false}
                                 />
-                              ) : thumbnailStatus === "error" ? (
-                                <div className="px-4 text-center">
-                                  <FileText className="mx-auto text-[var(--violet-400)]" size={34} />
-                                  <div className="mt-2 text-xs font-semibold text-[var(--text-secondary)]">Preview unavailable</div>
-                                </div>
                               ) : (
-                                <div className="w-full px-5">
-                                  <div className="mx-auto h-24 w-20 animate-pulse rounded-xl bg-white shadow-sm" />
-                                  <div className="mx-auto mt-3 h-2 w-24 animate-pulse rounded-full bg-white" />
-                                  <div className="mx-auto mt-2 h-2 w-16 animate-pulse rounded-full bg-white" />
+                                <div className="flex h-full min-h-[180px] w-full flex-col items-center justify-center text-center">
+                                  <FileText className="text-violet-300" size={36} />
+                                  <span className="mt-2 text-xs font-bold text-slate-400">
+                                    Page {pageNumber}
+                                  </span>
                                 </div>
                               )}
                             </div>
                           </div>
                         </button>
                       );
-                    })}
-                  </div>
-                ) : (
-                  <div className="mt-4 flex min-h-80 items-center justify-center rounded-[1.25rem] border border-dashed border-[var(--violet-border)] bg-[var(--violet-50)]/52 text-center">
-                    <div>
-                      <FileText className="mx-auto text-[var(--violet-400)]" size={42} />
-                      <div className="mt-3 text-[15px] font-semibold text-[var(--text-primary)]">No PDF loaded</div>
-                      <p className="mt-1 text-sm font-normal text-[var(--text-secondary)]">Upload a PDF to build split groups visually.</p>
+                    })
+                  ) : (
+                    <div className="col-span-full flex min-h-[300px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 text-center">
+                      <Loader2 className="animate-spin text-violet-600" size={24} />
+                      <div className="mt-3 text-sm font-bold text-slate-700">
+                        Preparing page previews...
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            </section>
-          </div>
+                  )}
+                </div>
+              </>
+            )}
+          </section>
 
-          <div className={`mt-3 px-1 text-sm font-medium ${statusLooksLikeError ? "text-red-600" : "text-[var(--text-secondary)]"}`}>
-            {status}
+          <div className={`mt-3 truncate px-1 text-sm font-medium ${statusLooksLikeError ? "text-red-600" : "text-slate-500"}`}>
+            {file && !statusLooksLikeError && busyMode === "idle"
+              ? `${outputSummary} · ${selectedSummary}`
+              : status}
           </div>
-
-          <div className="mt-3 flex flex-wrap items-center gap-2 px-1 text-xs font-semibold text-[var(--text-secondary)]">
-            <span className="inline-flex items-center gap-1">
-              <Package size={14} />
-              One group downloads as PDF. Multiple groups download as ZIP.
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <Layers size={14} />
-              {groups.length || 0} output group{groups.length === 1 ? "" : "s"}.
-            </span>
-          </div>
-
-          {selectedPages.length > 0 ? (
-            <div className="fixed inset-x-0 bottom-5 z-40 mx-auto flex w-[calc(100%-2rem)] max-w-3xl flex-wrap items-center justify-center gap-2 rounded-full border border-[var(--violet-border)] bg-white/95 px-3 py-2 text-sm font-semibold text-[var(--text-secondary)] shadow-[var(--shadow-card)] backdrop-blur">
-              <span className="px-2 text-[var(--violet-600)]">{selectedSummary}</span>
-              <button type="button" onClick={() => addSelectionToGroups(false)} disabled={busy} className="rounded-full px-3 py-1.5 transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40">
-                <ListPlus className="mr-1 inline" size={14} />
-                Add Group
-              </button>
-              <button type="button" onClick={() => addSelectionToGroups(true)} disabled={busy} className="rounded-full px-3 py-1.5 transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40">
-                Replace
-              </button>
-              <button type="button" onClick={clearSelection} disabled={busy} className="rounded-full px-3 py-1.5 text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40">
-                ✕ Clear
-              </button>
-            </div>
-          ) : null}
         </section>
       </main>
     </>
