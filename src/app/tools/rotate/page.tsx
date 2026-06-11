@@ -1,25 +1,32 @@
 "use client";
 
-import { useEffect, useMemo, useState, type MouseEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
 import {
   CheckSquare,
+  CircleHelp,
   Download,
   FileText,
-  ListRestart,
+  Grid2X2,
   Loader2,
   RotateCcw,
   RotateCw,
+  RotateCcwSquare,
+  RotateCwSquare,
+  Undo2,
+  Redo2,
   X,
 } from "lucide-react";
 
 import { Header } from "@/components/Header";
 import { PageGrid } from "@/components/tool-kit/PageGrid";
-import { PdfDropzone } from "@/components/tool-kit/PdfDropzone";
-import { SelectionToolbar } from "@/components/tool-kit/SelectionToolbar";
-import { StatusBar, type StatusBarType } from "@/components/tool-kit/StatusBar";
-import { ToolHero } from "@/components/tool-kit/ToolHero";
-import { ToolLandingState } from "@/components/tool-kit/ToolLandingState";
-import { ToolToolbar } from "@/components/tool-kit/ToolToolbar";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import { usePdfPages } from "@/hooks/usePdfPages";
 import { useRangeSelection } from "@/hooks/useRangeSelection";
@@ -34,33 +41,12 @@ import {
 } from "@/lib/pdf-engine";
 
 type RotationDegree = 90 | 180 | 270;
+type OpenPanel = "all" | "selected" | "history" | "help" | null;
 
 function getErrorMessage(error: unknown) {
   if (error instanceof PdfEngineError) return error.message;
   if (error instanceof Error) return error.message;
   return "Rotation export failed. Please check your PDF and try again.";
-}
-
-function getStatusType(message: string, result: PdfProcessingResult | null): StatusBarType {
-  const lowerMessage = message.toLowerCase();
-
-  if (result || lowerMessage.includes("download started")) return "success";
-
-  if (
-    lowerMessage.includes("failed") ||
-    lowerMessage.includes("valid") ||
-    lowerMessage.includes("unsupported") ||
-    lowerMessage.includes("too large") ||
-    lowerMessage.includes("unable") ||
-    lowerMessage.includes("limit") ||
-    lowerMessage.includes("empty") ||
-    lowerMessage.includes("upload a pdf") ||
-    lowerMessage.includes("select pages")
-  ) {
-    return "error";
-  }
-
-  return "info";
 }
 
 function cloneRotationMap(map: RotationMap): RotationMap {
@@ -87,7 +73,60 @@ function getSelectedPagesLabel(selectedPages: number[]) {
   return `${selectedPages.slice(0, 24).join(", ")}, +${selectedPages.length - 24} more`;
 }
 
+function IconButton({
+  label,
+  icon,
+  onClick,
+  disabled,
+  active,
+  danger,
+}: {
+  label: string;
+  icon: ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  active?: boolean;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      className={`group relative flex h-9 w-9 items-center justify-center rounded-xl border bg-white transition disabled:cursor-not-allowed disabled:opacity-40 ${
+        danger
+          ? "border-red-200 text-red-600 hover:border-red-300 hover:bg-red-50"
+          : active
+            ? "border-violet-300 bg-violet-50 text-violet-700"
+            : "border-slate-200 text-slate-600 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700"
+      }`}
+    >
+      {icon}
+      <span className="pointer-events-none absolute top-full z-50 mt-2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-xs font-semibold text-white opacity-0 shadow-lg transition delay-300 group-hover:opacity-100">
+        {label}
+      </span>
+    </button>
+  );
+}
+
+function ProgressBar({ value }: { value: number }) {
+  const safeValue = Math.max(0, Math.min(100, value));
+
+  return (
+    <div className="h-2 overflow-hidden rounded-full bg-white/75">
+      <div
+        className="h-full rounded-full bg-violet-600 transition-all duration-300"
+        style={{ width: `${safeValue}%` }}
+      />
+    </div>
+  );
+}
+
 export default function RotatePage() {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const toolbarRef = useRef<HTMLDivElement | null>(null);
+
   const { recordExport } = useEntitlement();
 
   const {
@@ -119,10 +158,10 @@ export default function RotatePage() {
   const [status, setStatus] = useState("Upload a PDF to rotate pages.");
   const [exporting, setExporting] = useState(false);
   const [result, setResult] = useState<PdfProcessingResult | null>(null);
+  const [openPanel, setOpenPanel] = useState<OpenPanel>(null);
 
   const selectedPages = selected;
   const isBusy = pdfLoading || exporting;
-  const statusType = getStatusType(lastError || pdfError || status, result);
 
   const changedPages = useMemo(
     () =>
@@ -140,6 +179,19 @@ export default function RotatePage() {
   const canUndoRotation = rotationPast.length > 0;
   const canRedoRotation = rotationFuture.length > 0;
 
+  const currentStatus = lastError || pdfError || status;
+
+  const statusIsError =
+    currentStatus.toLowerCase().includes("failed") ||
+    currentStatus.toLowerCase().includes("valid") ||
+    currentStatus.toLowerCase().includes("unsupported") ||
+    currentStatus.toLowerCase().includes("too large") ||
+    currentStatus.toLowerCase().includes("unable") ||
+    currentStatus.toLowerCase().includes("limit") ||
+    currentStatus.toLowerCase().includes("empty") ||
+    currentStatus.toLowerCase().includes("upload a pdf") ||
+    currentStatus.toLowerCase().includes("select pages");
+
   useEffect(() => {
     if (pdfError) {
       setStatus(pdfError);
@@ -153,15 +205,40 @@ export default function RotatePage() {
     }
   }, [file, pageCount, pdfError, pdfLoading]);
 
-  async function handleFile(selectedFile: File) {
+  useEffect(() => {
+    function handlePointerDown(event: PointerEvent) {
+      if (!toolbarRef.current) return;
+      if (event.target instanceof Node && toolbarRef.current.contains(event.target)) return;
+
+      setOpenPanel(null);
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, []);
+
+  function togglePanel(nextPanel: OpenPanel) {
+    setOpenPanel((current) => (current === nextPanel ? null : nextPanel));
+  }
+
+  async function handleFile(selectedFile?: File) {
+    if (!selectedFile || isBusy) return;
+
     setResult(null);
     setRotationMap({});
     setRotationPast([]);
     setRotationFuture([]);
+    setOpenPanel(null);
     resetSelection();
     setStatus("Reading PDF and rendering page thumbnails...");
 
     await loadFile(selectedFile);
+  }
+
+  function handleUploadDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    if (isBusy) return;
+    handleFile(event.dataTransfer.files?.[0]);
   }
 
   function clearFile() {
@@ -171,6 +248,7 @@ export default function RotatePage() {
     setRotationPast([]);
     setRotationFuture([]);
     setResult(null);
+    setOpenPanel(null);
     setStatus("Upload a PDF to rotate pages.");
   }
 
@@ -336,6 +414,7 @@ export default function RotatePage() {
 
     setExporting(true);
     setResult(null);
+    setOpenPanel(null);
     setStatus("Applying rotations with PDFMantra engine...");
 
     try {
@@ -372,96 +451,310 @@ export default function RotatePage() {
     }
   }
 
-  if (!file) {
-    return (
-      <>
-        <Header />
-        <ToolLandingState
-          icon={RotateCw}
-          title="Rotate PDF Pages"
-          description="Rotate individual pages or all pages together."
-          ctaLabel="Select PDF file"
-          tips={["Multi-select pages", "Batch rotate 90/180/270", "Selective control"]}
-          onFileSelect={(selected) => handleFile(Array.isArray(selected) ? selected[0] : selected)}
-        />
-      </>
-    );
-  }
-
   return (
     <>
       <Header />
 
-      <main className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)]">
-        <section className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
-          <ToolHero
-            icon={RotateCw}
-            title="Rotate PDF Pages"
-            description="Rotate individual pages, selected pages, or the full PDF from a visual page grid, then export a clean rotated PDF."
-            stats={[
-              { label: "Pages", value: pageCount || "-" },
-              { label: "Changed", value: changedPages || "-" },
-              { label: "Output", value: result ? formatFileSize(result.outputSize) : "-" },
-            ]}
+      <main className="min-h-screen bg-slate-50 text-slate-950">
+        <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+          <input
+            ref={inputRef}
+            type="file"
+            accept="application/pdf"
+            className="hidden"
+            onChange={(event) => handleFile(event.target.files?.[0])}
           />
 
-          <section className="grid gap-6 lg:grid-cols-[1fr_390px]">
-            <div className="space-y-5">
-              <PdfDropzone
-                onFile={handleFile}
-                loading={pdfLoading}
-                loadingLabel="Reading PDF..."
-                progress={progress}
-                currentFileName={file?.name}
-                pageCount={pageCount || undefined}
-                fileSize={file?.size}
-              />
+          <div className="mb-6 flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
+              <RotateCw size={20} />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-slate-900">Rotate PDF Pages</h1>
+              <p className="text-sm text-slate-500">
+                Rotate all pages, selected pages, or individual pages from a visual grid.
+              </p>
+            </div>
+          </div>
 
-              {file ? (
-                <div className="rounded-[1.5rem] border border-[var(--border-light)] bg-white p-5 shadow-sm">
-                  <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-                    <div className="min-w-0">
-                      <div className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
-                        Selected file
+          {file ? (
+            <div
+              ref={toolbarRef}
+              className="relative z-40 mb-4 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm lg:flex-row lg:items-center lg:justify-between"
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">
+                  {pageCount} page{pageCount === 1 ? "" : "s"}
+                </span>
+                <span className="rounded-full bg-violet-100 px-3 py-1.5 text-xs font-bold text-violet-700">
+                  {changedPages || 0} changed
+                </span>
+                <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">
+                  {selectedPages.length} selected
+                </span>
+                {result ? (
+                  <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">
+                    Output {formatFileSize(result.outputSize)}
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <IconButton
+                  label="Select all"
+                  icon={<CheckSquare size={16} />}
+                  onClick={handleSelectAll}
+                  disabled={!file || isBusy}
+                />
+
+                <IconButton
+                  label="Clear selection"
+                  icon={<X size={16} />}
+                  onClick={handleClearSelection}
+                  disabled={!file || isBusy || selectedPages.length === 0}
+                  danger={selectedPages.length > 0}
+                />
+
+                <IconButton
+                  label="Undo selection"
+                  icon={<Undo2 size={16} />}
+                  onClick={handleUndoSelection}
+                  disabled={isBusy || !canUndo}
+                />
+
+                <span className="mx-1 hidden h-7 w-px bg-slate-200 sm:inline-block" />
+
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => togglePanel("selected")}
+                    disabled={isBusy}
+                    className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <Grid2X2 size={15} />
+                    Selected
+                  </button>
+
+                  {openPanel === "selected" ? (
+                    <div className="absolute right-0 z-50 mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl">
+                      <div className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
+                        Rotate selected pages
                       </div>
-                      <div className="mt-1 truncate text-lg font-black tracking-[-0.03em] text-slate-950">
-                        {file.name}
+
+                      <div className="mt-3 grid grid-cols-3 gap-2">
+                        {[
+                          { label: "90°", value: 90 },
+                          { label: "180°", value: 180 },
+                          { label: "270°", value: 270 },
+                        ].map((item) => (
+                          <button
+                            key={item.value}
+                            type="button"
+                            onClick={() => rotateSelectedPages(item.value as RotationDegree)}
+                            disabled={!file || isBusy || selectedPages.length === 0}
+                            className="rounded-xl border border-slate-200 px-3 py-3 text-sm font-bold text-slate-700 transition hover:border-violet-300 hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            {item.label}
+                          </button>
+                        ))}
                       </div>
-                      <div className="mt-1 text-sm font-semibold text-slate-500">
-                        Original size: {formatFileSize(file.size)}
+
+                      <button
+                        type="button"
+                        onClick={resetSelectedPages}
+                        disabled={!file || isBusy || selectedPages.length === 0}
+                        className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <RotateCcw size={15} />
+                        Reset selected
+                      </button>
+
+                      <div className="mt-3 max-h-28 overflow-y-auto rounded-xl bg-slate-50 p-3 text-xs font-semibold leading-5 text-slate-500">
+                        {selectedPagesLabel}
                       </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={clearFile}
-                      disabled={isBusy}
-                      className="inline-flex items-center justify-center gap-2 rounded-full border border-red-100 bg-red-50 px-4 py-2 text-sm font-black text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <X size={15} />
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              ) : null}
-
-              <section className="rounded-[1.5rem] border border-[var(--border-light)] bg-white p-5 shadow-sm">
-                <div className="mb-5 flex flex-col justify-between gap-3 md:flex-row md:items-center">
-                  <div>
-                    <h2 className="text-[1.75rem] font-black tracking-[-0.04em] text-slate-950">
-                      Visual Rotation Grid
-                    </h2>
-                    <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
-                      Click pages to select them. Hold Shift and click another page to select a range.
-                    </p>
-                  </div>
-
-                  {file ? (
-                    <div className="rounded-full border border-[var(--violet-border)] bg-[var(--violet-50)] px-4 py-2 text-xs font-black uppercase tracking-[0.12em] text-[var(--violet-700)]">
-                      {selectedPages.length} selected
                     </div>
                   ) : null}
                 </div>
+
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => togglePanel("all")}
+                    disabled={isBusy}
+                    className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <RotateCwSquare size={15} />
+                    All
+                  </button>
+
+                  {openPanel === "all" ? (
+                    <div className="absolute right-0 z-50 mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl">
+                      <div className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
+                        Rotate all pages
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-3 gap-2">
+                        {[
+                          { label: "90°", value: 90 },
+                          { label: "180°", value: 180 },
+                          { label: "270°", value: 270 },
+                        ].map((item) => (
+                          <button
+                            key={item.value}
+                            type="button"
+                            onClick={() => rotateAll(item.value as RotationDegree)}
+                            disabled={!file || isBusy}
+                            className="rounded-xl border border-slate-200 px-3 py-3 text-sm font-bold text-slate-700 transition hover:border-violet-300 hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={resetAll}
+                        disabled={!file || isBusy || changedPages === 0}
+                        className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 px-3 py-2 text-sm font-bold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <RotateCcw size={15} />
+                        Reset all rotations
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => togglePanel("history")}
+                    disabled={isBusy}
+                    className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <RotateCcwSquare size={15} />
+                    History
+                  </button>
+
+                  {openPanel === "history" ? (
+                    <div className="absolute right-0 z-50 mt-2 w-64 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl">
+                      <button
+                        type="button"
+                        onClick={undoRotation}
+                        disabled={isBusy || !canUndoRotation}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <Undo2 size={15} />
+                        Undo rotation
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={redoRotation}
+                        disabled={isBusy || !canRedoRotation}
+                        className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <Redo2 size={15} />
+                        Redo rotation
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+
+                <IconButton
+                  label="Help"
+                  icon={<CircleHelp size={16} />}
+                  onClick={() => togglePanel("help")}
+                  active={openPanel === "help"}
+                />
+
+                <IconButton
+                  label="Remove file"
+                  icon={<X size={16} />}
+                  onClick={clearFile}
+                  disabled={isBusy}
+                  danger
+                />
+
+                <button
+                  type="button"
+                  onClick={handleExport}
+                  disabled={!file || isBusy}
+                  className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 text-sm font-bold text-white shadow-[0_12px_26px_rgba(101,80,232,0.22)] transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {exporting ? <Loader2 className="animate-spin" size={17} /> : <Download size={17} />}
+                  {exporting ? "Exporting" : result ? "Export Again" : "Export"}
+                </button>
+              </div>
+
+              {openPanel === "help" ? (
+                <div className="absolute right-3 top-full z-50 mt-2 w-80 rounded-2xl border border-slate-200 bg-white p-3 text-xs font-semibold leading-5 text-slate-600 shadow-xl">
+                  Click pages to select them. Hold Shift and click another page to select a range.
+                  Use individual page buttons for quick -90°, 0°, and +90° rotation.
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          <section
+            onDrop={handleUploadDrop}
+            onDragOver={(event) => event.preventDefault()}
+            className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+          >
+            {!file ? (
+              <button
+                type="button"
+                onClick={() => inputRef.current?.click()}
+                disabled={isBusy}
+                className="flex min-h-[400px] w-full flex-col items-center justify-center rounded-2xl border-2 border-dashed border-violet-200 bg-violet-50/35 text-center transition hover:border-violet-300 hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-600 text-white shadow-[0_16px_34px_rgba(101,80,232,0.24)]">
+                  {pdfLoading ? <Loader2 className="animate-spin" size={24} /> : <Upload size={24} />}
+                </div>
+                <div className="mt-5 text-lg font-bold text-slate-900">Drop PDF here</div>
+                <div className="mt-2 text-sm font-medium text-slate-500">Browse file or drag and drop</div>
+                <div className="mt-4 rounded-full bg-white px-4 py-2 text-xs font-bold text-slate-500 shadow-sm">
+                  Visual rotate · Multi-select · Undo/redo
+                </div>
+              </button>
+            ) : (
+              <>
+                <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                  <button
+                    type="button"
+                    onClick={() => inputRef.current?.click()}
+                    disabled={isBusy}
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-violet-200 bg-violet-50/55 px-4 py-3 text-sm font-bold text-violet-700 transition hover:border-violet-300 hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40 sm:w-[160px]"
+                  >
+                    <Upload size={16} />
+                    Change PDF
+                  </button>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">
+                      {file.name}
+                    </span>
+                    <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">
+                      {formatFileSize(file.size)}
+                    </span>
+                  </div>
+                </div>
+
+                {pdfLoading ? (
+                  <div className="mb-4 rounded-2xl border border-violet-200 bg-violet-50 p-3">
+                    <div className="mb-2 flex items-center justify-between gap-3 text-sm font-bold text-violet-700">
+                      <span>Rendering page thumbnails...</span>
+                      <span>{progress}%</span>
+                    </div>
+                    <ProgressBar value={progress} />
+                  </div>
+                ) : null}
+
+                {result ? (
+                  <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
+                    <Download size={16} />
+                    Rotated PDF created · {formatFileSize(result.outputSize)}
+                  </div>
+                ) : null}
 
                 <PageGrid
                   pages={pages}
@@ -480,7 +773,7 @@ export default function RotatePage() {
                           rotatePage(page.pageNumber, "left");
                         }}
                         disabled={isBusy}
-                        className="rounded-xl border border-[var(--border-light)] bg-white px-2 py-2 text-xs font-black text-slate-700 transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
+                        className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-bold text-slate-700 transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         -90°
                       </button>
@@ -491,7 +784,7 @@ export default function RotatePage() {
                           resetPage(page.pageNumber);
                         }}
                         disabled={isBusy}
-                        className="rounded-xl border border-[var(--border-light)] bg-white px-2 py-2 text-xs font-black text-slate-700 transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
+                        className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-bold text-slate-700 transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         0°
                       </button>
@@ -502,231 +795,23 @@ export default function RotatePage() {
                           rotatePage(page.pageNumber, "right");
                         }}
                         disabled={isBusy}
-                        className="rounded-xl border border-[var(--border-light)] bg-white px-2 py-2 text-xs font-black text-slate-700 transition hover:bg-[var(--violet-50)] disabled:cursor-not-allowed disabled:opacity-40"
+                        className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-bold text-slate-700 transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         +90°
                       </button>
                     </div>
                   )}
                 />
-              </section>
-            </div>
-
-            <aside className="space-y-5">
-              <div className="rounded-[1.75rem] border border-[var(--border-light)] bg-white p-5 shadow-sm">
-                <h2 className="text-xl font-black tracking-[-0.03em] text-slate-950">
-                  Rotate Settings
-                </h2>
-
-                <div className="mt-5 space-y-4">
-                  <ToolToolbar
-                    description="All Pages"
-                    actions={[
-                      {
-                        label: "90°",
-                        icon: RotateCw,
-                        onClick: () => rotateAll(90),
-                        disabled: !file || isBusy,
-                      },
-                      {
-                        label: "180°",
-                        icon: RotateCw,
-                        onClick: () => rotateAll(180),
-                        disabled: !file || isBusy,
-                      },
-                      {
-                        label: "270°",
-                        icon: RotateCw,
-                        onClick: () => rotateAll(270),
-                        disabled: !file || isBusy,
-                      },
-                    ]}
-                    moreOptions={[
-                      {
-                        label: "Reset All",
-                        icon: ListRestart,
-                        onClick: resetAll,
-                        disabled: !file || isBusy || changedPages === 0,
-                      },
-                    ]}
-                  />
-
-                  <ToolToolbar
-                    description="Selected Pages"
-                    actions={[
-                      {
-                        label: "90°",
-                        icon: RotateCw,
-                        onClick: () => rotateSelectedPages(90),
-                        disabled: !file || isBusy || selectedPages.length === 0,
-                      },
-                      {
-                        label: "180°",
-                        icon: RotateCw,
-                        onClick: () => rotateSelectedPages(180),
-                        disabled: !file || isBusy || selectedPages.length === 0,
-                      },
-                      {
-                        label: "270°",
-                        icon: RotateCw,
-                        onClick: () => rotateSelectedPages(270),
-                        disabled: !file || isBusy || selectedPages.length === 0,
-                      },
-                    ]}
-                    moreOptions={[
-                      {
-                        label: "Reset Selected",
-                        icon: RotateCcw,
-                        onClick: resetSelectedPages,
-                        disabled: !file || isBusy || selectedPages.length === 0,
-                      },
-                      {
-                        label: "Select All",
-                        icon: CheckSquare,
-                        onClick: handleSelectAll,
-                        disabled: !file || isBusy,
-                      },
-                      {
-                        label: "Clear Selection",
-                        icon: X,
-                        onClick: handleClearSelection,
-                        disabled: !file || isBusy || selectedPages.length === 0,
-                      },
-                    ]}
-                  />
-
-                  <ToolToolbar
-                    description="History and export"
-                    actions={[
-                      {
-                        label: "Undo",
-                        icon: RotateCcw,
-                        onClick: undoRotation,
-                        disabled: isBusy || !canUndoRotation,
-                      },
-                      {
-                        label: "Redo",
-                        icon: RotateCw,
-                        onClick: redoRotation,
-                        disabled: isBusy || !canRedoRotation,
-                      },
-                    ]}
-                    primaryAction={{
-                      label: exporting ? "Processing" : "Export PDF",
-                      icon: exporting ? Loader2 : Download,
-                      onClick: handleExport,
-                      disabled: !file || isBusy,
-                      loading: exporting,
-                    }}
-                  />
-                </div>
-
-                <div className="mt-5 grid grid-cols-2 gap-3">
-                  <div className="rounded-2xl bg-slate-50 p-4">
-                    <div className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
-                      Total pages
-                    </div>
-                    <div className="mt-1 text-3xl font-black tracking-[-0.04em] text-slate-950">
-                      {pageCount || "-"}
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl bg-[var(--violet-50)] p-4">
-                    <div className="text-xs font-black uppercase tracking-[0.14em] text-[var(--violet-700)]">
-                      Changed
-                    </div>
-                    <div className="mt-1 text-3xl font-black tracking-[-0.04em] text-[var(--violet-700)]">
-                      {changedPages || "-"}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-3 rounded-2xl bg-slate-50 p-4">
-                  <div className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
-                    Selected pages
-                  </div>
-                  <div className="mt-1 max-h-24 overflow-y-auto text-sm font-bold leading-6 text-slate-700">
-                    {selectedPagesLabel}
-                  </div>
-                </div>
-
-                <div className="mt-3 rounded-2xl bg-slate-50 p-4">
-                  <div className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
-                    Output
-                  </div>
-                  <div className="mt-1 text-xl font-black tracking-[-0.03em] text-slate-950">
-                    {result ? formatFileSize(result.outputSize) : "-"}
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-[1.5rem] border border-[var(--border-light)] bg-white p-4 shadow-sm">
-                <div className="mb-1 flex items-center gap-2 text-sm font-black text-slate-800">
-                  <FileText size={16} />
-                  Status
-                </div>
-                <StatusBar message={lastError || pdfError || status} type={statusType} />
-              </div>
-
-              <div className="rounded-[1.5rem] border border-indigo-100 bg-indigo-50 p-4 text-sm font-semibold leading-6 text-indigo-800">
-                <div className="font-black">How it works</div>
-                <p className="mt-2">
-                  Page thumbnails rotate visually in the grid. The final export uses the existing PDFMantra rotate engine and does not change the original uploaded file.
-                </p>
-              </div>
-            </aside>
+              </>
+            )}
           </section>
-        </section>
 
-        <SelectionToolbar
-          visible={selectedPages.length > 0}
-          selectedCount={selectedPages.length}
-          selectedLabel={`${selectedPages.length} page${selectedPages.length === 1 ? "" : "s"} selected`}
-          actions={[
-            {
-              label: "90°",
-              icon: "↻",
-              onClick: () => rotateSelectedPages(90),
-              disabled: isBusy,
-            },
-            {
-              label: "180°",
-              icon: "↻",
-              onClick: () => rotateSelectedPages(180),
-              disabled: isBusy,
-            },
-            {
-              label: "270°",
-              icon: "↻",
-              onClick: () => rotateSelectedPages(270),
-              disabled: isBusy,
-            },
-            {
-              label: "Reset",
-              icon: "0°",
-              onClick: resetSelectedPages,
-              disabled: isBusy,
-            },
-            {
-              label: "Undo Select",
-              icon: "↶",
-              onClick: handleUndoSelection,
-              disabled: isBusy || !canUndo,
-            },
-            {
-              label: "Clear",
-              icon: "×",
-              onClick: handleClearSelection,
-              disabled: isBusy,
-            },
-            {
-              label: "Export",
-              icon: "↓",
-              onClick: handleExport,
-              disabled: isBusy || !file,
-            },
-          ]}
-        />
+          <div className={`mt-3 truncate px-1 text-sm font-medium ${statusIsError ? "text-red-600" : "text-slate-500"}`}>
+            {file && !statusIsError && !isBusy
+              ? `${changedPages || 0} changed · ${selectedPages.length} selected · ${result ? `output ${formatFileSize(result.outputSize)}` : "ready to export"}`
+              : currentStatus}
+          </div>
+        </section>
       </main>
     </>
   );
