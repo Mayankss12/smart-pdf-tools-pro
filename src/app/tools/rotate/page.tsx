@@ -16,6 +16,7 @@ import {
   FileText,
   Grid2X2,
   Loader2,
+  Upload,
   RotateCcw,
   RotateCw,
   RotateCcwSquare,
