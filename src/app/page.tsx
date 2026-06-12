@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   CheckCircle2,
-  Clock3,
+  ChevronDown,
   FileImage,
   FileSignature,
   FileText,
@@ -17,11 +17,9 @@ import {
   Scissors,
   Search,
   ShieldCheck,
-  Sparkles,
   Trash2,
   Upload,
   X,
-  Zap,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -35,214 +33,232 @@ import {
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 
-type HomeTask = {
+type PdfAction = {
   title: string;
-  description: string;
   href: string;
   icon: LucideIcon;
   keywords: string[];
 };
 
-type TaskGroup = {
+type ActionGroup = {
   title: string;
-  description: string;
-  tasks: HomeTask[];
+  actions: PdfAction[];
 };
 
-const taskGroups: TaskGroup[] = [
+const popularActions: PdfAction[] = [
+  {
+    title: "Merge PDF",
+    href: "/tools/merge",
+    icon: Layers,
+    keywords: ["merge", "combine", "join", "multiple pdf"],
+  },
+  {
+    title: "Compress PDF",
+    href: "/tools/compress",
+    icon: Minimize2,
+    keywords: ["compress", "reduce size", "small pdf", "optimize"],
+  },
+  {
+    title: "Fill & Sign",
+    href: "/tools/fill-sign",
+    icon: FileSignature,
+    keywords: ["sign", "signature", "fill", "form", "date"],
+  },
+  {
+    title: "Edit PDF",
+    href: "/editor",
+    icon: FileText,
+    keywords: ["edit", "text", "highlight", "annotate", "editor"],
+  },
+  {
+    title: "Images to PDF",
+    href: "/tools/images-to-pdf",
+    icon: ImageIcon,
+    keywords: ["image", "jpg", "png", "photo", "convert"],
+  },
+  {
+    title: "PDF to Images",
+    href: "/tools/pdf-to-images",
+    icon: FileImage,
+    keywords: ["pdf to image", "jpg", "png", "export"],
+  },
+  {
+    title: "Reorder Pages",
+    href: "/tools/reorder",
+    icon: RotateCw,
+    keywords: ["reorder", "arrange", "sort", "move pages"],
+  },
+  {
+    title: "Delete Pages",
+    href: "/tools/delete-pages",
+    icon: Trash2,
+    keywords: ["delete", "remove", "pages"],
+  },
+];
+
+const actionGroups: ActionGroup[] = [
   {
     title: "Organize pages",
-    description: "Arrange, remove, rotate, or extract PDF pages.",
-    tasks: [
+    actions: [
       {
         title: "Merge PDF",
-        description: "Combine multiple PDFs into one file.",
         href: "/tools/merge",
         icon: Layers,
-        keywords: ["join", "combine", "merge", "multiple pdf"],
+        keywords: ["merge", "combine", "join"],
       },
       {
         title: "Split PDF",
-        description: "Separate one PDF into smaller files.",
         href: "/tools/split",
         icon: Scissors,
         keywords: ["split", "separate", "divide"],
       },
       {
         title: "Reorder Pages",
-        description: "Move pages into the right order.",
         href: "/tools/reorder",
         icon: RotateCw,
-        keywords: ["reorder", "arrange", "sort", "move pages"],
+        keywords: ["reorder", "arrange", "sort"],
       },
       {
         title: "Delete Pages",
-        description: "Remove unwanted pages from a PDF.",
         href: "/tools/delete-pages",
         icon: Trash2,
         keywords: ["delete", "remove", "pages"],
       },
       {
         title: "Extract Pages",
-        description: "Save selected pages as a new PDF.",
         href: "/tools/extract",
         icon: FileText,
-        keywords: ["extract", "selected pages", "save pages"],
+        keywords: ["extract", "selected pages"],
       },
     ],
   },
   {
     title: "Edit & sign",
-    description: "Add information, marks, page numbers, or signatures.",
-    tasks: [
+    actions: [
+      {
+        title: "Edit PDF",
+        href: "/editor",
+        icon: FileText,
+        keywords: ["edit", "annotate", "highlight", "text"],
+      },
       {
         title: "Fill & Sign",
-        description: "Add text, dates, marks, signatures, and images.",
         href: "/tools/fill-sign",
         icon: FileSignature,
-        keywords: ["sign", "signature", "fill", "form", "date"],
+        keywords: ["sign", "signature", "fill"],
       },
       {
         title: "Watermark PDF",
-        description: "Add a watermark to your document.",
         href: "/tools/watermark",
-        icon: Sparkles,
-        keywords: ["watermark", "stamp", "brand"],
+        icon: ShieldCheck,
+        keywords: ["watermark", "stamp"],
       },
       {
         title: "Page Numbers",
-        description: "Add page numbers to PDF pages.",
         href: "/tools/page-numbers",
         icon: Hash,
-        keywords: ["page number", "numbering", "footer"],
+        keywords: ["page number", "numbering"],
       },
     ],
   },
   {
     title: "Convert files",
-    description: "Move between PDFs and image formats.",
-    tasks: [
+    actions: [
       {
         title: "Images to PDF",
-        description: "Create a PDF from JPG, PNG, or images.",
         href: "/tools/images-to-pdf",
         icon: ImageIcon,
-        keywords: ["image", "jpg", "png", "photo", "convert"],
+        keywords: ["image", "jpg", "png", "photo"],
       },
       {
         title: "PDF to Images",
-        description: "Export PDF pages as images.",
         href: "/tools/pdf-to-images",
         icon: FileImage,
-        keywords: ["pdf to image", "jpg", "png", "export"],
+        keywords: ["pdf to image", "jpg", "png"],
       },
     ],
   },
   {
     title: "Optimize",
-    description: "Reduce PDF size for sharing and uploads.",
-    tasks: [
+    actions: [
       {
         title: "Compress PDF",
-        description: "Make PDF files smaller.",
         href: "/tools/compress",
         icon: Minimize2,
-        keywords: ["compress", "reduce size", "small pdf", "optimize"],
+        keywords: ["compress", "reduce size", "small pdf"],
       },
     ],
   },
 ];
 
-const quickTasks = [
-  "Merge PDF",
-  "Compress PDF",
-  "Fill & Sign",
-  "Reorder Pages",
-  "Images to PDF",
-  "PDF to Images",
-];
-
 const trustItems = [
-  "No signup needed",
-  "Browser-first tools",
-  "Fast everyday PDF actions",
+  "No signup",
+  "Browser-first",
+  "Fast PDF tools",
   "Free to start",
-];
+] as const;
 
-const workflowHints = [
-  {
-    title: "I need to combine files",
-    action: "Use Merge PDF",
-    href: "/tools/merge",
-  },
-  {
-    title: "My PDF is too large",
-    action: "Use Compress PDF",
-    href: "/tools/compress",
-  },
-  {
-    title: "I need to sign a document",
-    action: "Use Fill & Sign",
-    href: "/tools/fill-sign",
-  },
-  {
-    title: "Pages are in wrong order",
-    action: "Use Reorder Pages",
-    href: "/tools/reorder",
-  },
-];
+function getAllActions() {
+  const map = new Map<string, PdfAction>();
 
-function getAllTasks() {
-  return taskGroups.flatMap((group) => group.tasks);
+  [...popularActions, ...actionGroups.flatMap((group) => group.actions)].forEach(
+    (action) => {
+      map.set(action.href, action);
+    }
+  );
+
+  return Array.from(map.values());
 }
 
-function TaskRow({ task }: { readonly task: HomeTask }) {
-  const Icon = task.icon;
+function ActionPill({ action }: { readonly action: PdfAction }) {
+  const Icon = action.icon;
 
   return (
     <Link
-      href={task.href}
-      className="group flex items-center gap-3 rounded-2xl px-3 py-3 transition hover:bg-[var(--violet-50)]"
+      href={action.href}
+      className="inline-flex min-h-10 items-center gap-2 rounded-full border border-[var(--border-light)] bg-white px-3.5 py-2 text-sm font-bold text-[var(--text-primary)] shadow-sm transition hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] hover:text-[var(--violet-600)]"
     >
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[var(--violet-600)] shadow-sm ring-1 ring-[var(--border-light)] transition group-hover:bg-[var(--violet-600)] group-hover:text-white">
-        <Icon size={18} />
-      </span>
-
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm font-bold text-[var(--text-primary)]">
-          {task.title}
-        </span>
-        <span className="mt-0.5 block text-xs leading-5 text-[var(--text-secondary)]">
-          {task.description}
-        </span>
-      </span>
-
-      <ArrowRight
-        size={16}
-        className="shrink-0 text-[var(--text-muted)] transition group-hover:translate-x-0.5 group-hover:text-[var(--violet-600)]"
-      />
+      <Icon size={15} className="text-[var(--violet-600)]" />
+      {action.title}
     </Link>
   );
 }
 
-function TaskGroupPanel({ group }: { readonly group: TaskGroup }) {
-  return (
-    <section className="rounded-[1.5rem] border border-[var(--border-light)] bg-white p-3 shadow-[0_14px_45px_rgba(15,23,42,0.04)]">
-      <div className="px-3 py-2">
-        <h2 className="text-sm font-bold text-[var(--text-primary)]">
-          {group.title}
-        </h2>
-        <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
-          {group.description}
-        </p>
-      </div>
+function CompactActionRow({ action }: { readonly action: PdfAction }) {
+  const Icon = action.icon;
 
-      <div className="mt-1 divide-y divide-[var(--border-light)]">
-        {group.tasks.map((task) => (
-          <TaskRow key={task.href} task={task} />
+  return (
+    <Link
+      href={action.href}
+      className="flex items-center justify-between gap-3 rounded-xl px-2.5 py-2.5 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--violet-50)] hover:text-[var(--violet-600)]"
+    >
+      <span className="flex min-w-0 items-center gap-2.5">
+        <Icon size={16} className="shrink-0 text-[var(--violet-600)]" />
+        <span className="truncate">{action.title}</span>
+      </span>
+
+      <ArrowRight size={14} className="shrink-0 text-[var(--text-muted)]" />
+    </Link>
+  );
+}
+
+function ActionAccordion({ group }: { readonly group: ActionGroup }) {
+  return (
+    <details className="group border-b border-[var(--border-light)] py-2 last:border-b-0">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl px-2.5 py-2 text-sm font-bold text-[var(--text-primary)] transition hover:bg-slate-50">
+        {group.title}
+        <ChevronDown
+          size={16}
+          className="shrink-0 text-[var(--text-muted)] transition group-open:rotate-180"
+        />
+      </summary>
+
+      <div className="pb-2 pl-1 pt-1">
+        {group.actions.map((action) => (
+          <CompactActionRow key={action.href} action={action} />
         ))}
       </div>
-    </section>
+    </details>
   );
 }
 
@@ -251,26 +267,21 @@ export default function HomePage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [query, setQuery] = useState("");
 
-  const allTasks = useMemo(() => getAllTasks(), []);
+  const allActions = useMemo(() => getAllActions(), []);
   const normalizedQuery = query.trim().toLowerCase();
 
-  const searchResults = useMemo(() => {
+  const results = useMemo(() => {
     if (!normalizedQuery) return [];
 
-    return allTasks.filter((task) =>
-      [
-        task.title,
-        task.description,
-        task.href,
-        ...task.keywords,
-      ]
+    return allActions.filter((action) =>
+      [action.title, action.href, ...action.keywords]
         .join(" ")
         .toLowerCase()
         .includes(normalizedQuery)
     );
-  }, [allTasks, normalizedQuery]);
+  }, [allActions, normalizedQuery]);
 
-  function openWorkspace() {
+  function openEditor() {
     router.push("/editor");
   }
 
@@ -278,7 +289,7 @@ export default function HomePage() {
     const file = event.target.files?.[0];
 
     if (file) {
-      openWorkspace();
+      openEditor();
     }
 
     event.currentTarget.value = "";
@@ -290,15 +301,7 @@ export default function HomePage() {
     const file = event.dataTransfer.files?.[0];
 
     if (file) {
-      openWorkspace();
-    }
-  }
-
-  function openQuickTask(title: string) {
-    const task = allTasks.find((item) => item.title === title);
-
-    if (task) {
-      router.push(task.href);
+      openEditor();
     }
   }
 
@@ -306,7 +309,7 @@ export default function HomePage() {
     <>
       <Header />
 
-      <main className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)]">
+      <main className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f7f5ff_100%)] text-[var(--text-primary)]">
         <input
           ref={fileInputRef}
           type="file"
@@ -315,201 +318,115 @@ export default function HomePage() {
           onChange={handleFileChange}
         />
 
-        <section className="border-b border-[var(--border-light)] bg-[linear-gradient(180deg,#ffffff_0%,#f8f7ff_100%)]">
-          <div className="mx-auto max-w-[1280px] px-4 py-7 sm:px-6 sm:py-10 lg:px-8">
-            <div className="grid gap-5 lg:grid-cols-[0.92fr_1.08fr] lg:items-start">
-              <div className="lg:sticky lg:top-24">
-                <div className="inline-flex items-center gap-2 rounded-full border border-[var(--border-light)] bg-white px-3 py-1.5 text-xs font-bold text-[var(--text-secondary)] shadow-sm">
-                  <Zap size={14} className="text-[var(--violet-600)]" />
-                  PDF task launcher
-                </div>
+        <section className="mx-auto max-w-[980px] px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
+          <div className="text-center">
+            <p className="mx-auto inline-flex items-center gap-2 rounded-full border border-[var(--border-light)] bg-white px-3 py-1.5 text-xs font-bold text-[var(--text-secondary)] shadow-sm">
+              <FileText size={14} className="text-[var(--violet-600)]" />
+              PDFMantra
+            </p>
 
-                <h1 className="display-font mt-4 max-w-xl text-[2rem] font-bold leading-[1.08] tracking-[-0.035em] text-[var(--text-primary)] sm:text-[2.6rem] lg:text-[3.1rem]">
-                  What do you want to do with your PDF?
-                </h1>
+            <h1 className="display-font mx-auto mt-4 max-w-2xl text-3xl font-bold leading-tight tracking-[-0.035em] text-[var(--text-primary)] sm:text-4xl">
+              What do you want to do with your PDF?
+            </h1>
 
-                <p className="mt-4 max-w-xl text-sm leading-7 text-[var(--text-secondary)] sm:text-base">
-                  Upload a PDF, search a task, or choose the action you need. No long homepage journey — just start the work.
-                </p>
+            <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-[var(--text-secondary)] sm:text-base">
+              Upload a file or choose a PDF action. No signup, no confusion.
+            </p>
+          </div>
 
-                <div className="mt-5 grid gap-3 sm:grid-cols-[auto_1fr]">
+          <div className="mx-auto mt-6 max-w-3xl rounded-[1.75rem] border border-[var(--border-light)] bg-white p-4 shadow-[0_22px_70px_rgba(15,23,42,0.07)] sm:p-5">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              onDrop={handleDrop}
+              onDragOver={(event) => event.preventDefault()}
+              className="flex min-h-24 w-full flex-col items-center justify-center rounded-[1.25rem] border-2 border-dashed border-[var(--border-focus)] bg-[var(--violet-50)] px-4 py-5 text-center transition hover:bg-[var(--violet-100)]"
+            >
+              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--violet-600)] text-white shadow-[0_14px_30px_rgba(101,80,232,0.22)]">
+                <Upload size={20} />
+              </span>
+
+              <span className="mt-3 text-sm font-bold text-[var(--text-primary)]">
+                Upload or drop PDF
+              </span>
+
+              <span className="mt-1 text-xs font-medium text-[var(--text-secondary)]">
+                Open the workspace and start editing
+              </span>
+            </button>
+
+            <div className="mt-4">
+              <label className="flex min-h-11 items-center gap-2 rounded-2xl border border-[var(--border-light)] bg-white px-4 shadow-sm transition focus-within:border-[var(--border-focus)] focus-within:ring-4 focus-within:ring-[rgba(101,80,232,0.10)]">
+                <Search size={16} className="shrink-0 text-[var(--text-muted)]" />
+
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Search tools: merge, sign, compress..."
+                  className="w-full bg-transparent text-sm font-semibold text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
+                />
+
+                {query ? (
                   <button
                     type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    onDrop={handleDrop}
-                    onDragOver={(event) => event.preventDefault()}
-                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[var(--violet-600)] px-5 text-sm font-bold text-white shadow-[0_16px_35px_rgba(101,80,232,0.22)] transition hover:bg-[var(--violet-500)]"
+                    onClick={() => setQuery("")}
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[var(--text-muted)] transition hover:bg-[var(--violet-50)] hover:text-[var(--violet-600)]"
+                    aria-label="Clear search"
                   >
-                    <Upload size={17} />
-                    Upload PDF
+                    <X size={14} />
                   </button>
+                ) : null}
+              </label>
+            </div>
 
-                  <label className="flex min-h-12 items-center gap-2 rounded-2xl border border-[var(--border-light)] bg-white px-4 shadow-sm transition focus-within:border-[var(--border-focus)] focus-within:ring-4 focus-within:ring-[rgba(101,80,232,0.10)]">
-                    <Search size={17} className="shrink-0 text-[var(--text-muted)]" />
-
-                    <input
-                      value={query}
-                      onChange={(event) => setQuery(event.target.value)}
-                      placeholder="Search: merge, sign, compress..."
-                      className="w-full bg-transparent text-sm font-semibold text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
-                    />
-
-                    {query ? (
-                      <button
-                        type="button"
-                        onClick={() => setQuery("")}
-                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[var(--text-muted)] transition hover:bg-[var(--violet-50)] hover:text-[var(--violet-600)]"
-                        aria-label="Clear search"
-                      >
-                        <X size={14} />
-                      </button>
-                    ) : null}
-                  </label>
-                </div>
-
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {quickTasks.map((task) => (
-                    <button
-                      key={task}
-                      type="button"
-                      onClick={() => openQuickTask(task)}
-                      className="rounded-full border border-[var(--border-light)] bg-white px-3 py-2 text-xs font-bold text-[var(--text-secondary)] shadow-sm transition hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] hover:text-[var(--violet-600)]"
-                    >
-                      {task}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 text-xs font-bold text-[var(--text-secondary)]">
-                  {trustItems.map((item) => (
-                    <span key={item} className="inline-flex items-center gap-1.5">
-                      <CheckCircle2 size={14} className="text-[var(--violet-600)]" />
-                      {item}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <div className="rounded-[1.75rem] border border-[var(--border-light)] bg-white p-3 shadow-[0_22px_70px_rgba(15,23,42,0.07)]">
-                {normalizedQuery ? (
-                  <div>
-                    <div className="flex items-center justify-between gap-3 px-3 py-2">
-                      <div>
-                        <h2 className="text-sm font-bold text-[var(--text-primary)]">
-                          Search results
-                        </h2>
-                        <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                          Matching tools for “{query.trim()}”
-                        </p>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => setQuery("")}
-                        className="rounded-full border border-[var(--border-light)] px-3 py-1.5 text-xs font-bold text-[var(--text-secondary)] transition hover:bg-slate-50"
-                      >
-                        Clear
-                      </button>
-                    </div>
-
-                    <div className="mt-1 divide-y divide-[var(--border-light)]">
-                      {searchResults.length > 0 ? (
-                        searchResults.map((task) => (
-                          <TaskRow key={task.href} task={task} />
-                        ))
-                      ) : (
-                        <div className="px-3 py-8 text-center">
-                          <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--violet-50)] text-[var(--violet-600)]">
-                            <Search size={18} />
-                          </div>
-                          <h3 className="mt-3 text-sm font-bold text-[var(--text-primary)]">
-                            No matching task found
-                          </h3>
-                          <p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-[var(--text-secondary)]">
-                            Try words like merge, compress, sign, image, pages, or browse the full tools page.
-                          </p>
-                          <Link
-                            href="/tools"
-                            className="mt-4 inline-flex items-center gap-2 rounded-full bg-[var(--violet-600)] px-4 py-2 text-xs font-bold text-white"
-                          >
-                            Browse all tools
-                            <ArrowRight size={14} />
-                          </Link>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+            {normalizedQuery ? (
+              <div className="mt-3 rounded-2xl border border-[var(--border-light)] bg-slate-50 p-2">
+                {results.length > 0 ? (
+                  results.map((action) => (
+                    <CompactActionRow key={action.href} action={action} />
+                  ))
                 ) : (
-                  <div className="grid gap-3 md:grid-cols-2">
-                    {taskGroups.map((group) => (
-                      <TaskGroupPanel key={group.title} group={group} />
-                    ))}
+                  <div className="px-3 py-5 text-center text-sm font-semibold text-[var(--text-secondary)]">
+                    No matching tool found.
                   </div>
                 )}
               </div>
-            </div>
+            ) : null}
+
+            {!normalizedQuery ? (
+              <>
+                <div className="mt-4 flex flex-wrap justify-center gap-2">
+                  {popularActions.map((action) => (
+                    <ActionPill key={action.href} action={action} />
+                  ))}
+                </div>
+
+                <div className="mt-5 rounded-2xl border border-[var(--border-light)] bg-slate-50/70 px-2">
+                  {actionGroups.map((group) => (
+                    <ActionAccordion key={group.title} group={group} />
+                  ))}
+                </div>
+              </>
+            ) : null}
           </div>
-        </section>
 
-        <section className="bg-white px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
-          <div className="mx-auto max-w-[1280px]">
-            <div className="flex flex-col gap-4 rounded-[1.5rem] border border-[var(--border-light)] bg-slate-50/70 p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <h2 className="text-base font-bold text-[var(--text-primary)]">
-                  Not sure which tool to use?
-                </h2>
-                <p className="mt-1 text-sm leading-6 text-[var(--text-secondary)]">
-                  Pick the problem. PDFMantra will take you to the right workspace.
-                </p>
-              </div>
-
-              <Link
-                href="/tools"
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[var(--violet-600)] px-4 text-sm font-bold text-white shadow-[0_14px_30px_rgba(101,80,232,0.18)] transition hover:bg-[var(--violet-500)]"
-              >
-                Browse all tools
-                <ArrowRight size={15} />
-              </Link>
-            </div>
-
-            <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-              {workflowHints.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="group rounded-2xl border border-[var(--border-light)] bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)]"
-                >
-                  <div className="text-sm font-bold text-[var(--text-primary)]">
-                    {item.title}
-                  </div>
-                  <div className="mt-2 inline-flex items-center gap-2 text-xs font-bold text-[var(--violet-600)]">
-                    {item.action}
-                    <ArrowRight size={14} className="transition group-hover:translate-x-0.5" />
-                  </div>
-                </Link>
-              ))}
-            </div>
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs font-bold text-[var(--text-secondary)] sm:text-sm">
+            {trustItems.map((item) => (
+              <span key={item} className="inline-flex items-center gap-1.5">
+                <CheckCircle2 size={14} className="text-[var(--violet-600)]" />
+                {item}
+              </span>
+            ))}
           </div>
-        </section>
 
-        <section className="border-y border-[var(--border-light)] bg-white px-4 py-5 sm:px-6 lg:px-8">
-          <div className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-center gap-x-5 gap-y-3 text-center text-xs font-bold text-[var(--text-secondary)] sm:text-sm">
-            <span className="inline-flex items-center gap-2">
-              <ShieldCheck size={15} className="text-[var(--violet-600)]" />
-              Browser-first
-            </span>
-            <span className="inline-flex items-center gap-2">
-              <Clock3 size={15} className="text-[var(--violet-600)]" />
-              Fast daily PDF work
-            </span>
-            <span className="inline-flex items-center gap-2">
-              <FileText size={15} className="text-[var(--violet-600)]" />
-              Focused tools, not clutter
-            </span>
-            <span className="inline-flex items-center gap-2">
-              <Sparkles size={15} className="text-[var(--violet-600)]" />
-              Clean workspace
-            </span>
+          <div className="mt-6 text-center">
+            <Link
+              href="/tools"
+              className="inline-flex items-center gap-2 text-sm font-bold text-[var(--violet-600)] transition hover:text-[var(--violet-500)]"
+            >
+              Browse all tools
+              <ArrowRight size={15} />
+            </Link>
           </div>
         </section>
       </main>
