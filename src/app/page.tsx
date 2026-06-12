@@ -1,292 +1,437 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import {
+  ArrowRight,
+  BadgeCheck,
+  Check,
+  FileText,
+  IndianRupee,
+  Layers,
+  Lock,
+  MoveUpRight,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  Upload,
+} from "lucide-react";
+
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
-import { ToolGlyph, type ToolGlyphTone } from "@/components/ToolGlyph";
-import { tools } from "@/lib/tools";
-import { ArrowRight, BadgeCheck, MoveUpRight } from "lucide-react";
 
-const heroCategories = [
-  "All",
-  "Tools",
-  "Organize PDF",
-  "Optimize PDF",
-  "Convert PDF",
-  "Edit PDF",
-  "PDF Security",
+const showcaseTools = [
+  {
+    title: "Reorder PDF Pages",
+    description: "Move pages visually and export a clean reordered PDF.",
+    href: "/tools/reorder",
+    label: "Page workspace",
+    icon: Layers,
+  },
+  {
+    title: "Fill & Sign Documents",
+    description: "Add text, dates, marks, signatures, whiteout, and images.",
+    href: "/tools/fill-sign",
+    label: "Signature editor",
+    icon: FileText,
+  },
+  {
+    title: "OCR + Searchable PDFs",
+    description: "Prepared for searchable scanned document workflows.",
+    href: "/tools/ocr",
+    label: "Roadmap workflow",
+    icon: Search,
+  },
 ] as const;
 
-function toneForCategory(category: string): ToolGlyphTone {
-  if (category === "organize" || category === "optimize") return "indigo";
-  if (category === "convert") return "mint";
-  return "violet";
+const trustSignals = [
+  "11 focused tools",
+  "Browser-first",
+  "Zero upload for browser tools",
+  "OCR roadmap",
+  "Free forever tier",
+] as const;
+
+const pricingPlans = [
+  {
+    name: "Free",
+    price: "₹0",
+    suffix: "forever",
+    description: "Start fast with essential PDF tools.",
+    features: ["5 exports/day", "Browser-side tools", "No signup required", "Core PDF actions"],
+    href: "/tools",
+    cta: "Start free",
+    featured: false,
+  },
+  {
+    name: "Plus",
+    price: "₹99",
+    suffix: "/mo",
+    description: "For users who work with PDFs regularly.",
+    features: ["Unlimited exports", "Higher file limits", "No PDFMantra mark", "Priority browser tools"],
+    href: "/pricing",
+    cta: "Start trial",
+    featured: false,
+  },
+  {
+    name: "Pro",
+    price: "₹249",
+    suffix: "/mo",
+    description: "For power users and serious workflows.",
+    features: ["Everything in Plus", "Advanced editor roadmap", "OCR workflows roadmap", "Saved signatures planned"],
+    href: "/pricing",
+    cta: "Start trial",
+    featured: true,
+  },
+] as const;
+
+function ShowcaseCard({ tool }: { readonly tool: (typeof showcaseTools)[number] }) {
+  const Icon = tool.icon;
+
+  return (
+    <article className="group overflow-hidden rounded-[2rem] border border-[var(--border-light)] bg-white shadow-[0_20px_70px_rgba(15,23,42,0.06)] transition duration-300 hover:-translate-y-1 hover:border-[var(--border-focus)] hover:shadow-[0_28px_90px_rgba(101,80,232,0.15)]">
+      <div className="relative h-64 overflow-hidden bg-[radial-gradient(circle_at_20%_20%,rgba(124,92,255,0.24),transparent_34%),linear-gradient(135deg,#f5f3ff_0%,#eef2ff_52%,#ffffff_100%)] p-5">
+        <div className="absolute right-5 top-5 rounded-full border border-white/70 bg-white/70 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--violet-600)] shadow-sm backdrop-blur">
+          {tool.label}
+        </div>
+
+        <div className="flex h-full items-end">
+          <div className="w-full rounded-[1.35rem] border border-white/80 bg-white/85 p-4 shadow-[0_24px_70px_rgba(101,80,232,0.18)] backdrop-blur">
+            <div className="mb-4 flex items-center justify-between border-b border-[var(--border-light)] pb-3">
+              <div className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-full bg-red-300" />
+                <span className="h-2.5 w-2.5 rounded-full bg-amber-300" />
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-300" />
+              </div>
+              <div className="h-2 w-20 rounded-full bg-[var(--violet-100)]" />
+            </div>
+
+            <div className="grid grid-cols-[56px_1fr] gap-4">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--violet-50)] text-[var(--violet-600)]">
+                <Icon size={24} />
+              </div>
+
+              <div className="space-y-2">
+                <div className="h-3 w-4/5 rounded-full bg-[var(--violet-100)]" />
+                <div className="h-2.5 w-full rounded-full bg-slate-100" />
+                <div className="h-2.5 w-10/12 rounded-full bg-slate-100" />
+                <div className="mt-4 h-8 w-32 rounded-xl bg-[var(--violet-600)]/90" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-6">
+        <h3 className="display-font text-2xl font-bold tracking-[-0.03em] text-[var(--text-primary)]">
+          {tool.title}
+        </h3>
+
+        <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">
+          {tool.description}
+        </p>
+
+        <Link
+          href={tool.href}
+          className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-[var(--violet-600)] transition hover:text-[var(--violet-500)]"
+        >
+          Try it
+          <MoveUpRight size={16} />
+        </Link>
+      </div>
+    </article>
+  );
 }
 
-const homeTools = tools.filter((tool) => tool.status === "working");
-
-const premiumBenefits = [
-  "Sharper document tools across editing, organizing, and conversion",
-  "Focused PDF actions designed to feel cleaner from upload to export",
-  "A premium interface that keeps power tools easy to discover",
-] as const;
-
-function ToolCard({ tool }: { readonly tool: (typeof homeTools)[number] }) {
+function PricingCard({ plan }: { readonly plan: (typeof pricingPlans)[number] }) {
   return (
-    <Link
-      href={tool.href}
-      className="group mx-auto grid min-h-[160px] w-full max-w-[172px] justify-items-center rounded-[1.35rem] border border-[var(--border-light)] bg-[var(--bg-card)] px-3 py-4 text-center shadow-[var(--shadow-soft)] transition duration-200 hover:-translate-y-1 hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] hover:shadow-[var(--shadow-card-hover)] sm:min-h-[154px]"
+    <article
+      className={[
+        "relative rounded-[2rem] border bg-white p-6 shadow-[0_22px_75px_rgba(15,23,42,0.07)] transition duration-300 hover:-translate-y-1",
+        plan.featured
+          ? "border-[var(--violet-600)] ring-4 ring-[rgba(101,80,232,0.10)]"
+          : "border-[var(--border-light)]",
+      ].join(" ")}
     >
-      <ToolGlyph icon={tool.icon} tone={toneForCategory(tool.category)} size="sm" />
-
-      <h3 className="display-font mt-2 text-center text-[1.02rem] font-bold tracking-[-0.02em] text-[var(--text-primary)] transition group-hover:text-[var(--violet-600)]">
-        {tool.title}
-      </h3>
-
-      <p className="mx-auto mt-2 max-w-[150px] text-center text-[12.25px] font-normal leading-5 text-[var(--text-secondary)]">
-        {tool.menuDescription || tool.description}
-      </p>
-    </Link>
-  );
-}
-
-function DesktopVisual() {
-  return (
-    <div className="relative h-[180px] overflow-hidden rounded-t-[1.5rem] bg-[linear-gradient(180deg,#f1eeff_0%,#faf8ff_100%)] px-5 pt-5 sm:h-[212px]">
-      <div className="h-full rounded-t-[1.2rem] border border-[var(--violet-border)] bg-white shadow-[0_18px_42px_rgba(101,80,232,0.10)]">
-        <div className="flex h-8 items-center gap-2 border-b border-[var(--border-light)] px-4">
-          <span className="h-2 w-2 rounded-full bg-rose-300" />
-          <span className="h-2 w-2 rounded-full bg-amber-300" />
-          <span className="h-2 w-2 rounded-full bg-emerald-300" />
+      {plan.featured ? (
+        <div className="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full bg-[var(--violet-600)] px-4 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-white shadow-[0_14px_35px_rgba(101,80,232,0.24)]">
+          Popular
         </div>
-        <div className="grid h-[172px] grid-cols-[72px_1fr]">
-          <div className="border-r border-[var(--border-light)] bg-[var(--violet-50)] p-3">
-            <div className="space-y-3">
-              <div className="h-3 rounded bg-[var(--violet-100)]" />
-              <div className="h-3 rounded bg-[var(--violet-100)]" />
-              <div className="h-3 rounded bg-[var(--violet-600)]/18" />
-            </div>
-          </div>
-          <div className="p-4">
-            <div className="mx-auto h-full max-w-[190px] rounded-xl border border-[var(--border-light)] bg-white p-4 shadow-[var(--shadow-soft)]">
-              <div className="h-3 w-4/5 rounded bg-[var(--violet-100)]" />
-              <div className="mt-4 h-2.5 w-full rounded bg-slate-100" />
-              <div className="mt-2 h-2.5 w-11/12 rounded bg-slate-100" />
-              <div className="mt-2 h-2.5 w-4/5 rounded bg-slate-100" />
-              <div className="mt-5 h-8 rounded-lg bg-[var(--violet-50)]" />
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+      ) : null}
 
-function MobileVisual() {
-  return (
-    <div className="relative h-[180px] overflow-hidden rounded-t-[1.5rem] bg-[linear-gradient(180deg,#f1eeff_0%,#faf8ff_100%)] px-5 pt-5 sm:h-[212px]">
-      <div className="mx-auto h-[196px] w-[118px] rounded-[1.7rem] border-[6px] border-white bg-white shadow-[0_18px_42px_rgba(101,80,232,0.12)]">
-        <div className="h-full overflow-hidden rounded-[1.28rem] border border-[var(--border-light)] bg-[var(--bg-card)]">
-          <div className="flex h-7 items-center justify-center border-b border-[var(--border-light)] text-[10px] font-bold text-[var(--text-muted)]">
-            9:41
-          </div>
-          <div className="space-y-3 p-3">
-            <div className="rounded-xl border border-[var(--violet-border)] bg-[var(--violet-50)] p-2">
-              <div className="h-2.5 w-4/5 rounded bg-[var(--violet-600)]/20" />
-              <div className="mt-2 h-2 w-full rounded bg-white/90" />
-            </div>
-            <div className="rounded-xl border border-[var(--border-light)] bg-white p-2">
-              <div className="h-2.5 w-3/4 rounded bg-slate-100" />
-              <div className="mt-2 h-2 w-full rounded bg-slate-100" />
-            </div>
-            <div className="h-8 rounded-xl bg-[var(--violet-600)]/90" />
-          </div>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h3 className="display-font text-2xl font-bold tracking-[-0.03em] text-[var(--text-primary)]">
+            {plan.name}
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
+            {plan.description}
+          </p>
         </div>
-      </div>
-    </div>
-  );
-}
 
-function BusinessVisual() {
-  return (
-    <div className="relative h-[180px] overflow-hidden rounded-t-[1.5rem] bg-[linear-gradient(180deg,#f1eeff_0%,#faf8ff_100%)] px-5 pt-5 sm:h-[212px]">
-      <div className="absolute left-7 top-7 h-36 w-32 rounded-[1.2rem] border border-[var(--border-light)] bg-white p-4 shadow-[0_16px_38px_rgba(101,80,232,0.10)]">
-        <div className="h-3 w-3/5 rounded bg-[var(--violet-100)]" />
-        <div className="mt-4 h-2.5 w-full rounded bg-slate-100" />
-        <div className="mt-2 h-2.5 w-5/6 rounded bg-slate-100" />
-        <div className="mt-7 h-8 rounded-lg bg-[var(--violet-50)]" />
+        {plan.featured ? (
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--violet-50)] text-[var(--violet-600)]">
+            <Sparkles size={20} />
+          </div>
+        ) : null}
       </div>
-      <div className="absolute bottom-6 right-6 h-28 w-36 rounded-[1.15rem] bg-[#282a36] p-4 text-white shadow-[0_18px_42px_rgba(24,21,46,0.18)]">
-        <div className="text-[10px] font-semibold text-white/60">workflow.ts</div>
-        <div className="mt-3 space-y-2">
-          <div className="h-2 w-4/5 rounded bg-white/18" />
-          <div className="h-2 w-full rounded bg-white/18" />
-          <div className="h-2 w-3/5 rounded bg-white/18" />
-        </div>
+
+      <div className="mt-7 flex items-end gap-1">
+        <span className="display-font text-4xl font-bold tracking-[-0.04em] text-[var(--text-primary)]">
+          {plan.price}
+        </span>
+        <span className="pb-1 text-sm font-semibold text-[var(--text-secondary)]">
+          {plan.suffix}
+        </span>
       </div>
-    </div>
+
+      <ul className="mt-7 space-y-3">
+        {plan.features.map((feature) => (
+          <li key={feature} className="flex items-start gap-3 text-sm font-semibold leading-6 text-[var(--text-secondary)]">
+            <span className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--violet-50)] text-[var(--violet-600)]">
+              <Check size={13} />
+            </span>
+            {feature}
+          </li>
+        ))}
+      </ul>
+
+      <Link
+        href={plan.href}
+        className={[
+          "mt-8 inline-flex h-12 w-full items-center justify-center rounded-xl text-sm font-bold transition",
+          plan.featured
+            ? "bg-[var(--violet-600)] text-white shadow-[0_16px_35px_rgba(101,80,232,0.22)] hover:bg-[var(--violet-500)]"
+            : "border border-[var(--border-light)] bg-white text-[var(--violet-600)] hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)]",
+        ].join(" ")}
+      >
+        {plan.cta}
+      </Link>
+    </article>
   );
 }
 
 export default function HomePage() {
+  const router = useRouter();
+
+  function handleHeroDrop(event: React.DragEvent<HTMLButtonElement>) {
+    event.preventDefault();
+
+    const file = event.dataTransfer.files?.[0];
+
+    if (!file) return;
+
+    router.push("/editor");
+  }
+
   return (
     <>
       <Header />
 
-      <main
-        className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)]"
-        style={{
-          paddingLeft: "max(1rem, env(safe-area-inset-left))",
-          paddingRight: "max(1rem, env(safe-area-inset-right))",
-        }}
-      >
-        <section className="hero-aurora overflow-hidden border-b border-[var(--border-light)]">
-          <div className="mx-auto max-w-[1600px] px-4 pb-12 pt-12 sm:px-6 lg:px-8 lg:pb-16 lg:pt-16">
-            <div className="mx-auto max-w-6xl text-center">
-              <h1 className="display-font mx-auto mt-5 max-w-4xl text-[clamp(1.75rem,5vw,2.95rem)] font-bold leading-[1.08] tracking-[-0.03em] text-[var(--text-primary)]">
+      <main className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)]">
+        <section className="hero-aurora flex min-h-[80vh] items-center overflow-hidden border-b border-[var(--border-light)]">
+          <div className="mx-auto grid w-full max-w-[1500px] items-center gap-10 px-4 py-16 sm:px-6 lg:grid-cols-2 lg:px-8 lg:py-20">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-[var(--border-light)] bg-white/80 px-4 py-2 text-sm font-bold text-[var(--text-secondary)] shadow-sm backdrop-blur">
+                <BadgeCheck size={16} className="text-[var(--violet-600)]" />
+                No signups · No ads · Browser-first
+              </div>
+
+              <h1 className="display-font mt-7 max-w-4xl text-5xl font-bold leading-[0.96] tracking-tight text-[var(--text-primary)] sm:text-6xl lg:text-7xl">
                 Every PDF task,
-                <span className="brand-gradient-text block">one clear workspace.</span>
+                <span className="brand-gradient-text block">one clean workspace.</span>
               </h1>
 
-              <p className="mx-auto mt-4 max-w-3xl text-[15px] font-normal leading-7 text-[var(--text-secondary)] sm:text-base sm:leading-7">
-                Merge, edit, convert, organize, and secure PDFs through faster, cleaner tools.
+              <p className="mt-7 max-w-2xl text-base leading-8 text-[var(--text-secondary)] sm:text-lg">
+                PDFMantra brings editing, signing, organizing, conversion, and compression into a calm workspace built for fast everyday document work.
               </p>
 
-              <div className="mt-8 flex flex-wrap justify-center gap-2.5">
-                {heroCategories.map((item, index) => (
-                  <Link
-                    key={item}
-                    href="/tools"
-                    className={[
-                      "inline-flex min-h-11 items-center rounded-full border px-4 py-2.5 text-[13px] font-semibold transition duration-200 sm:text-sm",
-                      index === 0
-                        ? "border-[var(--violet-600)] bg-[var(--violet-600)] text-white shadow-[0_14px_30px_rgba(101,80,232,0.18)]"
-                        : "border-[var(--border-light)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] hover:text-[var(--violet-600)]",
-                    ].join(" ")}
-                  >
-                    {item}
-                  </Link>
-                ))}
+              <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+                <Link
+                  href="/tools"
+                  className="inline-flex h-13 items-center justify-center gap-2 rounded-2xl bg-[var(--violet-600)] px-6 py-4 text-sm font-bold text-white shadow-[0_18px_40px_rgba(101,80,232,0.24)] transition hover:bg-[var(--violet-500)]"
+                >
+                  Browse all tools
+                  <ArrowRight size={18} />
+                </Link>
+
+                <Link
+                  href="/pricing"
+                  className="inline-flex h-13 items-center justify-center rounded-2xl border border-[var(--border-light)] bg-white px-6 py-4 text-sm font-bold text-[var(--violet-600)] shadow-sm transition hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)]"
+                >
+                  View pricing
+                </Link>
+              </div>
+
+              <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm font-semibold text-[var(--text-secondary)]">
+                <span className="inline-flex items-center gap-2">
+                  <ShieldCheck size={16} className="text-[var(--violet-600)]" />
+                  Browser-side tools
+                </span>
+                <span className="inline-flex items-center gap-2">
+                  <Lock size={16} className="text-[var(--violet-600)]" />
+                  Privacy-first workflow
+                </span>
               </div>
             </div>
 
-            <div className="mx-auto mt-10 grid max-w-[1320px] grid-cols-2 place-items-center justify-items-center gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
-              {homeTools.map((tool) => (
-                <ToolCard key={tool.id} tool={tool} />
+            <button
+              type="button"
+              onClick={() => router.push("/editor")}
+              onDrop={handleHeroDrop}
+              onDragOver={(event) => event.preventDefault()}
+              className="group relative flex min-h-[480px] w-full items-center justify-center overflow-hidden rounded-[2.5rem] border-2 border-dashed border-[var(--border-focus)] bg-white/80 p-8 text-center shadow-[0_30px_100px_rgba(101,80,232,0.14)] backdrop-blur transition duration-300 hover:-translate-y-1 hover:bg-white hover:shadow-[0_40px_130px_rgba(101,80,232,0.20)]"
+            >
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(124,92,255,0.20),transparent_32%),radial-gradient(circle_at_80%_80%,rgba(79,70,229,0.14),transparent_30%)]" />
+
+              <div className="relative z-10 mx-auto max-w-sm">
+                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[2rem] bg-[var(--violet-600)] text-white shadow-[0_18px_45px_rgba(101,80,232,0.30)] transition group-hover:scale-105">
+                  <Upload size={34} />
+                </div>
+
+                <h2 className="display-font mt-7 text-3xl font-bold tracking-[-0.03em] text-[var(--text-primary)]">
+                  Drop any PDF here
+                </h2>
+
+                <p className="mt-3 text-sm font-medium leading-7 text-[var(--text-secondary)]">
+                  We&apos;ll open the editor so you can start working immediately.
+                </p>
+
+                <div className="mt-7 inline-flex items-center gap-2 rounded-full bg-[var(--violet-50)] px-4 py-2 text-sm font-bold text-[var(--violet-600)]">
+                  Open workspace
+                  <ArrowRight size={16} />
+                </div>
+              </div>
+            </button>
+          </div>
+        </section>
+
+        <section className="bg-white px-4 py-20 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-4xl text-center">
+            <p className="section-eyebrow justify-center">Why PDFMantra</p>
+
+            <h2 className="display-font mx-auto mt-4 max-w-3xl text-4xl font-bold leading-tight tracking-[-0.04em] text-[var(--text-primary)] sm:text-5xl">
+              Built in India.
+              <span className="block">Priced for India.</span>
+              <span className="brand-gradient-text block">Adobe-level polish.</span>
+            </h2>
+
+            <p className="mx-auto mt-5 max-w-2xl text-base leading-8 text-[var(--text-secondary)]">
+              Professional PDF work should not feel expensive or complicated. PDFMantra is designed for Indian users who want premium document tools at practical pricing.
+            </p>
+
+            <div className="mx-auto mt-12 grid max-w-4xl overflow-hidden rounded-[2rem] border border-[var(--border-light)] bg-white text-left shadow-[0_26px_90px_rgba(15,23,42,0.08)] md:grid-cols-2">
+              <div className="border-b border-[var(--border-light)] p-6 md:border-b-0 md:border-r">
+                <div className="text-sm font-bold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                  Adobe Acrobat
+                </div>
+
+                <div className="mt-5 flex items-end gap-2">
+                  <span className="display-font text-4xl font-bold tracking-[-0.04em] text-[var(--text-primary)]">
+                    $19.99
+                  </span>
+                  <span className="pb-1 text-sm font-semibold text-[var(--text-secondary)]">
+                    /month
+                  </span>
+                </div>
+
+                <p className="mt-3 text-sm font-semibold text-[var(--text-secondary)]">
+                  Around ₹1,670/month before taxes and currency variation.
+                </p>
+              </div>
+
+              <div className="relative bg-[linear-gradient(135deg,#f5f3ff_0%,#ffffff_100%)] p-6">
+                <div className="absolute right-5 top-5 rounded-full bg-[var(--violet-600)] px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-white">
+                  6x cheaper
+                </div>
+
+                <div className="text-sm font-bold uppercase tracking-[0.14em] text-[var(--violet-600)]">
+                  PDFMantra Pro
+                </div>
+
+                <div className="mt-5 flex items-end gap-2">
+                  <span className="display-font text-4xl font-bold tracking-[-0.04em] text-[var(--text-primary)]">
+                    ₹249
+                  </span>
+                  <span className="pb-1 text-sm font-semibold text-[var(--text-secondary)]">
+                    /month
+                  </span>
+                </div>
+
+                <p className="mt-3 text-sm font-semibold text-[var(--text-secondary)]">
+                  Premium PDF workflows, Indian pricing, and browser-first speed.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="bg-slate-50 px-4 py-20 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-7xl">
+            <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+              <div>
+                <p className="section-eyebrow">See it in action</p>
+                <h2 className="display-font mt-4 text-4xl font-bold tracking-[-0.04em] text-[var(--text-primary)] sm:text-5xl">
+                  Three workflows that show the product.
+                </h2>
+              </div>
+
+              <p className="max-w-md text-sm leading-7 text-[var(--text-secondary)]">
+                Screenshot placeholders are ready now. Replace them later with real screenshots from your tools.
+              </p>
+            </div>
+
+            <div className="mt-10 grid gap-6 lg:grid-cols-3">
+              {showcaseTools.map((tool) => (
+                <ShowcaseCard key={tool.title} tool={tool} />
               ))}
             </div>
           </div>
         </section>
 
-        <section className="bg-white px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
-          <div className="mx-auto max-w-[1480px]">
-            <div className="text-center">
-              <p className="section-eyebrow justify-center">Work your way</p>
-              <h2 className="display-font mt-3 text-[2.15rem] font-bold tracking-[-0.02em] text-[var(--text-primary)] sm:text-[2.8rem]">
-                More ways to keep PDF work moving.
-              </h2>
-            </div>
-
-            <div className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              <article className="overflow-hidden rounded-[1.75rem] border border-[var(--border-light)] bg-[var(--bg-card)] shadow-[var(--shadow-card)] transition hover:-translate-y-1 hover:shadow-[var(--shadow-card-hover)]">
-                <DesktopVisual />
-                <div className="p-6">
-                  <h3 className="display-font text-[1.35rem] font-bold tracking-[-0.02em] text-[var(--text-primary)]">
-                    Work with focused tools
-                  </h3>
-                  <p className="mt-3 text-sm font-normal leading-7 text-[var(--text-secondary)]">
-                    Open a task-specific PDF tool, upload your file, and finish the job without wandering through a busy dashboard.
-                  </p>
-                  <Link href="/tools" className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-[var(--violet-600)] transition hover:text-[var(--violet-500)]">
-                    Browse tools
-                    <MoveUpRight size={16} />
-                  </Link>
+        <section className="border-t border-slate-100 bg-white px-4 py-16 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-5xl">
+            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-3 rounded-[1.5rem] border border-[var(--border-light)] bg-white px-5 py-5 text-center text-sm font-bold text-slate-600 shadow-[0_18px_60px_rgba(15,23,42,0.05)]">
+              {trustSignals.map((signal, index) => (
+                <div key={signal} className="flex items-center gap-4">
+                  <span>{signal}</span>
+                  {index < trustSignals.length - 1 ? (
+                    <span className="h-1.5 w-1.5 rounded-full bg-[var(--violet-200)]" />
+                  ) : null}
                 </div>
-              </article>
-
-              <article className="overflow-hidden rounded-[1.75rem] border border-[var(--border-light)] bg-[var(--bg-card)] shadow-[var(--shadow-card)] transition hover:-translate-y-1 hover:shadow-[var(--shadow-card-hover)]">
-                <MobileVisual />
-                <div className="p-6">
-                  <h3 className="display-font text-[1.35rem] font-bold tracking-[-0.02em] text-[var(--text-primary)]">
-                    Move faster on smaller screens
-                  </h3>
-                  <p className="mt-3 text-sm font-normal leading-7 text-[var(--text-secondary)]">
-                    The interface stays readable and action-first, so users can find tools quickly even when working away from a desk.
-                  </p>
-                  <Link href="/features" className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-[var(--violet-600)] transition hover:text-[var(--violet-500)]">
-                    View features
-                    <MoveUpRight size={16} />
-                  </Link>
-                </div>
-              </article>
-
-              <article className="overflow-hidden rounded-[1.75rem] border border-[var(--border-light)] bg-[var(--bg-card)] shadow-[var(--shadow-card)] transition hover:-translate-y-1 hover:shadow-[var(--shadow-card-hover)]">
-                <BusinessVisual />
-                <div className="p-6">
-                  <h3 className="display-font text-[1.35rem] font-bold tracking-[-0.02em] text-[var(--text-primary)]">
-                    Built for serious document work
-                  </h3>
-                  <p className="mt-3 text-sm font-normal leading-7 text-[var(--text-secondary)]">
-                    From file cleanup to secure sharing, PDFMantra keeps advanced workflows visually calm and easier to trust.
-                  </p>
-                  <Link href="/security" className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-[var(--violet-600)] transition hover:text-[var(--violet-500)]">
-                    Explore security
-                    <MoveUpRight size={16} />
-                  </Link>
-                </div>
-              </article>
+              ))}
             </div>
           </div>
         </section>
 
-        <section className="bg-white px-4 pb-16 sm:px-6 lg:px-8 lg:pb-24">
-          <div className="mx-auto max-w-[1320px] overflow-hidden rounded-[2rem] border border-[var(--border-light)] bg-gradient-to-br from-violet-50 via-white to-indigo-50 shadow-[0_28px_90px_rgba(101,80,232,0.10)]">
-            <div className="grid gap-8 px-6 py-8 sm:px-8 sm:py-10 lg:grid-cols-[0.92fr_1.08fr] lg:px-12 lg:py-12">
-              <div className="flex flex-col justify-center">
-                <p className="section-eyebrow">PDFMantra Premium</p>
-                <h2 className="display-font mt-3 text-[2rem] font-bold leading-[1.14] tracking-[-0.02em] text-[var(--text-primary)] sm:text-[2.65rem]">
-                  Get more from every PDF tool.
-                </h2>
-                <div className="mt-6 space-y-3.5">
-                  {premiumBenefits.map((item) => (
-                    <div key={item} className="flex items-start gap-3 text-sm font-semibold leading-6 text-[var(--text-primary)] sm:text-[15px]">
-                      <BadgeCheck size={18} className="mt-0.5 shrink-0 text-emerald-600" />
-                      <span>{item}</span>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-                  <Link href="/pricing" className="btn-primary">
-                    <span>View Pricing</span>
-                    <ArrowRight size={16} />
-                  </Link>
-                  <Link href="/features" className="btn-secondary bg-white/90">
-                    <span>See Features</span>
-                    <ArrowRight size={16} />
-                  </Link>
-                </div>
-              </div>
+        <section className="bg-gradient-to-br from-violet-50 via-white to-indigo-50 px-4 py-20 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-7xl">
+            <div className="mx-auto max-w-3xl text-center">
+              <p className="section-eyebrow justify-center">Pricing</p>
 
-              <div className="relative min-h-[320px] rounded-[1.8rem] border border-white/80 bg-white/68 p-5 shadow-[0_22px_60px_rgba(101,80,232,0.12)] backdrop-blur sm:min-h-[360px]">
-                <div className="absolute right-5 top-5 rounded-full border border-amber-200 bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-700">
-                  Premium workspace
-                </div>
-                <div className="absolute left-8 top-10 hidden h-60 w-48 rotate-[-3deg] rounded-[1.2rem] border border-[var(--border-light)] bg-white p-5 shadow-[0_18px_42px_rgba(101,80,232,0.12)] sm:block">
-                  <div className="h-3 w-3/5 rounded bg-rose-300" />
-                  <div className="mt-4 h-2.5 w-full rounded bg-slate-100" />
-                  <div className="mt-2 h-2.5 w-11/12 rounded bg-slate-100" />
-                  <div className="mt-2 h-2.5 w-4/5 rounded bg-slate-100" />
-                  <div className="mt-8 h-24 rounded-xl bg-[var(--violet-50)]" />
-                </div>
-                <div className="absolute bottom-8 right-8 hidden h-48 w-60 rounded-[1.35rem] border border-[var(--violet-border)] bg-[var(--bg-panel)] p-5 shadow-[0_20px_48px_rgba(101,80,232,0.14)] sm:block">
-                  <div className="flex items-center justify-between">
-                    <div className="h-10 w-10 rounded-2xl bg-[var(--violet-600)]/90" />
-                    <div className="rounded-full bg-white px-3 py-1 text-[11px] font-bold text-[var(--violet-600)]">Aa</div>
-                  </div>
-                  <div className="mt-5 h-3 w-4/5 rounded bg-white" />
-                  <div className="mt-3 h-3 w-full rounded bg-white/85" />
-                  <div className="mt-3 h-3 w-3/5 rounded bg-white/75" />
-                  <div className="mt-5 h-10 rounded-xl bg-white/92" />
-                </div>
-              </div>
+              <h2 className="display-font mt-4 text-4xl font-bold tracking-[-0.04em] text-[var(--text-primary)] sm:text-5xl">
+                Simple pricing, no surprises.
+              </h2>
+
+              <p className="mx-auto mt-5 max-w-2xl text-base leading-8 text-[var(--text-secondary)]">
+                Start free, upgrade when your PDF work becomes frequent, and keep pricing easy to understand.
+              </p>
+            </div>
+
+            <div className="mt-12 grid gap-6 lg:grid-cols-3">
+              {pricingPlans.map((plan) => (
+                <PricingCard key={plan.name} plan={plan} />
+              ))}
+            </div>
+
+            <div className="mt-10 text-center">
+              <Link
+                href="/pricing"
+                className="inline-flex items-center gap-2 text-sm font-bold text-[var(--violet-600)] transition hover:text-[var(--violet-500)]"
+              >
+                Compare all features
+                <ArrowRight size={16} />
+              </Link>
             </div>
           </div>
         </section>
