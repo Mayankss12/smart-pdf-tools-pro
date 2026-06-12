@@ -1542,7 +1542,7 @@ export default function FillSignPage() {
     );
   }
 
-  function renderToolbarButton(item: (typeof TOOLBAR_ITEMS)[number]) {
+    function renderToolbarButton(item: (typeof TOOLBAR_ITEMS)[number]) {
     const Icon = item.icon;
     const isActive = activeTool === item.mode;
 
@@ -1567,13 +1567,33 @@ export default function FillSignPage() {
         className={[
           "inline-flex h-10 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-semibold transition",
           isActive
-            ? "border-indigo-500 bg-indigo-600 text-white shadow-[0_10px_24px_rgba(79,70,229,0.18)]"
-            : "border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700",
+            ? "border-[var(--violet-600)] bg-[var(--violet-600)] text-white shadow-[0_12px_28px_rgba(101,80,232,0.22)]"
+            : "border-[var(--border-light)] bg-white text-[var(--text-secondary)] hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] hover:text-[var(--violet-600)]",
         ].join(" ")}
       >
         <Icon size={16} />
         <span className="hidden sm:inline">{item.label}</span>
       </button>
+    );
+  }
+
+  function renderToolbarGroup(
+    label: string,
+    modes: ToolMode[],
+    compact = false
+  ) {
+    return (
+      <div className="flex items-center gap-1.5 rounded-2xl border border-[var(--border-light)] bg-white p-1 shadow-[0_10px_28px_rgba(15,23,42,0.04)]">
+        {!compact && (
+          <span className="hidden px-2 text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--text-muted)] xl:inline">
+            {label}
+          </span>
+        )}
+
+        {TOOLBAR_ITEMS.filter((item) => modes.includes(item.mode)).map(
+          renderToolbarButton
+        )}
+      </div>
     );
   }
 
@@ -1589,319 +1609,324 @@ export default function FillSignPage() {
       <Header />
 
       <main className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)]">
-        <section className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6 lg:px-8">
-          <div className="rounded-[1.6rem] border border-[var(--border-light)] bg-white shadow-[0_22px_70px_rgba(101,80,232,0.08)]">
-            <div className="border-b border-[var(--border-light)] px-4 py-4 sm:px-5 lg:px-6">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <div className="inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700">
-                    <FileSignature size={14} />
-                    PDFMantra Fill & Sign
-                  </div>
+        <section className="mx-auto max-w-[1500px] px-4 py-5 sm:px-6 lg:px-8">
+          <input
+            ref={pdfInputRef}
+            type="file"
+            accept="application/pdf"
+            className="hidden"
+            onChange={(event) => handlePdfFile(event.target.files?.[0])}
+          />
 
-                  <h1 className="display-font mt-3 text-[1.85rem] font-bold tracking-[-0.03em] text-slate-950 sm:text-[2.35rem]">
-                    Fill, type, sign, and mark PDF.
-                  </h1>
+          <input
+            ref={signatureImageInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/jpg,image/webp"
+            className="hidden"
+            onChange={(event) =>
+              handleImageFile(event.target.files?.[0], "signature")
+            }
+          />
 
-                  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                    A lighter Sejda-style signing workspace for text, typed or drawn signatures, dates, checkmarks, whiteout blocks, and images.
-                  </p>
+          <input
+            ref={objectImageInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/jpg,image/webp"
+            className="hidden"
+            onChange={(event) =>
+              handleImageFile(event.target.files?.[0], "object")
+            }
+          />
+
+          <div className="mb-4 flex flex-col gap-3 rounded-[1.4rem] border border-[var(--border-light)] bg-white px-4 py-4 shadow-[0_18px_55px_rgba(101,80,232,0.07)] lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex min-w-0 items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--violet-50)] text-[var(--violet-600)]">
+                <FileSignature size={21} />
+              </div>
+
+              <div className="min-w-0">
+                <div className="display-font text-xl font-bold tracking-[-0.025em] text-[var(--text-primary)] sm:text-2xl">
+                  Fill & Sign PDF
                 </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <input
-                    ref={pdfInputRef}
-                    type="file"
-                    accept="application/pdf"
-                    className="hidden"
-                    onChange={(event) => handlePdfFile(event.target.files?.[0])}
-                  />
-
-                  <input
-                    ref={signatureImageInputRef}
-                    type="file"
-                    accept="image/png,image/jpeg,image/jpg,image/webp"
-                    className="hidden"
-                    onChange={(event) =>
-                      handleImageFile(event.target.files?.[0], "signature")
-                    }
-                  />
-
-                  <input
-                    ref={objectImageInputRef}
-                    type="file"
-                    accept="image/png,image/jpeg,image/jpg,image/webp"
-                    className="hidden"
-                    onChange={(event) =>
-                      handleImageFile(event.target.files?.[0], "object")
-                    }
-                  />
-
-                  <button
-                    type="button"
-                    onClick={() => pdfInputRef.current?.click()}
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-indigo-100 bg-white px-4 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
-                  >
-                    <Upload size={16} />
-                    Upload PDF
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleExport}
-                    disabled={busy || !file || objects.length === 0}
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-bold text-white shadow-[0_12px_24px_rgba(16,185,129,0.18)] transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-                  >
-                    {busy ? (
-                      <>
-                        <Loader2 className="animate-spin" size={16} />
-                        Processing
-                      </>
-                    ) : (
-                      <>
-                        <Download size={16} />
-                        Export PDF
-                      </>
-                    )}
-                  </button>
-                </div>
+                <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--text-secondary)]">
+                  Add text, signatures, dates, marks, whiteout blocks, and images directly on your PDF.
+                </p>
               </div>
             </div>
 
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => pdfInputRef.current?.click()}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[var(--border-light)] bg-white px-4 text-sm font-bold text-[var(--violet-600)] transition hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)]"
+              >
+                <Upload size={16} />
+                Upload PDF
+              </button>
+
+              <button
+                type="button"
+                onClick={handleExport}
+                disabled={busy || !file || objects.length === 0}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[var(--violet-600)] px-4 text-sm font-bold text-white shadow-[0_14px_30px_rgba(101,80,232,0.22)] transition hover:bg-[var(--violet-500)] disabled:cursor-not-allowed disabled:bg-slate-300"
+              >
+                {busy ? (
+                  <>
+                    <Loader2 className="animate-spin" size={16} />
+                    Processing
+                  </>
+                ) : (
+                  <>
+                    <Download size={16} />
+                    Export PDF
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded-[1.45rem] border border-[var(--border-light)] bg-white shadow-[0_22px_70px_rgba(101,80,232,0.08)]">
             <div className="border-b border-[var(--border-light)] bg-slate-50/70 px-4 py-3 sm:px-5 lg:px-6">
-              <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-                <div className="flex flex-wrap gap-2">
-                  {TOOLBAR_ITEMS.map(renderToolbarButton)}
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={addActiveToolToDefaultSpot}
-                    disabled={!canPlaceCurrentTool}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-3 text-sm font-bold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-                  >
-                    <Plus size={16} />
-                    Add to page
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={undoLastChange}
-                    disabled={history.length === 0}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45"
-                  >
-                    <Undo2 size={16} />
-                    Undo
-                  </button>
-
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setMoreOpen((current) => !current)}
-                      className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                    >
-                      <MoreHorizontal size={16} />
-                      More
-                      <ChevronDown size={14} />
-                    </button>
-
-                    {moreOpen && (
-                      <div className="absolute right-0 z-50 mt-2 w-64 rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_24px_70px_rgba(15,23,42,0.14)]">
-                        <button
-                          type="button"
-                          onClick={addSignatureToAllPages}
-                          disabled={!file}
-                          className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-45"
-                        >
-                          <Copy size={15} />
-                          Add signature to all pages
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={clearObjects}
-                          className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                        >
-                          <RotateCcw size={15} />
-                          Clear added fields
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={clearPdf}
-                          className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 size={15} />
-                          Remove PDF
-                        </button>
-                      </div>
-                    )}
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                  <div className="flex flex-wrap gap-2">
+                    {renderToolbarGroup("Move", ["select"], true)}
+                    {renderToolbarGroup("Text", ["text"], true)}
+                    {renderToolbarGroup("Sign", ["signature"], true)}
+                    {renderToolbarGroup("Date", ["date"], true)}
+                    {renderToolbarGroup("Marks", ["check", "cross", "dot"], true)}
+                    {renderToolbarGroup("Tools", ["whiteout", "image"], true)}
                   </div>
 
-                  <div className="relative">
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => setHelpOpen((current) => !current)}
-                      className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
-                      title="Help"
+                      onClick={addActiveToolToDefaultSpot}
+                      disabled={!canPlaceCurrentTool}
+                      className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[var(--violet-600)] px-3 text-sm font-bold text-white transition hover:bg-[var(--violet-500)] disabled:cursor-not-allowed disabled:bg-slate-300"
                     >
-                      <HelpCircle size={17} />
+                      <Plus size={16} />
+                      Add to page
                     </button>
 
-                    {helpOpen && (
-                      <div className="absolute right-0 z-50 mt-2 w-72 rounded-2xl border border-indigo-100 bg-white p-4 text-sm font-medium leading-6 text-slate-600 shadow-[0_24px_70px_rgba(15,23,42,0.14)]">
-                        Choose a tool, click the PDF page to place it, then use Select mode to move or resize. Press Delete to remove selected field. Ctrl+Z works for undo.
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
+                    <button
+                      type="button"
+                      onClick={undoLastChange}
+                      disabled={history.length === 0}
+                      className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[var(--border-light)] bg-white px-3 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45"
+                    >
+                      <Undo2 size={16} />
+                      Undo
+                    </button>
 
-              {activeTool === "signature" && (
-                <div className="mt-3 rounded-2xl border border-indigo-100 bg-white p-3">
-                  <div className="grid gap-3 lg:grid-cols-[1fr_1fr_1.3fr]">
-                    <div>
-                      <div className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                        Signature type
-                      </div>
-                      <div className="mt-2 grid grid-cols-3 gap-2">
-                        {(["typed", "drawn", "uploaded"] as const).map((source) => (
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setMoreOpen((current) => !current)}
+                        className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[var(--border-light)] bg-white px-3 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-slate-50"
+                      >
+                        <MoreHorizontal size={16} />
+                        More
+                        <ChevronDown size={14} />
+                      </button>
+
+                      {moreOpen && (
+                        <div className="absolute right-0 z-50 mt-2 w-64 rounded-2xl border border-[var(--border-light)] bg-white p-2 shadow-[0_24px_70px_rgba(15,23,42,0.14)]">
                           <button
-                            key={source}
                             type="button"
-                            onClick={() => setSignatureSource(source)}
-                            className={[
-                              "rounded-xl border px-3 py-2 text-sm font-bold capitalize transition",
-                              signatureSource === source
-                                ? "border-indigo-500 bg-indigo-600 text-white"
-                                : "border-slate-200 bg-white text-slate-700 hover:bg-indigo-50",
-                            ].join(" ")}
+                            onClick={addSignatureToAllPages}
+                            disabled={!file}
+                            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold text-[var(--text-secondary)] hover:bg-[var(--violet-50)] hover:text-[var(--violet-600)] disabled:cursor-not-allowed disabled:opacity-45"
                           >
-                            {source}
+                            <Copy size={15} />
+                            Add signature to all pages
                           </button>
-                        ))}
-                      </div>
+
+                          <button
+                            type="button"
+                            onClick={clearObjects}
+                            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold text-[var(--text-secondary)] hover:bg-slate-50"
+                          >
+                            <RotateCcw size={15} />
+                            Clear added fields
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={clearPdf}
+                            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 size={15} />
+                            Remove PDF
+                          </button>
+                        </div>
+                      )}
                     </div>
 
-                    <label className="block">
-                      <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                        Typed signature
-                      </span>
-                      <input
-                        value={signerName}
-                        onChange={(event) => setSignerName(event.target.value)}
-                        className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
-                        placeholder="Enter name"
-                      />
-                    </label>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setHelpOpen((current) => !current)}
+                        className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--border-light)] bg-white text-[var(--text-secondary)] transition hover:bg-slate-50"
+                        title="Help"
+                      >
+                        <HelpCircle size={17} />
+                      </button>
 
-                    <div>
-                      <div className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-                        Draw / upload
+                      {helpOpen && (
+                        <div className="absolute right-0 z-50 mt-2 w-72 rounded-2xl border border-[var(--border-light)] bg-white p-4 text-sm font-medium leading-6 text-[var(--text-secondary)] shadow-[0_24px_70px_rgba(15,23,42,0.14)]">
+                          Choose a tool, click the PDF page to place it, then use Select mode to move or resize. Press Delete to remove the selected field. Ctrl+Z works for undo.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {activeTool === "signature" && (
+                  <div className="rounded-2xl border border-[var(--border-light)] bg-white p-3">
+                    <div className="grid gap-3 lg:grid-cols-[1fr_1fr_1.3fr]">
+                      <div>
+                        <div className="text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]">
+                          Signature type
+                        </div>
+                        <div className="mt-2 grid grid-cols-3 gap-2">
+                          {(["typed", "drawn", "uploaded"] as const).map((source) => (
+                            <button
+                              key={source}
+                              type="button"
+                              onClick={() => setSignatureSource(source)}
+                              className={[
+                                "rounded-xl border px-3 py-2 text-sm font-bold capitalize transition",
+                                signatureSource === source
+                                  ? "border-[var(--violet-600)] bg-[var(--violet-600)] text-white"
+                                  : "border-[var(--border-light)] bg-white text-[var(--text-secondary)] hover:bg-[var(--violet-50)]",
+                              ].join(" ")}
+                            >
+                              {source}
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                      <div className="flex flex-col gap-2 sm:flex-row">
-                        <canvas
-                          ref={drawCanvasRef}
-                          width={360}
-                          height={110}
-                          onPointerDown={startDrawing}
-                          onPointerMove={drawSignature}
-                          onPointerUp={stopDrawing}
-                          onPointerCancel={stopDrawing}
-                          className="h-[88px] flex-1 touch-none rounded-xl border border-dashed border-indigo-200 bg-white"
+
+                      <label className="block">
+                        <span className="text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]">
+                          Typed signature
+                        </span>
+                        <input
+                          value={signerName}
+                          onChange={(event) => setSignerName(event.target.value)}
+                          className="mt-2 h-11 w-full rounded-xl border border-[var(--border-light)] bg-white px-3 text-sm font-bold text-[var(--text-primary)] outline-none transition focus:border-[var(--border-focus)] focus:ring-4 focus:ring-[rgba(101,80,232,0.12)]"
+                          placeholder="Enter name"
                         />
-                        <div className="flex min-w-[140px] flex-row gap-2 sm:flex-col">
-                          <button
-                            type="button"
-                            onClick={clearDrawnSignature}
-                            className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
-                          >
-                            Clear draw
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => signatureImageInputRef.current?.click()}
-                            className="flex-1 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100"
-                          >
-                            Upload sign
-                          </button>
+                      </label>
+
+                      <div>
+                        <div className="mb-2 text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]">
+                          Draw / upload
+                        </div>
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                          <canvas
+                            ref={drawCanvasRef}
+                            width={360}
+                            height={110}
+                            onPointerDown={startDrawing}
+                            onPointerMove={drawSignature}
+                            onPointerUp={stopDrawing}
+                            onPointerCancel={stopDrawing}
+                            className="h-[88px] flex-1 touch-none rounded-xl border border-dashed border-[var(--border-focus)] bg-white"
+                          />
+                          <div className="flex min-w-[140px] flex-row gap-2 sm:flex-col">
+                            <button
+                              type="button"
+                              onClick={clearDrawnSignature}
+                              className="flex-1 rounded-xl border border-[var(--border-light)] bg-white px-3 py-2 text-xs font-bold text-[var(--text-secondary)] hover:bg-slate-50"
+                            >
+                              Clear draw
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => signatureImageInputRef.current?.click()}
+                              className="flex-1 rounded-xl border border-[var(--border-focus)] bg-[var(--violet-50)] px-3 py-2 text-xs font-bold text-[var(--violet-600)] hover:bg-[var(--violet-100)]"
+                            >
+                              Upload sign
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {activeTool === "text" && (
-                <div className="mt-3 grid gap-3 rounded-2xl border border-slate-200 bg-white p-3 md:grid-cols-[1fr_180px_180px]">
-                  <label>
-                    <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                      Text
-                    </span>
-                    <input
-                      value={textValue}
-                      onChange={(event) => setTextValue(event.target.value)}
-                      className="mt-2 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-bold outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
-                      placeholder="Enter text"
-                    />
-                  </label>
+                {activeTool === "text" && (
+                  <div className="grid gap-3 rounded-2xl border border-[var(--border-light)] bg-white p-3 md:grid-cols-[1fr_180px_180px]">
+                    <label>
+                      <span className="text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]">
+                        Text
+                      </span>
+                      <input
+                        value={textValue}
+                        onChange={(event) => setTextValue(event.target.value)}
+                        className="mt-2 h-11 w-full rounded-xl border border-[var(--border-light)] px-3 text-sm font-bold outline-none transition focus:border-[var(--border-focus)] focus:ring-4 focus:ring-[rgba(101,80,232,0.12)]"
+                        placeholder="Enter text"
+                      />
+                    </label>
 
-                  <label>
-                    <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                      Style
-                    </span>
-                    <select
-                      value={textStyle}
-                      onChange={(event) => setTextStyle(event.target.value as TextStyle)}
-                      className="mt-2 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-bold outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
-                    >
-                      {TEXT_STYLES.map((style) => (
-                        <option key={style.value} value={style.value}>
-                          {style.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                    <label>
+                      <span className="text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]">
+                        Style
+                      </span>
+                      <select
+                        value={textStyle}
+                        onChange={(event) => setTextStyle(event.target.value as TextStyle)}
+                        className="mt-2 h-11 w-full rounded-xl border border-[var(--border-light)] px-3 text-sm font-bold outline-none transition focus:border-[var(--border-focus)] focus:ring-4 focus:ring-[rgba(101,80,232,0.12)]"
+                      >
+                        {TEXT_STYLES.map((style) => (
+                          <option key={style.value} value={style.value}>
+                            {style.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
 
-                  <label>
-                    <span className="flex justify-between text-xs font-bold uppercase tracking-wide text-slate-500">
-                      Size <span>{fontSize}px</span>
-                    </span>
-                    <input
-                      type="range"
-                      min={9}
-                      max={42}
-                      value={fontSize}
-                      onChange={(event) => setFontSize(Number(event.target.value))}
-                      className="mt-4 w-full"
-                    />
-                  </label>
-                </div>
-              )}
-
-              {activeTool === "image" && (
-                <div className="mt-3 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="text-sm font-semibold text-slate-600">
-                    {objectImage
-                      ? `Selected image: ${objectImage.fileName}`
-                      : "Import an image, then click the PDF page to place it."}
+                    <label>
+                      <span className="flex justify-between text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]">
+                        Size <span>{fontSize}px</span>
+                      </span>
+                      <input
+                        type="range"
+                        min={9}
+                        max={42}
+                        value={fontSize}
+                        onChange={(event) => setFontSize(Number(event.target.value))}
+                        className="mt-4 w-full"
+                      />
+                    </label>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => objectImageInputRef.current?.click()}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-indigo-100 bg-indigo-50 px-3 text-sm font-bold text-indigo-700 hover:bg-indigo-100"
-                  >
-                    <ImageIcon size={16} />
-                    Import image
-                  </button>
-                </div>
-              )}
+                )}
+
+                {activeTool === "image" && (
+                  <div className="flex flex-col gap-3 rounded-2xl border border-[var(--border-light)] bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="text-sm font-semibold text-[var(--text-secondary)]">
+                      {objectImage
+                        ? `Selected image: ${objectImage.fileName}`
+                        : "Import an image, then click the PDF page to place it."}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => objectImageInputRef.current?.click()}
+                      className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[var(--border-focus)] bg-[var(--violet-50)] px-3 text-sm font-bold text-[var(--violet-600)] hover:bg-[var(--violet-100)]"
+                    >
+                      <ImageIcon size={16} />
+                      Import image
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="px-4 py-4 sm:px-5 lg:px-6">
               {previews.length > 0 && (
-                <div className="mb-4 flex items-center gap-3 overflow-x-auto rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                <div className="mb-4 flex items-center gap-3 overflow-x-auto rounded-2xl border border-[var(--border-light)] bg-slate-50 p-3">
                   {previews.map((preview) => {
                     const count = objects.filter(
                       (object) => object.pageNumber === preview.pageNumber
@@ -1915,14 +1940,14 @@ export default function FillSignPage() {
                         className={[
                           "min-w-[94px] overflow-hidden rounded-xl border bg-white text-left shadow-sm transition",
                           activePageNumber === preview.pageNumber
-                            ? "border-indigo-500 ring-4 ring-indigo-100"
-                            : "border-slate-200 hover:border-indigo-200",
+                            ? "border-[var(--violet-600)] ring-4 ring-[rgba(101,80,232,0.12)]"
+                            : "border-[var(--border-light)] hover:border-[var(--border-focus)]",
                         ].join(" ")}
                       >
-                        <div className="flex items-center justify-between px-2 py-1.5 text-[11px] font-bold text-slate-700">
+                        <div className="flex items-center justify-between px-2 py-1.5 text-[11px] font-bold text-[var(--text-secondary)]">
                           <span>Page {preview.pageNumber}</span>
                           {count > 0 && (
-                            <span className="rounded-full bg-indigo-50 px-1.5 py-0.5 text-[10px] text-indigo-700">
+                            <span className="rounded-full bg-[var(--violet-50)] px-1.5 py-0.5 text-[10px] text-[var(--violet-600)]">
                               {count}
                             </span>
                           )}
@@ -1931,7 +1956,7 @@ export default function FillSignPage() {
                           <img
                             src={preview.previewUrl}
                             alt={`Page ${preview.pageNumber}`}
-                            className="mx-auto max-h-24 rounded border border-slate-200 bg-white"
+                            className="mx-auto max-h-24 rounded border border-[var(--border-light)] bg-white"
                             draggable={false}
                           />
                         </div>
@@ -1940,7 +1965,7 @@ export default function FillSignPage() {
                   })}
 
                   {pageCount > previews.length && (
-                    <div className="min-w-[150px] rounded-xl border border-dashed border-slate-200 bg-white p-3 text-xs font-semibold leading-5 text-slate-500">
+                    <div className="min-w-[150px] rounded-xl border border-dashed border-[var(--border-light)] bg-white p-3 text-xs font-semibold leading-5 text-[var(--text-muted)]">
                       Showing first {previews.length} page previews. Export still applies fields added to all pages.
                     </div>
                   )}
@@ -1953,26 +1978,35 @@ export default function FillSignPage() {
                   handlePdfFile(event.dataTransfer.files?.[0]);
                 }}
                 onDragOver={(event) => event.preventDefault()}
-                className="flex min-h-[680px] items-start justify-center overflow-auto rounded-[1.35rem] border border-slate-200 bg-[linear-gradient(135deg,#f8fafc_0%,#eef2ff_100%)] p-4 sm:p-6"
+                className="flex min-h-[680px] items-start justify-center overflow-auto rounded-[1.35rem] border border-[var(--border-light)] bg-[linear-gradient(135deg,#f8fafc_0%,#eef2ff_100%)] p-4 sm:p-6"
               >
                 {busy && previews.length === 0 ? (
-                  <div className="mt-28 inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-4 text-sm font-bold text-slate-700 shadow-sm">
-                    <Loader2 className="animate-spin text-indigo-600" size={18} />
+                  <div className="mt-28 inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-4 text-sm font-bold text-[var(--text-secondary)] shadow-sm">
+                    <Loader2 className="animate-spin text-[var(--violet-600)]" size={18} />
                     Rendering PDF
                   </div>
                 ) : !activePreview ? (
                   <button
                     type="button"
                     onClick={() => pdfInputRef.current?.click()}
-                    className="mt-24 max-w-md rounded-[1.5rem] border-2 border-dashed border-indigo-200 bg-white p-8 text-center shadow-sm transition hover:border-indigo-400 hover:bg-indigo-50/40"
+                    className="mt-20 w-full max-w-xl rounded-[1.7rem] border-2 border-dashed border-[var(--border-focus)] bg-white p-8 text-center shadow-[0_20px_55px_rgba(101,80,232,0.08)] transition hover:bg-[var(--violet-50)]"
                   >
-                    <PenLine className="mx-auto text-indigo-400" size={44} />
-                    <div className="mt-4 text-xl font-bold text-slate-950">
+                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-[var(--violet-50)] text-[var(--violet-600)]">
+                      <PenLine size={30} />
+                    </div>
+
+                    <div className="display-font mt-5 text-2xl font-bold tracking-[-0.03em] text-[var(--text-primary)]">
                       Upload a PDF to start
                     </div>
-                    <p className="mt-2 text-sm font-medium leading-6 text-slate-500">
-                      Your PDF will appear here as a large page preview. Then you can type, sign, mark, whiteout, or add images.
+
+                    <p className="mx-auto mt-2 max-w-md text-sm font-medium leading-6 text-[var(--text-secondary)]">
+                      Drop your file here or choose a PDF. Your document stays in the browser while you add fields and export.
                     </p>
+
+                    <div className="mt-5 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[var(--violet-600)] px-4 text-sm font-bold text-white shadow-[0_14px_30px_rgba(101,80,232,0.22)]">
+                      <Upload size={16} />
+                      Choose PDF
+                    </div>
                   </button>
                 ) : (
                   <div
@@ -1997,14 +2031,14 @@ export default function FillSignPage() {
                   "mt-3 flex flex-col gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold sm:flex-row sm:items-center sm:justify-between",
                   statusIsError
                     ? "border-red-100 bg-red-50 text-red-700"
-                    : "border-amber-100 bg-amber-50 text-amber-900",
+                    : "border-[var(--border-focus)] bg-[var(--violet-50)] text-[var(--violet-700)]",
                 ].join(" ")}
               >
                 <div className="flex items-center gap-2">
                   <CheckCircle2 size={16} />
                   {status}
                 </div>
-                <div className="text-xs font-bold text-slate-500">
+                <div className="text-xs font-bold text-[var(--text-muted)]">
                   {file
                     ? `${pageCount} page${pageCount > 1 ? "s" : ""} • ${
                         objects.length
@@ -2017,13 +2051,13 @@ export default function FillSignPage() {
         </section>
 
         {selectedObject && (
-          <div className="fixed bottom-4 left-1/2 z-50 w-[calc(100%-2rem)] max-w-5xl -translate-x-1/2 rounded-2xl border border-indigo-100 bg-white/95 p-3 shadow-[0_24px_80px_rgba(15,23,42,0.20)] backdrop-blur">
+          <div className="fixed bottom-4 left-1/2 z-50 w-[calc(100%-2rem)] max-w-5xl -translate-x-1/2 rounded-2xl border border-[var(--border-focus)] bg-white/95 p-3 shadow-[0_24px_80px_rgba(15,23,42,0.20)] backdrop-blur">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div className="min-w-0">
-                <div className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                <div className="text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]">
                   Selected
                 </div>
-                <div className="truncate text-sm font-bold text-slate-950">
+                <div className="truncate text-sm font-bold text-[var(--text-primary)]">
                   {getObjectLabel(selectedObject.kind)} on page{" "}
                   {selectedObject.pageNumber}
                 </div>
@@ -2040,7 +2074,7 @@ export default function FillSignPage() {
                       text: event.target.value,
                     }))
                   }
-                  className="h-10 min-w-0 flex-1 rounded-xl border border-slate-200 px-3 text-sm font-bold outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 lg:max-w-md"
+                  className="h-10 min-w-0 flex-1 rounded-xl border border-[var(--border-light)] px-3 text-sm font-bold outline-none transition focus:border-[var(--border-focus)] focus:ring-4 focus:ring-[rgba(101,80,232,0.12)] lg:max-w-md"
                 />
               )}
 
@@ -2048,21 +2082,21 @@ export default function FillSignPage() {
                 <button
                   type="button"
                   onClick={() => resizeSelectedObject("smaller")}
-                  className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                  className="h-10 rounded-xl border border-[var(--border-light)] bg-white px-3 text-sm font-bold text-[var(--text-secondary)] hover:bg-slate-50"
                 >
                   Smaller
                 </button>
                 <button
                   type="button"
                   onClick={() => resizeSelectedObject("bigger")}
-                  className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                  className="h-10 rounded-xl border border-[var(--border-light)] bg-white px-3 text-sm font-bold text-[var(--text-secondary)] hover:bg-slate-50"
                 >
                   Bigger
                 </button>
                 <button
                   type="button"
                   onClick={duplicateSelectedObject}
-                  className="inline-flex h-10 items-center gap-2 rounded-xl border border-indigo-100 bg-indigo-50 px-3 text-sm font-bold text-indigo-700 hover:bg-indigo-100"
+                  className="inline-flex h-10 items-center gap-2 rounded-xl border border-[var(--border-focus)] bg-[var(--violet-50)] px-3 text-sm font-bold text-[var(--violet-600)] hover:bg-[var(--violet-100)]"
                 >
                   <Copy size={15} />
                   Duplicate
