@@ -63,6 +63,20 @@ type TargetPlan = {
 type OpenDropdown = "format" | "dpi" | "pages" | "more" | "help" | null;
 type PerRow = 1 | 2 | 3 | 4 | 5;
 
+type PdfToImagesVariant = {
+  title: string;
+  subtitle: string;
+  initialStatus: string;
+  defaultFormat: ExportFormat;
+};
+
+const DEFAULT_PDF_TO_IMAGES_VARIANT: PdfToImagesVariant = {
+  title: "PDF to Images",
+  subtitle: "Export PDF pages as PNG, JPG, or WebP images.",
+  initialStatus: "Upload a PDF to export pages as images.",
+  defaultFormat: "png",
+};
+
 const DPI_PRESETS = [
   { id: 96, label: "96 DPI", description: "Fast preview" },
   { id: 150, label: "150 DPI", description: "Web quality" },
@@ -333,7 +347,7 @@ function getGridClass(perRow: PerRow) {
   return "grid-cols-2 lg:grid-cols-5";
 }
 
-export default function PdfToImagesPage() {
+export default function PdfToImagesPage({ variant = DEFAULT_PDF_TO_IMAGES_VARIANT }: { readonly variant?: PdfToImagesVariant } = {}) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const toolbarRef = useRef<HTMLDivElement | null>(null);
   const renderTokenRef = useRef(0);
@@ -345,7 +359,7 @@ export default function PdfToImagesPage() {
   const [pageInput, setPageInput] = useState("1-3");
   const [targetMode, setTargetMode] = useState<TargetMode>("all");
 
-  const [format, setFormat] = useState<ExportFormat>("png");
+  const [format, setFormat] = useState<ExportFormat>(variant.defaultFormat);
   const [dpi, setDpi] = useState(200);
   const [quality, setQuality] = useState(0.92);
   const [downloadAsZip, setDownloadAsZip] = useState(true);
@@ -361,7 +375,7 @@ export default function PdfToImagesPage() {
   const [renderProgress, setRenderProgress] = useState({ done: 0, total: 0 });
   const [exportProgress, setExportProgress] = useState(0);
 
-  const [status, setStatus] = useState("Upload a PDF to export pages as images.");
+  const [status, setStatus] = useState(variant.initialStatus);
   const [outputs, setOutputs] = useState<RenderedImage[]>([]);
 
   const busy = busyMode !== "idle";
@@ -528,7 +542,7 @@ export default function PdfToImagesPage() {
     setExportProgress(0);
     setOpenDropdown(null);
     setBusyMode("idle");
-    setStatus("Upload a PDF to export pages as images.");
+    setStatus(variant.initialStatus);
   }
 
   function handleUploadDrop(event: DragEvent<HTMLDivElement>) {
@@ -725,8 +739,8 @@ export default function PdfToImagesPage() {
               <ImageIcon size={20} />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-slate-900">PDF to Images</h1>
-              <p className="text-sm text-slate-500">Export PDF pages as PNG, JPG, or WebP images.</p>
+              <h1 className="text-xl font-bold text-slate-900">{variant.title}</h1>
+              <p className="text-sm text-slate-500">{variant.subtitle}</p>
             </div>
           </div>
 
@@ -944,3 +958,4 @@ export default function PdfToImagesPage() {
     </>
   );
 }
+

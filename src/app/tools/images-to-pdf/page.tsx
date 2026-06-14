@@ -64,6 +64,22 @@ type ImageQueueItem = {
   previewUrl: string;
 };
 
+type ImagesToPdfVariant = {
+  title: string;
+  subtitle: string;
+  initialStatus: string;
+  accept: string;
+  outputSlug: string;
+};
+
+const DEFAULT_IMAGES_TO_PDF_VARIANT: ImagesToPdfVariant = {
+  title: "Images to PDF",
+  subtitle: "Convert images into a PDF document.",
+  initialStatus: "Upload JPG, PNG, or WebP images to convert into PDF.",
+  accept: "image/png,image/jpeg,image/jpg,image/webp",
+  outputSlug: "images-to-pdf",
+};
+
 type OcrSummary = {
   totalWords: number;
   rawWords: number;
@@ -370,7 +386,7 @@ function OcrGraph({ summary }: { summary: OcrSummary }) {
   );
 }
 
-export default function ImagesToPdfPage() {
+export default function ImagesToPdfPage({ variant = DEFAULT_IMAGES_TO_PDF_VARIANT }: { readonly variant?: ImagesToPdfVariant } = {}) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const toolbarRef = useRef<HTMLDivElement | null>(null);
   const draggedIndexRef = useRef<number | null>(null);
@@ -400,7 +416,7 @@ export default function ImagesToPdfPage() {
   const [ocrSummary, setOcrSummary] = useState<OcrSummary | null>(null);
   const [localOcrRunsUsed, setLocalOcrRunsUsed] = useState(0);
 
-  const [status, setStatus] = useState("Upload JPG, PNG, or WebP images to convert into PDF.");
+  const [status, setStatus] = useState(variant.initialStatus);
   const [busy, setBusy] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const [result, setResult] = useState<PdfProcessingResult | null>(null);
@@ -599,7 +615,7 @@ export default function ImagesToPdfPage() {
     setOcrProgress(null);
     setExportProgress(0);
     setOpenDropdown(null);
-    setStatus("Upload JPG, PNG, or WebP images to convert into PDF.");
+    setStatus(variant.initialStatus);
   }
 
   function reverseImages() {
@@ -783,7 +799,7 @@ export default function ImagesToPdfPage() {
       orientation,
       fitMode,
       margin,
-      outputFileName: ocrEnabled ? "PDFMantra-searchable-images.pdf" : "PDFMantra-images-to-pdf.pdf",
+      outputFileName: ocrEnabled ? `PDFMantra-searchable-${variant.outputSlug}.pdf` : `PDFMantra-${variant.outputSlug}.pdf`,
     };
 
     try {
@@ -885,7 +901,7 @@ export default function ImagesToPdfPage() {
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/png,image/jpeg,image/jpg,image/webp"
+            accept={variant.accept}
             multiple
             className="hidden"
             onChange={(event) => {
@@ -1458,3 +1474,4 @@ export default function ImagesToPdfPage() {
     </>
   );
 }
+
