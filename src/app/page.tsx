@@ -133,10 +133,10 @@ const mostUsedToolTitles = [
   "Compress PDF",
   "Fill & Sign",
   "Edit PDF",
-  "Reorder Pages",
   "Images to PDF",
+  "JPG to PDF",
   "PDF to Images",
-  "Delete Pages",
+  "PDF to JPG",
 ];
 
 const workflows: Workflow[] = [
@@ -153,7 +153,7 @@ const workflows: Workflow[] = [
   {
     title: "Convert files",
     description: "Move between PDFs and image formats for sharing or uploads.",
-    tools: ["Images to PDF", "PDF to Images"],
+    tools: ["Images to PDF", "JPG to PDF", "PNG to PDF", "PDF to Images", "PDF to JPG", "PDF to PNG"],
   },
   {
     title: "Optimize",
@@ -623,3 +623,4 @@ export default function HomePage() {
     </>
   );
 }
+
