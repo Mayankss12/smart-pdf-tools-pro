@@ -2,7 +2,6 @@
 
 import {
   AlertCircle,
-  FileText,
   Loader2,
   Trash2,
   Upload,
@@ -470,6 +469,7 @@ export function EditorCanvas({
   onFileDrop,
 }: EditorCanvasProps) {
   const [ocrOpen, setOcrOpen] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
 
   useEffect(() => {
     if (editor.activeTool === "ocr") {
@@ -480,12 +480,23 @@ export function EditorCanvas({
 
   function handleDrop(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
+    setDragActive(false);
 
     const file = event.dataTransfer.files?.[0];
 
     if (file && isPdfFile(file)) {
       void onFileDrop(file);
     }
+  }
+
+  function handleDragOver(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setDragActive(true);
+  }
+
+  function handleDragLeave(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setDragActive(false);
   }
 
   async function handleOcrStart(
@@ -507,30 +518,35 @@ export function EditorCanvas({
     return (
       <main
         onDrop={handleDrop}
-        onDragOver={(event) => event.preventDefault()}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
         className="min-w-0 flex-1 overflow-hidden bg-[radial-gradient(circle_at_top,#eef2ff_0,#f8fafc_42%,#eef2f7_100%)]"
       >
         <div className="flex min-h-full items-center justify-center p-6">
           <button
             type="button"
             onClick={onOpenFile}
-            className="group flex min-h-[540px] w-full max-w-4xl flex-col items-center justify-center rounded-[2rem] border-2 border-dashed border-violet-200 bg-white/90 px-8 text-center shadow-[0_30px_90px_rgba(15,23,42,0.10)] transition hover:border-violet-300 hover:bg-violet-50/70"
+            className={[
+              "group flex min-h-[540px] w-full max-w-4xl flex-col items-center justify-center rounded-[2rem] border-2 border-dashed px-8 text-center shadow-[0_30px_90px_rgba(15,23,42,0.10)] transition",
+              dragActive
+                ? "border-violet-500 bg-violet-50"
+                : "border-violet-200 bg-white/90 hover:border-violet-300 hover:bg-violet-50/70",
+            ].join(" ")}
           >
             <div className="flex h-16 w-16 items-center justify-center rounded-[1.7rem] bg-violet-600 text-white shadow-[0_20px_48px_rgba(124,58,237,0.30)] transition group-hover:scale-105">
               <Upload size={34} />
             </div>
 
             <h1 className="mt-7 text-3xl font-black tracking-[-0.05em] text-slate-950">
-              Open a PDF to edit
+              Drag & drop PDF here
             </h1>
 
             <p className="mt-3 max-w-xl text-sm font-bold leading-7 text-slate-500">
-              Add text, highlight content, whiteout areas, and prepare the file for export.
+              or click to upload PDF and start editing.
             </p>
 
-            <div className="mt-6 inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-xs font-black text-slate-600">
-              <FileText size={14} />
-              Browser-side PDF editor
+            <div className="mt-6 rounded-full bg-violet-600 px-5 py-2 text-xs font-black text-white shadow-[0_12px_26px_rgba(124,58,237,0.24)] transition group-hover:bg-violet-700">
+              Upload PDF
             </div>
           </button>
         </div>
@@ -541,7 +557,8 @@ export function EditorCanvas({
   return (
     <main
       onDrop={handleDrop}
-      onDragOver={(event) => event.preventDefault()}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
       className="min-w-0 flex-1 overflow-auto bg-[radial-gradient(circle_at_top,#eef2ff_0,#f8fafc_42%,#eef2f7_100%)]"
     >
       <div className="flex min-h-full justify-center px-8 py-10">

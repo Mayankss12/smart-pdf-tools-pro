@@ -243,7 +243,6 @@ export function useEditor(): EditorController {
 
       setObjects((current) => [...current, nextObject]);
       setSelectedObjectId(id);
-      setActiveToolState("select");
       markChanged();
 
       return id;
@@ -324,7 +323,6 @@ export function useEditor(): EditorController {
 
   const selectObject = useCallback((id: string | null) => {
     setSelectedObjectId(id);
-    setActiveToolState("select");
   }, []);
 
   const clearObjectsForPage = useCallback(

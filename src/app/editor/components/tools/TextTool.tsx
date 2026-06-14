@@ -1,6 +1,6 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
+import { useState } from "react";
 
 import type { EditorObject } from "../../hooks/useEditor";
 
@@ -28,54 +28,52 @@ export function TextTool({
   pageScale,
   onSelect,
   onUpdateData,
-  onDelete,
 }: TextToolProps) {
+  const [editing, setEditing] = useState(true);
+
   const data = object.data as TextData;
+  const text = data.text ?? "";
   const fontSize = Number(data.fontSize ?? 16);
+  const fontWeight = data.fontWeight ?? "normal";
+  const fontStyle = data.fontStyle ?? "normal";
+  const color = data.color ?? "#111827";
+
+  const showOutline = selected && editing;
 
   return (
     <div
       className={[
-        "absolute z-30 rounded-lg transition",
-        selected
-          ? "border-2 border-violet-500 bg-white/95 shadow-lg ring-4 ring-violet-100"
-          : "border border-transparent hover:border-violet-300",
+        "absolute z-30 rounded-none transition duration-150",
+        showOutline
+          ? "border border-violet-500 bg-white/80 shadow-[0_0_0_3px_rgba(124,58,237,0.14)]"
+          : "border border-transparent bg-transparent",
       ].join(" ")}
       style={{
         left: object.box.x * pageScale,
         top: object.box.y * pageScale,
         width: object.box.width * pageScale,
-        minHeight: object.box.height * pageScale,
+        height: object.box.height * pageScale,
       }}
       onPointerDown={(event) => {
         event.stopPropagation();
         onSelect(object.id);
+        setEditing(true);
       }}
       onClick={(event) => {
         event.stopPropagation();
         onSelect(object.id);
+        setEditing(true);
       }}
     >
-      {selected ? (
-        <div className="absolute -top-12 left-0 z-40 flex items-center gap-1 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-lg">
-          <span className="px-2 text-xs font-black text-slate-600">Text</span>
-
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              onDelete(object.id);
-            }}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-red-50 hover:text-red-600"
-            aria-label="Delete text"
-          >
-            <Trash2 size={15} />
-          </button>
-        </div>
-      ) : null}
-
       <textarea
-        value={data.text ?? ""}
+        value={text}
+        onFocus={() => {
+          onSelect(object.id);
+          setEditing(true);
+        }}
+        onBlur={() => {
+          setEditing(false);
+        }}
         onChange={(event) => {
           onUpdateData(object.id, {
             text: event.target.value,
@@ -84,17 +82,26 @@ export function TextTool({
         onPointerDown={(event) => {
           event.stopPropagation();
         }}
-        className="block h-full min-h-[32px] w-full resize-none rounded-lg bg-transparent px-2 py-1 outline-none"
+        className="block h-full w-full resize-none rounded-none bg-transparent px-1 py-0.5 outline-none"
         style={{
-          color: data.color ?? "#111827",
+          color,
           fontSize: fontSize * pageScale,
-          fontWeight: data.fontWeight ?? "normal",
-          fontStyle: data.fontStyle ?? "normal",
-          lineHeight: 1.35,
+          fontWeight,
+          fontStyle,
+          lineHeight: 1.3,
         }}
         spellCheck={false}
         aria-label="Edit PDF text"
       />
+
+      {showOutline ? (
+        <>
+          <div className="pointer-events-none absolute -left-1 -top-1 h-2 w-2 rounded-full border border-white bg-violet-600 shadow" />
+          <div className="pointer-events-none absolute -right-1 -top-1 h-2 w-2 rounded-full border border-white bg-violet-600 shadow" />
+          <div className="pointer-events-none absolute -bottom-1 -left-1 h-2 w-2 rounded-full border border-white bg-violet-600 shadow" />
+          <div className="pointer-events-none absolute -bottom-1 -right-1 h-2 w-2 rounded-full border border-white bg-violet-600 shadow" />
+        </>
+      ) : null}
     </div>
   );
 }

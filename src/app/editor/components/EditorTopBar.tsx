@@ -1,12 +1,14 @@
 "use client";
 
 import {
+  ArrowUpDown,
   Brain,
   ChevronLeft,
   ChevronRight,
   Download,
   FilePlus2,
   FolderOpen,
+  Hash,
   Highlighter,
   Image as ImageIcon,
   Languages,
@@ -15,6 +17,7 @@ import {
   PenLine,
   Pencil,
   Plus,
+  Redo2,
   RotateCw,
   Search,
   Share2,
@@ -23,8 +26,9 @@ import {
   StickyNote,
   Trash2,
   Type,
+  Undo2,
 } from "lucide-react";
-import type { ComponentType } from "react";
+import type { ComponentType, ReactNode } from "react";
 
 import type { EditorController } from "../hooks/useEditor";
 import type { EditorTool } from "../hooks/useActiveTool";
@@ -112,6 +116,51 @@ function ToolButton({
   );
 }
 
+function TextToolButtonStack({
+  item,
+  activeTool,
+  onSelect,
+  onUnavailableTool,
+}: {
+  readonly item: ToolButtonConfig;
+  readonly activeTool: EditorTool;
+  readonly onSelect: (tool: EditorTool) => void;
+  readonly onUnavailableTool?: (label: string) => void;
+}) {
+  const active = activeTool === item.id;
+
+  return (
+    <div className="flex shrink-0 flex-col items-center">
+      <ToolButton item={item} activeTool={activeTool} onSelect={onSelect} />
+
+      {active ? (
+        <div className="mt-1 flex items-center gap-1 rounded-xl border border-violet-200 bg-white p-1 shadow-[0_10px_24px_rgba(124,58,237,0.12)]">
+          <button
+            type="button"
+            title="Add new text"
+            onClick={() => onSelect("text")}
+            className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-100 text-violet-700 transition hover:bg-violet-200"
+            aria-label="Add new text"
+          >
+            <Plus size={14} />
+          </button>
+
+          <button
+            type="button"
+            title="Edit existing PDF text - Premium"
+            onClick={() => onUnavailableTool?.("Edit existing PDF text")}
+            className="relative flex h-7 w-7 items-center justify-center rounded-lg text-slate-600 transition hover:bg-violet-50 hover:text-violet-700"
+            aria-label="Edit existing PDF text"
+          >
+            <Pencil size={14} />
+            <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-violet-600" />
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function ActionButton({
   item,
   onFallback,
@@ -152,6 +201,46 @@ function ActionButton({
   );
 }
 
+function PageIconButton({
+  item,
+  onFallback,
+}: {
+  readonly item: ActionButtonConfig;
+  readonly onFallback?: (label: string) => void;
+}) {
+  const Icon = item.icon;
+
+  return (
+    <button
+      type="button"
+      disabled={!item.enabled}
+      title={`${item.label} (${item.shortcut})`}
+      onClick={() => {
+        if (item.onClick) {
+          item.onClick();
+          return;
+        }
+
+        onFallback?.(item.label);
+      }}
+      className={[
+        "relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border transition duration-200 sm:h-14 sm:w-14",
+        "border-transparent bg-white/0 text-slate-600 hover:border-slate-200 hover:bg-white hover:text-violet-700",
+        !item.enabled ? "cursor-not-allowed opacity-40" : "",
+      ].join(" ")}
+      aria-label={item.label}
+    >
+      {item.pro ? (
+        <span className="absolute -right-0.5 -top-0.5 rounded-full bg-violet-600 px-1.5 py-0.5 text-[7px] font-black text-white sm:-right-1 sm:-top-1 sm:text-[8px]">
+          PRO
+        </span>
+      ) : null}
+
+      <Icon size={20} className="sm:h-[22px] sm:w-[22px]" />
+    </button>
+  );
+}
+
 function GroupLabel({ title }: { readonly title: string }) {
   return (
     <div className="mb-1 hidden items-center gap-2 px-2 sm:flex">
@@ -168,12 +257,12 @@ function RibbonGroup({
   children,
 }: {
   readonly title: string;
-  readonly children: React.ReactNode;
+  readonly children: ReactNode;
 }) {
   return (
     <div className="shrink-0 rounded-2xl border border-slate-200/70 bg-slate-50/70 px-1.5 py-1 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:px-2">
       <GroupLabel title={title} />
-      <div className="flex items-center gap-1">{children}</div>
+      <div className="flex items-start gap-1">{children}</div>
     </div>
   );
 }
@@ -192,16 +281,35 @@ export function EditorTopBar({
   const canGoPrevious = hasDocument && editor.activePageNumber > 1;
   const canGoNext = hasDocument && editor.activePageNumber < editor.totalPages;
 
-  const toolGroups: ToolGroup[] = [
+  const homeTools: ToolButtonConfig[] = [
+    { id: "select", label: "Select", shortcut: "V", icon: MousePointer2, enabled: hasDocument },
+    { id: "text", label: "Text", shortcut: "T", icon: Type, enabled: hasDocument },
+    { id: "image", label: "Image", shortcut: "I", icon: ImageIcon, enabled: hasDocument },
+    { id: "signature", label: "Sign", shortcut: "S", icon: PenLine, enabled: hasDocument },
+  ];
+
+  const homePremiumActions: ActionButtonConfig[] = [
     {
-      title: "Home",
-      items: [
-        { id: "select", label: "Select", shortcut: "V", icon: MousePointer2, enabled: hasDocument },
-        { id: "text", label: "Text", shortcut: "T", icon: Type, enabled: hasDocument },
-        { id: "image", label: "Image", shortcut: "I", icon: ImageIcon, enabled: hasDocument },
-        { id: "signature", label: "Sign", shortcut: "S", icon: PenLine, enabled: hasDocument },
-      ],
+      id: "object-select",
+      label: "Object",
+      shortcut: "Obj",
+      icon: MousePointer2,
+      enabled: hasDocument,
+      pro: true,
+      onClick: () => onUnavailableTool?.("Object select, copy and image download"),
     },
+    {
+      id: "text-select",
+      label: "Text Sel",
+      shortcut: "OCR",
+      icon: Type,
+      enabled: hasDocument,
+      pro: true,
+      onClick: () => onUnavailableTool?.("OCR text select and copy"),
+    },
+  ];
+
+  const toolGroups: ToolGroup[] = [
     {
       title: "Comment",
       items: [
@@ -233,15 +341,47 @@ export function EditorTopBar({
     items: [
       {
         id: "add-page",
-        label: "Add",
+        label: "Add page",
         shortcut: "A",
         icon: FilePlus2,
         enabled: hasDocument,
         onClick: onAddBlankPage,
       },
       {
+        id: "reorder-page",
+        label: "Reorder pages",
+        shortcut: "Drag",
+        icon: ArrowUpDown,
+        enabled: hasDocument,
+        onClick: () => onUnavailableTool?.("Page reorder"),
+      },
+      {
+        id: "page-numbering",
+        label: "Page numbering",
+        shortcut: "#",
+        icon: Hash,
+        enabled: hasDocument,
+        onClick: () => onUnavailableTool?.("Page numbering"),
+      },
+      {
+        id: "undo",
+        label: "Undo",
+        shortcut: "Ctrl+Z",
+        icon: Undo2,
+        enabled: hasDocument,
+        onClick: () => onUnavailableTool?.("Undo"),
+      },
+      {
+        id: "redo",
+        label: "Redo",
+        shortcut: "Ctrl+Y",
+        icon: Redo2,
+        enabled: hasDocument,
+        onClick: () => onUnavailableTool?.("Redo"),
+      },
+      {
         id: "delete-page",
-        label: "Delete",
+        label: "Delete page",
         shortcut: "Del",
         icon: Trash2,
         enabled: hasDocument,
@@ -249,7 +389,7 @@ export function EditorTopBar({
       },
       {
         id: "rotate-page",
-        label: "Rotate",
+        label: "Rotate page",
         shortcut: "Ctrl+R",
         icon: RotateCw,
         enabled: hasDocument,
@@ -362,7 +502,36 @@ export function EditorTopBar({
         </div>
       </div>
 
-      <div className="flex h-[4.35rem] min-w-0 items-center gap-2 overflow-x-auto border-t border-slate-100 bg-white px-2 sm:h-[5rem] sm:px-4 lg:justify-center">
+      <div className="flex h-[6.7rem] min-w-0 items-start gap-2 overflow-x-auto border-t border-slate-100 bg-white px-2 py-2 sm:h-[7.2rem] sm:px-4 lg:justify-center">
+        <RibbonGroup title="Home">
+          {homeTools.map((item) =>
+            item.id === "text" ? (
+              <TextToolButtonStack
+                key={item.id}
+                item={item}
+                activeTool={editor.activeTool}
+                onSelect={editor.setActiveTool}
+                onUnavailableTool={onUnavailableTool}
+              />
+            ) : (
+              <ToolButton
+                key={item.id}
+                item={item}
+                activeTool={editor.activeTool}
+                onSelect={editor.setActiveTool}
+              />
+            ),
+          )}
+
+          {homePremiumActions.map((item) => (
+            <ActionButton
+              key={item.id}
+              item={item}
+              onFallback={onUnavailableTool}
+            />
+          ))}
+        </RibbonGroup>
+
         {toolGroups.map((group) => (
           <RibbonGroup key={group.title} title={group.title}>
             {group.items.map((item) => (
@@ -378,7 +547,7 @@ export function EditorTopBar({
 
         <RibbonGroup title={pageActions.title}>
           {pageActions.items.map((item) => (
-            <ActionButton
+            <PageIconButton
               key={item.id}
               item={item}
               onFallback={onUnavailableTool}
