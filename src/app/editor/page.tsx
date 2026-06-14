@@ -10,6 +10,17 @@ import { EditorStatusBar } from "./components/EditorStatusBar";
 import { EditorTopBar } from "./components/EditorTopBar";
 import { useEditor, type EditorObject } from "./hooks/useEditor";
 
+type EmbeddedTextFonts = {
+  readonly regular: any;
+  readonly bold: any;
+  readonly italic: any;
+  readonly boldItalic: any;
+};
+
+type TextDecorationData = {
+  readonly textDecoration?: "none" | "underline";
+};
+
 function configurePdfWorker() {
   if (typeof window === "undefined") return;
 
@@ -53,20 +64,91 @@ function safeEditedName(fileName: string) {
   return `PDFMantra-edited-${cleanName}.pdf`;
 }
 
-function drawEditorObject(page: any, object: EditorObject, font: any) {
+function getTextFont(object: EditorObject, fonts: EmbeddedTextFonts) {
+  const bold = object.data.fontWeight === "bold" || object.data.fontWeight === "700";
+  const italic = object.data.fontStyle === "italic";
+
+  if (bold && italic) return fonts.boldItalic;
+  if (bold) return fonts.bold;
+  if (italic) return fonts.italic;
+
+  return fonts.regular;
+}
+
+function drawTextUnderline({
+  page,
+  object,
+  font,
+  fontSize,
+  lineHeight,
+  color,
+}: {
+  readonly page: any;
+  readonly object: EditorObject;
+  readonly font: any;
+  readonly fontSize: number;
+  readonly lineHeight: number;
+  readonly color: ReturnType<typeof rgb>;
+}) {
+  const pageHeight = page.getHeight();
+  const lines = (object.data.text || "").split(/\r?\n/);
+  const startX = object.box.x;
+  const firstBaselineY = pageHeight - object.box.y - fontSize;
+  const underlineGap = Math.max(1.4, fontSize * 0.12);
+  const underlineThickness = Math.max(0.6, fontSize * 0.055);
+
+  lines.forEach((line, index) => {
+    if (!line) return;
+
+    const baselineY = firstBaselineY - index * lineHeight;
+    const lineWidth = font.widthOfTextAtSize(line, fontSize);
+
+    page.drawLine({
+      start: {
+        x: startX,
+        y: baselineY - underlineGap,
+      },
+      end: {
+        x: startX + lineWidth,
+        y: baselineY - underlineGap,
+      },
+      thickness: underlineThickness,
+      color,
+    });
+  });
+}
+
+function drawEditorObject(page: any, object: EditorObject, fonts: EmbeddedTextFonts) {
   const pageHeight = page.getHeight();
 
   if (object.type === "text") {
     const color = hexToRgb(object.data.color || "#111827");
     const fontSize = object.data.fontSize || 16;
+    const lineHeight = fontSize * 1.3;
+    const font = getTextFont(object, fonts);
+    const textColor = rgb(color.r, color.g, color.b);
+    const textDecoration = (object.data as TextDecorationData).textDecoration ?? "none";
 
     page.drawText(object.data.text || "", {
       x: object.box.x,
       y: pageHeight - object.box.y - fontSize,
       size: fontSize,
+      lineHeight,
       font,
-      color: rgb(color.r, color.g, color.b),
+      color: textColor,
+      maxWidth: object.box.width,
     });
+
+    if (textDecoration === "underline") {
+      drawTextUnderline({
+        page,
+        object,
+        font,
+        fontSize,
+        lineHeight,
+        color: textColor,
+      });
+    }
 
     return;
   }
@@ -169,14 +251,21 @@ export default function EditorPage() {
       setStatusMessage("Exporting edited PDF...");
 
       const pdfDoc = await PDFDocument.load(fileBytes);
-      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+      const fonts: EmbeddedTextFonts = {
+        regular: await pdfDoc.embedFont(StandardFonts.Helvetica),
+        bold: await pdfDoc.embedFont(StandardFonts.HelveticaBold),
+        italic: await pdfDoc.embedFont(StandardFonts.HelveticaOblique),
+        boldItalic: await pdfDoc.embedFont(StandardFonts.HelveticaBoldOblique),
+      };
+
       const pages = pdfDoc.getPages();
 
       editor.objects.forEach((object) => {
         const page = pages[object.pageNumber - 1];
         if (!page) return;
 
-        drawEditorObject(page, object, font);
+        drawEditorObject(page, object, fonts);
       });
 
       const editedBytes = await pdfDoc.save();
@@ -201,8 +290,8 @@ export default function EditorPage() {
     setStatusMessage("Share will be connected in backend phase.");
   }
 
-  function handleComingSoon(label: string) {
-    setStatusMessage(`${label} tool is planned for the next editor phase.`);
+  function handleUnavailableTool(label: string) {
+    setStatusMessage(`${label} is locked in this private editor build.`);
   }
 
   return (
@@ -228,7 +317,7 @@ export default function EditorPage() {
         onOpenFile={openFilePicker}
         onExport={exportEditedPdf}
         onShare={handleShare}
-        onUnavailableTool={handleComingSoon}
+        onUnavailableTool={handleUnavailableTool}
       />
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
