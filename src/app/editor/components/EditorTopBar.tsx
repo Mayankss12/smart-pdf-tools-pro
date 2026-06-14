@@ -12,6 +12,7 @@ import {
   Highlighter,
   Image as ImageIcon,
   Languages,
+  Lock,
   Minus,
   MousePointer2,
   PenLine,
@@ -33,33 +34,23 @@ import type { ComponentType, ReactNode } from "react";
 import type { EditorController } from "../hooks/useEditor";
 import type { EditorTool } from "../hooks/useActiveTool";
 
-type ToolButtonConfig = {
-  readonly id: EditorTool;
-  readonly label: string;
-  readonly shortcut: string;
-  readonly icon: ComponentType<{ size?: number; className?: string }>;
-  readonly enabled: boolean;
-  readonly pro?: boolean;
-};
+type ToolStatus = "working" | "locked";
 
-type ActionButtonConfig = {
+type RibbonTool = {
   readonly id: string;
   readonly label: string;
   readonly shortcut: string;
   readonly icon: ComponentType<{ size?: number; className?: string }>;
-  readonly enabled: boolean;
-  readonly pro?: boolean;
-  readonly onClick?: () => void;
+  readonly status: ToolStatus;
+  readonly tool?: EditorTool;
+  readonly action?: () => void;
+  readonly active?: boolean;
+  readonly disabled?: boolean;
 };
 
 type ToolGroup = {
-  readonly title: string;
-  readonly items: ToolButtonConfig[];
-};
-
-type ActionGroup = {
-  readonly title: string;
-  readonly items: ActionButtonConfig[];
+  readonly label: string;
+  readonly tools: RibbonTool[];
 };
 
 type EditorTopBarProps = {
@@ -78,192 +69,69 @@ function formatPageLabel(editor: EditorController) {
   return `Page ${editor.activePageNumber} of ${editor.totalPages}`;
 }
 
-function ToolButton({
-  item,
-  activeTool,
-  onSelect,
-}: {
-  readonly item: ToolButtonConfig;
-  readonly activeTool: EditorTool;
-  readonly onSelect: (tool: EditorTool) => void;
-}) {
-  const Icon = item.icon;
-  const active = activeTool === item.id;
-
-  return (
-    <button
-      type="button"
-      disabled={!item.enabled}
-      title={`${item.label} (${item.shortcut})`}
-      onClick={() => onSelect(item.id)}
-      className={[
-        "relative flex h-12 w-[4.1rem] shrink-0 flex-col items-center justify-center rounded-2xl border text-[9px] font-black leading-none transition duration-200 sm:h-14 sm:w-16 sm:text-[10px]",
-        active
-          ? "border-violet-300 bg-violet-100 text-violet-700 ring-2 ring-violet-500/25 shadow-[0_10px_24px_rgba(124,58,237,0.14)]"
-          : "border-transparent bg-white/0 text-slate-600 hover:border-slate-200 hover:bg-white hover:text-slate-950",
-        !item.enabled ? "cursor-not-allowed opacity-40" : "",
-      ].join(" ")}
-    >
-      {item.pro ? (
-        <span className="absolute -right-0.5 -top-0.5 rounded-full bg-violet-600 px-1.5 py-0.5 text-[7px] font-black text-white sm:-right-1 sm:-top-1 sm:text-[8px]">
-          PRO
-        </span>
-      ) : null}
-
-      <Icon size={18} className="sm:h-5 sm:w-5" />
-      <span className="mt-1 max-w-[58px] truncate sm:mt-1.5">{item.label}</span>
-    </button>
-  );
-}
-
-function TextToolButtonStack({
-  item,
-  activeTool,
-  onSelect,
-  onUnavailableTool,
-}: {
-  readonly item: ToolButtonConfig;
-  readonly activeTool: EditorTool;
-  readonly onSelect: (tool: EditorTool) => void;
-  readonly onUnavailableTool?: (label: string) => void;
-}) {
-  const active = activeTool === item.id;
-
-  return (
-    <div className="flex shrink-0 flex-col items-center">
-      <ToolButton item={item} activeTool={activeTool} onSelect={onSelect} />
-
-      {active ? (
-        <div className="mt-1 flex items-center gap-1 rounded-xl border border-violet-200 bg-white p-1 shadow-[0_10px_24px_rgba(124,58,237,0.12)]">
-          <button
-            type="button"
-            title="Add new text"
-            onClick={() => onSelect("text")}
-            className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-100 text-violet-700 transition hover:bg-violet-200"
-            aria-label="Add new text"
-          >
-            <Plus size={14} />
-          </button>
-
-          <button
-            type="button"
-            title="Edit existing PDF text - Premium"
-            onClick={() => onUnavailableTool?.("Edit existing PDF text")}
-            className="relative flex h-7 w-7 items-center justify-center rounded-lg text-slate-600 transition hover:bg-violet-50 hover:text-violet-700"
-            aria-label="Edit existing PDF text"
-          >
-            <Pencil size={14} />
-            <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-violet-600" />
-          </button>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function ActionButton({
-  item,
-  onFallback,
-}: {
-  readonly item: ActionButtonConfig;
-  readonly onFallback?: (label: string) => void;
-}) {
-  const Icon = item.icon;
-
-  return (
-    <button
-      type="button"
-      disabled={!item.enabled}
-      title={`${item.label} (${item.shortcut})`}
-      onClick={() => {
-        if (item.onClick) {
-          item.onClick();
-          return;
-        }
-
-        onFallback?.(item.label);
-      }}
-      className={[
-        "relative flex h-12 w-[4.1rem] shrink-0 flex-col items-center justify-center rounded-2xl border text-[9px] font-black leading-none transition duration-200 sm:h-14 sm:w-16 sm:text-[10px]",
-        "border-transparent bg-white/0 text-slate-600 hover:border-slate-200 hover:bg-white hover:text-slate-950",
-        !item.enabled ? "cursor-not-allowed opacity-40" : "",
-      ].join(" ")}
-    >
-      {item.pro ? (
-        <span className="absolute -right-0.5 -top-0.5 rounded-full bg-violet-600 px-1.5 py-0.5 text-[7px] font-black text-white sm:-right-1 sm:-top-1 sm:text-[8px]">
-          PRO
-        </span>
-      ) : null}
-
-      <Icon size={18} className="sm:h-5 sm:w-5" />
-      <span className="mt-1 max-w-[58px] truncate sm:mt-1.5">{item.label}</span>
-    </button>
-  );
-}
-
-function PageIconButton({
-  item,
-  onFallback,
-}: {
-  readonly item: ActionButtonConfig;
-  readonly onFallback?: (label: string) => void;
-}) {
-  const Icon = item.icon;
-
-  return (
-    <button
-      type="button"
-      disabled={!item.enabled}
-      title={`${item.label} (${item.shortcut})`}
-      onClick={() => {
-        if (item.onClick) {
-          item.onClick();
-          return;
-        }
-
-        onFallback?.(item.label);
-      }}
-      className={[
-        "relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border transition duration-200 sm:h-14 sm:w-14",
-        "border-transparent bg-white/0 text-slate-600 hover:border-slate-200 hover:bg-white hover:text-violet-700",
-        !item.enabled ? "cursor-not-allowed opacity-40" : "",
-      ].join(" ")}
-      aria-label={item.label}
-    >
-      {item.pro ? (
-        <span className="absolute -right-0.5 -top-0.5 rounded-full bg-violet-600 px-1.5 py-0.5 text-[7px] font-black text-white sm:-right-1 sm:-top-1 sm:text-[8px]">
-          PRO
-        </span>
-      ) : null}
-
-      <Icon size={20} className="sm:h-[22px] sm:w-[22px]" />
-    </button>
-  );
-}
-
-function GroupLabel({ title }: { readonly title: string }) {
-  return (
-    <div className="mb-1 hidden items-center gap-2 px-2 sm:flex">
-      <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.14em] text-violet-600">
-        {title}
-      </span>
-      <span className="h-px min-w-5 flex-1 bg-slate-200" />
-    </div>
-  );
-}
-
 function RibbonGroup({
-  title,
-  children,
+  group,
+  isLast,
 }: {
-  readonly title: string;
-  readonly children: ReactNode;
+  readonly group: ToolGroup;
+  readonly isLast: boolean;
 }) {
   return (
-    <div className="shrink-0 rounded-2xl border border-slate-200/70 bg-slate-50/70 px-1.5 py-1 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:px-2">
-      <GroupLabel title={title} />
-      <div className="flex items-start gap-1">{children}</div>
+    <div className="flex shrink-0 items-center gap-3">
+      <div className="shrink-0">
+        <div className="mb-1 px-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
+          {group.label}
+        </div>
+
+        <div className="flex items-center gap-1">
+          {group.tools.map((tool) => (
+            <RibbonButton key={tool.id} tool={tool} />
+          ))}
+        </div>
+      </div>
+
+      {!isLast ? <div className="h-12 w-px bg-slate-200" /> : null}
     </div>
+  );
+}
+
+function RibbonButton({ tool }: { readonly tool: RibbonTool }) {
+  const Icon = tool.icon;
+  const locked = tool.status === "locked";
+  const disabled = locked || tool.disabled;
+
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      title={`${tool.label} (${tool.shortcut})`}
+      onClick={() => {
+        if (disabled) return;
+
+        if (tool.action) {
+          tool.action();
+        }
+      }}
+      className={[
+        "relative flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-2xl border text-[10px] font-black leading-none transition duration-200",
+        tool.active
+          ? "border-violet-300 bg-violet-100 text-violet-700 ring-2 ring-violet-400 shadow-[0_10px_24px_rgba(124,58,237,0.14)]"
+          : "border-transparent text-slate-700",
+        disabled
+          ? "cursor-not-allowed opacity-40"
+          : "cursor-pointer hover:border-slate-200 hover:bg-slate-100 hover:text-slate-950",
+      ].join(" ")}
+      aria-label={tool.label}
+    >
+      {locked ? (
+        <span className="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-white text-slate-400 shadow-sm">
+          <Lock size={10} />
+        </span>
+      ) : null}
+
+      <Icon size={20} />
+      <span className="mt-1.5 max-w-[50px] truncate">{tool.label}</span>
+    </button>
   );
 }
 
@@ -272,131 +140,219 @@ export function EditorTopBar({
   onOpenFile,
   onExport,
   onShare,
-  onUnavailableTool,
   onAddBlankPage,
-  onDeleteCurrentPage,
   onRotateCurrentPage,
 }: EditorTopBarProps) {
   const hasDocument = Boolean(editor.file && editor.pdfDocument);
   const canGoPrevious = hasDocument && editor.activePageNumber > 1;
   const canGoNext = hasDocument && editor.activePageNumber < editor.totalPages;
 
-  const homeTools: ToolButtonConfig[] = [
-    { id: "select", label: "Select", shortcut: "V", icon: MousePointer2, enabled: hasDocument },
-    { id: "text", label: "Text", shortcut: "T", icon: Type, enabled: hasDocument },
-    { id: "image", label: "Image", shortcut: "I", icon: ImageIcon, enabled: hasDocument },
-    { id: "signature", label: "Sign", shortcut: "S", icon: PenLine, enabled: hasDocument },
-  ];
-
-  const homePremiumActions: ActionButtonConfig[] = [
-    {
-      id: "object-select",
-      label: "Object",
-      shortcut: "Obj",
-      icon: MousePointer2,
-      enabled: hasDocument,
-      pro: true,
-      onClick: () => onUnavailableTool?.("Object select, copy and image download"),
-    },
-    {
-      id: "text-select",
-      label: "Text Sel",
-      shortcut: "OCR",
-      icon: Type,
-      enabled: hasDocument,
-      pro: true,
-      onClick: () => onUnavailableTool?.("OCR text select and copy"),
-    },
-  ];
+  const selectTool = (tool: EditorTool) => {
+    editor.setActiveTool(tool);
+  };
 
   const toolGroups: ToolGroup[] = [
     {
-      title: "Comment",
-      items: [
-        { id: "highlight", label: "Highlight", shortcut: "H", icon: Highlighter, enabled: hasDocument },
-        { id: "note", label: "Note", shortcut: "N", icon: StickyNote, enabled: hasDocument },
-        { id: "draw", label: "Draw", shortcut: "D", icon: Pencil, enabled: hasDocument },
-        { id: "shape", label: "Shape", shortcut: "R", icon: Square, enabled: hasDocument },
-        { id: "stamp", label: "Stamp", shortcut: "M", icon: Stamp, enabled: hasDocument },
+      label: "Add",
+      tools: [
+        {
+          id: "select",
+          label: "Select",
+          shortcut: "V",
+          icon: MousePointer2,
+          status: "working",
+          active: editor.activeTool === "select",
+          disabled: !hasDocument,
+          action: () => selectTool("select"),
+        },
+        {
+          id: "text",
+          label: "Text",
+          shortcut: "T",
+          icon: Type,
+          status: "working",
+          active: editor.activeTool === "text",
+          disabled: !hasDocument,
+          action: () => selectTool("text"),
+        },
+        {
+          id: "image",
+          label: "Image",
+          shortcut: "I",
+          icon: ImageIcon,
+          status: "locked",
+        },
+        {
+          id: "signature",
+          label: "Sign",
+          shortcut: "S",
+          icon: PenLine,
+          status: "locked",
+        },
+        {
+          id: "shape",
+          label: "Shape",
+          shortcut: "R",
+          icon: Square,
+          status: "locked",
+        },
+        {
+          id: "draw",
+          label: "Draw",
+          shortcut: "D",
+          icon: Pencil,
+          status: "locked",
+        },
       ],
     },
     {
-      title: "Edit",
-      items: [
-        { id: "whiteout", label: "Whiteout", shortcut: "W", icon: Square, enabled: hasDocument },
+      label: "Markup",
+      tools: [
+        {
+          id: "highlight",
+          label: "Highlight",
+          shortcut: "H",
+          icon: Highlighter,
+          status: "working",
+          active: editor.activeTool === "highlight",
+          disabled: !hasDocument,
+          action: () => selectTool("highlight"),
+        },
+        {
+          id: "note",
+          label: "Note",
+          shortcut: "N",
+          icon: StickyNote,
+          status: "locked",
+        },
+        {
+          id: "whiteout",
+          label: "Whiteout",
+          shortcut: "W",
+          icon: Square,
+          status: "working",
+          active: editor.activeTool === "whiteout",
+          disabled: !hasDocument,
+          action: () => selectTool("whiteout"),
+        },
+        {
+          id: "stamp",
+          label: "Stamp",
+          shortcut: "M",
+          icon: Stamp,
+          status: "locked",
+        },
       ],
     },
     {
-      title: "Tools",
-      items: [
-        { id: "ocr", label: "OCR", shortcut: "O", icon: Brain, enabled: hasDocument, pro: true },
-        { id: "translate", label: "Translate", shortcut: "L", icon: Languages, enabled: hasDocument, pro: true },
-        { id: "find", label: "Find", shortcut: "F", icon: Search, enabled: hasDocument },
+      label: "Smart",
+      tools: [
+        {
+          id: "ocr",
+          label: "OCR",
+          shortcut: "O",
+          icon: Brain,
+          status: "locked",
+        },
+        {
+          id: "object-select",
+          label: "Object",
+          shortcut: "Obj",
+          icon: MousePointer2,
+          status: "locked",
+        },
+        {
+          id: "text-select",
+          label: "Text Sel",
+          shortcut: "OCR",
+          icon: Type,
+          status: "locked",
+        },
+        {
+          id: "translate",
+          label: "Translate",
+          shortcut: "L",
+          icon: Languages,
+          status: "locked",
+        },
+        {
+          id: "find",
+          label: "Find",
+          shortcut: "F",
+          icon: Search,
+          status: "locked",
+        },
+      ],
+    },
+    {
+      label: "Pages",
+      tools: [
+        {
+          id: "add-page",
+          label: "Add",
+          shortcut: "A",
+          icon: FilePlus2,
+          status: onAddBlankPage ? "working" : "locked",
+          disabled: !hasDocument,
+          action: onAddBlankPage,
+        },
+        {
+          id: "reorder",
+          label: "Reorder",
+          shortcut: "Drag",
+          icon: ArrowUpDown,
+          status: "locked",
+        },
+        {
+          id: "rotate",
+          label: "Rotate",
+          shortcut: "Ctrl+R",
+          icon: RotateCw,
+          status: onRotateCurrentPage ? "working" : "locked",
+          disabled: !hasDocument,
+          action: onRotateCurrentPage,
+        },
+        {
+          id: "number",
+          label: "Number",
+          shortcut: "#",
+          icon: Hash,
+          status: "locked",
+        },
+      ],
+    },
+    {
+      label: "Actions",
+      tools: [
+        {
+          id: "undo",
+          label: "Undo",
+          shortcut: "Ctrl+Z",
+          icon: Undo2,
+          status: "locked",
+        },
+        {
+          id: "redo",
+          label: "Redo",
+          shortcut: "Ctrl+Y",
+          icon: Redo2,
+          status: "locked",
+        },
+        {
+          id: "delete-selected",
+          label: "Delete",
+          shortcut: "Del",
+          icon: Trash2,
+          status: "working",
+          disabled: !hasDocument || !editor.selectedObjectId,
+          action: () => {
+            if (!editor.selectedObjectId) return;
+            editor.deleteObject(editor.selectedObjectId);
+          },
+        },
       ],
     },
   ];
-
-  const pageActions: ActionGroup = {
-    title: "Page",
-    items: [
-      {
-        id: "add-page",
-        label: "Add page",
-        shortcut: "A",
-        icon: FilePlus2,
-        enabled: hasDocument,
-        onClick: onAddBlankPage,
-      },
-      {
-        id: "reorder-page",
-        label: "Reorder pages",
-        shortcut: "Drag",
-        icon: ArrowUpDown,
-        enabled: hasDocument,
-        onClick: () => onUnavailableTool?.("Page reorder"),
-      },
-      {
-        id: "page-numbering",
-        label: "Page numbering",
-        shortcut: "#",
-        icon: Hash,
-        enabled: hasDocument,
-        onClick: () => onUnavailableTool?.("Page numbering"),
-      },
-      {
-        id: "undo",
-        label: "Undo",
-        shortcut: "Ctrl+Z",
-        icon: Undo2,
-        enabled: hasDocument,
-        onClick: () => onUnavailableTool?.("Undo"),
-      },
-      {
-        id: "redo",
-        label: "Redo",
-        shortcut: "Ctrl+Y",
-        icon: Redo2,
-        enabled: hasDocument,
-        onClick: () => onUnavailableTool?.("Redo"),
-      },
-      {
-        id: "delete-page",
-        label: "Delete page",
-        shortcut: "Del",
-        icon: Trash2,
-        enabled: hasDocument,
-        onClick: onDeleteCurrentPage,
-      },
-      {
-        id: "rotate-page",
-        label: "Rotate page",
-        shortcut: "Ctrl+R",
-        icon: RotateCw,
-        enabled: hasDocument,
-        onClick: onRotateCurrentPage,
-      },
-    ],
-  };
 
   return (
     <header className="shrink-0 border-b border-slate-200 bg-white shadow-sm">
@@ -502,58 +458,14 @@ export function EditorTopBar({
         </div>
       </div>
 
-      <div className="flex h-[6.7rem] min-w-0 items-start gap-2 overflow-x-auto border-t border-slate-100 bg-white px-2 py-2 sm:h-[7.2rem] sm:px-4 lg:justify-center">
-        <RibbonGroup title="Home">
-          {homeTools.map((item) =>
-            item.id === "text" ? (
-              <TextToolButtonStack
-                key={item.id}
-                item={item}
-                activeTool={editor.activeTool}
-                onSelect={editor.setActiveTool}
-                onUnavailableTool={onUnavailableTool}
-              />
-            ) : (
-              <ToolButton
-                key={item.id}
-                item={item}
-                activeTool={editor.activeTool}
-                onSelect={editor.setActiveTool}
-              />
-            ),
-          )}
-
-          {homePremiumActions.map((item) => (
-            <ActionButton
-              key={item.id}
-              item={item}
-              onFallback={onUnavailableTool}
-            />
-          ))}
-        </RibbonGroup>
-
-        {toolGroups.map((group) => (
-          <RibbonGroup key={group.title} title={group.title}>
-            {group.items.map((item) => (
-              <ToolButton
-                key={item.id}
-                item={item}
-                activeTool={editor.activeTool}
-                onSelect={editor.setActiveTool}
-              />
-            ))}
-          </RibbonGroup>
+      <div className="flex h-[5.75rem] min-w-0 items-start gap-3 overflow-x-auto border-t border-slate-100 bg-white px-2 py-2 sm:px-4 xl:justify-center">
+        {toolGroups.map((group, index) => (
+          <RibbonGroup
+            key={group.label}
+            group={group}
+            isLast={index === toolGroups.length - 1}
+          />
         ))}
-
-        <RibbonGroup title={pageActions.title}>
-          {pageActions.items.map((item) => (
-            <PageIconButton
-              key={item.id}
-              item={item}
-              onFallback={onUnavailableTool}
-            />
-          ))}
-        </RibbonGroup>
       </div>
     </header>
   );

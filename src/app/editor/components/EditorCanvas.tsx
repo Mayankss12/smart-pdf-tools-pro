@@ -16,7 +16,7 @@ import {
 
 import type { EditorController, EditorObject } from "../hooks/useEditor";
 import { HighlightTool } from "./tools/HighlightTool";
-import { OcrTool, type OcrOptions, type OcrProgress } from "./tools/OcrTool";
+
 import { TextTool } from "./tools/TextTool";
 
 type EditorCanvasProps = {
@@ -468,15 +468,7 @@ export function EditorCanvas({
   onOpenFile,
   onFileDrop,
 }: EditorCanvasProps) {
-  const [ocrOpen, setOcrOpen] = useState(false);
   const [dragActive, setDragActive] = useState(false);
-
-  useEffect(() => {
-    if (editor.activeTool === "ocr") {
-      setOcrOpen(true);
-      editor.setActiveTool("select");
-    }
-  }, [editor.activeTool, editor.setActiveTool]);
 
   function handleDrop(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
@@ -499,20 +491,6 @@ export function EditorCanvas({
     setDragActive(false);
   }
 
-  async function handleOcrStart(
-    _options: OcrOptions,
-    progress: (nextProgress: OcrProgress) => void,
-  ) {
-    progress({
-      currentPage: 0,
-      totalPages: editor.totalPages || 1,
-      message: "OCR PDF backend is not connected yet.",
-    });
-
-    throw new Error(
-      "PDF OCR needs backend page rendering and searchable text-layer rebuild. Current OCR engine is available for image OCR, but scanned PDF OCR must be wired through the backend workflow.",
-    );
-  }
 
   if (!editor.file || !editor.pdfDocument) {
     return (
@@ -565,13 +543,6 @@ export function EditorCanvas({
         <PdfPageRenderer editor={editor} />
       </div>
 
-      <OcrTool
-        open={ocrOpen}
-        fileName={editor.fileMeta?.name}
-        totalPages={editor.totalPages}
-        onClose={() => setOcrOpen(false)}
-        onStartOcr={handleOcrStart}
-      />
     </main>
   );
 }
