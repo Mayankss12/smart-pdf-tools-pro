@@ -93,10 +93,10 @@ function ToolButton({
       title={`${item.label} (${item.shortcut})`}
       onClick={() => onSelect(item.id)}
       className={[
-        "relative flex h-12 w-[4.25rem] shrink-0 flex-col items-center justify-center rounded-2xl border text-[9px] font-black leading-none transition duration-200 sm:h-14 sm:w-16 sm:text-[10px]",
+        "relative flex h-12 w-[4.1rem] shrink-0 flex-col items-center justify-center rounded-2xl border text-[9px] font-black leading-none transition duration-200 sm:h-14 sm:w-16 sm:text-[10px]",
         active
           ? "border-violet-300 bg-violet-100 text-violet-700 ring-2 ring-violet-500/25 shadow-[0_10px_24px_rgba(124,58,237,0.14)]"
-          : "border-transparent bg-transparent text-slate-700 hover:border-slate-200 hover:bg-slate-100",
+          : "border-transparent bg-white/0 text-slate-600 hover:border-slate-200 hover:bg-white hover:text-slate-950",
         !item.enabled ? "cursor-not-allowed opacity-40" : "",
       ].join(" ")}
     >
@@ -135,8 +135,8 @@ function ActionButton({
         onFallback?.(item.label);
       }}
       className={[
-        "relative flex h-12 w-[4.25rem] shrink-0 flex-col items-center justify-center rounded-2xl border text-[9px] font-black leading-none transition duration-200 sm:h-14 sm:w-16 sm:text-[10px]",
-        "border-transparent bg-transparent text-slate-700 hover:border-slate-200 hover:bg-slate-100",
+        "relative flex h-12 w-[4.1rem] shrink-0 flex-col items-center justify-center rounded-2xl border text-[9px] font-black leading-none transition duration-200 sm:h-14 sm:w-16 sm:text-[10px]",
+        "border-transparent bg-white/0 text-slate-600 hover:border-slate-200 hover:bg-white hover:text-slate-950",
         !item.enabled ? "cursor-not-allowed opacity-40" : "",
       ].join(" ")}
     >
@@ -154,14 +154,28 @@ function ActionButton({
 
 function GroupLabel({ title }: { readonly title: string }) {
   return (
-    <div className="mb-1 hidden px-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400 sm:block">
-      {title}
+    <div className="mb-1 hidden items-center gap-2 px-2 sm:flex">
+      <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.14em] text-violet-600">
+        {title}
+      </span>
+      <span className="h-px min-w-5 flex-1 bg-slate-200" />
     </div>
   );
 }
 
-function Separator() {
-  return <div className="mx-1 h-10 w-px shrink-0 bg-slate-200 sm:mx-2 sm:h-12" />;
+function RibbonGroup({
+  title,
+  children,
+}: {
+  readonly title: string;
+  readonly children: React.ReactNode;
+}) {
+  return (
+    <div className="shrink-0 rounded-2xl border border-slate-200/70 bg-slate-50/70 px-1.5 py-1 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:px-2">
+      <GroupLabel title={title} />
+      <div className="flex items-center gap-1">{children}</div>
+    </div>
+  );
 }
 
 export function EditorTopBar({
@@ -252,7 +266,7 @@ export function EditorTopBar({
             PM
           </div>
 
-          <div className="min-w-0 max-w-[72px] sm:max-w-[240px] lg:max-w-[360px]">
+          <div className="min-w-0 max-w-[76px] sm:max-w-[240px] xl:max-w-[360px]">
             <div className="truncate text-xs font-black tracking-[-0.02em] text-slate-950 sm:text-sm">
               {editor.fileMeta?.name || "PDFMantra Editor"}
             </div>
@@ -262,7 +276,7 @@ export function EditorTopBar({
           </div>
         </div>
 
-        <div className="flex min-w-0 shrink-0 items-center gap-1 sm:gap-2">
+        <div className="flex min-w-0 shrink-0 items-center justify-end gap-1 sm:gap-2">
           <button
             type="button"
             onClick={onOpenFile}
@@ -340,7 +354,7 @@ export function EditorTopBar({
             type="button"
             onClick={onShare}
             disabled={!hasDocument}
-            className="hidden h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-700 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-40 lg:inline-flex"
+            className="hidden h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-700 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-40 xl:inline-flex"
           >
             <Share2 size={16} />
             <span>Share</span>
@@ -348,43 +362,29 @@ export function EditorTopBar({
         </div>
       </div>
 
-      <div className="flex h-[3.75rem] min-w-0 items-center gap-1 overflow-x-auto border-t border-slate-100 px-2 sm:h-16 sm:gap-2 sm:px-4">
-        {toolGroups.map((group, groupIndex) => (
-          <div key={group.title} className="flex shrink-0 items-center">
-            {groupIndex > 0 ? <Separator /> : null}
-
-            <div>
-              <GroupLabel title={group.title} />
-
-              <div className="flex items-center gap-1">
-                {group.items.map((item) => (
-                  <ToolButton
-                    key={item.id}
-                    item={item}
-                    activeTool={editor.activeTool}
-                    onSelect={editor.setActiveTool}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-        ))}
-
-        <Separator />
-
-        <div className="shrink-0">
-          <GroupLabel title={pageActions.title} />
-
-          <div className="flex items-center gap-1">
-            {pageActions.items.map((item) => (
-              <ActionButton
+      <div className="flex h-[4.35rem] min-w-0 items-center gap-2 overflow-x-auto border-t border-slate-100 bg-white px-2 sm:h-[5rem] sm:px-4 lg:justify-center">
+        {toolGroups.map((group) => (
+          <RibbonGroup key={group.title} title={group.title}>
+            {group.items.map((item) => (
+              <ToolButton
                 key={item.id}
                 item={item}
-                onFallback={onUnavailableTool}
+                activeTool={editor.activeTool}
+                onSelect={editor.setActiveTool}
               />
             ))}
-          </div>
-        </div>
+          </RibbonGroup>
+        ))}
+
+        <RibbonGroup title={pageActions.title}>
+          {pageActions.items.map((item) => (
+            <ActionButton
+              key={item.id}
+              item={item}
+              onFallback={onUnavailableTool}
+            />
+          ))}
+        </RibbonGroup>
       </div>
     </header>
   );
