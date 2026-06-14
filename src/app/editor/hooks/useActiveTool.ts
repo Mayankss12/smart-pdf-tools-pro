@@ -12,4 +12,3 @@ export type EditorTool =
   | "ocr"
   | "translate"
   | "find";
-  

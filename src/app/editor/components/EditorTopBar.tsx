@@ -91,11 +91,9 @@ function ToolButton({
       type="button"
       disabled={!item.enabled}
       title={`${item.label} (${item.shortcut})`}
-      onClick={() => {
-        onSelect(item.id);
-      }}
+      onClick={() => onSelect(item.id)}
       className={[
-        "relative flex h-14 w-16 shrink-0 flex-col items-center justify-center rounded-2xl border text-[10px] font-black leading-none transition duration-200",
+        "relative flex h-12 w-[4.25rem] shrink-0 flex-col items-center justify-center rounded-2xl border text-[9px] font-black leading-none transition duration-200 sm:h-14 sm:w-16 sm:text-[10px]",
         active
           ? "border-violet-300 bg-violet-100 text-violet-700 ring-2 ring-violet-500/25 shadow-[0_10px_24px_rgba(124,58,237,0.14)]"
           : "border-transparent bg-transparent text-slate-700 hover:border-slate-200 hover:bg-slate-100",
@@ -103,13 +101,13 @@ function ToolButton({
       ].join(" ")}
     >
       {item.pro ? (
-        <span className="absolute -right-1 -top-1 rounded-full bg-violet-600 px-1.5 py-0.5 text-[8px] font-black text-white">
+        <span className="absolute -right-0.5 -top-0.5 rounded-full bg-violet-600 px-1.5 py-0.5 text-[7px] font-black text-white sm:-right-1 sm:-top-1 sm:text-[8px]">
           PRO
         </span>
       ) : null}
 
-      <Icon size={20} />
-      <span className="mt-1.5 max-w-[58px] truncate">{item.label}</span>
+      <Icon size={18} className="sm:h-5 sm:w-5" />
+      <span className="mt-1 max-w-[58px] truncate sm:mt-1.5">{item.label}</span>
     </button>
   );
 }
@@ -137,33 +135,33 @@ function ActionButton({
         onFallback?.(item.label);
       }}
       className={[
-        "relative flex h-14 w-16 shrink-0 flex-col items-center justify-center rounded-2xl border text-[10px] font-black leading-none transition duration-200",
+        "relative flex h-12 w-[4.25rem] shrink-0 flex-col items-center justify-center rounded-2xl border text-[9px] font-black leading-none transition duration-200 sm:h-14 sm:w-16 sm:text-[10px]",
         "border-transparent bg-transparent text-slate-700 hover:border-slate-200 hover:bg-slate-100",
         !item.enabled ? "cursor-not-allowed opacity-40" : "",
       ].join(" ")}
     >
       {item.pro ? (
-        <span className="absolute -right-1 -top-1 rounded-full bg-violet-600 px-1.5 py-0.5 text-[8px] font-black text-white">
+        <span className="absolute -right-0.5 -top-0.5 rounded-full bg-violet-600 px-1.5 py-0.5 text-[7px] font-black text-white sm:-right-1 sm:-top-1 sm:text-[8px]">
           PRO
         </span>
       ) : null}
 
-      <Icon size={20} />
-      <span className="mt-1.5 max-w-[58px] truncate">{item.label}</span>
+      <Icon size={18} className="sm:h-5 sm:w-5" />
+      <span className="mt-1 max-w-[58px] truncate sm:mt-1.5">{item.label}</span>
     </button>
   );
 }
 
 function GroupLabel({ title }: { readonly title: string }) {
   return (
-    <div className="mb-1 px-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+    <div className="mb-1 hidden px-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400 sm:block">
       {title}
     </div>
   );
 }
 
 function Separator() {
-  return <div className="mx-2 h-12 w-px shrink-0 bg-slate-200" />;
+  return <div className="mx-1 h-10 w-px shrink-0 bg-slate-200 sm:mx-2 sm:h-12" />;
 }
 
 export function EditorTopBar({
@@ -248,25 +246,28 @@ export function EditorTopBar({
 
   return (
     <header className="shrink-0 border-b border-slate-200 bg-white shadow-sm">
-      <div className="flex h-14 items-center justify-between gap-3 px-4">
-        <div className="flex min-w-0 items-center gap-3">
+      <div className="flex h-14 min-w-0 items-center justify-between gap-2 px-2 sm:px-4">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-600 text-sm font-black text-white shadow-[0_12px_26px_rgba(124,58,237,0.24)]">
             PM
           </div>
 
-          <div className="min-w-0">
-            <div className="truncate text-sm font-black tracking-[-0.02em] text-slate-950">
+          <div className="min-w-0 max-w-[72px] sm:max-w-[240px] lg:max-w-[360px]">
+            <div className="truncate text-xs font-black tracking-[-0.02em] text-slate-950 sm:text-sm">
               {editor.fileMeta?.name || "PDFMantra Editor"}
             </div>
-            <div className="text-xs font-bold text-slate-500">{formatPageLabel(editor)}</div>
+            <div className="truncate text-[11px] font-bold text-slate-500 sm:text-xs">
+              {formatPageLabel(editor)}
+            </div>
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex min-w-0 shrink-0 items-center gap-1 sm:gap-2">
           <button
             type="button"
             onClick={onOpenFile}
-            className="inline-flex h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-700 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700"
+            className="inline-flex h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white px-2 text-sm font-black text-slate-700 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 sm:px-3"
+            aria-label="Open PDF"
           >
             <FolderOpen size={16} />
             <span className="hidden sm:inline">Open</span>
@@ -309,7 +310,7 @@ export function EditorTopBar({
               <Minus size={15} />
             </button>
 
-            <div className="min-w-[54px] text-center text-xs font-black text-slate-700">
+            <div className="hidden min-w-[54px] text-center text-xs font-black text-slate-700 sm:block">
               {Math.round(editor.zoom * 100)}%
             </div>
 
@@ -328,7 +329,8 @@ export function EditorTopBar({
             type="button"
             onClick={onExport}
             disabled={!hasDocument}
-            className="inline-flex h-9 items-center gap-2 rounded-xl bg-violet-600 px-4 text-sm font-black text-white shadow-[0_12px_26px_rgba(124,58,237,0.24)] transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex h-9 items-center gap-2 rounded-xl bg-violet-600 px-3 text-sm font-black text-white shadow-[0_12px_26px_rgba(124,58,237,0.24)] transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40 sm:px-4"
+            aria-label="Export PDF"
           >
             <Download size={16} />
             <span className="hidden sm:inline">Export</span>
@@ -338,15 +340,15 @@ export function EditorTopBar({
             type="button"
             onClick={onShare}
             disabled={!hasDocument}
-            className="inline-flex h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-700 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
+            className="hidden h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-700 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-40 lg:inline-flex"
           >
             <Share2 size={16} />
-            <span className="hidden lg:inline">Share</span>
+            <span>Share</span>
           </button>
         </div>
       </div>
 
-      <div className="flex h-16 items-center gap-2 overflow-x-auto border-t border-slate-100 px-4">
+      <div className="flex h-[3.75rem] min-w-0 items-center gap-1 overflow-x-auto border-t border-slate-100 px-2 sm:h-16 sm:gap-2 sm:px-4">
         {toolGroups.map((group, groupIndex) => (
           <div key={group.title} className="flex shrink-0 items-center">
             {groupIndex > 0 ? <Separator /> : null}
