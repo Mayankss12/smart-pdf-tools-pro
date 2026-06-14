@@ -1,5 +1,9 @@
 ﻿import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 
+import { createHighlightLayer } from "../../engines/highlight/highlightEngine";
+import { prepareHighlightExportPlan } from "../../engines/highlight/highlightExporter";
+import type { PdfPageGeometryContext } from "../../engines/shared/types";
+
 type EmbeddedTextFonts = {
   readonly regular: PDFFont;
   readonly bold: PDFFont;
@@ -50,9 +54,18 @@ export type EditorExportObject = {
   readonly data: EditorExportObjectData;
 };
 
+const DEFAULT_HIGHLIGHT_COLOR = "#FDE047";
+const HIGHLIGHT_COLOR_PATTERN = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
+
 export function safeEditedName(fileName: string) {
   const cleanName = fileName.replace(/\.pdf$/i, "");
   return `PDFMantra-edited-${cleanName}.pdf`;
+}
+
+function clamp(value: number, min: number, max: number) {
+  if (!Number.isFinite(value)) return min;
+
+  return Math.max(min, Math.min(max, value));
 }
 
 function hexToRgb(hex: string) {
@@ -68,6 +81,56 @@ function hexToRgb(hex: string) {
   if ([r, g, b].some((value) => Number.isNaN(value))) return fallback;
 
   return { r, g, b };
+}
+
+function getSafeHighlightColor(color: string | undefined) {
+  if (!color || !HIGHLIGHT_COLOR_PATTERN.test(color)) {
+    return DEFAULT_HIGHLIGHT_COLOR;
+  }
+
+  return color.toUpperCase();
+}
+
+function getSafeOpacity(opacity: number | undefined, fallback: number) {
+  if (!Number.isFinite(opacity)) return fallback;
+
+  return clamp(Number(opacity), 0, 1);
+}
+
+function getPageGeometryContext(page: PDFPage, pageIndex: number): PdfPageGeometryContext {
+  const width = Math.max(page.getWidth(), 1);
+  const height = Math.max(page.getHeight(), 1);
+
+  return {
+    pageIndex,
+    pageNumber: pageIndex + 1,
+    rotation: 0,
+    pdfSize: {
+      width,
+      height,
+    },
+    viewportSize: {
+      width,
+      height,
+    },
+  };
+}
+
+function getNormalizedEditorBox(object: EditorExportObject, page: PDFPage) {
+  const pageWidth = Math.max(page.getWidth(), 1);
+  const pageHeight = Math.max(page.getHeight(), 1);
+
+  const left = clamp(object.box.x / pageWidth, 0, 1);
+  const top = clamp(object.box.y / pageHeight, 0, 1);
+  const right = clamp((object.box.x + object.box.width) / pageWidth, 0, 1);
+  const bottom = clamp((object.box.y + object.box.height) / pageHeight, 0, 1);
+
+  return {
+    x: Math.min(left, right),
+    y: Math.min(top, bottom),
+    width: Math.abs(right - left),
+    height: Math.abs(bottom - top),
+  };
 }
 
 function getTextFontFromStyle(style: Required<ExportTextStyle>, fonts: EmbeddedTextFonts) {
@@ -216,8 +279,69 @@ function drawRichTextObject(page: PDFPage, object: EditorExportObject, fonts: Em
   });
 }
 
+function drawLegacyHighlightFallback(page: PDFPage, object: EditorExportObject) {
+  const pageHeight = page.getHeight();
+  const color = hexToRgb(object.data.backgroundColor || "#fde047");
+
+  page.drawRectangle({
+    x: object.box.x,
+    y: pageHeight - object.box.y - object.box.height,
+    width: object.box.width,
+    height: object.box.height,
+    color: rgb(color.r, color.g, color.b),
+    opacity: object.data.opacity ?? 0.45,
+  });
+}
+
+function drawHighlightObjectWithSharedEngine(page: PDFPage, object: EditorExportObject, pageIndex: number) {
+  try {
+    const geometry = getPageGeometryContext(page, pageIndex);
+    const normalizedBounds = getNormalizedEditorBox(object, page);
+
+    const layer = createHighlightLayer({
+      id: object.id,
+      pageIndex,
+      creationSource: "freeform-drag",
+      style: {
+        color: getSafeHighlightColor(object.data.backgroundColor),
+        opacity: getSafeOpacity(object.data.opacity, 0.45),
+      },
+      regions: [
+        {
+          id: `${object.id}-region`,
+          pageIndex,
+          bounds: normalizedBounds,
+          source: "freeform",
+          granularity: "freeform",
+          readingOrder: 0,
+        },
+      ],
+    });
+
+    const plan = prepareHighlightExportPlan({
+      layers: [layer],
+      pageGeometryContexts: [geometry],
+    });
+
+    for (const command of plan.flatCommands) {
+      page.drawRectangle({
+        x: command.pdfBounds.x,
+        y: command.pdfBounds.y,
+        width: command.pdfBounds.width,
+        height: command.pdfBounds.height,
+        color: rgb(command.color.r, command.color.g, command.color.b),
+        opacity: command.opacity,
+        borderWidth: 0,
+      });
+    }
+  } catch {
+    drawLegacyHighlightFallback(page, object);
+  }
+}
+
 function drawEditorObject(page: PDFPage, object: EditorExportObject, fonts: EmbeddedTextFonts) {
   const pageHeight = page.getHeight();
+  const pageIndex = object.pageNumber - 1;
 
   if (object.type === "text") {
     drawRichTextObject(page, object, fonts);
@@ -225,17 +349,7 @@ function drawEditorObject(page: PDFPage, object: EditorExportObject, fonts: Embe
   }
 
   if (object.type === "highlight") {
-    const color = hexToRgb(object.data.backgroundColor || "#fde047");
-
-    page.drawRectangle({
-      x: object.box.x,
-      y: pageHeight - object.box.y - object.box.height,
-      width: object.box.width,
-      height: object.box.height,
-      color: rgb(color.r, color.g, color.b),
-      opacity: object.data.opacity ?? 0.45,
-    });
-
+    drawHighlightObjectWithSharedEngine(page, object, pageIndex);
     return;
   }
 
