@@ -31,11 +31,25 @@ export type EditorObjectBox = {
   readonly height: number;
 };
 
+export type EditorTextStyle = {
+  readonly fontWeight?: "normal" | "bold";
+  readonly fontStyle?: "normal" | "italic";
+  readonly textDecoration?: "none" | "underline";
+  readonly color?: string;
+};
+
+export type EditorTextRun = EditorTextStyle & {
+  readonly id: string;
+  readonly text: string;
+};
+
 export type EditorObjectData = {
   readonly text?: string;
+  readonly textRuns?: readonly EditorTextRun[];
   readonly fontSize?: number;
   readonly fontWeight?: "normal" | "bold";
   readonly fontStyle?: "normal" | "italic";
+  readonly textDecoration?: "none" | "underline";
   readonly color?: string;
   readonly backgroundColor?: string;
   readonly opacity?: number;

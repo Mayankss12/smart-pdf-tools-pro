@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import {
   AlertCircle,
@@ -16,7 +16,6 @@ import {
 
 import type { EditorController, EditorObject } from "../hooks/useEditor";
 import { HighlightTool } from "./tools/HighlightTool";
-
 import { TextTool } from "./tools/TextTool";
 
 type EditorCanvasProps = {
@@ -31,7 +30,7 @@ type PageSize = {
 };
 
 type DraftBox = {
-  readonly type: "highlight" | "whiteout";
+  readonly type: "text" | "highlight" | "whiteout";
   readonly startX: number;
   readonly startY: number;
   readonly x: number;
@@ -40,8 +39,29 @@ type DraftBox = {
   readonly height: number;
 };
 
+type Box = {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+};
+
+const DEFAULT_TEXT_BOX = {
+  width: 220,
+  height: 44,
+};
+
+const MIN_TEXT_BOX = {
+  width: 72,
+  height: 30,
+};
+
 function isPdfFile(file: File) {
   return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
 }
 
 function normalizeBox(startX: number, startY: number, currentX: number, currentY: number) {
@@ -53,17 +73,58 @@ function normalizeBox(startX: number, startY: number, currentX: number, currentY
   };
 }
 
+function getUnscaledPageSize(pageSize: PageSize, pageScale: number) {
+  return {
+    width: pageSize.width / pageScale,
+    height: pageSize.height / pageScale,
+  };
+}
+
+function clampBoxToPage(box: Box, pageSize: PageSize, pageScale: number, minWidth: number, minHeight: number) {
+  const page = getUnscaledPageSize(pageSize, pageScale);
+
+  const safePageWidth = Math.max(minWidth, page.width || minWidth);
+  const safePageHeight = Math.max(minHeight, page.height || minHeight);
+
+  const safeWidth = clamp(box.width, minWidth, safePageWidth);
+  const safeHeight = clamp(box.height, minHeight, safePageHeight);
+
+  const safeX = clamp(box.x, 0, Math.max(0, safePageWidth - safeWidth));
+  const safeY = clamp(box.y, 0, Math.max(0, safePageHeight - safeHeight));
+
+  return {
+    x: safeX,
+    y: safeY,
+    width: Math.min(safeWidth, safePageWidth - safeX),
+    height: Math.min(safeHeight, safePageHeight - safeY),
+  };
+}
+
+function clampPointToPage(point: { readonly x: number; readonly y: number }, pageSize: PageSize, pageScale: number) {
+  const page = getUnscaledPageSize(pageSize, pageScale);
+
+  return {
+    x: clamp(point.x, 0, Math.max(0, page.width)),
+    y: clamp(point.y, 0, Math.max(0, page.height)),
+  };
+}
+
 function getPointerPoint(
   event: ReactPointerEvent<HTMLDivElement>,
   layer: HTMLDivElement,
   pageScale: number,
+  pageSize: PageSize,
 ) {
   const rect = layer.getBoundingClientRect();
 
-  return {
-    x: (event.clientX - rect.left) / pageScale,
-    y: (event.clientY - rect.top) / pageScale,
-  };
+  return clampPointToPage(
+    {
+      x: (event.clientX - rect.left) / pageScale,
+      y: (event.clientY - rect.top) / pageScale,
+    },
+    pageSize,
+    pageScale,
+  );
 }
 
 function WhiteoutObject({
@@ -197,36 +258,47 @@ function PdfPageRenderer({
     };
   }, [editor.pdfDocument, editor.activePageNumber, editor.zoom]);
 
-  function addTextObject(point: { x: number; y: number }) {
+  function addTextObject(box: Box) {
+    const safeBox = clampBoxToPage(
+      box,
+      pageSize,
+      editor.zoom,
+      MIN_TEXT_BOX.width,
+      MIN_TEXT_BOX.height,
+    );
+
     editor.addObject({
       type: "text",
       pageNumber: editor.activePageNumber,
-      box: {
-        x: point.x,
-        y: point.y,
-        width: 210,
-        height: 38,
-      },
+      box: safeBox,
       data: {
         text: "Type text",
         fontSize: 16,
         fontWeight: "normal",
         fontStyle: "normal",
+        textDecoration: "none",
         color: "#111827",
       },
     });
   }
 
-  function addHighlightObject(box: { x: number; y: number; width: number; height: number }) {
-    editor.addObject({
-      type: "highlight",
-      pageNumber: editor.activePageNumber,
-      box: {
-        x: box.x,
-        y: box.y,
+  function addHighlightObject(box: Box) {
+    const safeBox = clampBoxToPage(
+      {
+        ...box,
         width: Math.max(40, box.width),
         height: Math.max(18, box.height),
       },
+      pageSize,
+      editor.zoom,
+      40,
+      18,
+    );
+
+    editor.addObject({
+      type: "highlight",
+      pageNumber: editor.activePageNumber,
+      box: safeBox,
       data: {
         backgroundColor: "#fde047",
         opacity: 0.45,
@@ -234,21 +306,43 @@ function PdfPageRenderer({
     });
   }
 
-  function addWhiteoutObject(box: { x: number; y: number; width: number; height: number }) {
-    editor.addObject({
-      type: "whiteout",
-      pageNumber: editor.activePageNumber,
-      box: {
-        x: box.x,
-        y: box.y,
+  function addWhiteoutObject(box: Box) {
+    const safeBox = clampBoxToPage(
+      {
+        ...box,
         width: Math.max(50, box.width),
         height: Math.max(22, box.height),
       },
+      pageSize,
+      editor.zoom,
+      50,
+      22,
+    );
+
+    editor.addObject({
+      type: "whiteout",
+      pageNumber: editor.activePageNumber,
+      box: safeBox,
       data: {
         backgroundColor: "#ffffff",
         opacity: 1,
       },
     });
+  }
+
+  function getFallbackTextBox(startX: number, startY: number) {
+    return clampBoxToPage(
+      {
+        x: startX,
+        y: startY,
+        width: DEFAULT_TEXT_BOX.width,
+        height: DEFAULT_TEXT_BOX.height,
+      },
+      pageSize,
+      editor.zoom,
+      MIN_TEXT_BOX.width,
+      MIN_TEXT_BOX.height,
+    );
   }
 
   function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
@@ -260,14 +354,14 @@ function PdfPageRenderer({
       return;
     }
 
-    const point = getPointerPoint(event, layer, editor.zoom);
+    const point = getPointerPoint(event, layer, editor.zoom, pageSize);
 
-    if (editor.activeTool === "text") {
-      addTextObject(point);
-      return;
-    }
-
-    if (editor.activeTool === "highlight" || editor.activeTool === "whiteout") {
+    if (
+      editor.activeTool === "text" ||
+      editor.activeTool === "highlight" ||
+      editor.activeTool === "whiteout"
+    ) {
+      event.preventDefault();
       event.currentTarget.setPointerCapture(event.pointerId);
 
       setDraftBox({
@@ -286,7 +380,7 @@ function PdfPageRenderer({
     const layer = pageLayerRef.current;
     if (!layer || !draftBox) return;
 
-    const point = getPointerPoint(event, layer, editor.zoom);
+    const point = getPointerPoint(event, layer, editor.zoom, pageSize);
     const normalized = normalizeBox(draftBox.startX, draftBox.startY, point.x, point.y);
 
     setDraftBox({
@@ -314,6 +408,18 @@ function PdfPageRenderer({
     }
 
     const tooSmall = finalBox.width < 8 || finalBox.height < 8;
+
+    if (draftBox.type === "text") {
+      addTextObject(
+        tooSmall
+          ? getFallbackTextBox(draftBox.startX, draftBox.startY)
+          : {
+              ...finalBox,
+              width: Math.max(MIN_TEXT_BOX.width, finalBox.width),
+              height: Math.max(MIN_TEXT_BOX.height, finalBox.height),
+            },
+      );
+    }
 
     if (draftBox.type === "highlight") {
       addHighlightObject(
@@ -353,7 +459,7 @@ function PdfPageRenderer({
           {editor.activeTool === "select"
             ? "Select"
             : editor.activeTool === "text"
-              ? "Click to add text"
+              ? "Drag to create text box"
               : editor.activeTool === "highlight"
                 ? "Drag to highlight"
                 : editor.activeTool === "whiteout"
@@ -361,6 +467,15 @@ function PdfPageRenderer({
                   : editor.activeTool.toUpperCase()}
         </span>
       </div>
+
+      {editor.selectedObject ? (
+        <div className="mb-3 flex min-h-[48px] items-center justify-center">
+          <div
+            id="editor-object-toolbar-host"
+            className="flex max-w-full items-center justify-center overflow-x-auto px-1"
+          />
+        </div>
+      ) : null}
 
       <div
         ref={pageLayerRef}
@@ -378,6 +493,7 @@ function PdfPageRenderer({
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
       >
         {isRendering ? (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/80">
@@ -448,7 +564,9 @@ function PdfPageRenderer({
               "pointer-events-none absolute z-40 rounded-lg border-2 border-dashed",
               draftBox.type === "highlight"
                 ? "border-yellow-500 bg-yellow-300/40"
-                : "border-violet-500 bg-white/90",
+                : draftBox.type === "text"
+                  ? "border-violet-500 bg-violet-100/20"
+                  : "border-violet-500 bg-white/90",
             ].join(" ")}
             style={{
               left: draftBox.x * editor.zoom,
@@ -490,7 +608,6 @@ export function EditorCanvas({
     event.preventDefault();
     setDragActive(false);
   }
-
 
   if (!editor.file || !editor.pdfDocument) {
     return (
@@ -542,7 +659,6 @@ export function EditorCanvas({
       <div className="flex min-h-full justify-center px-8 py-10">
         <PdfPageRenderer editor={editor} />
       </div>
-
     </main>
   );
 }

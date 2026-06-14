@@ -1,25 +1,17 @@
-"use client";
+﻿"use client";
 
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
 import { useEffect, useRef, useState } from "react";
 
+import {
+  exportEditorPdfBytes,
+  safeEditedName,
+} from "../../lib/pdf-tools/editor-export-engine";
 import { EditorCanvas } from "./components/EditorCanvas";
 import { EditorLeftPanel } from "./components/EditorLeftPanel";
 import { EditorStatusBar } from "./components/EditorStatusBar";
 import { EditorTopBar } from "./components/EditorTopBar";
-import { useEditor, type EditorObject } from "./hooks/useEditor";
-
-type EmbeddedTextFonts = {
-  readonly regular: any;
-  readonly bold: any;
-  readonly italic: any;
-  readonly boldItalic: any;
-};
-
-type TextDecorationData = {
-  readonly textDecoration?: "none" | "underline";
-};
+import { useEditor } from "./hooks/useEditor";
 
 function configurePdfWorker() {
   if (typeof window === "undefined") return;
@@ -29,21 +21,6 @@ function configurePdfWorker() {
 
 function isPdfFile(file: File) {
   return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
-}
-
-function hexToRgb(hex: string) {
-  const normalized = hex.replace("#", "");
-  const fallback = { r: 17 / 255, g: 24 / 255, b: 39 / 255 };
-
-  if (normalized.length !== 6) return fallback;
-
-  const r = Number.parseInt(normalized.slice(0, 2), 16) / 255;
-  const g = Number.parseInt(normalized.slice(2, 4), 16) / 255;
-  const b = Number.parseInt(normalized.slice(4, 6), 16) / 255;
-
-  if ([r, g, b].some((value) => Number.isNaN(value))) return fallback;
-
-  return { r, g, b };
 }
 
 function downloadBlob(blob: Blob, filename: string) {
@@ -57,127 +34,6 @@ function downloadBlob(blob: Blob, filename: string) {
   link.remove();
 
   URL.revokeObjectURL(url);
-}
-
-function safeEditedName(fileName: string) {
-  const cleanName = fileName.replace(/\.pdf$/i, "");
-  return `PDFMantra-edited-${cleanName}.pdf`;
-}
-
-function getTextFont(object: EditorObject, fonts: EmbeddedTextFonts) {
-  const bold = object.data.fontWeight === "bold" || object.data.fontWeight === "700";
-  const italic = object.data.fontStyle === "italic";
-
-  if (bold && italic) return fonts.boldItalic;
-  if (bold) return fonts.bold;
-  if (italic) return fonts.italic;
-
-  return fonts.regular;
-}
-
-function drawTextUnderline({
-  page,
-  object,
-  font,
-  fontSize,
-  lineHeight,
-  color,
-}: {
-  readonly page: any;
-  readonly object: EditorObject;
-  readonly font: any;
-  readonly fontSize: number;
-  readonly lineHeight: number;
-  readonly color: ReturnType<typeof rgb>;
-}) {
-  const pageHeight = page.getHeight();
-  const lines = (object.data.text || "").split(/\r?\n/);
-  const startX = object.box.x;
-  const firstBaselineY = pageHeight - object.box.y - fontSize;
-  const underlineGap = Math.max(1.4, fontSize * 0.12);
-  const underlineThickness = Math.max(0.6, fontSize * 0.055);
-
-  lines.forEach((line, index) => {
-    if (!line) return;
-
-    const baselineY = firstBaselineY - index * lineHeight;
-    const lineWidth = font.widthOfTextAtSize(line, fontSize);
-
-    page.drawLine({
-      start: {
-        x: startX,
-        y: baselineY - underlineGap,
-      },
-      end: {
-        x: startX + lineWidth,
-        y: baselineY - underlineGap,
-      },
-      thickness: underlineThickness,
-      color,
-    });
-  });
-}
-
-function drawEditorObject(page: any, object: EditorObject, fonts: EmbeddedTextFonts) {
-  const pageHeight = page.getHeight();
-
-  if (object.type === "text") {
-    const color = hexToRgb(object.data.color || "#111827");
-    const fontSize = object.data.fontSize || 16;
-    const lineHeight = fontSize * 1.3;
-    const font = getTextFont(object, fonts);
-    const textColor = rgb(color.r, color.g, color.b);
-    const textDecoration = (object.data as TextDecorationData).textDecoration ?? "none";
-
-    page.drawText(object.data.text || "", {
-      x: object.box.x,
-      y: pageHeight - object.box.y - fontSize,
-      size: fontSize,
-      lineHeight,
-      font,
-      color: textColor,
-      maxWidth: object.box.width,
-    });
-
-    if (textDecoration === "underline") {
-      drawTextUnderline({
-        page,
-        object,
-        font,
-        fontSize,
-        lineHeight,
-        color: textColor,
-      });
-    }
-
-    return;
-  }
-
-  if (object.type === "highlight") {
-    const color = hexToRgb(object.data.backgroundColor || "#fde047");
-
-    page.drawRectangle({
-      x: object.box.x,
-      y: pageHeight - object.box.y - object.box.height,
-      width: object.box.width,
-      height: object.box.height,
-      color: rgb(color.r, color.g, color.b),
-      opacity: object.data.opacity ?? 0.45,
-    });
-
-    return;
-  }
-
-  if (object.type === "whiteout") {
-    page.drawRectangle({
-      x: object.box.x,
-      y: pageHeight - object.box.y - object.box.height,
-      width: object.box.width,
-      height: object.box.height,
-      color: rgb(1, 1, 1),
-      opacity: 1,
-    });
-  }
 }
 
 export default function EditorPage() {
@@ -250,25 +106,10 @@ export default function EditorPage() {
       editor.markSaving();
       setStatusMessage("Exporting edited PDF...");
 
-      const pdfDoc = await PDFDocument.load(fileBytes);
-
-      const fonts: EmbeddedTextFonts = {
-        regular: await pdfDoc.embedFont(StandardFonts.Helvetica),
-        bold: await pdfDoc.embedFont(StandardFonts.HelveticaBold),
-        italic: await pdfDoc.embedFont(StandardFonts.HelveticaOblique),
-        boldItalic: await pdfDoc.embedFont(StandardFonts.HelveticaBoldOblique),
-      };
-
-      const pages = pdfDoc.getPages();
-
-      editor.objects.forEach((object) => {
-        const page = pages[object.pageNumber - 1];
-        if (!page) return;
-
-        drawEditorObject(page, object, fonts);
+      const editedBytes = await exportEditorPdfBytes({
+        fileBytes,
+        objects: editor.objects,
       });
-
-      const editedBytes = await pdfDoc.save();
 
       const blob = new Blob([editedBytes as unknown as BlobPart], {
         type: "application/pdf",
