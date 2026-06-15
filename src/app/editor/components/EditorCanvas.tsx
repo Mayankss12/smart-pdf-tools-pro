@@ -33,7 +33,7 @@ type PageSize = {
 };
 
 type DraftBox = {
-  readonly type: "text" | "highlight" | "whiteout";
+  readonly type: "text" | "highlight" | "whiteout" | "copy-area";
   readonly startX: number;
   readonly startY: number;
   readonly x: number;
@@ -77,6 +77,11 @@ const MIN_IMAGE_BOX = {
 const MIN_SIGNATURE_BOX = {
   width: 72,
   height: 24,
+};
+
+const MIN_COPY_AREA_BOX = {
+  width: 12,
+  height: 12,
 };
 
 const OPEN_IMAGE_PICKER_EVENT = "pdfmantra:editor-open-image-picker";
@@ -459,6 +464,87 @@ function PdfPageRenderer({
     );
   }
 
+  function cropPdfAreaAsImage(box: Box) {
+    const canvas = canvasRef.current;
+
+    if (!canvas || !pageSize.width || !pageSize.height) {
+      return null;
+    }
+
+    const scaleX = canvas.width / pageSize.width;
+    const scaleY = canvas.height / pageSize.height;
+    const sourceX = Math.round(box.x * editor.zoom * scaleX);
+    const sourceY = Math.round(box.y * editor.zoom * scaleY);
+    const sourceWidth = Math.max(1, Math.round(box.width * editor.zoom * scaleX));
+    const sourceHeight = Math.max(1, Math.round(box.height * editor.zoom * scaleY));
+
+    if (sourceWidth < 2 || sourceHeight < 2) {
+      return null;
+    }
+
+    const cropCanvas = document.createElement("canvas");
+    cropCanvas.width = sourceWidth;
+    cropCanvas.height = sourceHeight;
+
+    const context = cropCanvas.getContext("2d");
+
+    if (!context) {
+      return null;
+    }
+
+    context.drawImage(
+      canvas,
+      sourceX,
+      sourceY,
+      sourceWidth,
+      sourceHeight,
+      0,
+      0,
+      sourceWidth,
+      sourceHeight,
+    );
+
+    return cropCanvas.toDataURL("image/png");
+  }
+
+  function addCopiedAreaObject(box: Box) {
+    const sourceBox = clampBoxToPage(
+      box,
+      pageSize,
+      editor.zoom,
+      MIN_COPY_AREA_BOX.width,
+      MIN_COPY_AREA_BOX.height,
+    );
+    const imageDataUrl = cropPdfAreaAsImage(sourceBox);
+
+    if (!imageDataUrl) {
+      return;
+    }
+
+    const destinationBox = clampBoxToPage(
+      {
+        ...sourceBox,
+        x: sourceBox.x + 24,
+        y: sourceBox.y + 24,
+      },
+      pageSize,
+      editor.zoom,
+      MIN_COPY_AREA_BOX.width,
+      MIN_COPY_AREA_BOX.height,
+    );
+
+    editor.addObject({
+      type: "image",
+      pageNumber: editor.activePageNumber,
+      box: destinationBox,
+      data: {
+        imageDataUrl,
+      },
+    });
+
+    editor.setActiveTool("select");
+  }
+
   async function addImageObject(point: Point, file: File) {
     if (!isSupportedImageFile(file)) {
       return;
@@ -550,7 +636,8 @@ function PdfPageRenderer({
     if (
       editor.activeTool === "text" ||
       editor.activeTool === "highlight" ||
-      editor.activeTool === "whiteout"
+      editor.activeTool === "whiteout" ||
+      editor.activeTool === "copy-area"
     ) {
       event.preventDefault();
       event.currentTarget.setPointerCapture(event.pointerId);
@@ -637,6 +724,10 @@ function PdfPageRenderer({
           : finalBox,
       );
     }
+
+    if (draftBox.type === "copy-area" && !tooSmall) {
+      addCopiedAreaObject(finalBox);
+    }
   }
 
   return (
@@ -667,11 +758,13 @@ function PdfPageRenderer({
             ? "Select"
             : editor.activeTool === "text"
               ? "Drag to create text box"
-              : editor.activeTool === "highlight"
-                ? "Drag to highlight"
-                : editor.activeTool === "whiteout"
-                  ? "Drag to whiteout"
-                  : editor.activeTool.toUpperCase()}
+              : editor.activeTool === "copy-area"
+                ? "Drag area to copy PDF content"
+                : editor.activeTool === "highlight"
+                  ? "Drag to highlight"
+                  : editor.activeTool === "whiteout"
+                    ? "Drag to whiteout"
+                    : editor.activeTool.toUpperCase()}
         </span>
       </div>
 
@@ -692,6 +785,7 @@ function PdfPageRenderer({
           minHeight: pageSize.height || 680,
           cursor:
             editor.activeTool === "text" ||
+            editor.activeTool === "copy-area" ||
             editor.activeTool === "highlight" ||
             editor.activeTool === "whiteout"
               ? "crosshair"
@@ -800,9 +894,11 @@ function PdfPageRenderer({
               "pointer-events-none absolute z-40 rounded-lg border-2 border-dashed",
               draftBox.type === "highlight"
                 ? "border-yellow-500 bg-yellow-300/40"
-                : draftBox.type === "text"
-                  ? "border-violet-500 bg-violet-100/20"
-                  : "border-violet-500 bg-white/90",
+                : draftBox.type === "copy-area"
+                  ? "border-sky-500 bg-sky-300/25"
+                  : draftBox.type === "text"
+                    ? "border-violet-500 bg-violet-100/20"
+                    : "border-violet-500 bg-white/90",
             ].join(" ")}
             style={{
               left: draftBox.x * editor.zoom,
