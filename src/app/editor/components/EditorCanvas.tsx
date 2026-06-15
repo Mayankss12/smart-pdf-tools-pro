@@ -79,6 +79,9 @@ const MIN_SIGNATURE_BOX = {
   height: 24,
 };
 
+const OPEN_IMAGE_PICKER_EVENT = "pdfmantra:editor-open-image-picker";
+const OPEN_SIGNATURE_PICKER_EVENT = "pdfmantra:editor-open-signature-picker";
+
 function isPdfFile(file: File) {
   return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
 }
@@ -109,9 +112,11 @@ function normalizeBox(startX: number, startY: number, currentX: number, currentY
 }
 
 function getUnscaledPageSize(pageSize: PageSize, pageScale: number) {
+  const safeScale = Math.max(0.01, pageScale);
+
   return {
-    width: pageSize.width / pageScale,
-    height: pageSize.height / pageScale,
+    width: pageSize.width / safeScale,
+    height: pageSize.height / safeScale,
   };
 }
 
@@ -151,11 +156,12 @@ function getPointerPoint(
   pageSize: PageSize,
 ) {
   const rect = layer.getBoundingClientRect();
+  const safeScale = Math.max(0.01, pageScale);
 
   return clampPointToPage(
     {
-      x: (event.clientX - rect.left) / pageScale,
-      y: (event.clientY - rect.top) / pageScale,
+      x: (event.clientX - rect.left) / safeScale,
+      y: (event.clientY - rect.top) / safeScale,
     },
     pageSize,
     pageScale,
@@ -277,6 +283,53 @@ function PdfPageRenderer({
       }
     };
   }, [editor.pdfDocument, editor.activePageNumber, editor.zoom]);
+
+  function getDefaultImagePoint() {
+    const page = getUnscaledPageSize(pageSize, editor.zoom);
+
+    return {
+      x: clamp(page.width * 0.5 - 120, 16, Math.max(16, page.width - MIN_IMAGE_BOX.width)),
+      y: clamp(page.height * 0.32 - 60, 16, Math.max(16, page.height - MIN_IMAGE_BOX.height)),
+    };
+  }
+
+  function getDefaultSignaturePoint() {
+    const page = getUnscaledPageSize(pageSize, editor.zoom);
+
+    return {
+      x: clamp(page.width * 0.5 - 110, 16, Math.max(16, page.width - MIN_SIGNATURE_BOX.width)),
+      y: clamp(page.height * 0.72, 16, Math.max(16, page.height - MIN_SIGNATURE_BOX.height)),
+    };
+  }
+
+  function openImagePickerAtDefaultPoint() {
+    if (!editor.pdfDocument) return;
+
+    pendingImagePointRef.current = getDefaultImagePoint();
+    editor.setActiveTool("select");
+    imageInputRef.current?.click();
+  }
+
+  function openSignaturePickerAtDefaultPoint() {
+    if (!editor.pdfDocument) return;
+
+    pendingSignaturePointRef.current = getDefaultSignaturePoint();
+    editor.setActiveTool("select");
+    signatureInputRef.current?.click();
+  }
+
+  useEffect(() => {
+    const handleOpenImagePicker = () => openImagePickerAtDefaultPoint();
+    const handleOpenSignaturePicker = () => openSignaturePickerAtDefaultPoint();
+
+    window.addEventListener(OPEN_IMAGE_PICKER_EVENT, handleOpenImagePicker);
+    window.addEventListener(OPEN_SIGNATURE_PICKER_EVENT, handleOpenSignaturePicker);
+
+    return () => {
+      window.removeEventListener(OPEN_IMAGE_PICKER_EVENT, handleOpenImagePicker);
+      window.removeEventListener(OPEN_SIGNATURE_PICKER_EVENT, handleOpenSignaturePicker);
+    };
+  });
 
   function addTextObject(box: Box) {
     const safeBox = clampBoxToPage(
@@ -461,7 +514,7 @@ function PdfPageRenderer({
 
   function handleImageFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
-    const point = pendingImagePointRef.current;
+    const point = pendingImagePointRef.current ?? getDefaultImagePoint();
 
     pendingImagePointRef.current = null;
     event.currentTarget.value = "";
@@ -473,7 +526,7 @@ function PdfPageRenderer({
 
   function handleSignatureFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
-    const point = pendingSignaturePointRef.current;
+    const point = pendingSignaturePointRef.current ?? getDefaultSignaturePoint();
 
     pendingSignaturePointRef.current = null;
     event.currentTarget.value = "";
@@ -493,20 +546,6 @@ function PdfPageRenderer({
     }
 
     const point = getPointerPoint(event, layer, editor.zoom, pageSize);
-
-    if (editor.activeTool === "image") {
-      event.preventDefault();
-      pendingImagePointRef.current = point;
-      imageInputRef.current?.click();
-      return;
-    }
-
-    if (editor.activeTool === "signature") {
-      event.preventDefault();
-      pendingSignaturePointRef.current = point;
-      signatureInputRef.current?.click();
-      return;
-    }
 
     if (
       editor.activeTool === "text" ||
@@ -628,15 +667,11 @@ function PdfPageRenderer({
             ? "Select"
             : editor.activeTool === "text"
               ? "Drag to create text box"
-              : editor.activeTool === "image"
-                ? "Click PDF to place image"
-                : editor.activeTool === "signature"
-                  ? "Click PDF to place signature"
-                  : editor.activeTool === "highlight"
-                    ? "Drag to highlight"
-                    : editor.activeTool === "whiteout"
-                      ? "Drag to whiteout"
-                      : editor.activeTool.toUpperCase()}
+              : editor.activeTool === "highlight"
+                ? "Drag to highlight"
+                : editor.activeTool === "whiteout"
+                  ? "Drag to whiteout"
+                  : editor.activeTool.toUpperCase()}
         </span>
       </div>
 
@@ -657,8 +692,6 @@ function PdfPageRenderer({
           minHeight: pageSize.height || 680,
           cursor:
             editor.activeTool === "text" ||
-            editor.activeTool === "image" ||
-            editor.activeTool === "signature" ||
             editor.activeTool === "highlight" ||
             editor.activeTool === "whiteout"
               ? "crosshair"
