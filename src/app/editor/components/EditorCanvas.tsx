@@ -17,6 +17,7 @@ import {
 import type { EditorController } from "../hooks/useEditor";
 import { HighlightTool } from "./tools/HighlightTool";
 import { ImageTool } from "./tools/ImageTool";
+import { SignatureTool } from "./tools/SignatureTool";
 import { TextTool } from "./tools/TextTool";
 import { WhiteoutTool } from "./tools/WhiteoutTool";
 
@@ -71,6 +72,11 @@ const MIN_TEXT_BOX = {
 const MIN_IMAGE_BOX = {
   width: 48,
   height: 32,
+};
+
+const MIN_SIGNATURE_BOX = {
+  width: 72,
+  height: 24,
 };
 
 function isPdfFile(file: File) {
@@ -198,7 +204,9 @@ function PdfPageRenderer({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const pageLayerRef = useRef<HTMLDivElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const signatureInputRef = useRef<HTMLInputElement | null>(null);
   const pendingImagePointRef = useRef<Point | null>(null);
+  const pendingSignaturePointRef = useRef<Point | null>(null);
 
   const [isRendering, setIsRendering] = useState(true);
   const [error, setError] = useState("");
@@ -370,6 +378,34 @@ function PdfPageRenderer({
     );
   }
 
+  function getSignatureBox(point: Point, imageSize: ImageSize) {
+    const page = getUnscaledPageSize(pageSize, editor.zoom);
+    const aspectRatio = imageSize.width / Math.max(1, imageSize.height);
+    const maxWidth = Math.max(MIN_SIGNATURE_BOX.width, Math.min(220, page.width * 0.44));
+    const maxHeight = Math.max(MIN_SIGNATURE_BOX.height, Math.min(86, page.height * 0.16));
+
+    let width = maxWidth;
+    let height = width / Math.max(0.01, aspectRatio);
+
+    if (height > maxHeight) {
+      height = maxHeight;
+      width = height * aspectRatio;
+    }
+
+    return clampBoxToPage(
+      {
+        x: point.x,
+        y: point.y,
+        width,
+        height,
+      },
+      pageSize,
+      editor.zoom,
+      MIN_SIGNATURE_BOX.width,
+      MIN_SIGNATURE_BOX.height,
+    );
+  }
+
   async function addImageObject(point: Point, file: File) {
     if (!isSupportedImageFile(file)) {
       return;
@@ -381,6 +417,25 @@ function PdfPageRenderer({
 
     editor.addObject({
       type: "image",
+      pageNumber: editor.activePageNumber,
+      box: safeBox,
+      data: {
+        imageDataUrl,
+      },
+    });
+  }
+
+  async function addSignatureObject(point: Point, file: File) {
+    if (!isSupportedImageFile(file)) {
+      return;
+    }
+
+    const imageDataUrl = await readFileAsDataUrl(file);
+    const imageSize = await getImageSize(imageDataUrl);
+    const safeBox = getSignatureBox(point, imageSize);
+
+    editor.addObject({
+      type: "signature",
       pageNumber: editor.activePageNumber,
       box: safeBox,
       data: {
@@ -416,6 +471,18 @@ function PdfPageRenderer({
     void addImageObject(point, file);
   }
 
+  function handleSignatureFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    const point = pendingSignaturePointRef.current;
+
+    pendingSignaturePointRef.current = null;
+    event.currentTarget.value = "";
+
+    if (!file || !point) return;
+
+    void addSignatureObject(point, file);
+  }
+
   function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
     const layer = pageLayerRef.current;
     if (!layer || !editor.pdfDocument) return;
@@ -431,6 +498,13 @@ function PdfPageRenderer({
       event.preventDefault();
       pendingImagePointRef.current = point;
       imageInputRef.current?.click();
+      return;
+    }
+
+    if (editor.activeTool === "signature") {
+      event.preventDefault();
+      pendingSignaturePointRef.current = point;
+      signatureInputRef.current?.click();
       return;
     }
 
@@ -536,6 +610,14 @@ function PdfPageRenderer({
         onChange={handleImageFileChange}
       />
 
+      <input
+        ref={signatureInputRef}
+        type="file"
+        accept="image/png,image/jpeg"
+        className="hidden"
+        onChange={handleSignatureFileChange}
+      />
+
       <div className="mb-3 flex items-center justify-between">
         <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-slate-500 shadow-sm">
           Page {editor.activePageNumber}
@@ -548,11 +630,13 @@ function PdfPageRenderer({
               ? "Drag to create text box"
               : editor.activeTool === "image"
                 ? "Click PDF to place image"
-                : editor.activeTool === "highlight"
-                  ? "Drag to highlight"
-                  : editor.activeTool === "whiteout"
-                    ? "Drag to whiteout"
-                    : editor.activeTool.toUpperCase()}
+                : editor.activeTool === "signature"
+                  ? "Click PDF to place signature"
+                  : editor.activeTool === "highlight"
+                    ? "Drag to highlight"
+                    : editor.activeTool === "whiteout"
+                      ? "Drag to whiteout"
+                      : editor.activeTool.toUpperCase()}
         </span>
       </div>
 
@@ -574,6 +658,7 @@ function PdfPageRenderer({
           cursor:
             editor.activeTool === "text" ||
             editor.activeTool === "image" ||
+            editor.activeTool === "signature" ||
             editor.activeTool === "highlight" ||
             editor.activeTool === "whiteout"
               ? "crosshair"
@@ -619,6 +704,20 @@ function PdfPageRenderer({
           if (object.type === "image") {
             return (
               <ImageTool
+                key={object.id}
+                object={object}
+                selected={editor.selectedObjectId === object.id}
+                pageScale={editor.zoom}
+                onSelect={editor.selectObject}
+                onUpdateBox={editor.updateObjectBox}
+                onDelete={editor.deleteObject}
+              />
+            );
+          }
+
+          if (object.type === "signature") {
+            return (
+              <SignatureTool
                 key={object.id}
                 object={object}
                 selected={editor.selectedObjectId === object.id}
