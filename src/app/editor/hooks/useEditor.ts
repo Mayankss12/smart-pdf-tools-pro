@@ -107,6 +107,7 @@ export type EditorController = {
 
   readonly setActiveTool: (tool: EditorTool) => void;
   readonly addObject: (object: Omit<EditorObject, "id"> & { readonly id?: string }) => string;
+  readonly duplicateObject: (id: string) => string | null;
   readonly updateObject: (id: string, updates: Partial<Omit<EditorObject, "id">>) => void;
   readonly updateObjectData: (id: string, data: Partial<EditorObjectData>) => void;
   readonly updateObjectBox: (id: string, box: Partial<EditorObjectBox>) => void;
@@ -142,6 +143,16 @@ function createFileMeta(file: File): EditorFileMeta {
     size: file.size,
     type: file.type,
     lastModified: file.lastModified,
+  };
+}
+
+function cloneObjectData(data: EditorObjectData): EditorObjectData {
+  return {
+    ...data,
+    textRuns: data.textRuns?.map((run) => ({
+      ...run,
+      id: createId(),
+    })),
   };
 }
 
@@ -260,6 +271,48 @@ export function useEditor(): EditorController {
       markChanged();
 
       return id;
+    },
+    [markChanged],
+  );
+
+  const duplicateObject = useCallback(
+    (id: string) => {
+      let duplicatedId: string | null = null;
+
+      setObjects((current) => {
+        const sourceIndex = current.findIndex((object) => object.id === id);
+
+        if (sourceIndex < 0) {
+          return current;
+        }
+
+        const source = current[sourceIndex];
+        duplicatedId = createId();
+
+        const duplicate: EditorObject = {
+          ...source,
+          id: duplicatedId,
+          box: {
+            ...source.box,
+            x: source.box.x + 18,
+            y: source.box.y + 18,
+          },
+          data: cloneObjectData(source.data),
+        };
+
+        const nextObjects = [...current];
+        nextObjects.splice(sourceIndex + 1, 0, duplicate);
+        return nextObjects;
+      });
+
+      if (!duplicatedId) {
+        return null;
+      }
+
+      setSelectedObjectId(duplicatedId);
+      setActiveToolState("select");
+      markChanged();
+      return duplicatedId;
     },
     [markChanged],
   );
@@ -396,6 +449,7 @@ export function useEditor(): EditorController {
 
     setActiveTool,
     addObject,
+    duplicateObject,
     updateObject,
     updateObjectData,
     updateObjectBox,
