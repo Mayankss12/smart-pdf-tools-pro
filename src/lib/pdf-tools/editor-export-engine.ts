@@ -10,6 +10,7 @@ import {
   type ExportTextRun,
 } from "./editor-rich-text-engine";
 import { drawEditorWhiteout } from "./editor-whiteout-engine";
+import { drawEditorImageObject } from "./editor-image-engine";
 
 type EditorExportBox = {
   readonly x: number;
@@ -28,6 +29,7 @@ type EditorExportObjectData = {
   readonly color?: string;
   readonly backgroundColor?: string;
   readonly opacity?: number;
+  readonly imageDataUrl?: string;
 };
 
 export type EditorExportObject = {
@@ -177,7 +179,17 @@ function drawHighlightObjectWithSharedEngine(page: PDFPage, object: EditorExport
   }
 }
 
-function drawEditorObject(page: PDFPage, object: EditorExportObject, fonts: EmbeddedTextFonts) {
+async function drawEditorObject({
+  pdfDoc,
+  page,
+  object,
+  fonts,
+}: {
+  readonly pdfDoc: PDFDocument;
+  readonly page: PDFPage;
+  readonly object: EditorExportObject;
+  readonly fonts: EmbeddedTextFonts;
+}) {
   const pageIndex = object.pageNumber - 1;
 
   if (object.type === "text") {
@@ -194,6 +206,15 @@ function drawEditorObject(page: PDFPage, object: EditorExportObject, fonts: Embe
     drawEditorWhiteout(page, object.box, {
       opacity: object.data.opacity ?? 1,
     });
+    return;
+  }
+
+  if (object.type === "image") {
+    await drawEditorImageObject({
+      pdfDoc,
+      page,
+      object,
+    });
   }
 }
 
@@ -208,12 +229,17 @@ export async function exportEditorPdfBytes({
   const fonts = await embedEditorTextFonts(pdfDoc);
   const pages = pdfDoc.getPages();
 
-  objects.forEach((object) => {
+  for (const object of objects) {
     const page = pages[object.pageNumber - 1];
-    if (!page) return;
+    if (!page) continue;
 
-    drawEditorObject(page, object, fonts);
-  });
+    await drawEditorObject({
+      pdfDoc,
+      page,
+      object,
+      fonts,
+    });
+  }
 
   return pdfDoc.save();
 }
