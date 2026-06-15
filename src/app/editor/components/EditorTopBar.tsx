@@ -29,7 +29,7 @@ import {
   Type,
   Undo2,
 } from "lucide-react";
-import type { ComponentType, ReactNode } from "react";
+import type { ComponentType } from "react";
 
 import type { EditorController } from "../hooks/useEditor";
 import type { EditorTool } from "../hooks/useActiveTool";
@@ -180,7 +180,10 @@ export function EditorTopBar({
           label: "Image",
           shortcut: "I",
           icon: ImageIcon,
-          status: "locked",
+          status: "working",
+          active: editor.activeTool === "image",
+          disabled: !hasDocument,
+          action: () => selectTool("image"),
         },
         {
           id: "signature",
