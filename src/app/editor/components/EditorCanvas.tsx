@@ -9,12 +9,14 @@ import {
   useEffect,
   useRef,
   useState,
+  type ChangeEvent,
   type DragEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
 
 import type { EditorController } from "../hooks/useEditor";
 import { HighlightTool } from "./tools/HighlightTool";
+import { ImageTool } from "./tools/ImageTool";
 import { TextTool } from "./tools/TextTool";
 import { WhiteoutTool } from "./tools/WhiteoutTool";
 
@@ -46,6 +48,16 @@ type Box = {
   readonly height: number;
 };
 
+type Point = {
+  readonly x: number;
+  readonly y: number;
+};
+
+type ImageSize = {
+  readonly width: number;
+  readonly height: number;
+};
+
 const DEFAULT_TEXT_BOX = {
   width: 220,
   height: 44,
@@ -56,8 +68,25 @@ const MIN_TEXT_BOX = {
   height: 30,
 };
 
+const MIN_IMAGE_BOX = {
+  width: 48,
+  height: 32,
+};
+
 function isPdfFile(file: File) {
   return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+}
+
+function isSupportedImageFile(file: File) {
+  const lowerName = file.name.toLowerCase();
+
+  return (
+    file.type === "image/png" ||
+    file.type === "image/jpeg" ||
+    lowerName.endsWith(".png") ||
+    lowerName.endsWith(".jpg") ||
+    lowerName.endsWith(".jpeg")
+  );
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -127,6 +156,40 @@ function getPointerPoint(
   );
 }
 
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+
+      reject(new Error("Unable to read this image file."));
+    };
+
+    reader.onerror = () => reject(new Error("Unable to read this image file."));
+    reader.readAsDataURL(file);
+  });
+}
+
+function getImageSize(dataUrl: string) {
+  return new Promise<ImageSize>((resolve, reject) => {
+    const image = new window.Image();
+
+    image.onload = () => {
+      resolve({
+        width: Math.max(1, image.naturalWidth || image.width || 1),
+        height: Math.max(1, image.naturalHeight || image.height || 1),
+      });
+    };
+
+    image.onerror = () => reject(new Error("Unable to load this image."));
+    image.src = dataUrl;
+  });
+}
+
 function PdfPageRenderer({
   editor,
 }: {
@@ -134,6 +197,8 @@ function PdfPageRenderer({
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const pageLayerRef = useRef<HTMLDivElement | null>(null);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const pendingImagePointRef = useRef<Point | null>(null);
 
   const [isRendering, setIsRendering] = useState(true);
   const [error, setError] = useState("");
@@ -277,6 +342,53 @@ function PdfPageRenderer({
     });
   }
 
+  function getImageBox(point: Point, imageSize: ImageSize) {
+    const page = getUnscaledPageSize(pageSize, editor.zoom);
+    const aspectRatio = imageSize.width / Math.max(1, imageSize.height);
+    const maxWidth = Math.max(MIN_IMAGE_BOX.width, Math.min(240, page.width * 0.46));
+    const maxHeight = Math.max(MIN_IMAGE_BOX.height, page.height * 0.46);
+
+    let width = maxWidth;
+    let height = width / Math.max(0.01, aspectRatio);
+
+    if (height > maxHeight) {
+      height = maxHeight;
+      width = height * aspectRatio;
+    }
+
+    return clampBoxToPage(
+      {
+        x: point.x,
+        y: point.y,
+        width,
+        height,
+      },
+      pageSize,
+      editor.zoom,
+      MIN_IMAGE_BOX.width,
+      MIN_IMAGE_BOX.height,
+    );
+  }
+
+  async function addImageObject(point: Point, file: File) {
+    if (!isSupportedImageFile(file)) {
+      return;
+    }
+
+    const imageDataUrl = await readFileAsDataUrl(file);
+    const imageSize = await getImageSize(imageDataUrl);
+    const safeBox = getImageBox(point, imageSize);
+
+    editor.addObject({
+      type: "image",
+      pageNumber: editor.activePageNumber,
+      box: safeBox,
+      data: {
+        imageDataUrl,
+      },
+    });
+  }
+
   function getFallbackTextBox(startX: number, startY: number) {
     return clampBoxToPage(
       {
@@ -292,6 +404,18 @@ function PdfPageRenderer({
     );
   }
 
+  function handleImageFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    const point = pendingImagePointRef.current;
+
+    pendingImagePointRef.current = null;
+    event.currentTarget.value = "";
+
+    if (!file || !point) return;
+
+    void addImageObject(point, file);
+  }
+
   function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
     const layer = pageLayerRef.current;
     if (!layer || !editor.pdfDocument) return;
@@ -302,6 +426,13 @@ function PdfPageRenderer({
     }
 
     const point = getPointerPoint(event, layer, editor.zoom, pageSize);
+
+    if (editor.activeTool === "image") {
+      event.preventDefault();
+      pendingImagePointRef.current = point;
+      imageInputRef.current?.click();
+      return;
+    }
 
     if (
       editor.activeTool === "text" ||
@@ -397,6 +528,14 @@ function PdfPageRenderer({
 
   return (
     <div className="mx-auto">
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/png,image/jpeg"
+        className="hidden"
+        onChange={handleImageFileChange}
+      />
+
       <div className="mb-3 flex items-center justify-between">
         <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-slate-500 shadow-sm">
           Page {editor.activePageNumber}
@@ -407,11 +546,13 @@ function PdfPageRenderer({
             ? "Select"
             : editor.activeTool === "text"
               ? "Drag to create text box"
-              : editor.activeTool === "highlight"
-                ? "Drag to highlight"
-                : editor.activeTool === "whiteout"
-                  ? "Drag to whiteout"
-                  : editor.activeTool.toUpperCase()}
+              : editor.activeTool === "image"
+                ? "Click PDF to place image"
+                : editor.activeTool === "highlight"
+                  ? "Drag to highlight"
+                  : editor.activeTool === "whiteout"
+                    ? "Drag to whiteout"
+                    : editor.activeTool.toUpperCase()}
         </span>
       </div>
 
@@ -432,6 +573,7 @@ function PdfPageRenderer({
           minHeight: pageSize.height || 680,
           cursor:
             editor.activeTool === "text" ||
+            editor.activeTool === "image" ||
             editor.activeTool === "highlight" ||
             editor.activeTool === "whiteout"
               ? "crosshair"
@@ -468,6 +610,20 @@ function PdfPageRenderer({
                 pageScale={editor.zoom}
                 onSelect={editor.selectObject}
                 onUpdateData={editor.updateObjectData}
+                onUpdateBox={editor.updateObjectBox}
+                onDelete={editor.deleteObject}
+              />
+            );
+          }
+
+          if (object.type === "image") {
+            return (
+              <ImageTool
+                key={object.id}
+                object={object}
+                selected={editor.selectedObjectId === object.id}
+                pageScale={editor.zoom}
+                onSelect={editor.selectObject}
                 onUpdateBox={editor.updateObjectBox}
                 onDelete={editor.deleteObject}
               />
