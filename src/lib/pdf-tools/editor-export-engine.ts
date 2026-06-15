@@ -11,6 +11,7 @@ import {
 } from "./editor-rich-text-engine";
 import { drawEditorWhiteout } from "./editor-whiteout-engine";
 import { drawEditorImageObject } from "./editor-image-engine";
+import { drawEditorSignatureObject } from "./editor-signature-engine";
 
 type EditorExportBox = {
   readonly x: number;
@@ -211,6 +212,15 @@ async function drawEditorObject({
 
   if (object.type === "image") {
     await drawEditorImageObject({
+      pdfDoc,
+      page,
+      object,
+    });
+    return;
+  }
+
+  if (object.type === "signature") {
+    await drawEditorSignatureObject({
       pdfDoc,
       page,
       object,
