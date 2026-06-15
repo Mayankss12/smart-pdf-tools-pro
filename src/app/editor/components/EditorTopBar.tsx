@@ -5,6 +5,7 @@ import {
   Brain,
   ChevronLeft,
   ChevronRight,
+  Copy,
   Download,
   FilePlus2,
   FolderOpen,
@@ -147,6 +148,7 @@ export function EditorTopBar({
   onRotateCurrentPage,
 }: EditorTopBarProps) {
   const hasDocument = Boolean(editor.file && editor.pdfDocument);
+  const hasSelectedObject = Boolean(editor.selectedObjectId);
   const canGoPrevious = hasDocument && editor.activePageNumber > 1;
   const canGoNext = hasDocument && editor.activePageNumber < editor.totalPages;
 
@@ -354,12 +356,24 @@ export function EditorTopBar({
           status: "locked",
         },
         {
+          id: "duplicate-selected",
+          label: "Duplicate",
+          shortcut: "Ctrl+D",
+          icon: Copy,
+          status: "working",
+          disabled: !hasDocument || !hasSelectedObject,
+          action: () => {
+            if (!editor.selectedObjectId) return;
+            editor.duplicateObject(editor.selectedObjectId);
+          },
+        },
+        {
           id: "delete-selected",
           label: "Delete",
           shortcut: "Del",
           icon: Trash2,
           status: "working",
-          disabled: !hasDocument || !editor.selectedObjectId,
+          disabled: !hasDocument || !hasSelectedObject,
           action: () => {
             if (!editor.selectedObjectId) return;
             editor.deleteObject(editor.selectedObjectId);
