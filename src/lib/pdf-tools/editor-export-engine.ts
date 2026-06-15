@@ -1,8 +1,9 @@
-﻿import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
+import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 
 import { createHighlightLayer } from "../../engines/highlight/highlightEngine";
 import { prepareHighlightExportPlan } from "../../engines/highlight/highlightExporter";
 import type { PdfPageGeometryContext } from "../../engines/shared/types";
+import { drawEditorWhiteout } from "./editor-whiteout-engine";
 
 type EmbeddedTextFonts = {
   readonly regular: PDFFont;
@@ -340,7 +341,6 @@ function drawHighlightObjectWithSharedEngine(page: PDFPage, object: EditorExport
 }
 
 function drawEditorObject(page: PDFPage, object: EditorExportObject, fonts: EmbeddedTextFonts) {
-  const pageHeight = page.getHeight();
   const pageIndex = object.pageNumber - 1;
 
   if (object.type === "text") {
@@ -354,13 +354,8 @@ function drawEditorObject(page: PDFPage, object: EditorExportObject, fonts: Embe
   }
 
   if (object.type === "whiteout") {
-    page.drawRectangle({
-      x: object.box.x,
-      y: pageHeight - object.box.y - object.box.height,
-      width: object.box.width,
-      height: object.box.height,
-      color: rgb(1, 1, 1),
-      opacity: 1,
+    drawEditorWhiteout(page, object.box, {
+      opacity: object.data.opacity ?? 1,
     });
   }
 }
