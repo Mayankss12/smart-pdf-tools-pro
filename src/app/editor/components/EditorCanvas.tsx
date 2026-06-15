@@ -1,9 +1,8 @@
-﻿"use client";
+"use client";
 
 import {
   AlertCircle,
   Loader2,
-  Trash2,
   Upload,
 } from "lucide-react";
 import {
@@ -14,9 +13,10 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 
-import type { EditorController, EditorObject } from "../hooks/useEditor";
+import type { EditorController } from "../hooks/useEditor";
 import { HighlightTool } from "./tools/HighlightTool";
 import { TextTool } from "./tools/TextTool";
+import { WhiteoutTool } from "./tools/WhiteoutTool";
 
 type EditorCanvasProps = {
   readonly editor: EditorController;
@@ -124,59 +124,6 @@ function getPointerPoint(
     },
     pageSize,
     pageScale,
-  );
-}
-
-function WhiteoutObject({
-  object,
-  selected,
-  pageScale,
-  onSelect,
-  onDelete,
-}: {
-  readonly object: EditorObject;
-  readonly selected: boolean;
-  readonly pageScale: number;
-  readonly onSelect: (id: string) => void;
-  readonly onDelete: (id: string) => void;
-}) {
-  return (
-    <div
-      className={[
-        "absolute z-30 rounded-lg bg-white shadow-sm transition",
-        selected
-          ? "border-2 border-violet-500 ring-4 ring-violet-100"
-          : "border border-slate-200 hover:border-violet-300",
-      ].join(" ")}
-      style={{
-        left: object.box.x * pageScale,
-        top: object.box.y * pageScale,
-        width: object.box.width * pageScale,
-        height: object.box.height * pageScale,
-      }}
-      onClick={(event) => {
-        event.stopPropagation();
-        onSelect(object.id);
-      }}
-    >
-      {selected ? (
-        <div className="absolute -top-12 left-0 z-40 flex items-center gap-1 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-[0_18px_40px_rgba(15,23,42,0.18)]">
-          <span className="px-2 text-xs font-black text-slate-600">Whiteout</span>
-
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              onDelete(object.id);
-            }}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-red-50 hover:text-red-600"
-            aria-label="Delete whiteout"
-          >
-            <Trash2 size={15} />
-          </button>
-        </div>
-      ) : null}
-    </div>
   );
 }
 
@@ -544,12 +491,13 @@ function PdfPageRenderer({
 
           if (object.type === "whiteout") {
             return (
-              <WhiteoutObject
+              <WhiteoutTool
                 key={object.id}
                 object={object}
                 selected={editor.selectedObjectId === object.id}
                 pageScale={editor.zoom}
                 onSelect={editor.selectObject}
+                onUpdateBox={editor.updateObjectBox}
                 onDelete={editor.deleteObject}
               />
             );
