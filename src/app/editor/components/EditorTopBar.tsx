@@ -190,7 +190,10 @@ export function EditorTopBar({
           label: "Sign",
           shortcut: "S",
           icon: PenLine,
-          status: "locked",
+          status: "working",
+          active: editor.activeTool === "signature",
+          disabled: !hasDocument,
+          action: () => selectTool("signature"),
         },
         {
           id: "shape",
