@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { GripHorizontal, Trash2 } from "lucide-react";
 import {
@@ -12,7 +12,22 @@ import { createPortal } from "react-dom";
 
 import type { EditorObject, EditorObjectBox } from "../../hooks/useEditor";
 
-type ResizeHandle = "top-left" | "top-right" | "bottom-left" | "bottom-right";
+type ResizeHandle =
+  | "top-left"
+  | "top"
+  | "top-right"
+  | "right"
+  | "bottom-right"
+  | "bottom"
+  | "bottom-left"
+  | "left";
+
+type CornerResizeHandle = Extract<
+  ResizeHandle,
+  "top-left" | "top-right" | "bottom-left" | "bottom-right"
+>;
+
+type PointerTarget = HTMLButtonElement | HTMLDivElement;
 
 type DragState = {
   readonly startClientX: number;
@@ -27,6 +42,11 @@ type ResizeState = {
   readonly startBox: EditorObjectBox;
 };
 
+type PageBounds = {
+  readonly width: number;
+  readonly height: number;
+};
+
 type EditorObjectFrameProps = {
   readonly object: EditorObject;
   readonly selected: boolean;
@@ -36,17 +56,41 @@ type EditorObjectFrameProps = {
   readonly toolbarLabel?: string;
   readonly toolbarContent?: ReactNode;
   readonly children: ReactNode;
+  readonly directDrag?: boolean;
+  readonly preserveAspectRatioOnCornerResize?: boolean;
   readonly onSelect: (id: string) => void;
   readonly onUpdateBox: (id: string, box: Partial<EditorObjectBox>) => void;
   readonly onDelete: (id: string) => void;
 };
 
 const HANDLE_STYLES: Record<ResizeHandle, string> = {
-  "top-left": "-left-1 -top-1 cursor-nwse-resize",
-  "top-right": "-right-1 -top-1 cursor-nesw-resize",
-  "bottom-left": "-bottom-1 -left-1 cursor-nesw-resize",
-  "bottom-right": "-bottom-1 -right-1 cursor-nwse-resize",
+  "top-left": "-left-1.5 -top-1.5 cursor-nwse-resize",
+  top: "left-1/2 -top-1.5 -translate-x-1/2 cursor-ns-resize",
+  "top-right": "-right-1.5 -top-1.5 cursor-nesw-resize",
+  right: "right-[-0.375rem] top-1/2 -translate-y-1/2 cursor-ew-resize",
+  "bottom-right": "-bottom-1.5 -right-1.5 cursor-nwse-resize",
+  bottom: "bottom-[-0.375rem] left-1/2 -translate-x-1/2 cursor-ns-resize",
+  "bottom-left": "-bottom-1.5 -left-1.5 cursor-nesw-resize",
+  left: "left-[-0.375rem] top-1/2 -translate-y-1/2 cursor-ew-resize",
 };
+
+const RESIZE_HANDLES: readonly ResizeHandle[] = [
+  "top-left",
+  "top",
+  "top-right",
+  "right",
+  "bottom-right",
+  "bottom",
+  "bottom-left",
+  "left",
+];
+
+const CORNER_HANDLES = new Set<ResizeHandle>([
+  "top-left",
+  "top-right",
+  "bottom-left",
+  "bottom-right",
+]);
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
@@ -54,6 +98,126 @@ function clamp(value: number, min: number, max: number) {
 
 function clampSize(value: number, minimum: number) {
   return Math.max(minimum, value);
+}
+
+function isCornerHandle(handle: ResizeHandle): handle is CornerResizeHandle {
+  return CORNER_HANDLES.has(handle);
+}
+
+function getAspectLockedCornerBox({
+  handle,
+  startBox,
+  rawLeft,
+  rawTop,
+  rawRight,
+  rawBottom,
+  minWidth,
+  minHeight,
+  pageBounds,
+}: {
+  readonly handle: CornerResizeHandle;
+  readonly startBox: EditorObjectBox;
+  readonly rawLeft: number;
+  readonly rawTop: number;
+  readonly rawRight: number;
+  readonly rawBottom: number;
+  readonly minWidth: number;
+  readonly minHeight: number;
+  readonly pageBounds: PageBounds | null;
+}): EditorObjectBox {
+  const safeStartWidth = Math.max(minWidth, startBox.width);
+  const safeStartHeight = Math.max(minHeight, startBox.height);
+  const aspectRatio = Math.max(0.01, safeStartWidth / safeStartHeight);
+
+  const rawWidth = Math.max(minWidth, rawRight - rawLeft);
+  const rawHeight = Math.max(minHeight, rawBottom - rawTop);
+  const widthFromHeight = rawHeight * aspectRatio;
+  const heightFromWidth = rawWidth / aspectRatio;
+
+  let targetWidth = rawWidth >= widthFromHeight ? rawWidth : widthFromHeight;
+  let targetHeight = targetWidth / aspectRatio;
+
+  const minAspectWidth = Math.max(minWidth, minHeight * aspectRatio);
+  const pageWidth = pageBounds?.width ?? Number.POSITIVE_INFINITY;
+  const pageHeight = pageBounds?.height ?? Number.POSITIVE_INFINITY;
+
+  let maxAspectWidth = Number.POSITIVE_INFINITY;
+
+  if (handle === "bottom-right") {
+    maxAspectWidth = Math.min(
+      pageWidth - startBox.x,
+      (pageHeight - startBox.y) * aspectRatio,
+    );
+  }
+
+  if (handle === "bottom-left") {
+    const anchorX = startBox.x + startBox.width;
+
+    maxAspectWidth = Math.min(
+      anchorX,
+      (pageHeight - startBox.y) * aspectRatio,
+    );
+  }
+
+  if (handle === "top-right") {
+    const anchorY = startBox.y + startBox.height;
+
+    maxAspectWidth = Math.min(
+      pageWidth - startBox.x,
+      anchorY * aspectRatio,
+    );
+  }
+
+  if (handle === "top-left") {
+    const anchorX = startBox.x + startBox.width;
+    const anchorY = startBox.y + startBox.height;
+
+    maxAspectWidth = Math.min(anchorX, anchorY * aspectRatio);
+  }
+
+  targetWidth = clamp(targetWidth, minAspectWidth, Math.max(minAspectWidth, maxAspectWidth));
+  targetHeight = targetWidth / aspectRatio;
+
+  if (handle === "bottom-right") {
+    return {
+      x: startBox.x,
+      y: startBox.y,
+      width: targetWidth,
+      height: targetHeight,
+    };
+  }
+
+  if (handle === "bottom-left") {
+    const anchorX = startBox.x + startBox.width;
+
+    return {
+      x: anchorX - targetWidth,
+      y: startBox.y,
+      width: targetWidth,
+      height: targetHeight,
+    };
+  }
+
+  if (handle === "top-right") {
+    const anchorY = startBox.y + startBox.height;
+
+    return {
+      x: startBox.x,
+      y: anchorY - targetHeight,
+      width: targetWidth,
+      height: targetHeight,
+    };
+  }
+
+  const anchorX = startBox.x + startBox.width;
+  const anchorY = startBox.y + startBox.height;
+
+  return {
+    x: anchorX - targetWidth,
+    y: anchorY - targetHeight,
+    width: targetWidth,
+    height: targetHeight,
+  };
 }
 
 export function EditorObjectFrame({
@@ -65,6 +229,8 @@ export function EditorObjectFrame({
   toolbarLabel = "Object",
   toolbarContent,
   children,
+  directDrag = false,
+  preserveAspectRatioOnCornerResize = false,
   onSelect,
   onUpdateBox,
   onDelete,
@@ -91,7 +257,7 @@ export function EditorObjectFrame({
     return () => window.cancelAnimationFrame(frame);
   }, [selected]);
 
-  function getPageBounds() {
+  function getPageBounds(): PageBounds | null {
     const root = rootRef.current;
     const pageLayer = root?.parentElement;
 
@@ -128,7 +294,7 @@ export function EditorObjectFrame({
     };
   }
 
-  function startMove(event: ReactPointerEvent<HTMLButtonElement>) {
+  function startMove(event: ReactPointerEvent<PointerTarget>) {
     event.preventDefault();
     event.stopPropagation();
 
@@ -143,7 +309,7 @@ export function EditorObjectFrame({
     event.currentTarget.setPointerCapture(event.pointerId);
   }
 
-  function moveObject(event: ReactPointerEvent<HTMLButtonElement>) {
+  function moveObject(event: ReactPointerEvent<PointerTarget>) {
     if (!dragRef.current) return;
 
     event.preventDefault();
@@ -165,7 +331,7 @@ export function EditorObjectFrame({
     });
   }
 
-  function stopMove(event: ReactPointerEvent<HTMLButtonElement>) {
+  function stopMove(event: ReactPointerEvent<PointerTarget>) {
     dragRef.current = null;
 
     try {
@@ -173,6 +339,16 @@ export function EditorObjectFrame({
     } catch {
       // Ignore pointer release errors.
     }
+  }
+
+  function handleRootPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    if (directDrag) {
+      startMove(event);
+      return;
+    }
+
+    event.stopPropagation();
+    onSelect(object.id);
   }
 
   function startResize(handle: ResizeHandle, event: ReactPointerEvent<HTMLButtonElement>) {
@@ -227,14 +403,26 @@ export function EditorObjectFrame({
       top = clamp(startBox.y + deltaY, 0, startBox.y + startBox.height - minHeight);
     }
 
-    const nextBox = clampBoxToPage({
-      x: left,
-      y: top,
-      width: right - left,
-      height: bottom - top,
-    });
+    const nextBox = preserveAspectRatioOnCornerResize && isCornerHandle(handle)
+      ? getAspectLockedCornerBox({
+          handle,
+          startBox,
+          rawLeft: left,
+          rawTop: top,
+          rawRight: right,
+          rawBottom: bottom,
+          minWidth,
+          minHeight,
+          pageBounds,
+        })
+      : {
+          x: left,
+          y: top,
+          width: right - left,
+          height: bottom - top,
+        };
 
-    onUpdateBox(object.id, nextBox);
+    onUpdateBox(object.id, clampBoxToPage(nextBox));
   }
 
   function stopResize(event: ReactPointerEvent<HTMLButtonElement>) {
@@ -250,22 +438,24 @@ export function EditorObjectFrame({
   const toolbar = selected && toolbarHost
     ? createPortal(
         <div className="flex max-w-full items-center gap-1 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-[0_18px_45px_rgba(15,23,42,0.14)]">
-          <button
-            type="button"
-            onPointerDown={startMove}
-            onPointerMove={moveObject}
-            onPointerUp={stopMove}
-            onPointerCancel={stopMove}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-slate-600 transition duration-200 hover:bg-violet-50 hover:text-violet-700"
-            aria-label={`Move ${toolbarLabel}`}
-            title={`Move ${toolbarLabel}`}
-          >
-            <GripHorizontal size={16} />
-          </button>
+          {!directDrag ? (
+            <button
+              type="button"
+              onPointerDown={startMove}
+              onPointerMove={moveObject}
+              onPointerUp={stopMove}
+              onPointerCancel={stopMove}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-slate-600 transition duration-200 hover:bg-violet-50 hover:text-violet-700"
+              aria-label={`Move ${toolbarLabel}`}
+              title={`Move ${toolbarLabel}`}
+            >
+              <GripHorizontal size={16} />
+            </button>
+          ) : null}
 
           {toolbarContent ? (
             <>
-              <span className="h-5 w-px shrink-0 bg-slate-200" />
+              {!directDrag ? <span className="h-5 w-px shrink-0 bg-slate-200" /> : null}
               <div className="flex min-w-0 shrink-0 items-center gap-1">{toolbarContent}</div>
             </>
           ) : null}
@@ -296,6 +486,7 @@ export function EditorObjectFrame({
         ref={rootRef}
         className={[
           "absolute z-30 rounded-none transition duration-200",
+          directDrag ? "cursor-move touch-none" : "",
           selected
             ? "border border-violet-500 bg-white/5 ring-2 ring-violet-500/20"
             : "border border-transparent hover:border-violet-300/70",
@@ -306,10 +497,10 @@ export function EditorObjectFrame({
           width: object.box.width * pageScale,
           height: object.box.height * pageScale,
         }}
-        onPointerDown={(event) => {
-          event.stopPropagation();
-          onSelect(object.id);
-        }}
+        onPointerDown={handleRootPointerDown}
+        onPointerMove={directDrag ? moveObject : undefined}
+        onPointerUp={directDrag ? stopMove : undefined}
+        onPointerCancel={directDrag ? stopMove : undefined}
         onClick={(event) => {
           event.stopPropagation();
           onSelect(object.id);
@@ -319,7 +510,7 @@ export function EditorObjectFrame({
 
         {selected ? (
           <>
-            {(Object.keys(HANDLE_STYLES) as ResizeHandle[]).map((handle) => (
+            {RESIZE_HANDLES.map((handle) => (
               <button
                 key={handle}
                 type="button"
@@ -328,11 +519,15 @@ export function EditorObjectFrame({
                 onPointerUp={stopResize}
                 onPointerCancel={stopResize}
                 className={[
-                  "absolute z-40 h-2 w-2 rounded-full border border-white bg-violet-600 shadow-sm transition duration-200",
+                  "absolute z-40 h-3 w-3 rounded-full border-2 border-white bg-violet-600 shadow-[0_2px_8px_rgba(79,70,229,0.32)] transition duration-200 hover:scale-125 hover:bg-violet-700",
                   HANDLE_STYLES[handle],
                 ].join(" ")}
                 aria-label={`Resize ${toolbarLabel}`}
-                title={`Resize ${toolbarLabel}`}
+                title={
+                  preserveAspectRatioOnCornerResize && isCornerHandle(handle)
+                    ? `Resize ${toolbarLabel} proportionally`
+                    : `Resize ${toolbarLabel}`
+                }
               />
             ))}
           </>
