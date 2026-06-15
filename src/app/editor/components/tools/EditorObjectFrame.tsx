@@ -107,116 +107,109 @@ function isCornerHandle(handle: ResizeHandle): handle is CornerResizeHandle {
 function getAspectLockedCornerBox({
   handle,
   startBox,
-  rawLeft,
-  rawTop,
-  rawRight,
-  rawBottom,
+  deltaX,
+  deltaY,
   minWidth,
   minHeight,
   pageBounds,
 }: {
   readonly handle: CornerResizeHandle;
   readonly startBox: EditorObjectBox;
-  readonly rawLeft: number;
-  readonly rawTop: number;
-  readonly rawRight: number;
-  readonly rawBottom: number;
+  readonly deltaX: number;
+  readonly deltaY: number;
   readonly minWidth: number;
   readonly minHeight: number;
   readonly pageBounds: PageBounds | null;
 }): EditorObjectBox {
-  const safeStartWidth = Math.max(minWidth, startBox.width);
-  const safeStartHeight = Math.max(minHeight, startBox.height);
-  const aspectRatio = Math.max(0.01, safeStartWidth / safeStartHeight);
+  const startWidth = Math.max(minWidth, startBox.width);
+  const startHeight = Math.max(minHeight, startBox.height);
 
-  const rawWidth = Math.max(minWidth, rawRight - rawLeft);
-  const rawHeight = Math.max(minHeight, rawBottom - rawTop);
-  const widthFromHeight = rawHeight * aspectRatio;
-  const heightFromWidth = rawWidth / aspectRatio;
+  const horizontalDelta = handle.includes("left") ? -deltaX : deltaX;
+  const verticalDelta = handle.includes("top") ? -deltaY : deltaY;
 
-  let targetWidth = rawWidth >= widthFromHeight ? rawWidth : widthFromHeight;
-  let targetHeight = targetWidth / aspectRatio;
+  const horizontalScale = (startWidth + horizontalDelta) / startWidth;
+  const verticalScale = (startHeight + verticalDelta) / startHeight;
 
-  const minAspectWidth = Math.max(minWidth, minHeight * aspectRatio);
+  const horizontalChange = Math.abs(horizontalScale - 1);
+  const verticalChange = Math.abs(verticalScale - 1);
+  let targetScale = horizontalChange >= verticalChange ? horizontalScale : verticalScale;
+
+  const minScale = Math.max(minWidth / startWidth, minHeight / startHeight);
   const pageWidth = pageBounds?.width ?? Number.POSITIVE_INFINITY;
   const pageHeight = pageBounds?.height ?? Number.POSITIVE_INFINITY;
 
-  let maxAspectWidth = Number.POSITIVE_INFINITY;
+  let maxWidth = Number.POSITIVE_INFINITY;
+  let maxHeight = Number.POSITIVE_INFINITY;
 
   if (handle === "bottom-right") {
-    maxAspectWidth = Math.min(
-      pageWidth - startBox.x,
-      (pageHeight - startBox.y) * aspectRatio,
-    );
+    maxWidth = pageWidth - startBox.x;
+    maxHeight = pageHeight - startBox.y;
   }
 
   if (handle === "bottom-left") {
-    const anchorX = startBox.x + startBox.width;
-
-    maxAspectWidth = Math.min(
-      anchorX,
-      (pageHeight - startBox.y) * aspectRatio,
-    );
+    maxWidth = startBox.x + startWidth;
+    maxHeight = pageHeight - startBox.y;
   }
 
   if (handle === "top-right") {
-    const anchorY = startBox.y + startBox.height;
-
-    maxAspectWidth = Math.min(
-      pageWidth - startBox.x,
-      anchorY * aspectRatio,
-    );
+    maxWidth = pageWidth - startBox.x;
+    maxHeight = startBox.y + startHeight;
   }
 
   if (handle === "top-left") {
-    const anchorX = startBox.x + startBox.width;
-    const anchorY = startBox.y + startBox.height;
-
-    maxAspectWidth = Math.min(anchorX, anchorY * aspectRatio);
+    maxWidth = startBox.x + startWidth;
+    maxHeight = startBox.y + startHeight;
   }
 
-  targetWidth = clamp(targetWidth, minAspectWidth, Math.max(minAspectWidth, maxAspectWidth));
-  targetHeight = targetWidth / aspectRatio;
+  const maxScale = Math.max(
+    minScale,
+    Math.min(maxWidth / startWidth, maxHeight / startHeight),
+  );
+
+  targetScale = clamp(targetScale, minScale, maxScale);
+
+  const width = startWidth * targetScale;
+  const height = startHeight * targetScale;
 
   if (handle === "bottom-right") {
     return {
       x: startBox.x,
       y: startBox.y,
-      width: targetWidth,
-      height: targetHeight,
+      width,
+      height,
     };
   }
 
   if (handle === "bottom-left") {
-    const anchorX = startBox.x + startBox.width;
+    const anchorX = startBox.x + startWidth;
 
     return {
-      x: anchorX - targetWidth,
+      x: anchorX - width,
       y: startBox.y,
-      width: targetWidth,
-      height: targetHeight,
+      width,
+      height,
     };
   }
 
   if (handle === "top-right") {
-    const anchorY = startBox.y + startBox.height;
+    const anchorY = startBox.y + startHeight;
 
     return {
       x: startBox.x,
-      y: anchorY - targetHeight,
-      width: targetWidth,
-      height: targetHeight,
+      y: anchorY - height,
+      width,
+      height,
     };
   }
 
-  const anchorX = startBox.x + startBox.width;
-  const anchorY = startBox.y + startBox.height;
+  const anchorX = startBox.x + startWidth;
+  const anchorY = startBox.y + startHeight;
 
   return {
-    x: anchorX - targetWidth,
-    y: anchorY - targetHeight,
-    width: targetWidth,
-    height: targetHeight,
+    x: anchorX - width,
+    y: anchorY - height,
+    width,
+    height,
   };
 }
 
@@ -315,14 +308,15 @@ export function EditorObjectFrame({
     event.preventDefault();
     event.stopPropagation();
 
+    const safeScale = Math.max(0.01, pageScale);
     const nextBox = clampBoxToPage({
       ...dragRef.current.startBox,
       x:
         dragRef.current.startBox.x +
-        (event.clientX - dragRef.current.startClientX) / pageScale,
+        (event.clientX - dragRef.current.startClientX) / safeScale,
       y:
         dragRef.current.startBox.y +
-        (event.clientY - dragRef.current.startClientY) / pageScale,
+        (event.clientY - dragRef.current.startClientY) / safeScale,
     });
 
     onUpdateBox(object.id, {
@@ -373,9 +367,10 @@ export function EditorObjectFrame({
     event.preventDefault();
     event.stopPropagation();
 
+    const safeScale = Math.max(0.01, pageScale);
     const pageBounds = getPageBounds();
-    const deltaX = (event.clientX - resizeRef.current.startClientX) / pageScale;
-    const deltaY = (event.clientY - resizeRef.current.startClientY) / pageScale;
+    const deltaX = (event.clientX - resizeRef.current.startClientX) / safeScale;
+    const deltaY = (event.clientY - resizeRef.current.startClientY) / safeScale;
 
     const { handle, startBox } = resizeRef.current;
 
@@ -407,10 +402,8 @@ export function EditorObjectFrame({
       ? getAspectLockedCornerBox({
           handle,
           startBox,
-          rawLeft: left,
-          rawTop: top,
-          rawRight: right,
-          rawBottom: bottom,
+          deltaX,
+          deltaY,
           minWidth,
           minHeight,
           pageBounds,
