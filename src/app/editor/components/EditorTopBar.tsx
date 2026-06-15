@@ -64,6 +64,9 @@ type EditorTopBarProps = {
   readonly onRotateCurrentPage?: () => void;
 };
 
+const OPEN_IMAGE_PICKER_EVENT = "pdfmantra:editor-open-image-picker";
+const OPEN_SIGNATURE_PICKER_EVENT = "pdfmantra:editor-open-signature-picker";
+
 function formatPageLabel(editor: EditorController) {
   if (!editor.pdfDocument) return "No PDF";
   return `Page ${editor.activePageNumber} of ${editor.totalPages}`;
@@ -151,6 +154,14 @@ export function EditorTopBar({
     editor.setActiveTool(tool);
   };
 
+  const openPickerFromToolbar = (eventName: string) => {
+    editor.setActiveTool("select");
+
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(eventName));
+    }
+  };
+
   const toolGroups: ToolGroup[] = [
     {
       label: "Add",
@@ -178,22 +189,20 @@ export function EditorTopBar({
         {
           id: "image",
           label: "Image",
-          shortcut: "I",
+          shortcut: "Browse",
           icon: ImageIcon,
           status: "working",
-          active: editor.activeTool === "image",
           disabled: !hasDocument,
-          action: () => selectTool("image"),
+          action: () => openPickerFromToolbar(OPEN_IMAGE_PICKER_EVENT),
         },
         {
           id: "signature",
           label: "Sign",
-          shortcut: "S",
+          shortcut: "Browse",
           icon: PenLine,
           status: "working",
-          active: editor.activeTool === "signature",
           disabled: !hasDocument,
-          action: () => selectTool("signature"),
+          action: () => openPickerFromToolbar(OPEN_SIGNATURE_PICKER_EVENT),
         },
         {
           id: "shape",
