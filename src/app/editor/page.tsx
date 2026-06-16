@@ -12,6 +12,7 @@ import { EditorLeftPanel } from "./components/EditorLeftPanel";
 import { EditorStatusBar } from "./components/EditorStatusBar";
 import { EditorTopBar } from "./components/EditorTopBar";
 import { useEditor } from "./hooks/useEditor";
+import { useEditorKeyboard } from "./hooks/useEditorKeyboard";
 
 function configurePdfWorker() {
   if (typeof window === "undefined") return;
@@ -43,6 +44,8 @@ export default function EditorPage() {
   const [fileBytes, setFileBytes] = useState<Uint8Array | null>(null);
   const [statusMessage, setStatusMessage] = useState("Open a PDF to start editing.");
   const [loading, setLoading] = useState(false);
+
+  useEditorKeyboard(editor);
 
   useEffect(() => {
     configurePdfWorker();
