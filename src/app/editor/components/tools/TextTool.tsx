@@ -209,7 +209,7 @@ function readDomRuns(root: HTMLElement, fallback: Required<EditorTextStyle>) {
   return mergeRuns(runs);
 }
 
-const COMMAND_TO_STYLE: Record
+const COMMAND_TO_STYLE: Record<
   InlineCommand,
   { key: keyof EditorTextStyle; on: string; off: string }
 > = {
