@@ -4,7 +4,7 @@ export type EditorTool =
   | "image"
   | "signature"
   | "highlight"
-  | "copy-area"
+  | "object"
   | "note"
   | "draw"
   | "shape"
