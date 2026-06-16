@@ -15,7 +15,7 @@ type ResizeHandle =
   | "bottom-left"
   | "left";
 
-type CornerResizeHandle = Extract
+type CornerResizeHandle = Extract<
   ResizeHandle,
   "top-left" | "top-right" | "bottom-left" | "bottom-right"
 >;
@@ -25,13 +25,14 @@ type ResizeState = {
   readonly startClientX: number;
   readonly startClientY: number;
   readonly startBox: EditorObjectBox;
+  readonly pointerId: number;
 };
 
 type DragState = {
-  startClientX: number;
-  startClientY: number;
-  startBox: EditorObjectBox;
-  pointerId: number;
+  readonly startClientX: number;
+  readonly startClientY: number;
+  readonly startBox: EditorObjectBox;
+  readonly pointerId: number;
   dragging: boolean;
 };
 
@@ -49,7 +50,6 @@ type EditorObjectFrameProps = {
   readonly toolbarLabel?: string;
   readonly toolbarContent?: ReactNode;
   readonly children: ReactNode;
-  // Accepted for backward compatibility; drag is now always body-based.
   readonly directDrag?: boolean;
   readonly preserveAspectRatioOnCornerResize?: boolean;
   readonly onSelect: (id: string) => void;
@@ -125,12 +125,10 @@ function getAspectLockedCornerBox({
 
   const horizontalScale = (startWidth + horizontalDelta) / startWidth;
   const verticalScale = (startHeight + verticalDelta) / startHeight;
-
   const horizontalChange = Math.abs(horizontalScale - 1);
   const verticalChange = Math.abs(verticalScale - 1);
-  let targetScale = horizontalChange >= verticalChange ? horizontalScale : verticalScale;
-
   const minScale = Math.max(minWidth / startWidth, minHeight / startHeight);
+
   const pageWidth = pageBounds?.width ?? Number.POSITIVE_INFINITY;
   const pageHeight = pageBounds?.height ?? Number.POSITIVE_INFINITY;
 
@@ -162,10 +160,14 @@ function getAspectLockedCornerBox({
     Math.min(maxWidth / startWidth, maxHeight / startHeight),
   );
 
-  targetScale = clamp(targetScale, minScale, maxScale);
+  const nextScale = clamp(
+    horizontalChange >= verticalChange ? horizontalScale : verticalScale,
+    minScale,
+    maxScale,
+  );
 
-  const width = startWidth * targetScale;
-  const height = startHeight * targetScale;
+  const width = startWidth * nextScale;
+  const height = startHeight * nextScale;
 
   if (handle === "bottom-right") {
     return { x: startBox.x, y: startBox.y, width, height };
@@ -244,7 +246,6 @@ export function EditorObjectFrame({
     };
   }
 
-  // Body drag with a small threshold so a plain click still edits/selects.
   function handleRootPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
     onSelect(object.id);
 
@@ -310,7 +311,6 @@ export function EditorObjectFrame({
   function startResize(handle: ResizeHandle, event: ReactPointerEvent<HTMLButtonElement>) {
     event.preventDefault();
     event.stopPropagation();
-
     onSelect(object.id);
 
     if (locked) {
@@ -323,9 +323,14 @@ export function EditorObjectFrame({
       startClientX: event.clientX,
       startClientY: event.clientY,
       startBox: object.box,
+      pointerId: event.pointerId,
     };
 
-    event.currentTarget.setPointerCapture(event.pointerId);
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // Ignore capture errors.
+    }
   }
 
   function resizeObject(event: ReactPointerEvent<HTMLButtonElement>) {
@@ -338,7 +343,6 @@ export function EditorObjectFrame({
     const pageBounds = getPageBounds();
     const deltaX = (event.clientX - resizeRef.current.startClientX) / safeScale;
     const deltaY = (event.clientY - resizeRef.current.startClientY) / safeScale;
-
     const { handle, startBox } = resizeRef.current;
 
     const pageWidth = pageBounds?.width ?? Number.POSITIVE_INFINITY;
@@ -387,16 +391,16 @@ export function EditorObjectFrame({
   }
 
   function stopResize(event: ReactPointerEvent<HTMLButtonElement>) {
+    const state = resizeRef.current;
     resizeRef.current = null;
 
     try {
-      event.currentTarget.releasePointerCapture(event.pointerId);
+      event.currentTarget.releasePointerCapture(state?.pointerId ?? event.pointerId);
     } catch {
       // Ignore release errors.
     }
   }
 
-  // Flip toolbar below the object when it sits too close to the page top.
   const showToolbarBelow = object.box.y * pageScale < 56;
 
   return (
