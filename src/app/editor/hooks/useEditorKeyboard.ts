@@ -56,6 +56,34 @@ export function useEditorKeyboard(editor: EditorController) {
         return;
       }
 
+      // Z-order: Ctrl+] forward, Ctrl+[ backward, +Shift = front/back.
+      if (mod && event.key === "]") {
+        event.preventDefault();
+        if (event.shiftKey) {
+          editor.bringToFront(selectedId);
+        } else {
+          editor.bringForward(selectedId);
+        }
+        return;
+      }
+
+      if (mod && event.key === "[") {
+        event.preventDefault();
+        if (event.shiftKey) {
+          editor.sendToBack(selectedId);
+        } else {
+          editor.sendBackward(selectedId);
+        }
+        return;
+      }
+
+      // Lock toggle.
+      if (mod && event.key.toLowerCase() === "l") {
+        event.preventDefault();
+        editor.toggleObjectLock(selectedId);
+        return;
+      }
+
       // Delete.
       if (event.key === "Delete" || event.key === "Backspace") {
         event.preventDefault();
