@@ -139,6 +139,8 @@ const MAX_ZOOM = 4;
 const ZOOM_STEP = 0.1;
 const HISTORY_LIMIT = 100;
 const BOX_COALESCE_MS = 600;
+const AUTO_OFFSET_STEP = 18;
+const AUTO_OFFSET_CYCLE = 8;
 
 function createId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -173,6 +175,41 @@ function cloneObjectData(data: EditorObjectData): EditorObjectData {
 
 function isObjectLocked(object: EditorObject | undefined) {
   return Boolean(object?.locked);
+}
+
+function shouldAutoOffsetObject(type: EditorObjectType) {
+  return type === "image" || type === "signature";
+}
+
+function isSameInitialPlacement(candidate: EditorObject, existing: EditorObject) {
+  return (
+    existing.pageNumber === candidate.pageNumber &&
+    existing.type === candidate.type &&
+    Math.abs(existing.box.x - candidate.box.x) < 4 &&
+    Math.abs(existing.box.y - candidate.box.y) < 4
+  );
+}
+
+function getAutoOffsetBox(candidate: EditorObject, existingObjects: readonly EditorObject[]) {
+  if (!shouldAutoOffsetObject(candidate.type)) {
+    return candidate.box;
+  }
+
+  const matchingPlacementCount = existingObjects.filter((object) =>
+    isSameInitialPlacement(candidate, object),
+  ).length;
+
+  if (matchingPlacementCount === 0) {
+    return candidate.box;
+  }
+
+  const offset = (((matchingPlacementCount - 1) % AUTO_OFFSET_CYCLE) + 1) * AUTO_OFFSET_STEP;
+
+  return {
+    ...candidate.box,
+    x: candidate.box.x + offset,
+    y: candidate.box.y + offset,
+  };
 }
 
 export function useEditor(): EditorController {
@@ -332,7 +369,6 @@ export function useEditor(): EditorController {
       recordHistory("add");
 
       const id = object.id || createId();
-
       const nextObject: EditorObject = {
         id,
         type: object.type,
@@ -342,7 +378,13 @@ export function useEditor(): EditorController {
         locked: object.locked,
       };
 
-      setObjects((current) => [...current, nextObject]);
+      setObjects((current) => [
+        ...current,
+        {
+          ...nextObject,
+          box: getAutoOffsetBox(nextObject, current),
+        },
+      ]);
       setSelectedObjectId(id);
       markChanged();
 
