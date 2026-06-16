@@ -49,6 +49,24 @@ export function useEditorKeyboard(editor: EditorController) {
         return;
       }
 
+      // Lock toggle stays available even when object is locked.
+      if (mod && event.key.toLowerCase() === "l") {
+        event.preventDefault();
+        editor.toggleObjectLock(selectedId);
+        return;
+      }
+
+      // Deselect stays available even when object is locked.
+      if (event.key === "Escape") {
+        event.preventDefault();
+        editor.selectObject(null);
+        return;
+      }
+
+      if (selected.locked) {
+        return;
+      }
+
       // Duplicate.
       if (mod && event.key.toLowerCase() === "d") {
         event.preventDefault();
@@ -77,24 +95,10 @@ export function useEditorKeyboard(editor: EditorController) {
         return;
       }
 
-      // Lock toggle.
-      if (mod && event.key.toLowerCase() === "l") {
-        event.preventDefault();
-        editor.toggleObjectLock(selectedId);
-        return;
-      }
-
       // Delete.
       if (event.key === "Delete" || event.key === "Backspace") {
         event.preventDefault();
         editor.deleteObject(selectedId);
-        return;
-      }
-
-      // Deselect.
-      if (event.key === "Escape") {
-        event.preventDefault();
-        editor.selectObject(null);
         return;
       }
 
