@@ -118,6 +118,13 @@ export type EditorController = {
   readonly selectObject: (id: string | null) => void;
   readonly clearObjectsForPage: (pageNumber: number) => void;
 
+  readonly bringForward: (id: string) => void;
+  readonly sendBackward: (id: string) => void;
+  readonly bringToFront: (id: string) => void;
+  readonly sendToBack: (id: string) => void;
+  readonly toggleObjectLock: (id: string) => void;
+  readonly setObjectOpacity: (id: string, opacity: number) => void;
+
   readonly undo: () => void;
   readonly redo: () => void;
 
@@ -162,6 +169,10 @@ function cloneObjectData(data: EditorObjectData): EditorObjectData {
       id: createId(),
     })),
   };
+}
+
+function isObjectLocked(object: EditorObject | undefined) {
+  return Boolean(object?.locked);
 }
 
 export function useEditor(): EditorController {
@@ -348,7 +359,7 @@ export function useEditor(): EditorController {
     (id: string) => {
       const source = objectsRef.current.find((object) => object.id === id);
 
-      if (!source) {
+      if (!source || isObjectLocked(source)) {
         return null;
       }
 
@@ -358,6 +369,7 @@ export function useEditor(): EditorController {
       const duplicate: EditorObject = {
         ...source,
         id: duplicatedId,
+        locked: false,
         box: {
           ...source.box,
           x: source.box.x + 18,
@@ -388,6 +400,12 @@ export function useEditor(): EditorController {
 
   const updateObject = useCallback(
     (id: string, updates: Partial<Omit<EditorObject, "id">>) => {
+      const source = objectsRef.current.find((object) => object.id === id);
+
+      if (isObjectLocked(source) && updates.box) {
+        return;
+      }
+
       recordHistory("update");
 
       setObjects((current) =>
@@ -433,6 +451,12 @@ export function useEditor(): EditorController {
 
   const updateObjectBox = useCallback(
     (id: string, box: Partial<EditorObjectBox>) => {
+      const source = objectsRef.current.find((object) => object.id === id);
+
+      if (isObjectLocked(source)) {
+        return;
+      }
+
       recordHistory("box", id);
 
       setObjects((current) =>
@@ -456,6 +480,12 @@ export function useEditor(): EditorController {
 
   const deleteObject = useCallback(
     (id: string) => {
+      const source = objectsRef.current.find((object) => object.id === id);
+
+      if (isObjectLocked(source)) {
+        return;
+      }
+
       recordHistory("delete");
 
       setObjects((current) => current.filter((object) => object.id !== id));
@@ -475,6 +505,122 @@ export function useEditor(): EditorController {
 
       setObjects((current) => current.filter((object) => object.pageNumber !== pageNumber));
       setSelectedObjectId(null);
+      markChanged();
+    },
+    [markChanged, recordHistory],
+  );
+
+  const moveObjectInOrder = useCallback(
+    (id: string, mode: "front" | "back" | "forward" | "backward") => {
+      const index = objectsRef.current.findIndex((object) => object.id === id);
+
+      if (index < 0) {
+        return;
+      }
+
+      recordHistory("reorder", id);
+
+      setObjects((current) => {
+        const idx = current.findIndex((object) => object.id === id);
+
+        if (idx < 0) {
+          return current;
+        }
+
+        const next = [...current];
+        const [item] = next.splice(idx, 1);
+
+        if (!item) {
+          return current;
+        }
+
+        if (mode === "front") {
+          next.push(item);
+        } else if (mode === "back") {
+          next.unshift(item);
+        } else if (mode === "forward") {
+          next.splice(Math.min(idx + 1, next.length), 0, item);
+        } else {
+          next.splice(Math.max(idx - 1, 0), 0, item);
+        }
+
+        return next;
+      });
+
+      setSelectedObjectId(id);
+      markChanged();
+    },
+    [markChanged, recordHistory],
+  );
+
+  const bringForward = useCallback(
+    (id: string) => moveObjectInOrder(id, "forward"),
+    [moveObjectInOrder],
+  );
+
+  const sendBackward = useCallback(
+    (id: string) => moveObjectInOrder(id, "backward"),
+    [moveObjectInOrder],
+  );
+
+  const bringToFront = useCallback(
+    (id: string) => moveObjectInOrder(id, "front"),
+    [moveObjectInOrder],
+  );
+
+  const sendToBack = useCallback(
+    (id: string) => moveObjectInOrder(id, "back"),
+    [moveObjectInOrder],
+  );
+
+  const toggleObjectLock = useCallback(
+    (id: string) => {
+      const source = objectsRef.current.find((object) => object.id === id);
+
+      if (!source) {
+        return;
+      }
+
+      recordHistory("lock", id);
+
+      setObjects((current) =>
+        current.map((object) =>
+          object.id === id
+            ? {
+                ...object,
+                locked: !object.locked,
+              }
+            : object,
+        ),
+      );
+
+      setSelectedObjectId(id);
+      markChanged();
+    },
+    [markChanged, recordHistory],
+  );
+
+  const setObjectOpacity = useCallback(
+    (id: string, opacity: number) => {
+      const clamped = clamp(Number(opacity), 0.1, 1);
+
+      recordHistory("opacity", id);
+
+      setObjects((current) =>
+        current.map((object) =>
+          object.id === id
+            ? {
+                ...object,
+                data: {
+                  ...object.data,
+                  opacity: clamped,
+                },
+              }
+            : object,
+        ),
+      );
+
+      setSelectedObjectId(id);
       markChanged();
     },
     [markChanged, recordHistory],
@@ -573,6 +719,13 @@ export function useEditor(): EditorController {
     deleteObject,
     selectObject,
     clearObjectsForPage,
+
+    bringForward,
+    sendBackward,
+    bringToFront,
+    sendToBack,
+    toggleObjectLock,
+    setObjectOpacity,
 
     undo,
     redo,
