@@ -8,6 +8,7 @@ import {
   safeEditedName,
 } from "../../lib/pdf-tools/editor-export-engine";
 import { EditorCanvas } from "./components/EditorCanvas";
+import { EditorLayerControls } from "./components/EditorLayerControls";
 import { EditorLeftPanel } from "./components/EditorLeftPanel";
 import { EditorStatusBar } from "./components/EditorStatusBar";
 import { EditorTopBar } from "./components/EditorTopBar";
@@ -163,6 +164,8 @@ export default function EditorPage() {
         onShare={handleShare}
         onUnavailableTool={handleUnavailableTool}
       />
+
+      <EditorLayerControls editor={editor} />
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <EditorLeftPanel editor={editor} onOpenFile={openFilePicker} />
