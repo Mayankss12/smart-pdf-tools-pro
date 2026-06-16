@@ -194,11 +194,9 @@ export function useEditor(): EditorController {
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
 
-  // Always-fresh mirror of objects for synchronous history snapshots.
   const objectsRef = useRef<EditorObject[]>(objects);
   objectsRef.current = objects;
 
-  // Snapshot-based history stacks (kept in refs to avoid render churn).
   const undoStackRef = useRef<EditorObject[][]>([]);
   const redoStackRef = useRef<EditorObject[][]>([]);
   const lastHistoryRef = useRef<{ reason: string; objectId: string | null; time: number } | null>(
@@ -222,8 +220,6 @@ export function useEditor(): EditorController {
     setCanRedo(redoStackRef.current.length > 0);
   }, []);
 
-  // Capture the pre-mutation snapshot. Rapid same-object box edits (drag/resize)
-  // coalesce into one history entry so a single Undo reverts the whole gesture.
   const recordHistory = useCallback(
     (reason: string, objectId: string | null = null) => {
       const now = Date.now();
@@ -512,9 +508,9 @@ export function useEditor(): EditorController {
 
   const moveObjectInOrder = useCallback(
     (id: string, mode: "front" | "back" | "forward" | "backward") => {
-      const index = objectsRef.current.findIndex((object) => object.id === id);
+      const source = objectsRef.current.find((object) => object.id === id);
 
-      if (index < 0) {
+      if (!source || isObjectLocked(source)) {
         return;
       }
 
