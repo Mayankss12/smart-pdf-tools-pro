@@ -125,21 +125,7 @@ export function HighlightTool({
       onUpdateBox={onUpdateBox}
       onDelete={onDelete}
     >
-      <div
-        className="h-full w-full rounded-sm"
-        style={{
-          backgroundColor,
-          opacity,
-        }}
-        onPointerDown={(event) => {
-          event.stopPropagation();
-          onSelect(object.id);
-        }}
-        onClick={(event) => {
-          event.stopPropagation();
-          onSelect(object.id);
-        }}
-      />
+      <div className="h-full w-full rounded-sm" style={{ backgroundColor }} />
     </EditorObjectFrame>
   );
 }
