@@ -1,14 +1,7 @@
 "use client";
 
-import { GripHorizontal, Lock, Trash2 } from "lucide-react";
-import {
-  useEffect,
-  useRef,
-  useState,
-  type PointerEvent as ReactPointerEvent,
-  type ReactNode,
-} from "react";
-import { createPortal } from "react-dom";
+import { Lock, Trash2 } from "lucide-react";
+import { useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 
 import type { EditorObject, EditorObjectBox } from "../../hooks/useEditor";
 
@@ -22,24 +15,24 @@ type ResizeHandle =
   | "bottom-left"
   | "left";
 
-type CornerResizeHandle = Extract<
+type CornerResizeHandle = Extract
   ResizeHandle,
   "top-left" | "top-right" | "bottom-left" | "bottom-right"
 >;
-
-type PointerTarget = HTMLButtonElement | HTMLDivElement;
-
-type DragState = {
-  readonly startClientX: number;
-  readonly startClientY: number;
-  readonly startBox: EditorObjectBox;
-};
 
 type ResizeState = {
   readonly handle: ResizeHandle;
   readonly startClientX: number;
   readonly startClientY: number;
   readonly startBox: EditorObjectBox;
+};
+
+type DragState = {
+  startClientX: number;
+  startClientY: number;
+  startBox: EditorObjectBox;
+  pointerId: number;
+  dragging: boolean;
 };
 
 type PageBounds = {
@@ -56,12 +49,15 @@ type EditorObjectFrameProps = {
   readonly toolbarLabel?: string;
   readonly toolbarContent?: ReactNode;
   readonly children: ReactNode;
+  // Accepted for backward compatibility; drag is now always body-based.
   readonly directDrag?: boolean;
   readonly preserveAspectRatioOnCornerResize?: boolean;
   readonly onSelect: (id: string) => void;
   readonly onUpdateBox: (id: string, box: Partial<EditorObjectBox>) => void;
   readonly onDelete: (id: string) => void;
 };
+
+const DRAG_THRESHOLD = 3;
 
 const HANDLE_STYLES: Record<ResizeHandle, string> = {
   "top-left": "-left-1.5 -top-1.5 cursor-nwse-resize",
@@ -172,45 +168,23 @@ function getAspectLockedCornerBox({
   const height = startHeight * targetScale;
 
   if (handle === "bottom-right") {
-    return {
-      x: startBox.x,
-      y: startBox.y,
-      width,
-      height,
-    };
+    return { x: startBox.x, y: startBox.y, width, height };
   }
 
   if (handle === "bottom-left") {
     const anchorX = startBox.x + startWidth;
-
-    return {
-      x: anchorX - width,
-      y: startBox.y,
-      width,
-      height,
-    };
+    return { x: anchorX - width, y: startBox.y, width, height };
   }
 
   if (handle === "top-right") {
     const anchorY = startBox.y + startHeight;
-
-    return {
-      x: startBox.x,
-      y: anchorY - height,
-      width,
-      height,
-    };
+    return { x: startBox.x, y: anchorY - height, width, height };
   }
 
   const anchorX = startBox.x + startWidth;
   const anchorY = startBox.y + startHeight;
 
-  return {
-    x: anchorX - width,
-    y: anchorY - height,
-    width,
-    height,
-  };
+  return { x: anchorX - width, y: anchorY - height, width, height };
 }
 
 export function EditorObjectFrame({
@@ -222,7 +196,6 @@ export function EditorObjectFrame({
   toolbarLabel = "Object",
   toolbarContent,
   children,
-  directDrag = false,
   preserveAspectRatioOnCornerResize = false,
   onSelect,
   onUpdateBox,
@@ -231,26 +204,8 @@ export function EditorObjectFrame({
   const rootRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<DragState | null>(null);
   const resizeRef = useRef<ResizeState | null>(null);
-  const [toolbarHost, setToolbarHost] = useState<HTMLElement | null>(null);
   const locked = Boolean(object.locked);
   const objectOpacity = object.data.opacity ?? 1;
-
-  useEffect(() => {
-    if (!selected) {
-      setToolbarHost(null);
-      return;
-    }
-
-    const updateHost = () => {
-      setToolbarHost(document.getElementById("editor-object-toolbar-host"));
-    };
-
-    updateHost();
-
-    const frame = window.requestAnimationFrame(updateHost);
-
-    return () => window.cancelAnimationFrame(frame);
-  }, [selected]);
 
   function getPageBounds(): PageBounds | null {
     const root = rootRef.current;
@@ -289,10 +244,8 @@ export function EditorObjectFrame({
     };
   }
 
-  function startMove(event: ReactPointerEvent<PointerTarget>) {
-    event.preventDefault();
-    event.stopPropagation();
-
+  // Body drag with a small threshold so a plain click still edits/selects.
+  function handleRootPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
     onSelect(object.id);
 
     if (locked) {
@@ -304,52 +257,54 @@ export function EditorObjectFrame({
       startClientX: event.clientX,
       startClientY: event.clientY,
       startBox: object.box,
+      pointerId: event.pointerId,
+      dragging: false,
     };
-
-    event.currentTarget.setPointerCapture(event.pointerId);
   }
 
-  function moveObject(event: ReactPointerEvent<PointerTarget>) {
-    if (locked || !dragRef.current) return;
+  function handleRootPointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+    const state = dragRef.current;
+
+    if (locked || !state) return;
+
+    const dxClient = event.clientX - state.startClientX;
+    const dyClient = event.clientY - state.startClientY;
+
+    if (!state.dragging) {
+      if (Math.hypot(dxClient, dyClient) < DRAG_THRESHOLD) return;
+
+      state.dragging = true;
+
+      try {
+        event.currentTarget.setPointerCapture(state.pointerId);
+      } catch {
+        // Ignore capture errors.
+      }
+    }
 
     event.preventDefault();
-    event.stopPropagation();
 
     const safeScale = Math.max(0.01, pageScale);
     const nextBox = clampBoxToPage({
-      ...dragRef.current.startBox,
-      x:
-        dragRef.current.startBox.x +
-        (event.clientX - dragRef.current.startClientX) / safeScale,
-      y:
-        dragRef.current.startBox.y +
-        (event.clientY - dragRef.current.startClientY) / safeScale,
+      ...state.startBox,
+      x: state.startBox.x + dxClient / safeScale,
+      y: state.startBox.y + dyClient / safeScale,
     });
 
-    onUpdateBox(object.id, {
-      x: nextBox.x,
-      y: nextBox.y,
-    });
+    onUpdateBox(object.id, { x: nextBox.x, y: nextBox.y });
   }
 
-  function stopMove(event: ReactPointerEvent<PointerTarget>) {
+  function handleRootPointerUp(event: ReactPointerEvent<HTMLDivElement>) {
+    const state = dragRef.current;
     dragRef.current = null;
 
-    try {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    } catch {
-      // Ignore pointer release errors.
+    if (state?.dragging) {
+      try {
+        event.currentTarget.releasePointerCapture(state.pointerId);
+      } catch {
+        // Ignore release errors.
+      }
     }
-  }
-
-  function handleRootPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
-    if (directDrag && !locked) {
-      startMove(event);
-      return;
-    }
-
-    event.stopPropagation();
-    onSelect(object.id);
   }
 
   function startResize(handle: ResizeHandle, event: ReactPointerEvent<HTMLButtonElement>) {
@@ -410,22 +365,23 @@ export function EditorObjectFrame({
       top = clamp(startBox.y + deltaY, 0, startBox.y + startBox.height - minHeight);
     }
 
-    const nextBox = preserveAspectRatioOnCornerResize && isCornerHandle(handle)
-      ? getAspectLockedCornerBox({
-          handle,
-          startBox,
-          deltaX,
-          deltaY,
-          minWidth,
-          minHeight,
-          pageBounds,
-        })
-      : {
-          x: left,
-          y: top,
-          width: right - left,
-          height: bottom - top,
-        };
+    const nextBox =
+      preserveAspectRatioOnCornerResize && isCornerHandle(handle)
+        ? getAspectLockedCornerBox({
+            handle,
+            startBox,
+            deltaX,
+            deltaY,
+            minWidth,
+            minHeight,
+            pageBounds,
+          })
+        : {
+            x: left,
+            y: top,
+            width: right - left,
+            height: bottom - top,
+          };
 
     onUpdateBox(object.id, clampBoxToPage(nextBox));
   }
@@ -436,13 +392,79 @@ export function EditorObjectFrame({
     try {
       event.currentTarget.releasePointerCapture(event.pointerId);
     } catch {
-      // Ignore pointer release errors.
+      // Ignore release errors.
     }
   }
 
-  const toolbar = selected && toolbarHost
-    ? createPortal(
-        <div className="flex max-w-full items-center gap-1 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-[0_18px_45px_rgba(15,23,42,0.14)]">
+  // Flip toolbar below the object when it sits too close to the page top.
+  const showToolbarBelow = object.box.y * pageScale < 56;
+
+  return (
+    <div
+      ref={rootRef}
+      className={[
+        "absolute z-30 transition duration-200",
+        locked ? "cursor-default" : "cursor-move touch-none",
+        selected
+          ? locked
+            ? "border border-slate-500 bg-slate-100/10 ring-2 ring-slate-400/20"
+            : "border border-violet-500 bg-white/5 ring-2 ring-violet-500/20"
+          : "border border-transparent hover:border-violet-300/70",
+      ].join(" ")}
+      style={{
+        left: object.box.x * pageScale,
+        top: object.box.y * pageScale,
+        width: object.box.width * pageScale,
+        height: object.box.height * pageScale,
+      }}
+      onPointerDown={handleRootPointerDown}
+      onPointerMove={locked ? undefined : handleRootPointerMove}
+      onPointerUp={locked ? undefined : handleRootPointerUp}
+      onPointerCancel={locked ? undefined : handleRootPointerUp}
+    >
+      <div
+        className={["h-full w-full overflow-hidden", locked ? "pointer-events-none" : ""].join(" ")}
+        style={{ opacity: objectOpacity }}
+      >
+        {children}
+      </div>
+
+      {selected && locked ? (
+        <span className="absolute -right-2 -top-2 z-50 flex h-5 w-5 items-center justify-center rounded-full border border-white bg-slate-700 text-white shadow-md">
+          <Lock size={11} />
+        </span>
+      ) : null}
+
+      {selected && !locked
+        ? RESIZE_HANDLES.map((handle) => (
+            <button
+              key={handle}
+              type="button"
+              onPointerDown={(event) => startResize(handle, event)}
+              onPointerMove={resizeObject}
+              onPointerUp={stopResize}
+              onPointerCancel={stopResize}
+              className={[
+                "absolute z-40 h-3 w-3 rounded-full border-2 border-white bg-violet-600 shadow-[0_2px_8px_rgba(79,70,229,0.32)] transition duration-200 hover:scale-125 hover:bg-violet-700",
+                HANDLE_STYLES[handle],
+              ].join(" ")}
+              aria-label={`Resize ${toolbarLabel}`}
+              title={
+                preserveAspectRatioOnCornerResize && isCornerHandle(handle)
+                  ? `Resize ${toolbarLabel} proportionally`
+                  : `Resize ${toolbarLabel}`
+              }
+            />
+          ))
+        : null}
+
+      {selected ? (
+        <div
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => event.stopPropagation()}
+          className="absolute left-0 z-50 flex items-center gap-1 whitespace-nowrap rounded-2xl border border-slate-200 bg-white p-1.5 shadow-[0_18px_45px_rgba(15,23,42,0.14)]"
+          style={showToolbarBelow ? { top: "100%", marginTop: 8 } : { bottom: "100%", marginBottom: 8 }}
+        >
           {locked ? (
             <span className="flex h-8 shrink-0 items-center gap-1 rounded-xl bg-slate-100 px-2 text-[11px] font-black text-slate-600">
               <Lock size={13} />
@@ -450,29 +472,11 @@ export function EditorObjectFrame({
             </span>
           ) : null}
 
-          {!directDrag && !locked ? (
-            <button
-              type="button"
-              onPointerDown={startMove}
-              onPointerMove={moveObject}
-              onPointerUp={stopMove}
-              onPointerCancel={stopMove}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-slate-600 transition duration-200 hover:bg-violet-50 hover:text-violet-700"
-              aria-label={`Move ${toolbarLabel}`}
-              title={`Move ${toolbarLabel}`}
-            >
-              <GripHorizontal size={16} />
-            </button>
-          ) : null}
-
           {toolbarContent ? (
-            <>
-              {!directDrag && !locked ? <span className="h-5 w-px shrink-0 bg-slate-200" /> : null}
-              <div className="flex min-w-0 shrink-0 items-center gap-1">{toolbarContent}</div>
-            </>
+            <div className="flex min-w-0 shrink-0 items-center gap-1">{toolbarContent}</div>
           ) : null}
 
-          <span className="h-5 w-px shrink-0 bg-slate-200" />
+          {toolbarContent ? <span className="h-5 w-px shrink-0 bg-slate-200" /> : null}
 
           <button
             type="button"
@@ -488,80 +492,8 @@ export function EditorObjectFrame({
           >
             <Trash2 size={15} />
           </button>
-        </div>,
-        toolbarHost,
-      )
-    : null;
-
-  return (
-    <>
-      <div
-        ref={rootRef}
-        className={[
-          "absolute z-30 rounded-none transition duration-200",
-          directDrag && !locked ? "cursor-move touch-none" : "",
-          locked ? "cursor-default" : "",
-          selected
-            ? locked
-              ? "border border-slate-500 bg-slate-100/10 ring-2 ring-slate-400/20"
-              : "border border-violet-500 bg-white/5 ring-2 ring-violet-500/20"
-            : "border border-transparent hover:border-violet-300/70",
-        ].join(" ")}
-        style={{
-          left: object.box.x * pageScale,
-          top: object.box.y * pageScale,
-          width: object.box.width * pageScale,
-          height: object.box.height * pageScale,
-        }}
-        onPointerDown={handleRootPointerDown}
-        onPointerMove={directDrag && !locked ? moveObject : undefined}
-        onPointerUp={directDrag && !locked ? stopMove : undefined}
-        onPointerCancel={directDrag && !locked ? stopMove : undefined}
-        onClick={(event) => {
-          event.stopPropagation();
-          onSelect(object.id);
-        }}
-      >
-        <div
-          className={["h-full w-full overflow-hidden", locked ? "pointer-events-none" : ""].join(" ")}
-          style={{ opacity: objectOpacity }}
-        >
-          {children}
         </div>
-
-        {selected && locked ? (
-          <span className="absolute -right-2 -top-2 z-50 flex h-5 w-5 items-center justify-center rounded-full border border-white bg-slate-700 text-white shadow-md">
-            <Lock size={11} />
-          </span>
-        ) : null}
-
-        {selected && !locked ? (
-          <>
-            {RESIZE_HANDLES.map((handle) => (
-              <button
-                key={handle}
-                type="button"
-                onPointerDown={(event) => startResize(handle, event)}
-                onPointerMove={resizeObject}
-                onPointerUp={stopResize}
-                onPointerCancel={stopResize}
-                className={[
-                  "absolute z-40 h-3 w-3 rounded-full border-2 border-white bg-violet-600 shadow-[0_2px_8px_rgba(79,70,229,0.32)] transition duration-200 hover:scale-125 hover:bg-violet-700",
-                  HANDLE_STYLES[handle],
-                ].join(" ")}
-                aria-label={`Resize ${toolbarLabel}`}
-                title={
-                  preserveAspectRatioOnCornerResize && isCornerHandle(handle)
-                    ? `Resize ${toolbarLabel} proportionally`
-                    : `Resize ${toolbarLabel}`
-                }
-              />
-            ))}
-          </>
-        ) : null}
-      </div>
-
-      {toolbar}
-    </>
+      ) : null}
+    </div>
   );
 }
