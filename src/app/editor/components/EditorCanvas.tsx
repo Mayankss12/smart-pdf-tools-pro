@@ -2,6 +2,9 @@
 
 import {
   AlertCircle,
+  Copy,
+  CopyPlus,
+  EyeOff,
   Loader2,
   Upload,
 } from "lucide-react";
@@ -13,6 +16,8 @@ import {
   type DragEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
+
+import { detectPageImages, type DetectedImage } from "@/lib/editor/pdf-image-detect";
 
 import type { EditorController } from "../hooks/useEditor";
 import { HighlightTool } from "./tools/HighlightTool";
@@ -33,7 +38,7 @@ type PageSize = {
 };
 
 type DraftBox = {
-  readonly type: "text" | "highlight" | "whiteout" | "copy-area";
+  readonly type: "text" | "highlight" | "whiteout";
   readonly startX: number;
   readonly startY: number;
   readonly x: number;
@@ -59,30 +64,10 @@ type ImageSize = {
   readonly height: number;
 };
 
-const DEFAULT_TEXT_BOX = {
-  width: 220,
-  height: 44,
-};
-
-const MIN_TEXT_BOX = {
-  width: 72,
-  height: 30,
-};
-
-const MIN_IMAGE_BOX = {
-  width: 48,
-  height: 32,
-};
-
-const MIN_SIGNATURE_BOX = {
-  width: 72,
-  height: 24,
-};
-
-const MIN_COPY_AREA_BOX = {
-  width: 12,
-  height: 12,
-};
+const DEFAULT_TEXT_BOX = { width: 220, height: 44 };
+const MIN_TEXT_BOX = { width: 72, height: 30 };
+const MIN_IMAGE_BOX = { width: 48, height: 32 };
+const MIN_SIGNATURE_BOX = { width: 72, height: 24 };
 
 const OPEN_IMAGE_PICKER_EVENT = "pdfmantra:editor-open-image-picker";
 const OPEN_SIGNATURE_PICKER_EVENT = "pdfmantra:editor-open-signature-picker";
@@ -125,7 +110,13 @@ function getUnscaledPageSize(pageSize: PageSize, pageScale: number) {
   };
 }
 
-function clampBoxToPage(box: Box, pageSize: PageSize, pageScale: number, minWidth: number, minHeight: number) {
+function clampBoxToPage(
+  box: Box,
+  pageSize: PageSize,
+  pageScale: number,
+  minWidth: number,
+  minHeight: number,
+) {
   const page = getUnscaledPageSize(pageSize, pageScale);
 
   const safePageWidth = Math.max(minWidth, page.width || minWidth);
@@ -145,7 +136,7 @@ function clampBoxToPage(box: Box, pageSize: PageSize, pageScale: number, minWidt
   };
 }
 
-function clampPointToPage(point: { readonly x: number; readonly y: number }, pageSize: PageSize, pageScale: number) {
+function clampPointToPage(point: Point, pageSize: PageSize, pageScale: number) {
   const page = getUnscaledPageSize(pageSize, pageScale);
 
   return {
@@ -207,11 +198,7 @@ function getImageSize(dataUrl: string) {
   });
 }
 
-function PdfPageRenderer({
-  editor,
-}: {
-  readonly editor: EditorController;
-}) {
+function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const pageLayerRef = useRef<HTMLDivElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
@@ -223,6 +210,8 @@ function PdfPageRenderer({
   const [error, setError] = useState("");
   const [pageSize, setPageSize] = useState<PageSize>({ width: 0, height: 0 });
   const [draftBox, setDraftBox] = useState<DraftBox | null>(null);
+  const [detectedImages, setDetectedImages] = useState<DetectedImage[]>([]);
+  const [objectPopover, setObjectPopover] = useState<DetectedImage | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -249,19 +238,13 @@ function PdfPageRenderer({
         canvas.style.width = `${viewport.width}px`;
         canvas.style.height = `${viewport.height}px`;
 
-        setPageSize({
-          width: viewport.width,
-          height: viewport.height,
-        });
+        setPageSize({ width: viewport.width, height: viewport.height });
 
         context.setTransform(ratio, 0, 0, ratio, 0, 0);
         context.fillStyle = "#ffffff";
         context.fillRect(0, 0, viewport.width, viewport.height);
 
-        renderTask = page.render({
-          canvasContext: context,
-          viewport,
-        });
+        renderTask = page.render({ canvasContext: context, viewport });
 
         await renderTask.promise;
 
@@ -288,6 +271,36 @@ function PdfPageRenderer({
       }
     };
   }, [editor.pdfDocument, editor.activePageNumber, editor.zoom]);
+
+  // Detect raster images on the page when the Object tool is active.
+  useEffect(() => {
+    let cancelled = false;
+
+    if (editor.activeTool !== "object" || !editor.pdfDocument) {
+      setDetectedImages([]);
+      setObjectPopover(null);
+      return;
+    }
+
+    (async () => {
+      try {
+        const page = await editor.pdfDocument.getPage(editor.activePageNumber);
+        const found = await detectPageImages(page);
+
+        if (!cancelled) {
+          setDetectedImages(found);
+        }
+      } catch {
+        if (!cancelled) {
+          setDetectedImages([]);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [editor.activeTool, editor.activePageNumber, editor.pdfDocument]);
 
   function getDefaultImagePoint() {
     const page = getUnscaledPageSize(pageSize, editor.zoom);
@@ -337,13 +350,7 @@ function PdfPageRenderer({
   });
 
   function addTextObject(box: Box) {
-    const safeBox = clampBoxToPage(
-      box,
-      pageSize,
-      editor.zoom,
-      MIN_TEXT_BOX.width,
-      MIN_TEXT_BOX.height,
-    );
+    const safeBox = clampBoxToPage(box, pageSize, editor.zoom, MIN_TEXT_BOX.width, MIN_TEXT_BOX.height);
 
     editor.addObject({
       type: "text",
@@ -362,11 +369,7 @@ function PdfPageRenderer({
 
   function addHighlightObject(box: Box) {
     const safeBox = clampBoxToPage(
-      {
-        ...box,
-        width: Math.max(40, box.width),
-        height: Math.max(18, box.height),
-      },
+      { ...box, width: Math.max(40, box.width), height: Math.max(18, box.height) },
       pageSize,
       editor.zoom,
       40,
@@ -377,20 +380,13 @@ function PdfPageRenderer({
       type: "highlight",
       pageNumber: editor.activePageNumber,
       box: safeBox,
-      data: {
-        backgroundColor: "#fde047",
-        opacity: 0.45,
-      },
+      data: { backgroundColor: "#fde047", opacity: 0.45 },
     });
   }
 
   function addWhiteoutObject(box: Box) {
     const safeBox = clampBoxToPage(
-      {
-        ...box,
-        width: Math.max(50, box.width),
-        height: Math.max(22, box.height),
-      },
+      { ...box, width: Math.max(50, box.width), height: Math.max(22, box.height) },
       pageSize,
       editor.zoom,
       50,
@@ -401,10 +397,7 @@ function PdfPageRenderer({
       type: "whiteout",
       pageNumber: editor.activePageNumber,
       box: safeBox,
-      data: {
-        backgroundColor: "#ffffff",
-        opacity: 1,
-      },
+      data: { backgroundColor: "#ffffff", opacity: 1 },
     });
   }
 
@@ -423,12 +416,7 @@ function PdfPageRenderer({
     }
 
     return clampBoxToPage(
-      {
-        x: point.x,
-        y: point.y,
-        width,
-        height,
-      },
+      { x: point.x, y: point.y, width, height },
       pageSize,
       editor.zoom,
       MIN_IMAGE_BOX.width,
@@ -451,12 +439,7 @@ function PdfPageRenderer({
     }
 
     return clampBoxToPage(
-      {
-        x: point.x,
-        y: point.y,
-        width,
-        height,
-      },
+      { x: point.x, y: point.y, width, height },
       pageSize,
       editor.zoom,
       MIN_SIGNATURE_BOX.width,
@@ -507,48 +490,70 @@ function PdfPageRenderer({
     return cropCanvas.toDataURL("image/png");
   }
 
-  function addCopiedAreaObject(box: Box) {
-    const sourceBox = clampBoxToPage(
-      box,
-      pageSize,
-      editor.zoom,
-      MIN_COPY_AREA_BOX.width,
-      MIN_COPY_AREA_BOX.height,
-    );
-    const imageDataUrl = cropPdfAreaAsImage(sourceBox);
+  async function copyDetectedImage(rect: DetectedImage) {
+    const dataUrl = cropPdfAreaAsImage(rect);
 
-    if (!imageDataUrl) {
-      return;
+    if (!dataUrl) return;
+
+    const link = document.createElement("a");
+    link.href = dataUrl;
+    link.download = "pdf-image.png";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    try {
+      const blob = await (await fetch(dataUrl)).blob();
+      if (navigator.clipboard && "write" in navigator.clipboard) {
+        await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+      }
+    } catch {
+      // Clipboard not available; download already succeeded.
     }
 
+    setObjectPopover(null);
+  }
+
+  function duplicateDetectedImage(rect: DetectedImage) {
+    const dataUrl = cropPdfAreaAsImage(rect);
+
+    if (!dataUrl) return;
+
     const destinationBox = clampBoxToPage(
-      {
-        ...sourceBox,
-        x: sourceBox.x + 24,
-        y: sourceBox.y + 24,
-      },
+      { x: rect.x + 24, y: rect.y + 24, width: rect.width, height: rect.height },
       pageSize,
       editor.zoom,
-      MIN_COPY_AREA_BOX.width,
-      MIN_COPY_AREA_BOX.height,
+      MIN_IMAGE_BOX.width,
+      MIN_IMAGE_BOX.height,
     );
 
     editor.addObject({
       type: "image",
       pageNumber: editor.activePageNumber,
       box: destinationBox,
-      data: {
-        imageDataUrl,
-      },
+      data: { imageDataUrl: dataUrl },
     });
 
+    setObjectPopover(null);
+    editor.setActiveTool("select");
+  }
+
+  function coverDetectedImage(rect: DetectedImage) {
+    const box = clampBoxToPage(rect, pageSize, editor.zoom, 8, 8);
+
+    editor.addObject({
+      type: "whiteout",
+      pageNumber: editor.activePageNumber,
+      box,
+      data: { backgroundColor: "#ffffff", opacity: 1 },
+    });
+
+    setObjectPopover(null);
     editor.setActiveTool("select");
   }
 
   async function addImageObject(point: Point, file: File) {
-    if (!isSupportedImageFile(file)) {
-      return;
-    }
+    if (!isSupportedImageFile(file)) return;
 
     const imageDataUrl = await readFileAsDataUrl(file);
     const imageSize = await getImageSize(imageDataUrl);
@@ -558,16 +563,12 @@ function PdfPageRenderer({
       type: "image",
       pageNumber: editor.activePageNumber,
       box: safeBox,
-      data: {
-        imageDataUrl,
-      },
+      data: { imageDataUrl },
     });
   }
 
   async function addSignatureObject(point: Point, file: File) {
-    if (!isSupportedImageFile(file)) {
-      return;
-    }
+    if (!isSupportedImageFile(file)) return;
 
     const imageDataUrl = await readFileAsDataUrl(file);
     const imageSize = await getImageSize(imageDataUrl);
@@ -577,20 +578,13 @@ function PdfPageRenderer({
       type: "signature",
       pageNumber: editor.activePageNumber,
       box: safeBox,
-      data: {
-        imageDataUrl,
-      },
+      data: { imageDataUrl },
     });
   }
 
   function getFallbackTextBox(startX: number, startY: number) {
     return clampBoxToPage(
-      {
-        x: startX,
-        y: startY,
-        width: DEFAULT_TEXT_BOX.width,
-        height: DEFAULT_TEXT_BOX.height,
-      },
+      { x: startX, y: startY, width: DEFAULT_TEXT_BOX.width, height: DEFAULT_TEXT_BOX.height },
       pageSize,
       editor.zoom,
       MIN_TEXT_BOX.width,
@@ -631,13 +625,17 @@ function PdfPageRenderer({
       return;
     }
 
+    if (editor.activeTool === "object") {
+      setObjectPopover(null);
+      return;
+    }
+
     const point = getPointerPoint(event, layer, editor.zoom, pageSize);
 
     if (
       editor.activeTool === "text" ||
       editor.activeTool === "highlight" ||
-      editor.activeTool === "whiteout" ||
-      editor.activeTool === "copy-area"
+      editor.activeTool === "whiteout"
     ) {
       event.preventDefault();
       event.currentTarget.setPointerCapture(event.pointerId);
@@ -661,10 +659,7 @@ function PdfPageRenderer({
     const point = getPointerPoint(event, layer, editor.zoom, pageSize);
     const normalized = normalizeBox(draftBox.startX, draftBox.startY, point.x, point.y);
 
-    setDraftBox({
-      ...draftBox,
-      ...normalized,
-    });
+    setDraftBox({ ...draftBox, ...normalized });
   }
 
   function handlePointerUp(event: ReactPointerEvent<HTMLDivElement>) {
@@ -701,34 +696,21 @@ function PdfPageRenderer({
 
     if (draftBox.type === "highlight") {
       addHighlightObject(
-        tooSmall
-          ? {
-              x: draftBox.startX,
-              y: draftBox.startY,
-              width: 180,
-              height: 28,
-            }
-          : finalBox,
+        tooSmall ? { x: draftBox.startX, y: draftBox.startY, width: 180, height: 28 } : finalBox,
       );
     }
 
     if (draftBox.type === "whiteout") {
       addWhiteoutObject(
-        tooSmall
-          ? {
-              x: draftBox.startX,
-              y: draftBox.startY,
-              width: 180,
-              height: 34,
-            }
-          : finalBox,
+        tooSmall ? { x: draftBox.startX, y: draftBox.startY, width: 180, height: 34 } : finalBox,
       );
     }
-
-    if (draftBox.type === "copy-area" && !tooSmall) {
-      addCopiedAreaObject(finalBox);
-    }
   }
+
+  const isDrawTool =
+    editor.activeTool === "text" ||
+    editor.activeTool === "highlight" ||
+    editor.activeTool === "whiteout";
 
   return (
     <div className="mx-auto">
@@ -758,8 +740,8 @@ function PdfPageRenderer({
             ? "Select"
             : editor.activeTool === "text"
               ? "Drag to create text box"
-              : editor.activeTool === "copy-area"
-                ? "Drag area to copy PDF content"
+              : editor.activeTool === "object"
+                ? "Click an image to copy, duplicate, or cover"
                 : editor.activeTool === "highlight"
                   ? "Drag to highlight"
                   : editor.activeTool === "whiteout"
@@ -783,13 +765,7 @@ function PdfPageRenderer({
         style={{
           width: pageSize.width || undefined,
           minHeight: pageSize.height || 680,
-          cursor:
-            editor.activeTool === "text" ||
-            editor.activeTool === "copy-area" ||
-            editor.activeTool === "highlight" ||
-            editor.activeTool === "whiteout"
-              ? "crosshair"
-              : "default",
+          cursor: isDrawTool ? "crosshair" : "default",
         }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -888,17 +864,106 @@ function PdfPageRenderer({
           return null;
         })}
 
+        {/* Object tool — detected image overlays */}
+        {editor.activeTool === "object"
+          ? detectedImages.map((rect, index) => {
+              const active =
+                objectPopover &&
+                objectPopover.x === rect.x &&
+                objectPopover.y === rect.y &&
+                objectPopover.width === rect.width;
+
+              return (
+                <button
+                  key={`detected-${index}`}
+                  type="button"
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setObjectPopover(rect);
+                  }}
+                  className={[
+                    "absolute z-40 rounded-sm border-2 transition duration-150",
+                    active
+                      ? "border-violet-600 bg-violet-500/10"
+                      : "border-violet-400/70 bg-violet-400/5 hover:border-violet-600 hover:bg-violet-500/10",
+                  ].join(" ")}
+                  style={{
+                    left: rect.x * editor.zoom,
+                    top: rect.y * editor.zoom,
+                    width: rect.width * editor.zoom,
+                    height: rect.height * editor.zoom,
+                  }}
+                  aria-label="Select PDF image"
+                  title="Click for image actions"
+                />
+              );
+            })
+          : null}
+
+        {/* Object tool — action popover */}
+        {editor.activeTool === "object" && objectPopover ? (
+          <div
+            onPointerDown={(event) => event.stopPropagation()}
+            className="absolute z-50 flex items-center gap-1 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-[0_18px_45px_rgba(15,23,42,0.18)]"
+            style={{
+              left: clamp(objectPopover.x * editor.zoom, 0, Math.max(0, pageSize.width - 150)),
+              top: Math.max(0, objectPopover.y * editor.zoom - 48),
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => void copyDetectedImage(objectPopover)}
+              className="flex h-8 items-center gap-1.5 rounded-xl px-2.5 text-xs font-black text-slate-700 transition hover:bg-violet-50 hover:text-violet-700"
+              title="Copy / download this image"
+            >
+              <Copy size={14} />
+              Copy
+            </button>
+
+            <span className="h-5 w-px bg-slate-200" />
+
+            <button
+              type="button"
+              onClick={() => duplicateDetectedImage(objectPopover)}
+              className="flex h-8 items-center gap-1.5 rounded-xl px-2.5 text-xs font-black text-slate-700 transition hover:bg-violet-50 hover:text-violet-700"
+              title="Duplicate as a movable object"
+            >
+              <CopyPlus size={14} />
+              Duplicate
+            </button>
+
+            <span className="h-5 w-px bg-slate-200" />
+
+            <button
+              type="button"
+              onClick={() => coverDetectedImage(objectPopover)}
+              className="flex h-8 items-center gap-1.5 rounded-xl px-2.5 text-xs font-black text-slate-700 transition hover:bg-red-50 hover:text-red-600"
+              title="Cover (hide) this image with white"
+            >
+              <EyeOff size={14} />
+              Cover
+            </button>
+          </div>
+        ) : null}
+
+        {editor.activeTool === "object" && !isRendering && detectedImages.length === 0 ? (
+          <div className="pointer-events-none absolute inset-x-0 top-4 z-30 flex justify-center">
+            <span className="rounded-full bg-slate-900/80 px-4 py-1.5 text-xs font-black text-white">
+              No raster images detected on this page
+            </span>
+          </div>
+        ) : null}
+
         {draftBox ? (
           <div
             className={[
               "pointer-events-none absolute z-40 rounded-lg border-2 border-dashed",
               draftBox.type === "highlight"
                 ? "border-yellow-500 bg-yellow-300/40"
-                : draftBox.type === "copy-area"
-                  ? "border-sky-500 bg-sky-300/25"
-                  : draftBox.type === "text"
-                    ? "border-violet-500 bg-violet-100/20"
-                    : "border-violet-500 bg-white/90",
+                : draftBox.type === "text"
+                  ? "border-violet-500 bg-violet-100/20"
+                  : "border-violet-500 bg-white/90",
             ].join(" ")}
             style={{
               left: draftBox.x * editor.zoom,
@@ -913,11 +978,7 @@ function PdfPageRenderer({
   );
 }
 
-export function EditorCanvas({
-  editor,
-  onOpenFile,
-  onFileDrop,
-}: EditorCanvasProps) {
+export function EditorCanvas({ editor, onOpenFile, onFileDrop }: EditorCanvasProps) {
   const [dragActive, setDragActive] = useState(false);
 
   function handleDrop(event: DragEvent<HTMLDivElement>) {
@@ -965,7 +1026,7 @@ export function EditorCanvas({
             </div>
 
             <h1 className="mt-7 text-3xl font-black tracking-[-0.05em] text-slate-950">
-              Drag & drop PDF here
+              Drag &amp; drop PDF here
             </h1>
 
             <p className="mt-3 max-w-xl text-sm font-bold leading-7 text-slate-500">
