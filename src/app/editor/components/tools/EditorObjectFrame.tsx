@@ -1,6 +1,6 @@
 "use client";
 
-import { GripHorizontal, Trash2 } from "lucide-react";
+import { GripHorizontal, Lock, Trash2 } from "lucide-react";
 import {
   useEffect,
   useRef,
@@ -232,6 +232,8 @@ export function EditorObjectFrame({
   const dragRef = useRef<DragState | null>(null);
   const resizeRef = useRef<ResizeState | null>(null);
   const [toolbarHost, setToolbarHost] = useState<HTMLElement | null>(null);
+  const locked = Boolean(object.locked);
+  const objectOpacity = object.data.opacity ?? 1;
 
   useEffect(() => {
     if (!selected) {
@@ -293,6 +295,11 @@ export function EditorObjectFrame({
 
     onSelect(object.id);
 
+    if (locked) {
+      dragRef.current = null;
+      return;
+    }
+
     dragRef.current = {
       startClientX: event.clientX,
       startClientY: event.clientY,
@@ -303,7 +310,7 @@ export function EditorObjectFrame({
   }
 
   function moveObject(event: ReactPointerEvent<PointerTarget>) {
-    if (!dragRef.current) return;
+    if (locked || !dragRef.current) return;
 
     event.preventDefault();
     event.stopPropagation();
@@ -336,7 +343,7 @@ export function EditorObjectFrame({
   }
 
   function handleRootPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
-    if (directDrag) {
+    if (directDrag && !locked) {
       startMove(event);
       return;
     }
@@ -351,6 +358,11 @@ export function EditorObjectFrame({
 
     onSelect(object.id);
 
+    if (locked) {
+      resizeRef.current = null;
+      return;
+    }
+
     resizeRef.current = {
       handle,
       startClientX: event.clientX,
@@ -362,7 +374,7 @@ export function EditorObjectFrame({
   }
 
   function resizeObject(event: ReactPointerEvent<HTMLButtonElement>) {
-    if (!resizeRef.current) return;
+    if (locked || !resizeRef.current) return;
 
     event.preventDefault();
     event.stopPropagation();
@@ -431,7 +443,14 @@ export function EditorObjectFrame({
   const toolbar = selected && toolbarHost
     ? createPortal(
         <div className="flex max-w-full items-center gap-1 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-[0_18px_45px_rgba(15,23,42,0.14)]">
-          {!directDrag ? (
+          {locked ? (
+            <span className="flex h-8 shrink-0 items-center gap-1 rounded-xl bg-slate-100 px-2 text-[11px] font-black text-slate-600">
+              <Lock size={13} />
+              Locked
+            </span>
+          ) : null}
+
+          {!directDrag && !locked ? (
             <button
               type="button"
               onPointerDown={startMove}
@@ -448,7 +467,7 @@ export function EditorObjectFrame({
 
           {toolbarContent ? (
             <>
-              {!directDrag ? <span className="h-5 w-px shrink-0 bg-slate-200" /> : null}
+              {!directDrag && !locked ? <span className="h-5 w-px shrink-0 bg-slate-200" /> : null}
               <div className="flex min-w-0 shrink-0 items-center gap-1">{toolbarContent}</div>
             </>
           ) : null}
@@ -457,14 +476,15 @@ export function EditorObjectFrame({
 
           <button
             type="button"
+            disabled={locked}
             onClick={(event) => {
               event.preventDefault();
               event.stopPropagation();
               onDelete(object.id);
             }}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-slate-500 transition duration-200 hover:bg-red-50 hover:text-red-600"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-slate-500 transition duration-200 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
             aria-label={`Delete ${toolbarLabel}`}
-            title={`Delete ${toolbarLabel}`}
+            title={locked ? `Unlock ${toolbarLabel} before deleting` : `Delete ${toolbarLabel}`}
           >
             <Trash2 size={15} />
           </button>
@@ -479,9 +499,12 @@ export function EditorObjectFrame({
         ref={rootRef}
         className={[
           "absolute z-30 rounded-none transition duration-200",
-          directDrag ? "cursor-move touch-none" : "",
+          directDrag && !locked ? "cursor-move touch-none" : "",
+          locked ? "cursor-default" : "",
           selected
-            ? "border border-violet-500 bg-white/5 ring-2 ring-violet-500/20"
+            ? locked
+              ? "border border-slate-500 bg-slate-100/10 ring-2 ring-slate-400/20"
+              : "border border-violet-500 bg-white/5 ring-2 ring-violet-500/20"
             : "border border-transparent hover:border-violet-300/70",
         ].join(" ")}
         style={{
@@ -491,17 +514,28 @@ export function EditorObjectFrame({
           height: object.box.height * pageScale,
         }}
         onPointerDown={handleRootPointerDown}
-        onPointerMove={directDrag ? moveObject : undefined}
-        onPointerUp={directDrag ? stopMove : undefined}
-        onPointerCancel={directDrag ? stopMove : undefined}
+        onPointerMove={directDrag && !locked ? moveObject : undefined}
+        onPointerUp={directDrag && !locked ? stopMove : undefined}
+        onPointerCancel={directDrag && !locked ? stopMove : undefined}
         onClick={(event) => {
           event.stopPropagation();
           onSelect(object.id);
         }}
       >
-        <div className="h-full w-full overflow-hidden">{children}</div>
+        <div
+          className={["h-full w-full overflow-hidden", locked ? "pointer-events-none" : ""].join(" ")}
+          style={{ opacity: objectOpacity }}
+        >
+          {children}
+        </div>
 
-        {selected ? (
+        {selected && locked ? (
+          <span className="absolute -right-2 -top-2 z-50 flex h-5 w-5 items-center justify-center rounded-full border border-white bg-slate-700 text-white shadow-md">
+            <Lock size={11} />
+          </span>
+        ) : null}
+
+        {selected && !locked ? (
           <>
             {RESIZE_HANDLES.map((handle) => (
               <button
