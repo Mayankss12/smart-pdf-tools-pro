@@ -53,17 +53,7 @@ export function WhiteoutTool({
       onUpdateBox={onUpdateBox}
       onDelete={onDelete}
     >
-      <div
-        className="h-full w-full rounded-sm bg-white"
-        onPointerDown={(event) => {
-          event.stopPropagation();
-          onSelect(object.id);
-        }}
-        onClick={(event) => {
-          event.stopPropagation();
-          onSelect(object.id);
-        }}
-      />
+      <div className="h-full w-full rounded-sm bg-white" />
     </EditorObjectFrame>
   );
 }
