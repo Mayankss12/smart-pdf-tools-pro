@@ -35,7 +35,7 @@ function getObjectLabel(object: EditorObject) {
     return "Copied area";
   }
 
-  if (object.type === "image") return "Image";
+  if (object.type === "image") return "Image / area";
   if (object.type === "signature") return "Signature";
   if (object.type === "text") return "Text";
   if (object.type === "highlight") return "Highlight";
