@@ -38,6 +38,7 @@ export type RichTextExportData = {
   readonly fontStyle?: "normal" | "italic";
   readonly textDecoration?: "none" | "underline";
   readonly color?: string;
+  readonly opacity?: number;
 };
 
 export type EditorRichTextExportObject = {
@@ -67,6 +68,12 @@ function hexToRgb(hex: string) {
   if ([r, g, b].some((value) => Number.isNaN(value))) return fallback;
 
   return { r, g, b };
+}
+
+function getSafeOpacity(opacity: number | undefined) {
+  if (!Number.isFinite(opacity)) return 1;
+
+  return Math.max(0.1, Math.min(1, Number(opacity)));
 }
 
 function getTextFontFromStyle(style: Required<ExportTextStyle>, fonts: EmbeddedTextFonts) {
@@ -124,6 +131,7 @@ function drawUnderlineSegment({
   baselineY,
   fontSize,
   color,
+  opacity,
 }: {
   readonly page: PDFPage;
   readonly startX: number;
@@ -131,6 +139,7 @@ function drawUnderlineSegment({
   readonly baselineY: number;
   readonly fontSize: number;
   readonly color: ReturnType<typeof rgb>;
+  readonly opacity: number;
 }) {
   if (endX <= startX) return;
 
@@ -148,6 +157,7 @@ function drawUnderlineSegment({
     },
     thickness: underlineThickness,
     color,
+    opacity,
   });
 }
 
@@ -158,6 +168,7 @@ export function drawEditorRichTextObject(
 ) {
   const pageHeight = page.getHeight();
   const fontSize = object.data.fontSize || 16;
+  const opacity = getSafeOpacity(object.data.opacity);
   const lineHeight = fontSize * 1.3;
   const startX = object.box.x;
   const maxX = object.box.x + object.box.width;
@@ -199,6 +210,7 @@ export function drawEditorRichTextObject(
           font,
           color: textColor,
           maxWidth: object.box.width,
+          opacity,
         });
 
         if (style.textDecoration === "underline") {
@@ -209,6 +221,7 @@ export function drawEditorRichTextObject(
             baselineY,
             fontSize,
             color: textColor,
+            opacity,
           });
         }
       }
