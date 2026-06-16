@@ -5,9 +5,8 @@ export interface BrandMarkProps extends SVGProps<SVGSVGElement> {
 }
 
 /**
- * PDFMantra mark — folded document + clear "M" monogram.
- * The document body uses a solid high-contrast brand fill so it remains
- * visible at small header sizes and on pale violet page backgrounds.
+ * PDFMantra brand mark — folded PDF document + infinity loop.
+ * Built for the light violet product theme and clear header/favicon usage.
  */
 export function BrandMark({
   title = "PDFMantra",
@@ -23,38 +22,70 @@ export function BrandMark({
       {...props}
     >
       <defs>
-        <linearGradient id="pdfmantra-fold" x1="38" y1="6" x2="54" y2="24" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#C2B8FF" />
-          <stop offset="1" stopColor="#7F70F6" />
+        <linearGradient id="pdfmantra-document" x1="10" y1="8" x2="55" y2="58" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#FBF9FF" />
+          <stop offset="0.5" stopColor="#F1ECFF" />
+          <stop offset="1" stopColor="#E6DBFF" />
         </linearGradient>
-        <linearGradient id="pdfmantra-base" x1="12" y1="52" x2="54" y2="62" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#3450DF" />
-          <stop offset="1" stopColor="#2039C8" />
+
+        <linearGradient id="pdfmantra-violet" x1="13" y1="11" x2="55" y2="57" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#C4B5FD" />
+          <stop offset="0.45" stopColor="#8B5CF6" />
+          <stop offset="1" stopColor="#6D28D9" />
+        </linearGradient>
+
+        <linearGradient id="pdfmantra-fold" x1="39" y1="8" x2="55" y2="24" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#A78BFA" />
+          <stop offset="1" stopColor="#6D28D9" />
         </linearGradient>
       </defs>
 
       <path
-        d="M17.5 6.5H38.1L53.5 21.9V55.2C53.5 58.68 50.68 61.5 47.2 61.5H17.5C14.02 61.5 11.2 58.68 11.2 55.2V12.8C11.2 9.32 14.02 6.5 17.5 6.5Z"
-        fill="#1D2BB7"
-        stroke="#15259D"
-        strokeWidth="1.15"
-      />
-      <path
-        d="M38.1 6.5V17.65C38.1 20.08 40.07 22.05 42.5 22.05H53.5L38.1 6.5Z"
-        fill="url(#pdfmantra-fold)"
-      />
-      <path
-        d="M11.2 51.2L23.1 41.75L32.35 49.45L41.7 41.75L53.5 51.2V55.2C53.5 58.68 50.68 61.5 47.2 61.5H17.5C14.02 61.5 11.2 58.68 11.2 55.2V51.2Z"
-        fill="url(#pdfmantra-base)"
+        d="M17.8 7.6H38.9L55.1 23.8V51.1C55.1 56 51.1 60 46.2 60H17.8C12.9 60 8.9 56 8.9 51.1V16.5C8.9 11.6 12.9 7.6 17.8 7.6Z"
+        fill="url(#pdfmantra-document)"
+        stroke="url(#pdfmantra-violet)"
+        strokeWidth="3.2"
+        strokeLinejoin="round"
       />
 
       <path
-        d="M18.95 31.05V52.8H26.05V42.9L32.35 48.2L38.55 42.9V52.8H45.65V31.05L32.35 42.15L18.95 31.05Z"
-        fill="#FFFFFF"
+        d="M38.9 7.6V18.9C38.9 21.6 41.1 23.8 43.8 23.8H55.1L38.9 7.6Z"
+        fill="url(#pdfmantra-fold)"
       />
+
       <path
-        d="M20.15 17.6L21.85 21.35L25.6 23.05L21.85 24.75L20.15 28.5L18.45 24.75L14.7 23.05L18.45 21.35L20.15 17.6Z"
-        fill="#C5BAFF"
+        d="M15.8 47.8C15.8 51.1 18.5 53.7 21.7 53.7H47.9"
+        stroke="url(#pdfmantra-violet)"
+        strokeWidth="3.2"
+        strokeLinecap="round"
+      />
+
+      <path
+        d="M18.8 34.1C23.5 25.9 31.7 25.9 36.4 34.1C41.2 42.4 49.3 42.4 54.1 34.1"
+        stroke="url(#pdfmantra-violet)"
+        strokeWidth="5.2"
+        strokeLinecap="round"
+      />
+
+      <path
+        d="M18.8 34.1C23.5 42.4 31.7 42.4 36.4 34.1C41.2 25.9 49.3 25.9 54.1 34.1"
+        stroke="url(#pdfmantra-violet)"
+        strokeWidth="5.2"
+        strokeLinecap="round"
+      />
+
+      <path
+        d="M21.2 17.8H31.7"
+        stroke="#C4B5FD"
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+
+      <path
+        d="M21.2 24.4H34.2"
+        stroke="#DDD6FE"
+        strokeWidth="3"
+        strokeLinecap="round"
       />
     </svg>
   );
