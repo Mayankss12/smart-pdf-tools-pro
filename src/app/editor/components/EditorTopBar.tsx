@@ -150,6 +150,7 @@ export function EditorTopBar({
 }: EditorTopBarProps) {
   const hasDocument = Boolean(editor.file && editor.pdfDocument);
   const hasSelectedObject = Boolean(editor.selectedObjectId);
+  const selectedObjectLocked = Boolean(editor.selectedObject?.locked);
   const canGoPrevious = hasDocument && editor.activePageNumber > 1;
   const canGoNext = hasDocument && editor.activePageNumber < editor.totalPages;
 
@@ -357,14 +358,18 @@ export function EditorTopBar({
           label: "Undo",
           shortcut: "Ctrl+Z",
           icon: Undo2,
-          status: "locked",
+          status: "working",
+          disabled: !hasDocument || !editor.canUndo,
+          action: editor.undo,
         },
         {
           id: "redo",
           label: "Redo",
           shortcut: "Ctrl+Y",
           icon: Redo2,
-          status: "locked",
+          status: "working",
+          disabled: !hasDocument || !editor.canRedo,
+          action: editor.redo,
         },
         {
           id: "duplicate-selected",
@@ -372,7 +377,7 @@ export function EditorTopBar({
           shortcut: "Ctrl+D",
           icon: Copy,
           status: "working",
-          disabled: !hasDocument || !hasSelectedObject,
+          disabled: !hasDocument || !hasSelectedObject || selectedObjectLocked,
           action: () => {
             if (!editor.selectedObjectId) return;
             editor.duplicateObject(editor.selectedObjectId);
@@ -384,7 +389,7 @@ export function EditorTopBar({
           shortcut: "Del",
           icon: Trash2,
           status: "working",
-          disabled: !hasDocument || !hasSelectedObject,
+          disabled: !hasDocument || !hasSelectedObject || selectedObjectLocked,
           action: () => {
             if (!editor.selectedObjectId) return;
             editor.deleteObject(editor.selectedObjectId);
