@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   type ClipboardEvent,
+  type KeyboardEvent,
   type MouseEvent,
 } from "react";
 
@@ -28,14 +29,9 @@ type TextToolProps = {
   readonly onDelete: (id: string) => void;
 };
 
-const TEXT_COLORS = [
-  "#111827",
-  "#dc2626",
-  "#2563eb",
-  "#16a34a",
-  "#ca8a04",
-  "#7c3aed",
-];
+type InlineCommand = "bold" | "italic" | "underline";
+
+const TEXT_COLORS = ["#111827", "#dc2626", "#2563eb", "#16a34a", "#ca8a04", "#7c3aed"];
 
 function createRunId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -101,17 +97,11 @@ function mergeRuns(runs: readonly EditorTextRun[]) {
     const previous = merged.at(-1);
 
     if (previous && sameStyle(previous, run)) {
-      merged[merged.length - 1] = {
-        ...previous,
-        text: previous.text + run.text,
-      };
+      merged[merged.length - 1] = { ...previous, text: previous.text + run.text };
       return;
     }
 
-    merged.push({
-      ...run,
-      id: run.id || createRunId(),
-    });
+    merged.push({ ...run, id: run.id || createRunId() });
   });
 
   return merged;
@@ -133,13 +123,7 @@ function getRunsFromObject(object: EditorObject) {
     return mergeRuns(object.data.textRuns.map((run) => normalizeRun(run, fallback)));
   }
 
-  return [
-    {
-      id: createRunId(),
-      text: object.data.text ?? "",
-      ...fallback,
-    },
-  ];
+  return [{ id: createRunId(), text: object.data.text ?? "", ...fallback }];
 }
 
 function runToStyle(run: EditorTextRun) {
@@ -152,6 +136,8 @@ function runToStyle(run: EditorTextRun) {
 }
 
 function runsToHtml(runs: readonly EditorTextRun[]) {
+  if (runs.length === 0) return "";
+
   return runs
     .map((run) => {
       const safeText = escapeHtml(run.text).replaceAll("\n", "<br>");
@@ -165,12 +151,7 @@ function readDomRuns(root: HTMLElement, fallback: Required<EditorTextStyle>) {
 
   function pushText(text: string, style: Required<EditorTextStyle>) {
     if (!text) return;
-
-    runs.push({
-      id: createRunId(),
-      text,
-      ...style,
-    });
+    runs.push({ id: createRunId(), text, ...style });
   }
 
   function walk(node: Node, inheritedStyle: Required<EditorTextStyle>) {
@@ -189,10 +170,7 @@ function readDomRuns(root: HTMLElement, fallback: Required<EditorTextStyle>) {
       return;
     }
 
-    const nextStyle: Required<EditorTextStyle> = {
-      ...inheritedStyle,
-    };
-
+    const nextStyle: Required<EditorTextStyle> = { ...inheritedStyle };
     const computedColor = normalizeColor(element.style.color);
 
     if (tag === "b" || tag === "strong" || element.style.fontWeight === "bold") {
@@ -231,6 +209,15 @@ function readDomRuns(root: HTMLElement, fallback: Required<EditorTextStyle>) {
   return mergeRuns(runs);
 }
 
+const COMMAND_TO_STYLE: Record
+  InlineCommand,
+  { key: keyof EditorTextStyle; on: string; off: string }
+> = {
+  bold: { key: "fontWeight", on: "bold", off: "normal" },
+  italic: { key: "fontStyle", on: "italic", off: "normal" },
+  underline: { key: "textDecoration", on: "underline", off: "none" },
+};
+
 export function TextTool({
   object,
   selected,
@@ -241,62 +228,16 @@ export function TextTool({
   onDelete,
 }: TextToolProps) {
   const editableRef = useRef<HTMLDivElement | null>(null);
-  const initializedObjectIdRef = useRef<string | null>(null);
-  const [editing, setEditing] = useState(true);
+  const fallbackStyle = getFallbackStyle(object);
+  const fontSize = Number(object.data.fontSize ?? 16);
+
+  const hasInitialText = Boolean(object.data.text && object.data.text.trim().length);
+  const [editing, setEditing] = useState(!hasInitialText);
   const [toolbarState, setToolbarState] = useState({
     bold: false,
     italic: false,
     underline: false,
   });
-
-  const fallbackStyle = getFallbackStyle(object);
-  const fontSize = Number(object.data.fontSize ?? 16);
-
-  useEffect(() => {
-    const editable = editableRef.current;
-    if (!editable) return;
-
-    if (initializedObjectIdRef.current !== object.id) {
-      editable.innerHTML = runsToHtml(getRunsFromObject(object));
-      initializedObjectIdRef.current = object.id;
-    }
-  }, [object]);
-
-  useEffect(() => {
-    if (!selected || !editing) return;
-
-    const frame = window.requestAnimationFrame(() => {
-      editableRef.current?.focus();
-      refreshToolbarState();
-    });
-
-    return () => window.cancelAnimationFrame(frame);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected, editing]);
-
-  useEffect(() => {
-    if (!selected) return;
-
-    document.addEventListener("selectionchange", refreshToolbarState);
-
-    return () => {
-      document.removeEventListener("selectionchange", refreshToolbarState);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected]);
-
-  function syncFromDom() {
-    const editable = editableRef.current;
-    if (!editable) return;
-
-    const runs = readDomRuns(editable, fallbackStyle);
-    const text = runs.map((run) => run.text).join("");
-
-    onUpdateData(object.id, {
-      text,
-      textRuns: runs,
-    });
-  }
 
   function refreshToolbarState() {
     if (!editableRef.current) return;
@@ -308,105 +249,208 @@ export function TextTool({
     });
   }
 
-  function runCommand(
-    event: MouseEvent<HTMLButtonElement>,
-    command: "bold" | "italic" | "underline" | "foreColor",
-    value?: string,
-  ) {
+  function syncFromDom() {
+    const editable = editableRef.current;
+    if (!editable) return;
+
+    const runs = readDomRuns(editable, fallbackStyle);
+    const text = runs.map((run) => run.text).join("");
+
+    onUpdateData(object.id, { text, textRuns: runs });
+  }
+
+  // Keep the rendered HTML in sync while NOT editing (after undo/redo or
+  // whole-box style toggles) without disturbing an active caret.
+  useEffect(() => {
+    const editable = editableRef.current;
+    if (!editable || editing) return;
+
+    editable.innerHTML = runsToHtml(getRunsFromObject(object));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [object, editing]);
+
+  // Focus + caret-to-end when entering edit mode.
+  useEffect(() => {
+    if (!selected || !editing) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      const editable = editableRef.current;
+      if (!editable) return;
+
+      if (!editable.innerHTML) {
+        editable.innerHTML = runsToHtml(getRunsFromObject(object));
+      }
+
+      editable.focus();
+
+      const selection = window.getSelection();
+      if (selection) {
+        const range = document.createRange();
+        range.selectNodeContents(editable);
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+
+      refreshToolbarState();
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected, editing]);
+
+  // Live B/I/U button state while editing.
+  useEffect(() => {
+    if (!selected || !editing) return;
+
+    document.addEventListener("selectionchange", refreshToolbarState);
+    return () => document.removeEventListener("selectionchange", refreshToolbarState);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected, editing]);
+
+  function ensureSelectionInEditable() {
+    const editable = editableRef.current;
+    if (!editable) return;
+
+    editable.focus();
+
+    const selection = window.getSelection();
+    const usable =
+      selection &&
+      selection.rangeCount > 0 &&
+      !selection.isCollapsed &&
+      editable.contains(selection.anchorNode) &&
+      editable.contains(selection.focusNode);
+
+    if (!usable) {
+      const range = document.createRange();
+      range.selectNodeContents(editable);
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+    }
+  }
+
+  // Toggle a style across the whole box via the data model (used when the box
+  // is selected but not in edit mode).
+  function toggleWholeBoxStyle(command: InlineCommand) {
+    const mapping = COMMAND_TO_STYLE[command];
+    const runs = getRunsFromObject(object);
+    const allOn = runs.length > 0 && runs.every((run) => (run[mapping.key] ?? mapping.off) === mapping.on);
+    const nextValue = allOn ? mapping.off : mapping.on;
+
+    const nextRuns = runs.map((run) => ({ ...run, [mapping.key]: nextValue }));
+
+    onUpdateData(object.id, {
+      text: nextRuns.map((run) => run.text).join(""),
+      textRuns: nextRuns,
+      [mapping.key]: nextValue,
+    });
+  }
+
+  function applyInlineCommand(event: MouseEvent<HTMLButtonElement>, command: InlineCommand) {
     event.preventDefault();
     event.stopPropagation();
-
     onSelect(object.id);
-    setEditing(true);
 
-    document.execCommand(command, false, value);
-    syncFromDom();
-    refreshToolbarState();
+    if (editing && editableRef.current) {
+      // Selection-aware: applies to selection, or whole box if caret is collapsed.
+      ensureSelectionInEditable();
+      document.execCommand("styleWithCSS", false, "true");
+      document.execCommand(command, false);
+      syncFromDom();
+      refreshToolbarState();
+      return;
+    }
+
+    toggleWholeBoxStyle(command);
+  }
+
+  function applyColor(event: MouseEvent<HTMLButtonElement>, color: string) {
+    event.preventDefault();
+    event.stopPropagation();
+    onSelect(object.id);
+
+    if (editing && editableRef.current) {
+      ensureSelectionInEditable();
+      document.execCommand("styleWithCSS", false, "true");
+      document.execCommand("foreColor", false, color);
+      syncFromDom();
+      refreshToolbarState();
+      return;
+    }
+
+    const nextRuns = getRunsFromObject(object).map((run) => ({ ...run, color }));
+
+    onUpdateData(object.id, {
+      text: nextRuns.map((run) => run.text).join(""),
+      textRuns: nextRuns,
+      color,
+    });
+  }
+
+  function changeFontSize(event: MouseEvent<HTMLButtonElement>, delta: number) {
+    event.preventDefault();
+    event.stopPropagation();
+    onUpdateData(object.id, { fontSize: clampFontSize(fontSize + delta) });
   }
 
   function insertPlainText(event: ClipboardEvent<HTMLDivElement>) {
     event.preventDefault();
-
     const text = event.clipboardData.getData("text/plain");
     document.execCommand("insertText", false, text);
     syncFromDom();
   }
 
+  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      editableRef.current?.blur();
+    }
+  }
+
   const toolbarContent = (
     <>
-      <button
-        type="button"
-        onMouseDown={(event) => runCommand(event, "bold")}
-        className={[
-          "flex h-8 w-8 items-center justify-center rounded-xl text-xs font-black transition duration-200",
-          toolbarState.bold ? "bg-violet-100 text-violet-700" : "text-slate-600 hover:bg-slate-100",
-        ].join(" ")}
-        title="Bold selected text"
-        aria-label="Bold selected text"
-      >
-        <Bold size={15} />
-      </button>
+      {(["bold", "italic", "underline"] as const).map((command) => {
+        const Icon = command === "bold" ? Bold : command === "italic" ? Italic : Underline;
+        const active = toolbarState[command];
 
-      <button
-        type="button"
-        onMouseDown={(event) => runCommand(event, "italic")}
-        className={[
-          "flex h-8 w-8 items-center justify-center rounded-xl text-xs font-black transition duration-200",
-          toolbarState.italic ? "bg-violet-100 text-violet-700" : "text-slate-600 hover:bg-slate-100",
-        ].join(" ")}
-        title="Italic selected text"
-        aria-label="Italic selected text"
-      >
-        <Italic size={15} />
-      </button>
-
-      <button
-        type="button"
-        onMouseDown={(event) => runCommand(event, "underline")}
-        className={[
-          "flex h-8 w-8 items-center justify-center rounded-xl text-xs font-black transition duration-200",
-          toolbarState.underline ? "bg-violet-100 text-violet-700" : "text-slate-600 hover:bg-slate-100",
-        ].join(" ")}
-        title="Underline selected text"
-        aria-label="Underline selected text"
-      >
-        <Underline size={15} />
-      </button>
+        return (
+          <button
+            key={command}
+            type="button"
+            onMouseDown={(event) => applyInlineCommand(event, command)}
+            className={[
+              "flex h-8 w-8 items-center justify-center rounded-xl transition duration-200",
+              active ? "bg-violet-100 text-violet-700" : "text-slate-600 hover:bg-slate-100",
+            ].join(" ")}
+            title={`${command[0].toUpperCase()}${command.slice(1)} text`}
+            aria-label={`${command} text`}
+          >
+            <Icon size={15} />
+          </button>
+        );
+      })}
 
       <span className="h-5 w-px bg-slate-200" />
 
       <button
         type="button"
-        onMouseDown={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          onUpdateData(object.id, {
-            fontSize: clampFontSize(fontSize - 1),
-          });
-        }}
+        onMouseDown={(event) => changeFontSize(event, -1)}
         className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-600 transition duration-200 hover:bg-slate-100"
-        title="Decrease full text-box font size"
-        aria-label="Decrease full text-box font size"
+        title="Decrease font size"
+        aria-label="Decrease font size"
       >
         <Minus size={14} />
       </button>
 
-      <span className="min-w-8 text-center text-xs font-black text-slate-600">
-        {fontSize}
-      </span>
+      <span className="min-w-8 text-center text-xs font-black text-slate-600">{fontSize}</span>
 
       <button
         type="button"
-        onMouseDown={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          onUpdateData(object.id, {
-            fontSize: clampFontSize(fontSize + 1),
-          });
-        }}
+        onMouseDown={(event) => changeFontSize(event, 1)}
         className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-600 transition duration-200 hover:bg-slate-100"
-        title="Increase full text-box font size"
-        aria-label="Increase full text-box font size"
+        title="Increase font size"
+        aria-label="Increase font size"
       >
         <Plus size={14} />
       </button>
@@ -418,11 +462,11 @@ export function TextTool({
           <button
             key={textColor}
             type="button"
-            onMouseDown={(event) => runCommand(event, "foreColor", textColor)}
+            onMouseDown={(event) => applyColor(event, textColor)}
             className="h-6 w-6 rounded-full border-2 border-white transition duration-200 hover:ring-2 hover:ring-slate-200"
             style={{ backgroundColor: textColor }}
-            title={`Set selected text color ${textColor}`}
-            aria-label={`Set selected text color ${textColor}`}
+            title={`Text color ${textColor}`}
+            aria-label={`Set text color ${textColor}`}
           />
         ))}
       </div>
@@ -455,11 +499,12 @@ export function TextTool({
           setEditing(false);
           syncFromDom();
         }}
-        onInput={() => {
-          syncFromDom();
-        }}
+        onInput={syncFromDom}
         onPaste={insertPlainText}
+        onKeyDown={handleKeyDown}
         onPointerDown={(event) => {
+          // Editing: keep the caret here. Not editing: let it bubble so the
+          // shared frame can start a full-body drag.
           if (editing) {
             event.stopPropagation();
             onSelect(object.id);
@@ -469,16 +514,12 @@ export function TextTool({
           event.stopPropagation();
           onSelect(object.id);
           setEditing(true);
-          window.requestAnimationFrame(() => editableRef.current?.focus());
         }}
         className={[
           "block h-full w-full overflow-hidden whitespace-pre-wrap break-words rounded-none border-0 bg-transparent px-1 py-0.5 outline-none",
-          editing ? "cursor-text" : "cursor-move",
+          editing ? "cursor-text select-text" : "cursor-move select-none",
         ].join(" ")}
-        style={{
-          fontSize: fontSize * pageScale,
-          lineHeight: 1.3,
-        }}
+        style={{ fontSize: fontSize * pageScale, lineHeight: 1.3 }}
         spellCheck={false}
         aria-label="Edit PDF text"
       />
