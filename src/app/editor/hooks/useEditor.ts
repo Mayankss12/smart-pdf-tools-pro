@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 import type { EditorTool } from "./useActiveTool";
 
@@ -94,6 +94,9 @@ export type EditorController = {
   readonly activePageObjects: EditorObject[];
   readonly selectedObject: EditorObject | null;
 
+  readonly canUndo: boolean;
+  readonly canRedo: boolean;
+
   readonly setFile: (file: File | null) => void;
   readonly setPdfDocument: (document: PdfDocumentLike | null) => void;
   readonly setActivePage: (page: number) => void;
@@ -115,6 +118,9 @@ export type EditorController = {
   readonly selectObject: (id: string | null) => void;
   readonly clearObjectsForPage: (pageNumber: number) => void;
 
+  readonly undo: () => void;
+  readonly redo: () => void;
+
   readonly markChanged: (count?: number) => void;
   readonly markSaving: () => void;
   readonly markSaved: () => void;
@@ -124,6 +130,8 @@ export type EditorController = {
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 4;
 const ZOOM_STEP = 0.1;
+const HISTORY_LIMIT = 100;
+const BOX_COALESCE_MS = 600;
 
 function createId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -172,6 +180,20 @@ export function useEditor(): EditorController {
   const [objects, setObjects] = useState<EditorObject[]>([]);
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
 
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+
+  // Always-fresh mirror of objects for synchronous history snapshots.
+  const objectsRef = useRef<EditorObject[]>(objects);
+  objectsRef.current = objects;
+
+  // Snapshot-based history stacks (kept in refs to avoid render churn).
+  const undoStackRef = useRef<EditorObject[][]>([]);
+  const redoStackRef = useRef<EditorObject[][]>([]);
+  const lastHistoryRef = useRef<{ reason: string; objectId: string | null; time: number } | null>(
+    null,
+  );
+
   const totalPages = pdfDocument?.numPages ?? 0;
 
   const activePageObjects = useMemo(
@@ -183,6 +205,47 @@ export function useEditor(): EditorController {
     () => objects.find((object) => object.id === selectedObjectId) ?? null,
     [objects, selectedObjectId],
   );
+
+  const syncHistoryFlags = useCallback(() => {
+    setCanUndo(undoStackRef.current.length > 0);
+    setCanRedo(redoStackRef.current.length > 0);
+  }, []);
+
+  // Capture the pre-mutation snapshot. Rapid same-object box edits (drag/resize)
+  // coalesce into one history entry so a single Undo reverts the whole gesture.
+  const recordHistory = useCallback(
+    (reason: string, objectId: string | null = null) => {
+      const now = Date.now();
+      const last = lastHistoryRef.current;
+
+      if (
+        reason === "box" &&
+        last &&
+        last.reason === "box" &&
+        last.objectId === objectId &&
+        now - last.time < BOX_COALESCE_MS
+      ) {
+        lastHistoryRef.current = { reason, objectId, time: now };
+        return;
+      }
+
+      undoStackRef.current.push(objectsRef.current);
+      if (undoStackRef.current.length > HISTORY_LIMIT) {
+        undoStackRef.current.shift();
+      }
+      redoStackRef.current = [];
+      lastHistoryRef.current = { reason, objectId, time: now };
+      syncHistoryFlags();
+    },
+    [syncHistoryFlags],
+  );
+
+  const clearHistory = useCallback(() => {
+    undoStackRef.current = [];
+    redoStackRef.current = [];
+    lastHistoryRef.current = null;
+    syncHistoryFlags();
+  }, [syncHistoryFlags]);
 
   const markChanged = useCallback((count = 1) => {
     setUnsavedChanges((current) => Math.max(0, current + count));
@@ -199,21 +262,25 @@ export function useEditor(): EditorController {
     setSaveState("saved");
   }, []);
 
-  const setFile = useCallback((nextFile: File | null) => {
-    setFileState(nextFile);
-    setFileMeta(nextFile ? createFileMeta(nextFile) : null);
-    setActivePageNumber(1);
-    setUnsavedChanges(0);
-    setLastSavedAt(null);
-    setSaveState("saved");
-    setActiveToolState("select");
-    setObjects([]);
-    setSelectedObjectId(null);
+  const setFile = useCallback(
+    (nextFile: File | null) => {
+      setFileState(nextFile);
+      setFileMeta(nextFile ? createFileMeta(nextFile) : null);
+      setActivePageNumber(1);
+      setUnsavedChanges(0);
+      setLastSavedAt(null);
+      setSaveState("saved");
+      setActiveToolState("select");
+      setObjects([]);
+      setSelectedObjectId(null);
+      clearHistory();
 
-    if (!nextFile) {
-      setPdfDocumentState(null);
-    }
-  }, []);
+      if (!nextFile) {
+        setPdfDocumentState(null);
+      }
+    },
+    [clearHistory],
+  );
 
   const setPdfDocument = useCallback((document: PdfDocumentLike | null) => {
     setPdfDocumentState(document);
@@ -255,6 +322,8 @@ export function useEditor(): EditorController {
 
   const addObject = useCallback(
     (object: Omit<EditorObject, "id"> & { readonly id?: string }) => {
+      recordHistory("add");
+
       const id = object.id || createId();
 
       const nextObject: EditorObject = {
@@ -272,53 +341,55 @@ export function useEditor(): EditorController {
 
       return id;
     },
-    [markChanged],
+    [markChanged, recordHistory],
   );
 
   const duplicateObject = useCallback(
     (id: string) => {
-      let duplicatedId: string | null = null;
+      const source = objectsRef.current.find((object) => object.id === id);
+
+      if (!source) {
+        return null;
+      }
+
+      recordHistory("duplicate");
+
+      const duplicatedId = createId();
+      const duplicate: EditorObject = {
+        ...source,
+        id: duplicatedId,
+        box: {
+          ...source.box,
+          x: source.box.x + 18,
+          y: source.box.y + 18,
+        },
+        data: cloneObjectData(source.data),
+      };
 
       setObjects((current) => {
         const sourceIndex = current.findIndex((object) => object.id === id);
 
         if (sourceIndex < 0) {
-          return current;
+          return [...current, duplicate];
         }
-
-        const source = current[sourceIndex];
-        duplicatedId = createId();
-
-        const duplicate: EditorObject = {
-          ...source,
-          id: duplicatedId,
-          box: {
-            ...source.box,
-            x: source.box.x + 18,
-            y: source.box.y + 18,
-          },
-          data: cloneObjectData(source.data),
-        };
 
         const nextObjects = [...current];
         nextObjects.splice(sourceIndex + 1, 0, duplicate);
         return nextObjects;
       });
 
-      if (!duplicatedId) {
-        return null;
-      }
-
       setSelectedObjectId(duplicatedId);
       setActiveToolState("select");
       markChanged();
       return duplicatedId;
     },
-    [markChanged],
+    [markChanged, recordHistory],
   );
 
   const updateObject = useCallback(
     (id: string, updates: Partial<Omit<EditorObject, "id">>) => {
+      recordHistory("update");
+
       setObjects((current) =>
         current.map((object) =>
           object.id === id
@@ -334,11 +405,13 @@ export function useEditor(): EditorController {
 
       markChanged();
     },
-    [markChanged],
+    [markChanged, recordHistory],
   );
 
   const updateObjectData = useCallback(
     (id: string, data: Partial<EditorObjectData>) => {
+      recordHistory("data", id);
+
       setObjects((current) =>
         current.map((object) =>
           object.id === id
@@ -355,11 +428,13 @@ export function useEditor(): EditorController {
 
       markChanged();
     },
-    [markChanged],
+    [markChanged, recordHistory],
   );
 
   const updateObjectBox = useCallback(
     (id: string, box: Partial<EditorObjectBox>) => {
+      recordHistory("box", id);
+
       setObjects((current) =>
         current.map((object) =>
           object.id === id
@@ -376,16 +451,18 @@ export function useEditor(): EditorController {
 
       markChanged();
     },
-    [markChanged],
+    [markChanged, recordHistory],
   );
 
   const deleteObject = useCallback(
     (id: string) => {
+      recordHistory("delete");
+
       setObjects((current) => current.filter((object) => object.id !== id));
       setSelectedObjectId((current) => (current === id ? null : current));
       markChanged();
     },
-    [markChanged],
+    [markChanged, recordHistory],
   );
 
   const selectObject = useCallback((id: string | null) => {
@@ -394,12 +471,48 @@ export function useEditor(): EditorController {
 
   const clearObjectsForPage = useCallback(
     (pageNumber: number) => {
+      recordHistory("clear");
+
       setObjects((current) => current.filter((object) => object.pageNumber !== pageNumber));
       setSelectedObjectId(null);
       markChanged();
     },
-    [markChanged],
+    [markChanged, recordHistory],
   );
+
+  const undo = useCallback(() => {
+    if (undoStackRef.current.length === 0) {
+      return;
+    }
+
+    const previous = undoStackRef.current.pop() as EditorObject[];
+    redoStackRef.current.push(objectsRef.current);
+
+    setObjects(previous);
+    setSelectedObjectId(null);
+    setUnsavedChanges((current) => Math.max(1, current));
+    setSaveState("unsaved");
+
+    lastHistoryRef.current = null;
+    syncHistoryFlags();
+  }, [syncHistoryFlags]);
+
+  const redo = useCallback(() => {
+    if (redoStackRef.current.length === 0) {
+      return;
+    }
+
+    const next = redoStackRef.current.pop() as EditorObject[];
+    undoStackRef.current.push(objectsRef.current);
+
+    setObjects(next);
+    setSelectedObjectId(null);
+    setUnsavedChanges((current) => Math.max(1, current));
+    setSaveState("unsaved");
+
+    lastHistoryRef.current = null;
+    syncHistoryFlags();
+  }, [syncHistoryFlags]);
 
   const resetEditor = useCallback(() => {
     setFileState(null);
@@ -415,7 +528,8 @@ export function useEditor(): EditorController {
     setActiveToolState("select");
     setObjects([]);
     setSelectedObjectId(null);
-  }, []);
+    clearHistory();
+  }, [clearHistory]);
 
   return {
     file,
@@ -435,6 +549,9 @@ export function useEditor(): EditorController {
     selectedObjectId,
     activePageObjects,
     selectedObject,
+
+    canUndo,
+    canRedo,
 
     setFile,
     setPdfDocument,
@@ -456,6 +573,9 @@ export function useEditor(): EditorController {
     deleteObject,
     selectObject,
     clearObjectsForPage,
+
+    undo,
+    redo,
 
     markChanged,
     markSaving,
