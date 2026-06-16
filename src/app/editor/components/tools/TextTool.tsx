@@ -444,7 +444,7 @@ export function TextTool({
     >
       <div
         ref={editableRef}
-        contentEditable
+        contentEditable={editing}
         suppressContentEditableWarning
         onFocus={() => {
           onSelect(object.id);
@@ -460,19 +460,20 @@ export function TextTool({
         }}
         onPaste={insertPlainText}
         onPointerDown={(event) => {
-          event.stopPropagation();
-          onSelect(object.id);
-          setEditing(true);
+          if (editing) {
+            event.stopPropagation();
+            onSelect(object.id);
+          }
         }}
-        onClick={(event) => {
+        onDoubleClick={(event) => {
           event.stopPropagation();
           onSelect(object.id);
           setEditing(true);
-          refreshToolbarState();
+          window.requestAnimationFrame(() => editableRef.current?.focus());
         }}
         className={[
           "block h-full w-full overflow-hidden whitespace-pre-wrap break-words rounded-none border-0 bg-transparent px-1 py-0.5 outline-none",
-          selected ? "cursor-text" : "cursor-pointer",
+          editing ? "cursor-text" : "cursor-move",
         ].join(" ")}
         style={{
           fontSize: fontSize * pageScale,
