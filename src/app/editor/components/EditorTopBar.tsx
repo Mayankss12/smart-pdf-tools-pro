@@ -21,7 +21,6 @@ import {
   Plus,
   Redo2,
   RotateCw,
-  ScanLine,
   Search,
   Share2,
   Square,
@@ -33,8 +32,8 @@ import {
 } from "lucide-react";
 import type { ComponentType } from "react";
 
-import type { EditorController } from "../hooks/useEditor";
 import type { EditorTool } from "../hooks/useActiveTool";
+import type { EditorController } from "../hooks/useEditor";
 
 type ToolStatus = "working" | "locked";
 
@@ -44,7 +43,6 @@ type RibbonTool = {
   readonly shortcut: string;
   readonly icon: ComponentType<{ size?: number; className?: string }>;
   readonly status: ToolStatus;
-  readonly tool?: EditorTool;
   readonly action?: () => void;
   readonly active?: boolean;
   readonly disabled?: boolean;
@@ -238,14 +236,14 @@ export function EditorTopBar({
           action: () => selectTool("highlight"),
         },
         {
-          id: "copy-area",
-          label: "Copy Area",
-          shortcut: "Drag",
-          icon: ScanLine,
+          id: "object",
+          label: "Object",
+          shortcut: "Obj",
+          icon: MousePointer2,
           status: "working",
-          active: editor.activeTool === "copy-area",
+          active: editor.activeTool === "object",
           disabled: !hasDocument,
-          action: () => selectTool("copy-area"),
+          action: () => selectTool("object"),
         },
         {
           id: "note",
@@ -285,8 +283,8 @@ export function EditorTopBar({
         },
         {
           id: "object-select",
-          label: "Object",
-          shortcut: "Obj",
+          label: "Object AI",
+          shortcut: "AI",
           icon: MousePointer2,
           status: "locked",
         },
