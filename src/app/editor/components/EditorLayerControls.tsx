@@ -1,6 +1,6 @@
 "use client";
 
-import type { EditorController } from "../hooks/useEditor";
+import type { EditorController, EditorObject } from "../hooks/useEditor";
 
 type EditorLayerControlsProps = {
   readonly editor: EditorController;
@@ -30,6 +30,20 @@ function LayerButton({
   );
 }
 
+function getObjectLabel(object: EditorObject) {
+  if (object.type === "image" && object.data.note === "Copied area") {
+    return "Copied area";
+  }
+
+  if (object.type === "image") return "Image";
+  if (object.type === "signature") return "Signature";
+  if (object.type === "text") return "Text";
+  if (object.type === "highlight") return "Highlight";
+  if (object.type === "whiteout") return "Whiteout";
+
+  return "Object";
+}
+
 export function EditorLayerControls({ editor }: EditorLayerControlsProps) {
   const selectedObjectId = editor.selectedObjectId;
   const selectedObject = editor.selectedObject;
@@ -40,12 +54,13 @@ export function EditorLayerControls({ editor }: EditorLayerControlsProps) {
 
   const locked = Boolean(selectedObject.locked);
   const opacity = Math.round((selectedObject.data.opacity ?? 1) * 100);
+  const objectLabel = getObjectLabel(selectedObject);
 
   return (
     <div className="border-b border-slate-200 bg-white px-3 py-2 shadow-sm">
       <div className="mx-auto flex max-w-7xl items-center gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-slate-50 p-1.5">
         <span className="shrink-0 rounded-xl bg-white px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-slate-400 ring-1 ring-slate-200">
-          Layer
+          {objectLabel}
         </span>
 
         <LayerButton
@@ -87,11 +102,10 @@ export function EditorLayerControls({ editor }: EditorLayerControlsProps) {
             min={10}
             max={100}
             value={opacity}
-            disabled={locked}
             onChange={(event) => {
               editor.setObjectOpacity(selectedObjectId, Number(event.target.value) / 100);
             }}
-            className="h-1 w-28 accent-violet-600 disabled:opacity-40"
+            className="h-1 w-28 accent-violet-600"
             aria-label="Selected object opacity"
           />
           <span className="w-8 text-right text-[10px] font-black text-slate-500">
@@ -101,7 +115,7 @@ export function EditorLayerControls({ editor }: EditorLayerControlsProps) {
 
         {locked ? (
           <span className="ml-1 shrink-0 rounded-xl bg-slate-200 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-600">
-            Locked
+            Position locked
           </span>
         ) : null}
       </div>
