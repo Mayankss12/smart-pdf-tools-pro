@@ -1,3 +1,4 @@
+import fontkit from "@pdf-lib/fontkit";
 import {
   PDFDocument,
   StandardFonts,
@@ -48,9 +49,71 @@ type TransformedWord = {
   fontSize: number;
 };
 
+type ScriptFonts = {
+  latin: PDFFont;
+  devanagari?: PDFFont;
+  arabic?: PDFFont;
+};
+
 const MIN_FONT_SIZE = 2.5;
 const MAX_FONT_SIZE = 72;
 const TEXT_OPACITY = 0.01;
+
+const FONT_URLS = {
+  latin: "/fonts/NotoSans-Regular.ttf",
+  devanagari: "/fonts/NotoSansDevanagari-Regular.ttf",
+  arabic: "/fonts/NotoNaskhArabic-Regular.ttf",
+} as const;
+
+const fontBytesCache = new Map<string, Uint8Array | null>();
+
+async function loadFontBytes(url: string): Promise<Uint8Array | null> {
+  if (fontBytesCache.has(url)) {
+    return fontBytesCache.get(url) ?? null;
+  }
+
+  try {
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      fontBytesCache.set(url, null);
+      return null;
+    }
+
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    fontBytesCache.set(url, bytes);
+    return bytes;
+  } catch {
+    fontBytesCache.set(url, null);
+    return null;
+  }
+}
+
+async function embedScriptFonts(pdf: PDFDocument): Promise<ScriptFonts> {
+  pdf.registerFontkit(fontkit);
+
+  const latinBytes = await loadFontBytes(FONT_URLS.latin);
+  const latin = latinBytes
+    ? await pdf.embedFont(latinBytes, { subset: true })
+    : await pdf.embedFont(StandardFonts.Helvetica);
+
+  const devanagariBytes = await loadFontBytes(FONT_URLS.devanagari);
+  const arabicBytes = await loadFontBytes(FONT_URLS.arabic);
+
+  return {
+    latin,
+    devanagari: devanagariBytes
+      ? await pdf.embedFont(devanagariBytes, { subset: true })
+      : undefined,
+    arabic: arabicBytes ? await pdf.embedFont(arabicBytes, { subset: true }) : undefined,
+  };
+}
+
+function pickFontForText(text: string, fonts: ScriptFonts): PDFFont {
+  if (/[\u0900-\u097F]/.test(text) && fonts.devanagari) return fonts.devanagari;
+  if (/[\u0600-\u06FF]/.test(text) && fonts.arabic) return fonts.arabic;
+  return fonts.latin;
+}
 
 export async function addSearchableTextLayer(
   pdf: PDFDocument,
@@ -67,7 +130,7 @@ export async function addSearchableTextLayer(
   }
 
   const pages = pdf.getPages();
-  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const fonts = await embedScriptFonts(pdf);
   const placementByPageIndex = new Map(placements.map((placement) => [placement.pageIndex, placement]));
   const totalWords = ocrResults.reduce((sum, result) => sum + result.words.length, 0);
 
@@ -87,7 +150,7 @@ export async function addSearchableTextLayer(
     for (const word of words) {
       throwIfAborted(signal);
 
-      drawInvisibleSearchableWord(page, font, word);
+      drawInvisibleSearchableWord(page, fonts, word);
       processedWords += 1;
 
       if (processedWords % 25 === 0 || processedWords === totalWords) {
@@ -156,13 +219,15 @@ export function transformOcrWordsToPdfSpace(
     .filter((word): word is TransformedWord => Boolean(word));
 }
 
-function drawInvisibleSearchableWord(page: PDFPage, font: PDFFont, word: TransformedWord) {
+function drawInvisibleSearchableWord(page: PDFPage, fonts: ScriptFonts, word: TransformedWord) {
   const pageSize = page.getSize();
   const safeX = clamp(word.x, 0, pageSize.width);
   const safeY = clamp(word.y, 0, pageSize.height);
   const safeFontSize = clamp(word.fontSize, MIN_FONT_SIZE, MAX_FONT_SIZE);
 
   if (!word.text.trim()) return;
+
+  const font = pickFontForText(word.text, fonts);
 
   try {
     page.drawText(word.text, {
@@ -173,19 +238,27 @@ function drawInvisibleSearchableWord(page: PDFPage, font: PDFFont, word: Transfo
       color: rgb(0, 0, 0),
       opacity: TEXT_OPACITY,
     });
+    return;
   } catch {
-    const fallbackText = word.text.replace(/[^\x20-\x7E]/g, "").trim();
+    // Chosen font could not encode this word — fall back to Latin-safe text so
+    // at least ASCII content stays searchable instead of being dropped.
+  }
 
-    if (!fallbackText) return;
+  try {
+    const latinSafe = word.text.replace(/[^\x20-\x7E]/g, "").trim();
 
-    page.drawText(fallbackText, {
+    if (!latinSafe) return;
+
+    page.drawText(latinSafe, {
       x: safeX,
       y: safeY,
       size: safeFontSize,
-      font,
+      font: fonts.latin,
       color: rgb(0, 0, 0),
       opacity: TEXT_OPACITY,
     });
+  } catch {
+    // Skip this word rather than failing the whole export.
   }
 }
 
