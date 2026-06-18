@@ -180,6 +180,26 @@ function useHeaderAuthState(): HeaderAuthState {
   return authState;
 }
 
+function LogoutButton({
+  className,
+  onClick,
+  variant,
+}: {
+  readonly className: string;
+  readonly onClick?: () => void;
+  readonly variant: "desktop" | "mobile";
+}) {
+  return (
+    <form action="/logout" method="post" onSubmit={onClick}>
+      <button type="submit" role="menuitem" className={className}>
+        {variant === "desktop" ? <LogOut size={17} /> : null}
+        <span>Logout</span>
+        {variant === "mobile" ? <LogOut size={15} /> : null}
+      </button>
+    </form>
+  );
+}
+
 function AccountAvatarMenu({
   email,
   displayName,
@@ -285,15 +305,11 @@ function AccountAvatarMenu({
           </div>
 
           <div className="border-t border-violet-100 p-2">
-            <Link
-              href="/logout"
-              role="menuitem"
+            <LogoutButton
+              variant="desktop"
               onClick={() => setMenuOpen(false)}
-              className="flex items-center justify-center gap-2 rounded-2xl bg-red-50 px-4 py-3 text-sm font-black text-red-700 transition hover:bg-red-100"
-            >
-              <LogOut size={17} />
-              Logout
-            </Link>
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-red-50 px-4 py-3 text-sm font-black text-red-700 transition hover:bg-red-100"
+            />
           </div>
         </div>
       ) : null}
@@ -359,13 +375,10 @@ export function MobileHeaderAuthLink() {
           Subscription details
           <ArrowRight size={15} />
         </Link>
-        <Link
-          href="/logout"
-          className="flex items-center justify-between px-4 py-4 text-sm font-bold text-red-700 transition hover:bg-red-50"
-        >
-          Logout
-          <LogOut size={15} />
-        </Link>
+        <LogoutButton
+          variant="mobile"
+          className="flex w-full items-center justify-between px-4 py-4 text-sm font-bold text-red-700 transition hover:bg-red-50"
+        />
       </div>
     );
   }
