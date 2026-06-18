@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { isSameSiteStateChangingRequest } from "@/lib/api-security";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 async function logout(request: NextRequest) {
@@ -13,9 +14,13 @@ async function logout(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  if (!isSameSiteStateChangingRequest(request)) {
+    return NextResponse.redirect(new URL("/login", request.nextUrl.origin));
+  }
+
   return logout(request);
 }
 
 export async function GET(request: NextRequest) {
-  return logout(request);
+  return NextResponse.redirect(new URL("/login", request.nextUrl.origin));
 }
