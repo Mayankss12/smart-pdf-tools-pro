@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 
 import {
+  createCorsPreflightResponse,
+  createNoStoreHeaders,
+  isSameOriginRequest,
+  isVerifiedAnonymousIdentity,
+} from "@/lib/api-security";
+import {
   getDailyCleanExportLimit,
   getEntitlementPlan,
   normalizeTier,
@@ -207,6 +213,7 @@ async function updateUsageRow({
 }
 
 function createUsageResponse({
+  request,
   allowed,
   identityType,
   tier,
@@ -214,6 +221,7 @@ function createUsageResponse({
   usageRow,
   exportKind,
 }: {
+  request: Request;
   allowed: boolean;
   identityType: "guest" | "user";
   tier: UserTier;
@@ -244,14 +252,45 @@ function createUsageResponse({
     },
     {
       status: allowed ? 200 : 402,
-      headers: {
-        "Cache-Control": "no-store",
-      },
+      headers: createNoStoreHeaders(request),
     },
   );
 }
 
+function createErrorResponse({
+  request,
+  status,
+  error,
+}: {
+  request: Request;
+  status: number;
+  error: string;
+}) {
+  return NextResponse.json(
+    {
+      allowed: false,
+      error,
+    },
+    {
+      status,
+      headers: createNoStoreHeaders(request),
+    },
+  );
+}
+
+export async function OPTIONS(request: Request) {
+  return createCorsPreflightResponse(request, "POST, OPTIONS");
+}
+
 export async function POST(request: Request) {
+  if (!isSameOriginRequest(request)) {
+    return createErrorResponse({
+      request,
+      status: 403,
+      error: "Request origin is not allowed.",
+    });
+  }
+
   const body = await readRequestBody(request);
 
   const userId = await getCurrentUserId();
@@ -260,19 +299,12 @@ export async function POST(request: Request) {
   const requestedExportKind = normalizeExportKind(body.exportKind);
   const usageDate = getTodayDateKey();
 
-  if (!userId && !anonymousId) {
-    return NextResponse.json(
-      {
-        allowed: false,
-        error: "Missing anonymous usage identity.",
-      },
-      {
-        status: 400,
-        headers: {
-          "Cache-Control": "no-store",
-        },
-      },
-    );
+  if (!userId && !isVerifiedAnonymousIdentity(request, anonymousId)) {
+    return createErrorResponse({
+      request,
+      status: 401,
+      error: "Anonymous usage identity could not be verified.",
+    });
   }
 
   try {
@@ -318,6 +350,7 @@ export async function POST(request: Request) {
         });
 
     return createUsageResponse({
+      request,
       allowed: finalAllowed,
       identityType,
       tier: entitlement.tier,
@@ -328,17 +361,10 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error(error);
 
-    return NextResponse.json(
-      {
-        allowed: false,
-        error: "Unable to record usage right now.",
-      },
-      {
-        status: 500,
-        headers: {
-          "Cache-Control": "no-store",
-        },
-      },
-    );
+    return createErrorResponse({
+      request,
+      status: 500,
+      error: "Unable to record usage right now.",
+    });
   }
 }
