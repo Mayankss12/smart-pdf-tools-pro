@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import {
   createCorsPreflightResponse,
   createNoStoreHeaders,
-  isSameOriginRequest,
+  isSameSiteStateChangingRequest,
   isVerifiedAnonymousIdentity,
 } from "@/lib/api-security";
 import {
@@ -283,7 +283,7 @@ export async function OPTIONS(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!isSameOriginRequest(request)) {
+  if (!isSameSiteStateChangingRequest(request)) {
     return createErrorResponse({
       request,
       status: 403,
