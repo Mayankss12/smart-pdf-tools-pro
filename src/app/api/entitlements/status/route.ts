@@ -6,6 +6,12 @@ import {
   normalizeTier,
   type UserTier,
 } from "@/lib/entitlements";
+import {
+  createAnonymousIdentityCookie,
+  createCorsPreflightResponse,
+  createNoStoreHeaders,
+  isSameOriginRequest,
+} from "@/lib/api-security";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -16,6 +22,7 @@ type UsageRow = {
 };
 
 const GUEST_DAILY_CLEAN_EXPORT_LIMIT = 1;
+const ALLOWED_METHODS = "GET, OPTIONS";
 
 function isAnonymousId(value: string | null) {
   return typeof value === "string" && /^anon_[a-zA-Z0-9._-]+$/.test(value);
@@ -33,26 +40,52 @@ function emptyUsage(): UsageRow {
   };
 }
 
-function createResponse(payload: {
-  identityType: "guest" | "user";
-  tier: UserTier;
-  dailyCleanExportLimit: number;
-  cleanExportsUsed: number;
-  cleanExportsRemaining: number;
-  watermarkedExportsUsed: number;
-  blockedExportsCount: number;
-  canExportClean: boolean;
-  isUnlimited: boolean;
-  planLabel: string;
-}) {
+function createResponse(
+  request: Request,
+  payload: {
+    identityType: "guest" | "user";
+    tier: UserTier;
+    dailyCleanExportLimit: number;
+    cleanExportsUsed: number;
+    cleanExportsRemaining: number;
+    watermarkedExportsUsed: number;
+    blockedExportsCount: number;
+    canExportClean: boolean;
+    isUnlimited: boolean;
+    planLabel: string;
+  },
+  options?: {
+    setAnonymousIdentity?: string;
+  },
+) {
+  const headers = createNoStoreHeaders(request);
+
+  if (options?.setAnonymousIdentity) {
+    headers.append("Set-Cookie", createAnonymousIdentityCookie(options.setAnonymousIdentity));
+  }
+
   return NextResponse.json(payload, {
-    headers: {
-      "Cache-Control": "no-store",
-    },
+    headers,
   });
 }
 
+export async function OPTIONS(request: Request) {
+  return createCorsPreflightResponse(request, ALLOWED_METHODS);
+}
+
 export async function GET(request: Request) {
+  if (!isSameOriginRequest(request)) {
+    return NextResponse.json(
+      {
+        error: "Request origin is not allowed.",
+      },
+      {
+        status: 403,
+        headers: createNoStoreHeaders(request),
+      },
+    );
+  }
+
   const url = new URL(request.url);
   const anonymousId = url.searchParams.get("anonymousId");
   const usageDate = getTodayDateKey();
@@ -106,7 +139,7 @@ export async function GET(request: Request) {
       ? dailyLimit
       : Math.max(0, dailyLimit - usageRow.clean_exports_used);
 
-    return createResponse({
+    return createResponse(request, {
       identityType: "user",
       tier: userTier,
       dailyCleanExportLimit: dailyLimit,
@@ -123,7 +156,7 @@ export async function GET(request: Request) {
   if (!isAnonymousId(anonymousId)) {
     const plan = getEntitlementPlan("guest");
 
-    return createResponse({
+    return createResponse(request, {
       identityType: "guest",
       tier: "guest",
       dailyCleanExportLimit: GUEST_DAILY_CLEAN_EXPORT_LIMIT,
@@ -151,16 +184,22 @@ export async function GET(request: Request) {
   );
   const plan = getEntitlementPlan("guest");
 
-  return createResponse({
-    identityType: "guest",
-    tier: "guest",
-    dailyCleanExportLimit: GUEST_DAILY_CLEAN_EXPORT_LIMIT,
-    cleanExportsUsed: usageRow.clean_exports_used,
-    cleanExportsRemaining: remaining,
-    watermarkedExportsUsed: usageRow.watermarked_exports_used,
-    blockedExportsCount: usageRow.blocked_exports_count,
-    canExportClean: remaining > 0,
-    isUnlimited: false,
-    planLabel: plan.label,
-  });
+  return createResponse(
+    request,
+    {
+      identityType: "guest",
+      tier: "guest",
+      dailyCleanExportLimit: GUEST_DAILY_CLEAN_EXPORT_LIMIT,
+      cleanExportsUsed: usageRow.clean_exports_used,
+      cleanExportsRemaining: remaining,
+      watermarkedExportsUsed: usageRow.watermarked_exports_used,
+      blockedExportsCount: usageRow.blocked_exports_count,
+      canExportClean: remaining > 0,
+      isUnlimited: false,
+      planLabel: plan.label,
+    },
+    {
+      setAnonymousIdentity: anonymousId,
+    },
+  );
 }
