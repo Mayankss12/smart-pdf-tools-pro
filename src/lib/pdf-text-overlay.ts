@@ -59,11 +59,22 @@ const MIN_FONT_SIZE = 2.5;
 const MAX_FONT_SIZE = 72;
 const TEXT_OPACITY = 0.01;
 
-const FONT_URLS = {
-  latin: "/fonts/NotoSans-Regular.ttf",
-  devanagari: "/fonts/NotoSansDevanagari-Regular.ttf",
-  arabic: "/fonts/NotoNaskhArabic-Regular.ttf",
-} as const;
+type FontScript = "latin" | "devanagari" | "arabic";
+
+const FONT_SOURCES: Record<FontScript, readonly string[]> = {
+  latin: [
+    "/fonts/NotoSans-Regular.ttf",
+    "https://raw.githubusercontent.com/notofonts/noto-fonts/main/hinted/ttf/NotoSans/NotoSans-Regular.ttf",
+  ],
+  devanagari: [
+    "/fonts/NotoSansDevanagari-Regular.ttf",
+    "https://raw.githubusercontent.com/notofonts/noto-fonts/main/hinted/ttf/NotoSansDevanagari/NotoSansDevanagari-Regular.ttf",
+  ],
+  arabic: [
+    "/fonts/NotoNaskhArabic-Regular.ttf",
+    "https://raw.githubusercontent.com/notofonts/noto-fonts/main/hinted/ttf/NotoNaskhArabic/NotoNaskhArabic-Regular.ttf",
+  ],
+};
 
 const fontBytesCache = new Map<string, Uint8Array | null>();
 
@@ -89,23 +100,40 @@ async function loadFontBytes(url: string): Promise<Uint8Array | null> {
   }
 }
 
+async function loadFirstAvailableFontBytes(script: FontScript): Promise<Uint8Array | null> {
+  for (const source of FONT_SOURCES[script]) {
+    const bytes = await loadFontBytes(source);
+
+    if (bytes?.length) {
+      return bytes;
+    }
+  }
+
+  return null;
+}
+
+async function embedOptionalFont(pdf: PDFDocument, script: FontScript): Promise<PDFFont | undefined> {
+  const bytes = await loadFirstAvailableFontBytes(script);
+
+  if (!bytes) {
+    return undefined;
+  }
+
+  return pdf.embedFont(bytes, { subset: true });
+}
+
 async function embedScriptFonts(pdf: PDFDocument): Promise<ScriptFonts> {
   pdf.registerFontkit(fontkit);
 
-  const latinBytes = await loadFontBytes(FONT_URLS.latin);
+  const latinBytes = await loadFirstAvailableFontBytes("latin");
   const latin = latinBytes
     ? await pdf.embedFont(latinBytes, { subset: true })
     : await pdf.embedFont(StandardFonts.Helvetica);
 
-  const devanagariBytes = await loadFontBytes(FONT_URLS.devanagari);
-  const arabicBytes = await loadFontBytes(FONT_URLS.arabic);
-
   return {
     latin,
-    devanagari: devanagariBytes
-      ? await pdf.embedFont(devanagariBytes, { subset: true })
-      : undefined,
-    arabic: arabicBytes ? await pdf.embedFont(arabicBytes, { subset: true }) : undefined,
+    devanagari: await embedOptionalFont(pdf, "devanagari"),
+    arabic: await embedOptionalFont(pdf, "arabic"),
   };
 }
 
