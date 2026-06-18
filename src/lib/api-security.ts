@@ -11,10 +11,35 @@ export function getOriginHeader(request: Request) {
   return request.headers.get("origin");
 }
 
+export function getRefererHeader(request: Request) {
+  return request.headers.get("referer");
+}
+
 export function isSameOriginRequest(request: Request) {
   const origin = getOriginHeader(request);
 
   return !origin || origin === getRequestOrigin(request);
+}
+
+export function isSameSiteStateChangingRequest(request: Request) {
+  const requestOrigin = getRequestOrigin(request);
+  const origin = getOriginHeader(request);
+
+  if (origin) {
+    return origin === requestOrigin;
+  }
+
+  const referer = getRefererHeader(request);
+
+  if (!referer) {
+    return false;
+  }
+
+  try {
+    return new URL(referer).origin === requestOrigin;
+  } catch {
+    return false;
+  }
 }
 
 export function createNoStoreHeaders(request: Request, extraHeaders?: HeadersInit) {
