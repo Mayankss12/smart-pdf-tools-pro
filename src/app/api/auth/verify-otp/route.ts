@@ -3,6 +3,7 @@ import { createHmac } from "node:crypto";
 import { createServerClient } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
 
+import { isSameSiteStateChangingRequest } from "@/lib/api-security";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -12,7 +13,7 @@ const LOCK_SECONDS = 10 * 60;
 const GENERIC_VERIFICATION_ERROR = "Verification failed. Please try again.";
 const LOCKED_ERROR = "Too many attempts. Please wait a few minutes before trying again.";
 
-type AttemptScope = "identifier" | "ip";
+ type AttemptScope = "identifier" | "ip";
 
 type AttemptKey = {
   scope: AttemptScope;
@@ -166,6 +167,10 @@ async function clearAttempts(admin: ReturnType<typeof createAdminClient>, keys: 
 }
 
 export async function POST(request: NextRequest) {
+  if (!isSameSiteStateChangingRequest(request)) {
+    return jsonError("Request origin is not allowed.", 403);
+  }
+
   const config = getSupabaseConfig();
   const attemptHashSecret = getAttemptHashSecret();
 
