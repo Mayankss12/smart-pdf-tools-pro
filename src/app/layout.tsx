@@ -17,8 +17,10 @@ const display = Plus_Jakarta_Sans({
   variable: "--font-display",
 });
 
+const siteUrl = "https://smart-pdf-tools-pro.vercel.app";
+
 export const metadata: Metadata = {
-  metadataBase: new URL("https://smart-pdf-tools-pro.vercel.app"),
+  metadataBase: new URL(siteUrl),
   title: {
     default: "PDFMantra - Smart PDF Workspace",
     template: "%s | PDFMantra",
@@ -39,11 +41,25 @@ export const metadata: Metadata = {
   applicationName: "PDFMantra",
   creator: "PDFMantra",
   publisher: "PDFMantra",
+  alternates: {
+    canonical: "/",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
   openGraph: {
     title: "PDFMantra - Smart PDF Workspace",
     description:
       "Modern PDF tools for editing, signing, highlighting, and document workflows.",
-    url: "https://smart-pdf-tools-pro.vercel.app",
+    url: siteUrl,
     siteName: "PDFMantra",
     type: "website",
   },
