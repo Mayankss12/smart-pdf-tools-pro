@@ -22,6 +22,7 @@ import { detectPageImages, type DetectedImage } from "@/lib/editor/pdf-image-det
 import type { EditorController } from "../hooks/useEditor";
 import { HighlightTool } from "./tools/HighlightTool";
 import { ImageTool } from "./tools/ImageTool";
+import { ShapeTool } from "./tools/ShapeTool";
 import { SignatureTool } from "./tools/SignatureTool";
 import { TextTool } from "./tools/TextTool";
 import { WhiteoutTool } from "./tools/WhiteoutTool";
@@ -37,8 +38,10 @@ type PageSize = {
   readonly height: number;
 };
 
+type DraftTool = "text" | "highlight" | "whiteout" | "shape";
+
 type DraftBox = {
-  readonly type: "text" | "highlight" | "whiteout";
+  readonly type: DraftTool;
   readonly startX: number;
   readonly startY: number;
   readonly x: number;
@@ -68,6 +71,8 @@ const DEFAULT_TEXT_BOX = { width: 220, height: 44 };
 const MIN_TEXT_BOX = { width: 72, height: 30 };
 const MIN_IMAGE_BOX = { width: 48, height: 32 };
 const MIN_SIGNATURE_BOX = { width: 72, height: 24 };
+const MIN_SHAPE_BOX = { width: 24, height: 24 };
+const DEFAULT_SHAPE_BOX = { width: 160, height: 96 };
 
 const OPEN_IMAGE_PICKER_EVENT = "pdfmantra:editor-open-image-picker";
 const OPEN_SIGNATURE_PICKER_EVENT = "pdfmantra:editor-open-signature-picker";
@@ -162,6 +167,13 @@ function getPointerPoint(
     pageSize,
     pageScale,
   );
+}
+
+function getRelativeLinePoint(point: Point, box: Box) {
+  return {
+    x: clamp(point.x - box.x, 0, Math.max(0, box.width)),
+    y: clamp(point.y - box.y, 0, Math.max(0, box.height)),
+  };
 }
 
 function readFileAsDataUrl(file: File) {
@@ -401,6 +413,50 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
     });
   }
 
+  function addShapeObject(draft: DraftBox, box: Box) {
+    const tooSmall = box.width < 8 || box.height < 8;
+    const baseBox = tooSmall
+      ? {
+          x: draft.startX,
+          y: draft.startY,
+          width: DEFAULT_SHAPE_BOX.width,
+          height: DEFAULT_SHAPE_BOX.height,
+        }
+      : {
+          ...box,
+          width: Math.max(MIN_SHAPE_BOX.width, box.width),
+          height: Math.max(MIN_SHAPE_BOX.height, box.height),
+        };
+
+    const safeBox = clampBoxToPage(
+      baseBox,
+      pageSize,
+      editor.zoom,
+      MIN_SHAPE_BOX.width,
+      MIN_SHAPE_BOX.height,
+    );
+
+    editor.addObject({
+      type: "shape",
+      pageNumber: editor.activePageNumber,
+      box: safeBox,
+      data: {
+        shapeType: "rectangle",
+        strokeColor: "#111827",
+        strokeWidth: 2,
+        fillColor: "none",
+        opacity: 1,
+        lineStart: tooSmall ? { x: 0, y: 0 } : getRelativeLinePoint({ x: draft.startX, y: draft.startY }, safeBox),
+        lineEnd: tooSmall
+          ? { x: safeBox.width, y: safeBox.height }
+          : getRelativeLinePoint(
+              { x: draft.startX + (draft.startX <= draft.x ? box.width : -box.width), y: draft.startY + (draft.startY <= draft.y ? box.height : -box.height) },
+              safeBox,
+            ),
+      },
+    });
+  }
+
   function getImageBox(point: Point, imageSize: ImageSize) {
     const page = getUnscaledPageSize(pageSize, editor.zoom);
     const aspectRatio = imageSize.width / Math.max(1, imageSize.height);
@@ -635,7 +691,8 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
     if (
       editor.activeTool === "text" ||
       editor.activeTool === "highlight" ||
-      editor.activeTool === "whiteout"
+      editor.activeTool === "whiteout" ||
+      editor.activeTool === "shape"
     ) {
       event.preventDefault();
       event.currentTarget.setPointerCapture(event.pointerId);
@@ -705,12 +762,17 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
         tooSmall ? { x: draftBox.startX, y: draftBox.startY, width: 180, height: 34 } : finalBox,
       );
     }
+
+    if (draftBox.type === "shape") {
+      addShapeObject(draftBox, finalBox);
+    }
   }
 
   const isDrawTool =
     editor.activeTool === "text" ||
     editor.activeTool === "highlight" ||
-    editor.activeTool === "whiteout";
+    editor.activeTool === "whiteout" ||
+    editor.activeTool === "shape";
 
   return (
     <div className="mx-auto">
@@ -746,7 +808,9 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
                   ? "Drag to highlight"
                   : editor.activeTool === "whiteout"
                     ? "Drag to whiteout"
-                    : editor.activeTool.toUpperCase()}
+                    : editor.activeTool === "shape"
+                      ? "Drag to draw a shape"
+                      : editor.activeTool.toUpperCase()}
         </span>
       </div>
 
@@ -861,6 +925,21 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
             );
           }
 
+          if (object.type === "shape") {
+            return (
+              <ShapeTool
+                key={object.id}
+                object={object}
+                selected={editor.selectedObjectId === object.id}
+                pageScale={editor.zoom}
+                onSelect={editor.selectObject}
+                onUpdateData={editor.updateObjectData}
+                onUpdateBox={editor.updateObjectBox}
+                onDelete={editor.deleteObject}
+              />
+            );
+          }
+
           return null;
         })}
 
@@ -963,7 +1042,9 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
                 ? "border-yellow-500 bg-yellow-300/40"
                 : draftBox.type === "text"
                   ? "border-violet-500 bg-violet-100/20"
-                  : "border-violet-500 bg-white/90",
+                  : draftBox.type === "shape"
+                    ? "border-violet-600 bg-violet-500/10"
+                    : "border-violet-500 bg-white/90",
             ].join(" ")}
             style={{
               left: draftBox.x * editor.zoom,
