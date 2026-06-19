@@ -31,6 +31,11 @@ export type EditorObjectBox = {
   readonly height: number;
 };
 
+export type EditorPoint = {
+  readonly x: number;
+  readonly y: number;
+};
+
 export type EditorTextStyle = {
   readonly fontWeight?: "normal" | "bold";
   readonly fontStyle?: "normal" | "italic";
@@ -56,7 +61,12 @@ export type EditorObjectData = {
   readonly imageDataUrl?: string;
   readonly note?: string;
   readonly stampLabel?: string;
-  readonly shapeType?: "rectangle" | "ellipse" | "line" | "arrow";
+  readonly shapeType?: "rectangle" | "circle" | "line" | "arrow";
+  readonly strokeColor?: string;
+  readonly strokeWidth?: number;
+  readonly fillColor?: string;
+  readonly lineStart?: EditorPoint;
+  readonly lineEnd?: EditorPoint;
 };
 
 export type EditorObject = {
