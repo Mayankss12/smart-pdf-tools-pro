@@ -12,12 +12,18 @@ import {
 import { drawEditorWhiteout } from "./editor-whiteout-engine";
 import { drawEditorImageObject } from "./editor-image-engine";
 import { drawEditorSignatureObject } from "./editor-signature-engine";
+import { drawEditorShapeObject } from "./editor-shape-engine";
 
 type EditorExportBox = {
   readonly x: number;
   readonly y: number;
   readonly width: number;
   readonly height: number;
+};
+
+type EditorExportPoint = {
+  readonly x: number;
+  readonly y: number;
 };
 
 type EditorExportObjectData = {
@@ -31,6 +37,12 @@ type EditorExportObjectData = {
   readonly backgroundColor?: string;
   readonly opacity?: number;
   readonly imageDataUrl?: string;
+  readonly shapeType?: "rectangle" | "circle" | "line" | "arrow";
+  readonly strokeColor?: string;
+  readonly strokeWidth?: number;
+  readonly fillColor?: string;
+  readonly lineStart?: EditorExportPoint;
+  readonly lineEnd?: EditorExportPoint;
 };
 
 export type EditorExportObject = {
@@ -207,6 +219,11 @@ async function drawEditorObject({
     drawEditorWhiteout(page, object.box, {
       opacity: object.data.opacity ?? 1,
     });
+    return;
+  }
+
+  if (object.type === "shape") {
+    drawEditorShapeObject(page, object);
     return;
   }
 
