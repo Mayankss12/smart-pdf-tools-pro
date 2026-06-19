@@ -2,6 +2,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PDFDocument } from 'pdf-lib'
 
+import { isSameSiteStateChangingRequest } from '@/lib/api-security'
+
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
@@ -10,6 +12,18 @@ type CompressionLevel = 'low' | 'medium' | 'high'
 const PROCESSING_API_BASE = process.env.PDFMANTRA_PROCESSING_API_BASE_URL
 const SECRET_KEY = process.env.PDFMANTRA_SECRET_KEY
 const MAX_FILE_SIZE = 50 * 1024 * 1024
+
+function createJsonError(error: string, status: number) {
+  return NextResponse.json(
+    { error },
+    {
+      status,
+      headers: {
+        'Cache-Control': 'no-store',
+      },
+    },
+  )
+}
 
 async function compressViaBackend(
   fileBuffer: Buffer,
@@ -59,22 +73,26 @@ async function compressViaPdfLib(
 }
 
 export async function POST(req: NextRequest) {
+  if (!isSameSiteStateChangingRequest(req)) {
+    return createJsonError('Request origin is not allowed.', 403)
+  }
+
   try {
     const formData = await req.formData()
     const file = formData.get('file') as File | null
     const level = ((formData.get('level') as string) || 'medium') as CompressionLevel
 
     if (!file) {
-      return NextResponse.json({ error: 'No file provided.' }, { status: 400 })
+      return createJsonError('No file provided.', 400)
     }
     if (file.type !== 'application/pdf') {
-      return NextResponse.json({ error: 'Only PDF files are accepted.' }, { status: 415 })
+      return createJsonError('Only PDF files are accepted.', 415)
     }
     if (!['low', 'medium', 'high'].includes(level)) {
-      return NextResponse.json({ error: 'Level must be low, medium, or high.' }, { status: 400 })
+      return createJsonError('Level must be low, medium, or high.', 400)
     }
     if (file.size > MAX_FILE_SIZE) {
-      return NextResponse.json({ error: 'File too large. Maximum 50 MB.' }, { status: 413 })
+      return createJsonError('File too large. Maximum 50 MB.', 413)
     }
 
     const fileBuffer = Buffer.from(await file.arrayBuffer())
@@ -114,13 +132,11 @@ export async function POST(req: NextRequest) {
         'X-Saved-Percent': savedPercent,
         'X-Compression-Method': method,
         'X-Compression-Level': level,
+        'Cache-Control': 'no-store',
       },
     })
   } catch (err) {
     console.error('[compress] Unhandled error:', err)
-    return NextResponse.json(
-      { error: 'Compression failed. Please try a different file.' },
-      { status: 500 }
-    )
+    return createJsonError('Compression failed. Please try a different file.', 500)
   }
 }
