@@ -110,10 +110,7 @@ function RibbonButton({ tool }: { readonly tool: RibbonTool }) {
       title={`${tool.label} (${tool.shortcut})`}
       onClick={() => {
         if (disabled) return;
-
-        if (tool.action) {
-          tool.action();
-        }
+        tool.action?.();
       }}
       className={[
         "relative flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-2xl border text-[10px] font-black leading-none transition duration-200",
@@ -221,7 +218,10 @@ export function EditorTopBar({
           label: "Draw",
           shortcut: "D",
           icon: Pencil,
-          status: "locked",
+          status: "working",
+          active: editor.activeTool === "draw",
+          disabled: !hasDocument,
+          action: () => selectTool("draw"),
         },
       ],
     },
@@ -277,41 +277,11 @@ export function EditorTopBar({
     {
       label: "Smart",
       tools: [
-        {
-          id: "ocr",
-          label: "OCR",
-          shortcut: "O",
-          icon: Brain,
-          status: "locked",
-        },
-        {
-          id: "object-select",
-          label: "Object AI",
-          shortcut: "AI",
-          icon: MousePointer2,
-          status: "locked",
-        },
-        {
-          id: "text-select",
-          label: "Text Sel",
-          shortcut: "OCR",
-          icon: Type,
-          status: "locked",
-        },
-        {
-          id: "translate",
-          label: "Translate",
-          shortcut: "L",
-          icon: Languages,
-          status: "locked",
-        },
-        {
-          id: "find",
-          label: "Find",
-          shortcut: "F",
-          icon: Search,
-          status: "locked",
-        },
+        { id: "ocr", label: "OCR", shortcut: "O", icon: Brain, status: "locked" },
+        { id: "object-select", label: "Object AI", shortcut: "AI", icon: MousePointer2, status: "locked" },
+        { id: "text-select", label: "Text Sel", shortcut: "OCR", icon: Type, status: "locked" },
+        { id: "translate", label: "Translate", shortcut: "L", icon: Languages, status: "locked" },
+        { id: "find", label: "Find", shortcut: "F", icon: Search, status: "locked" },
       ],
     },
     {
@@ -326,13 +296,7 @@ export function EditorTopBar({
           disabled: !hasDocument,
           action: onAddBlankPage,
         },
-        {
-          id: "reorder",
-          label: "Reorder",
-          shortcut: "Drag",
-          icon: ArrowUpDown,
-          status: "locked",
-        },
+        { id: "reorder", label: "Reorder", shortcut: "Drag", icon: ArrowUpDown, status: "locked" },
         {
           id: "rotate",
           label: "Rotate",
@@ -342,13 +306,7 @@ export function EditorTopBar({
           disabled: !hasDocument,
           action: onRotateCurrentPage,
         },
-        {
-          id: "number",
-          label: "Number",
-          shortcut: "#",
-          icon: Hash,
-          status: "locked",
-        },
+        { id: "number", label: "Number", shortcut: "#", icon: Hash, status: "locked" },
       ],
     },
     {
