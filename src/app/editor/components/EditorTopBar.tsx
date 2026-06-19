@@ -211,7 +211,10 @@ export function EditorTopBar({
           label: "Shape",
           shortcut: "R",
           icon: Square,
-          status: "locked",
+          status: "working",
+          active: editor.activeTool === "shape",
+          disabled: !hasDocument,
+          action: () => selectTool("shape"),
         },
         {
           id: "draw",
