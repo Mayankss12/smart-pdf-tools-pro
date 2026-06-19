@@ -20,6 +20,7 @@ import {
 import { detectPageImages, type DetectedImage } from "@/lib/editor/pdf-image-detect";
 
 import type { EditorController } from "../hooks/useEditor";
+import { DrawTool } from "./tools/DrawTool";
 import { HighlightTool } from "./tools/HighlightTool";
 import { ImageTool } from "./tools/ImageTool";
 import { ShapeTool } from "./tools/ShapeTool";
@@ -67,12 +68,20 @@ type ImageSize = {
   readonly height: number;
 };
 
+type DrawStroke = {
+  readonly points: Point[];
+  readonly pathData: string;
+  readonly box: Box;
+};
+
 const DEFAULT_TEXT_BOX = { width: 220, height: 44 };
 const MIN_TEXT_BOX = { width: 72, height: 30 };
 const MIN_IMAGE_BOX = { width: 48, height: 32 };
 const MIN_SIGNATURE_BOX = { width: 72, height: 24 };
 const MIN_SHAPE_BOX = { width: 24, height: 24 };
+const MIN_DRAW_BOX = { width: 8, height: 8 };
 const DEFAULT_SHAPE_BOX = { width: 160, height: 96 };
+const DRAW_POINT_DISTANCE = 1.5;
 
 const OPEN_IMAGE_PICKER_EVENT = "pdfmantra:editor-open-image-picker";
 const OPEN_SIGNATURE_PICKER_EVENT = "pdfmantra:editor-open-signature-picker";
@@ -126,10 +135,8 @@ function clampBoxToPage(
 
   const safePageWidth = Math.max(minWidth, page.width || minWidth);
   const safePageHeight = Math.max(minHeight, page.height || minHeight);
-
   const safeWidth = clamp(box.width, minWidth, safePageWidth);
   const safeHeight = clamp(box.height, minHeight, safePageHeight);
-
   const safeX = clamp(box.x, 0, Math.max(0, safePageWidth - safeWidth));
   const safeY = clamp(box.y, 0, Math.max(0, safePageHeight - safeHeight));
 
@@ -176,6 +183,47 @@ function getRelativeLinePoint(point: Point, box: Box) {
   };
 }
 
+function getDistance(a: Point, b: Point) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function getPointsBox(points: readonly Point[], padding = 0): Box {
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  const minX = Math.min(...xs) - padding;
+  const minY = Math.min(...ys) - padding;
+  const maxX = Math.max(...xs) + padding;
+  const maxY = Math.max(...ys) + padding;
+
+  return {
+    x: minX,
+    y: minY,
+    width: Math.max(MIN_DRAW_BOX.width, maxX - minX),
+    height: Math.max(MIN_DRAW_BOX.height, maxY - minY),
+  };
+}
+
+function getPathData(points: readonly Point[], box: Box) {
+  return points
+    .map((point, index) => {
+      const command = index === 0 ? "M" : "L";
+      const x = Number((point.x - box.x).toFixed(2));
+      const y = Number((point.y - box.y).toFixed(2));
+      return `${command} ${x} ${y}`;
+    })
+    .join(" ");
+}
+
+function createDrawStroke(points: readonly Point[]): DrawStroke {
+  const box = getPointsBox(points, 4);
+
+  return {
+    points: [...points],
+    box,
+    pathData: getPathData(points, box),
+  };
+}
+
 function readFileAsDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -217,11 +265,13 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
   const signatureInputRef = useRef<HTMLInputElement | null>(null);
   const pendingImagePointRef = useRef<Point | null>(null);
   const pendingSignaturePointRef = useRef<Point | null>(null);
+  const drawPointsRef = useRef<Point[]>([]);
 
   const [isRendering, setIsRendering] = useState(true);
   const [error, setError] = useState("");
   const [pageSize, setPageSize] = useState<PageSize>({ width: 0, height: 0 });
   const [draftBox, setDraftBox] = useState<DraftBox | null>(null);
+  const [drawStroke, setDrawStroke] = useState<DrawStroke | null>(null);
   const [detectedImages, setDetectedImages] = useState<DetectedImage[]>([]);
   const [objectPopover, setObjectPopover] = useState<DetectedImage | null>(null);
 
@@ -275,7 +325,6 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
 
     return () => {
       cancelled = true;
-
       try {
         renderTask?.cancel();
       } catch {
@@ -284,7 +333,6 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
     };
   }, [editor.pdfDocument, editor.activePageNumber, editor.zoom]);
 
-  // Detect raster images on the page when the Object tool is active.
   useEffect(() => {
     let cancelled = false;
 
@@ -416,25 +464,10 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
   function addShapeObject(draft: DraftBox, box: Box) {
     const tooSmall = box.width < 8 || box.height < 8;
     const baseBox = tooSmall
-      ? {
-          x: draft.startX,
-          y: draft.startY,
-          width: DEFAULT_SHAPE_BOX.width,
-          height: DEFAULT_SHAPE_BOX.height,
-        }
-      : {
-          ...box,
-          width: Math.max(MIN_SHAPE_BOX.width, box.width),
-          height: Math.max(MIN_SHAPE_BOX.height, box.height),
-        };
+      ? { x: draft.startX, y: draft.startY, width: DEFAULT_SHAPE_BOX.width, height: DEFAULT_SHAPE_BOX.height }
+      : { ...box, width: Math.max(MIN_SHAPE_BOX.width, box.width), height: Math.max(MIN_SHAPE_BOX.height, box.height) };
 
-    const safeBox = clampBoxToPage(
-      baseBox,
-      pageSize,
-      editor.zoom,
-      MIN_SHAPE_BOX.width,
-      MIN_SHAPE_BOX.height,
-    );
+    const safeBox = clampBoxToPage(baseBox, pageSize, editor.zoom, MIN_SHAPE_BOX.width, MIN_SHAPE_BOX.height);
 
     editor.addObject({
       type: "shape",
@@ -450,10 +483,29 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
         lineEnd: tooSmall
           ? { x: safeBox.width, y: safeBox.height }
           : getRelativeLinePoint(
-              { x: draft.startX + (draft.startX <= draft.x ? box.width : -box.width), y: draft.startY + (draft.startY <= draft.y ? box.height : -box.height) },
+              {
+                x: draft.startX + (draft.startX <= draft.x ? box.width : -box.width),
+                y: draft.startY + (draft.startY <= draft.y ? box.height : -box.height),
+              },
               safeBox,
             ),
       },
+    });
+  }
+
+  function addDrawObject(stroke: DrawStroke) {
+    const safeBox = clampBoxToPage(stroke.box, pageSize, editor.zoom, MIN_DRAW_BOX.width, MIN_DRAW_BOX.height);
+
+    editor.addObject({
+      type: "draw",
+      pageNumber: editor.activePageNumber,
+      box: safeBox,
+      data: {
+        pathData: stroke.pathData,
+        strokeColor: "#111827",
+        strokeWidth: 2,
+        opacity: 1,
+      } as any,
     });
   }
 
@@ -688,6 +740,15 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
 
     const point = getPointerPoint(event, layer, editor.zoom, pageSize);
 
+    if (editor.activeTool === "draw") {
+      event.preventDefault();
+      event.currentTarget.setPointerCapture(event.pointerId);
+      editor.selectObject(null);
+      drawPointsRef.current = [point];
+      setDrawStroke(createDrawStroke([point]));
+      return;
+    }
+
     if (
       editor.activeTool === "text" ||
       editor.activeTool === "highlight" ||
@@ -711,15 +772,49 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
 
   function handlePointerMove(event: ReactPointerEvent<HTMLDivElement>) {
     const layer = pageLayerRef.current;
-    if (!layer || !draftBox) return;
+    if (!layer) return;
 
     const point = getPointerPoint(event, layer, editor.zoom, pageSize);
-    const normalized = normalizeBox(draftBox.startX, draftBox.startY, point.x, point.y);
 
+    if (drawStroke) {
+      const points = drawPointsRef.current;
+      const lastPoint = points[points.length - 1];
+
+      if (!lastPoint || getDistance(lastPoint, point) >= DRAW_POINT_DISTANCE) {
+        const nextPoints = [...points, point];
+        drawPointsRef.current = nextPoints;
+        setDrawStroke(createDrawStroke(nextPoints));
+      }
+      return;
+    }
+
+    if (!draftBox) return;
+
+    const normalized = normalizeBox(draftBox.startX, draftBox.startY, point.x, point.y);
     setDraftBox({ ...draftBox, ...normalized });
   }
 
+  function releasePointer(event: ReactPointerEvent<HTMLDivElement>) {
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch {
+      // Ignore pointer release issue.
+    }
+  }
+
   function handlePointerUp(event: ReactPointerEvent<HTMLDivElement>) {
+    if (drawStroke) {
+      const finalStroke = drawStroke;
+      setDrawStroke(null);
+      drawPointsRef.current = [];
+      releasePointer(event);
+
+      if (finalStroke.points.length >= 1) {
+        addDrawObject(finalStroke);
+      }
+      return;
+    }
+
     if (!draftBox) return;
 
     const finalBox = {
@@ -730,12 +825,7 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
     };
 
     setDraftBox(null);
-
-    try {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    } catch {
-      // Ignore pointer release issue.
-    }
+    releasePointer(event);
 
     const tooSmall = finalBox.width < 8 || finalBox.height < 8;
 
@@ -772,7 +862,8 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
     editor.activeTool === "text" ||
     editor.activeTool === "highlight" ||
     editor.activeTool === "whiteout" ||
-    editor.activeTool === "shape";
+    editor.activeTool === "shape" ||
+    editor.activeTool === "draw";
 
   return (
     <div className="mx-auto">
@@ -810,7 +901,9 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
                     ? "Drag to whiteout"
                     : editor.activeTool === "shape"
                       ? "Drag to draw a shape"
-                      : editor.activeTool.toUpperCase()}
+                      : editor.activeTool === "draw"
+                        ? "Draw freehand on the page"
+                        : editor.activeTool.toUpperCase()}
         </span>
       </div>
 
@@ -940,10 +1033,24 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
             );
           }
 
+          if (object.type === "draw") {
+            return (
+              <DrawTool
+                key={object.id}
+                object={object}
+                selected={editor.selectedObjectId === object.id}
+                pageScale={editor.zoom}
+                onSelect={editor.selectObject}
+                onUpdateData={editor.updateObjectData}
+                onUpdateBox={editor.updateObjectBox}
+                onDelete={editor.deleteObject}
+              />
+            );
+          }
+
           return null;
         })}
 
-        {/* Object tool — detected image overlays */}
         {editor.activeTool === "object"
           ? detectedImages.map((rect, index) => {
               const active =
@@ -980,7 +1087,6 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
             })
           : null}
 
-        {/* Object tool — action popover */}
         {editor.activeTool === "object" && objectPopover ? (
           <div
             onPointerDown={(event) => event.stopPropagation()}
@@ -1053,6 +1159,30 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
               height: draftBox.height * editor.zoom,
             }}
           />
+        ) : null}
+
+        {drawStroke ? (
+          <svg
+            viewBox={`0 0 ${drawStroke.box.width} ${drawStroke.box.height}`}
+            className="pointer-events-none absolute z-40 overflow-visible"
+            preserveAspectRatio="none"
+            style={{
+              left: drawStroke.box.x * editor.zoom,
+              top: drawStroke.box.y * editor.zoom,
+              width: drawStroke.box.width * editor.zoom,
+              height: drawStroke.box.height * editor.zoom,
+            }}
+          >
+            <path
+              d={drawStroke.pathData}
+              fill="none"
+              stroke="#111827"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              vectorEffect="non-scaling-stroke"
+            />
+          </svg>
         ) : null}
       </div>
     </div>
