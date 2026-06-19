@@ -38,6 +38,7 @@ type EditorExportObjectData = {
   readonly backgroundColor?: string;
   readonly opacity?: number;
   readonly imageDataUrl?: string;
+  readonly stampLabel?: string;
   readonly pathData?: string;
   readonly shapeType?: "rectangle" | "circle" | "line" | "arrow";
   readonly strokeColor?: string;
@@ -234,7 +235,7 @@ async function drawEditorObject({
     return;
   }
 
-  if (object.type === "image") {
+  if (object.type === "image" || object.type === "stamp") {
     await drawEditorImageObject({
       pdfDoc,
       page,
