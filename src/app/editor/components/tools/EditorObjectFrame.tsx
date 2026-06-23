@@ -247,6 +247,7 @@ export function EditorObjectFrame({
   }
 
   function handleRootPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    event.stopPropagation();
     onSelect(object.id);
 
     if (locked) {
@@ -264,6 +265,7 @@ export function EditorObjectFrame({
   }
 
   function handleRootPointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+    event.stopPropagation();
     const state = dragRef.current;
 
     if (locked || !state) return;
@@ -296,6 +298,7 @@ export function EditorObjectFrame({
   }
 
   function handleRootPointerUp(event: ReactPointerEvent<HTMLDivElement>) {
+    event.stopPropagation();
     const state = dragRef.current;
     dragRef.current = null;
 
