@@ -59,6 +59,7 @@ const COLOR_PRESETS = ["#111827", "#dc2626", "#2563eb", "#16a34a", "#ca8a04", "#
 const DEFAULT_STROKE_COLOR = "#111827";
 const DEFAULT_FILL_COLOR = "#ede9fe";
 const DEFAULT_STROKE_WIDTH = 2;
+const MIN_SCALE_DIMENSION = 0.01;
 
 function clampStrokeWidth(value: number) {
   if (!Number.isFinite(value)) return DEFAULT_STROKE_WIDTH;
@@ -102,6 +103,38 @@ function getLinePoints(data: ShapeData, width: number, height: number) {
     start: getRelativePoint(data.lineStart, { x: 0, y: 0 }, width, height),
     end: getRelativePoint(data.lineEnd, { x: width, y: height }, width, height),
   };
+}
+
+function scaleRelativePoint({
+  point,
+  fallback,
+  oldWidth,
+  oldHeight,
+  nextWidth,
+  nextHeight,
+}: {
+  readonly point: RelativePoint | undefined;
+  readonly fallback: RelativePoint;
+  readonly oldWidth: number;
+  readonly oldHeight: number;
+  readonly nextWidth: number;
+  readonly nextHeight: number;
+}) {
+  const safeOldWidth = Math.max(MIN_SCALE_DIMENSION, oldWidth);
+  const safeOldHeight = Math.max(MIN_SCALE_DIMENSION, oldHeight);
+  const safeNextWidth = Math.max(MIN_SCALE_DIMENSION, nextWidth);
+  const safeNextHeight = Math.max(MIN_SCALE_DIMENSION, nextHeight);
+  const currentPoint = getRelativePoint(point, fallback, safeOldWidth, safeOldHeight);
+
+  return getRelativePoint(
+    {
+      x: currentPoint.x * (safeNextWidth / safeOldWidth),
+      y: currentPoint.y * (safeNextHeight / safeOldHeight),
+    },
+    fallback,
+    safeNextWidth,
+    safeNextHeight,
+  );
 }
 
 function getArrowMarkerId(objectId: string) {
@@ -269,6 +302,47 @@ export function ShapeTool({
     });
   }
 
+  function updateShapeBox(id: string, box: Partial<EditorObjectBox>) {
+    if (shapeType !== "line" && shapeType !== "arrow") {
+      onUpdateBox(id, box);
+      return;
+    }
+
+    const nextBox = {
+      ...object.box,
+      ...box,
+    };
+
+    if (
+      nextBox.width === object.box.width &&
+      nextBox.height === object.box.height
+    ) {
+      onUpdateBox(id, box);
+      return;
+    }
+
+    onUpdateData(id, {
+      lineStart: scaleRelativePoint({
+        point: data.lineStart,
+        fallback: { x: 0, y: 0 },
+        oldWidth: object.box.width,
+        oldHeight: object.box.height,
+        nextWidth: nextBox.width,
+        nextHeight: nextBox.height,
+      }),
+      lineEnd: scaleRelativePoint({
+        point: data.lineEnd,
+        fallback: { x: object.box.width, y: object.box.height },
+        oldWidth: object.box.width,
+        oldHeight: object.box.height,
+        nextWidth: nextBox.width,
+        nextHeight: nextBox.height,
+      }),
+    });
+
+    onUpdateBox(id, box);
+  }
+
   const toolbarContent = (
     <>
       <div className="flex shrink-0 items-center gap-1">
@@ -414,7 +488,7 @@ export function ShapeTool({
       toolbarLabel="Shape"
       toolbarContent={toolbarContent}
       onSelect={onSelect}
-      onUpdateBox={onUpdateBox}
+      onUpdateBox={updateShapeBox}
       onDelete={onDelete}
     >
       <ShapePreview object={object} data={data} />
