@@ -12,6 +12,8 @@ import { EditorObjectFrame } from "./EditorObjectFrame";
 
 type DrawData = EditorObjectData & {
   readonly pathData?: string;
+  readonly drawWidth?: number;
+  readonly drawHeight?: number;
   readonly strokeColor?: string;
   readonly strokeWidth?: number;
 };
@@ -29,6 +31,7 @@ type DrawToolProps = {
 const COLOR_PRESETS = ["#111827", "#dc2626", "#2563eb", "#16a34a", "#ca8a04", "#7c3aed"];
 const DEFAULT_STROKE_COLOR = "#111827";
 const DEFAULT_STROKE_WIDTH = 2;
+const MIN_DRAW_DIMENSION = 1;
 
 function clampStrokeWidth(value: number) {
   if (!Number.isFinite(value)) return DEFAULT_STROKE_WIDTH;
@@ -40,6 +43,16 @@ function getSafePathData(value: unknown) {
   if (typeof value !== "string") return "";
 
   return value;
+}
+
+function getDrawDimension(value: unknown, fallback: number) {
+  const dimension = Number(value);
+
+  if (Number.isFinite(dimension) && dimension > 0) {
+    return Math.max(MIN_DRAW_DIMENSION, dimension);
+  }
+
+  return Math.max(MIN_DRAW_DIMENSION, fallback);
 }
 
 export function DrawTool({
@@ -55,8 +68,8 @@ export function DrawTool({
   const pathData = getSafePathData(data.pathData);
   const strokeColor = data.strokeColor || DEFAULT_STROKE_COLOR;
   const strokeWidth = clampStrokeWidth(Number(data.strokeWidth ?? DEFAULT_STROKE_WIDTH));
-  const viewBoxWidth = Math.max(1, object.box.width);
-  const viewBoxHeight = Math.max(1, object.box.height);
+  const viewBoxWidth = getDrawDimension(data.drawWidth, object.box.width);
+  const viewBoxHeight = getDrawDimension(data.drawHeight, object.box.height);
 
   function handleToolbarMouseDown(event: MouseEvent<HTMLButtonElement>) {
     event.preventDefault();

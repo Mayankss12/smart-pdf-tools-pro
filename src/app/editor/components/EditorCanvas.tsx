@@ -502,10 +502,12 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
       box: safeBox,
       data: {
         pathData: stroke.pathData,
+        drawWidth: safeBox.width,
+        drawHeight: safeBox.height,
         strokeColor: "#111827",
         strokeWidth: 2,
         opacity: 1,
-      } as any,
+      },
     });
   }
 

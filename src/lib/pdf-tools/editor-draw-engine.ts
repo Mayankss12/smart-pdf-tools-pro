@@ -9,6 +9,8 @@ type DrawObject = {
   readonly box: { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
   readonly data: {
     readonly pathData?: string;
+    readonly drawWidth?: number;
+    readonly drawHeight?: number;
     readonly strokeColor?: string;
     readonly strokeWidth?: number;
     readonly opacity?: number;
@@ -17,6 +19,7 @@ type DrawObject = {
 
 const DEFAULT_STROKE_COLOR = "#111827";
 const DEFAULT_STROKE_WIDTH = 2;
+const MIN_DRAW_DIMENSION = 1;
 
 function clamp(value: number, min: number, max: number) {
   if (!Number.isFinite(value)) return min;
@@ -54,10 +57,25 @@ function parsePath(pathData: string | undefined): DrawPoint[] {
   return points;
 }
 
+function getDrawDimension(value: unknown, fallback: number) {
+  const dimension = Number(value);
+
+  if (Number.isFinite(dimension) && dimension > 0) {
+    return Math.max(MIN_DRAW_DIMENSION, dimension);
+  }
+
+  return Math.max(MIN_DRAW_DIMENSION, fallback);
+}
+
 function toPdfPoint(page: PDFPage, object: DrawObject, point: DrawPoint) {
+  const drawWidth = getDrawDimension(object.data.drawWidth, object.box.width);
+  const drawHeight = getDrawDimension(object.data.drawHeight, object.box.height);
+  const scaleX = object.box.width / drawWidth;
+  const scaleY = object.box.height / drawHeight;
+
   return {
-    x: object.box.x + point.x,
-    y: page.getHeight() - (object.box.y + point.y),
+    x: object.box.x + point.x * scaleX,
+    y: page.getHeight() - (object.box.y + point.y * scaleY),
   };
 }
 

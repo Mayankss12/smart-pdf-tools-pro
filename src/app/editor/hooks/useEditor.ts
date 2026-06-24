@@ -61,6 +61,9 @@ export type EditorObjectData = {
   readonly imageDataUrl?: string;
   readonly note?: string;
   readonly stampLabel?: string;
+  readonly pathData?: string;
+  readonly drawWidth?: number;
+  readonly drawHeight?: number;
   readonly shapeType?: "rectangle" | "circle" | "line" | "arrow";
   readonly strokeColor?: string;
   readonly strokeWidth?: number;
