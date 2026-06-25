@@ -10,14 +10,6 @@ import type {
 } from "../../hooks/useEditor";
 import { EditorObjectFrame } from "./EditorObjectFrame";
 
-type DrawData = EditorObjectData & {
-  readonly pathData?: string;
-  readonly drawWidth?: number;
-  readonly drawHeight?: number;
-  readonly strokeColor?: string;
-  readonly strokeWidth?: number;
-};
-
 type DrawToolProps = {
   readonly object: EditorObject;
   readonly selected: boolean;
@@ -64,7 +56,7 @@ export function DrawTool({
   onUpdateBox,
   onDelete,
 }: DrawToolProps) {
-  const data = object.data as DrawData;
+  const data = object.data;
   const pathData = getSafePathData(data.pathData);
   const strokeColor = data.strokeColor || DEFAULT_STROKE_COLOR;
   const strokeWidth = clampStrokeWidth(Number(data.strokeWidth ?? DEFAULT_STROKE_WIDTH));
@@ -77,8 +69,8 @@ export function DrawTool({
     onSelect(object.id);
   }
 
-  function updateDrawData(nextData: Partial<DrawData>) {
-    onUpdateData(object.id, nextData as Partial<EditorObjectData>);
+  function updateDrawData(nextData: Partial<EditorObjectData>) {
+    onUpdateData(object.id, nextData);
   }
 
   function setStrokeColor(event: MouseEvent<HTMLButtonElement>, nextColor: string) {

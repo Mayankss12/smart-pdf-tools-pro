@@ -24,14 +24,7 @@ type RelativePoint = {
   readonly y: number;
 };
 
-type ShapeData = EditorObjectData & {
-  readonly shapeType?: ShapeType;
-  readonly strokeColor?: string;
-  readonly strokeWidth?: number;
-  readonly fillColor?: string;
-  readonly lineStart?: RelativePoint;
-  readonly lineEnd?: RelativePoint;
-};
+type ShapeData = EditorObjectData;
 
 type ShapeToolProps = {
   readonly object: EditorObject;
@@ -247,7 +240,7 @@ export function ShapeTool({
   onUpdateBox,
   onDelete,
 }: ShapeToolProps) {
-  const data = object.data as ShapeData;
+  const data = object.data;
   const shapeType = getShapeType(data.shapeType);
   const strokeColor = data.strokeColor || DEFAULT_STROKE_COLOR;
   const strokeWidth = clampStrokeWidth(Number(data.strokeWidth ?? DEFAULT_STROKE_WIDTH));
@@ -255,8 +248,8 @@ export function ShapeTool({
   const fillColor = fillEnabled ? data.fillColor || DEFAULT_FILL_COLOR : "none";
   const canUseFill = shapeType === "rectangle" || shapeType === "circle";
 
-  function updateShapeData(nextData: Partial<ShapeData>) {
-    onUpdateData(object.id, nextData as Partial<EditorObjectData>);
+  function updateShapeData(nextData: Partial<EditorObjectData>) {
+    onUpdateData(object.id, nextData);
   }
 
   function handleToolbarMouseDown(event: MouseEvent<HTMLButtonElement>) {
