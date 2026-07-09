@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { DM_Sans, Plus_Jakarta_Sans } from "next/font/google";
+import "react-pdf-highlighter-plus/style/style.css";
+import "react-pdf-highlighter-plus/style/pdf_viewer.css";
 import "@/styles/tokens.css";
 import "./globals.css";
 
