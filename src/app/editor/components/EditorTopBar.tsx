@@ -66,6 +66,7 @@ type EditorTopBarProps = {
 
 const OPEN_IMAGE_PICKER_EVENT = "pdfmantra:editor-open-image-picker";
 const OPEN_SIGNATURE_PICKER_EVENT = "pdfmantra:editor-open-signature-picker";
+const OPEN_STAMP_PICKER_EVENT = "pdfmantra:editor-open-stamp-picker";
 
 function formatPageLabel(editor: EditorController) {
   if (!editor.pdfDocument) return "No PDF";
@@ -270,7 +271,9 @@ export function EditorTopBar({
           label: "Stamp",
           shortcut: "M",
           icon: Stamp,
-          status: "locked",
+          status: "working",
+          disabled: !hasDocument,
+          action: () => openPickerFromToolbar(OPEN_STAMP_PICKER_EVENT),
         },
       ],
     },

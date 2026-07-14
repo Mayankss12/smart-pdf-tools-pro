@@ -37,6 +37,7 @@ function getObjectLabel(object: EditorObject) {
 
   if (object.type === "image") return "Image / area";
   if (object.type === "signature") return "Signature";
+  if (object.type === "stamp") return object.data.stampLabel || "Stamp";
   if (object.type === "text") return "Text";
   if (object.type === "highlight") return "Highlight";
   if (object.type === "whiteout") return "Whiteout";

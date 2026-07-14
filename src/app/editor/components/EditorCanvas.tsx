@@ -25,6 +25,7 @@ import { HighlightTool } from "./tools/HighlightTool";
 import { ImageTool } from "./tools/ImageTool";
 import { ShapeTool } from "./tools/ShapeTool";
 import { SignatureTool } from "./tools/SignatureTool";
+import { StampTool } from "./tools/StampTool";
 import { TextTool } from "./tools/TextTool";
 import { WhiteoutTool } from "./tools/WhiteoutTool";
 
@@ -85,6 +86,7 @@ const DRAW_POINT_DISTANCE = 1.5;
 
 const OPEN_IMAGE_PICKER_EVENT = "pdfmantra:editor-open-image-picker";
 const OPEN_SIGNATURE_PICKER_EVENT = "pdfmantra:editor-open-signature-picker";
+const OPEN_STAMP_PICKER_EVENT = "pdfmantra:editor-open-stamp-picker";
 
 function isPdfFile(file: File) {
   return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
@@ -263,8 +265,10 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
   const pageLayerRef = useRef<HTMLDivElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const signatureInputRef = useRef<HTMLInputElement | null>(null);
+  const stampInputRef = useRef<HTMLInputElement | null>(null);
   const pendingImagePointRef = useRef<Point | null>(null);
   const pendingSignaturePointRef = useRef<Point | null>(null);
+  const pendingStampPointRef = useRef<Point | null>(null);
   const drawPointsRef = useRef<Point[]>([]);
 
   const [isRendering, setIsRendering] = useState(true);
@@ -396,16 +400,27 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
     signatureInputRef.current?.click();
   }
 
+  function openStampPickerAtDefaultPoint() {
+    if (!editor.pdfDocument) return;
+
+    pendingStampPointRef.current = getDefaultImagePoint();
+    editor.setActiveTool("select");
+    stampInputRef.current?.click();
+  }
+
   useEffect(() => {
     const handleOpenImagePicker = () => openImagePickerAtDefaultPoint();
     const handleOpenSignaturePicker = () => openSignaturePickerAtDefaultPoint();
+    const handleOpenStampPicker = () => openStampPickerAtDefaultPoint();
 
     window.addEventListener(OPEN_IMAGE_PICKER_EVENT, handleOpenImagePicker);
     window.addEventListener(OPEN_SIGNATURE_PICKER_EVENT, handleOpenSignaturePicker);
+    window.addEventListener(OPEN_STAMP_PICKER_EVENT, handleOpenStampPicker);
 
     return () => {
       window.removeEventListener(OPEN_IMAGE_PICKER_EVENT, handleOpenImagePicker);
       window.removeEventListener(OPEN_SIGNATURE_PICKER_EVENT, handleOpenSignaturePicker);
+      window.removeEventListener(OPEN_STAMP_PICKER_EVENT, handleOpenStampPicker);
     };
   });
 
@@ -692,6 +707,21 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
     });
   }
 
+  async function addStampObject(point: Point, file: File) {
+    if (!isSupportedImageFile(file)) return;
+
+    const imageDataUrl = await readFileAsDataUrl(file);
+    const imageSize = await getImageSize(imageDataUrl);
+    const safeBox = getImageBox(point, imageSize);
+
+    editor.addObject({
+      type: "stamp",
+      pageNumber: editor.activePageNumber,
+      box: safeBox,
+      data: { imageDataUrl, stampLabel: "Stamp" },
+    });
+  }
+
   function getFallbackTextBox(startX: number, startY: number) {
     return clampBoxToPage(
       { x: startX, y: startY, width: DEFAULT_TEXT_BOX.width, height: DEFAULT_TEXT_BOX.height },
@@ -724,6 +754,18 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
     if (!file || !point) return;
 
     void addSignatureObject(point, file);
+  }
+
+  function handleStampFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    const point = pendingStampPointRef.current ?? getDefaultImagePoint();
+
+    pendingStampPointRef.current = null;
+    event.currentTarget.value = "";
+
+    if (!file || !point) return;
+
+    void addStampObject(point, file);
   }
 
   function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
@@ -885,6 +927,14 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
         onChange={handleSignatureFileChange}
       />
 
+      <input
+        ref={stampInputRef}
+        type="file"
+        accept="image/png,image/jpeg"
+        className="hidden"
+        onChange={handleStampFileChange}
+      />
+
       <div className="mb-3 flex items-center justify-between">
         <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-slate-500 shadow-sm">
           Page {editor.activePageNumber}
@@ -980,6 +1030,20 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
           if (object.type === "signature") {
             return (
               <SignatureTool
+                key={object.id}
+                object={object}
+                selected={editor.selectedObjectId === object.id}
+                pageScale={editor.zoom}
+                onSelect={editor.selectObject}
+                onUpdateBox={editor.updateObjectBox}
+                onDelete={editor.deleteObject}
+              />
+            );
+          }
+
+          if (object.type === "stamp") {
+            return (
+              <StampTool
                 key={object.id}
                 object={object}
                 selected={editor.selectedObjectId === object.id}

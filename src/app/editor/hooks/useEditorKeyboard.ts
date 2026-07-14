@@ -4,6 +4,8 @@ import { useEffect, useRef } from "react";
 
 import type { EditorController } from "./useEditor";
 
+const OPEN_STAMP_PICKER_EVENT = "pdfmantra:editor-open-stamp-picker";
+
 function isTypingTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) {
     return false;
@@ -39,6 +41,13 @@ export function useEditorKeyboard(editor: EditorController) {
         if (typing) return;
         event.preventDefault();
         editor.redo();
+        return;
+      }
+
+      if (!mod && !typing && event.key.toLowerCase() === "m" && editor.pdfDocument) {
+        event.preventDefault();
+        editor.setActiveTool("select");
+        window.dispatchEvent(new CustomEvent(OPEN_STAMP_PICKER_EVENT));
         return;
       }
 

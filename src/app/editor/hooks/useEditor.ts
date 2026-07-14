@@ -191,7 +191,7 @@ function isObjectLocked(object: EditorObject | undefined) {
 }
 
 function shouldAutoOffsetObject(type: EditorObjectType) {
-  return type === "image" || type === "signature";
+  return type === "image" || type === "signature" || type === "stamp";
 }
 
 function isSameInitialPlacement(candidate: EditorObject, existing: EditorObject) {
