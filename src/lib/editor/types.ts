@@ -121,12 +121,34 @@ export type DrawState = {
 
 export type TextOverlayItem = {
   id: string;
+  page: number;
   text: string;
   leftPercent: number;
   topPercent: number;
   widthPercent: number;
   heightPercent: number;
   fontSizePx: number;
+  fontSizePdf: number;
+  transform?: number[];
+  fontName?: string;
+};
+
+export type TextOverlayWord = TextOverlayItem & {
+  sourceItemId: string;
+  wordIndex: number;
+};
+
+export type ParagraphBlock = {
+  id: string;
+  page: number;
+  text: string;
+  itemIds: string[];
+  leftPercent: number;
+  topPercent: number;
+  widthPercent: number;
+  heightPercent: number;
+  fontSizePx: number;
+  fontSizePdf: number;
 };
 
 /* -------------------------------------------------------------------------- */

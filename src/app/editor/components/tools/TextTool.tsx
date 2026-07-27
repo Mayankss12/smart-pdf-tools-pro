@@ -170,19 +170,19 @@ function readDomRuns(root: HTMLElement, fallback: Required<EditorTextStyle>) {
       return;
     }
 
-    const nextStyle: Required<EditorTextStyle> = { ...inheritedStyle };
+    let nextStyle: Required<EditorTextStyle> = { ...inheritedStyle };
     const computedColor = normalizeColor(element.style.color);
 
     if (tag === "b" || tag === "strong" || element.style.fontWeight === "bold") {
-      nextStyle.fontWeight = "bold";
+      nextStyle = { ...nextStyle, fontWeight: "bold" };
     }
 
     if (Number.parseInt(element.style.fontWeight || "0", 10) >= 600) {
-      nextStyle.fontWeight = "bold";
+      nextStyle = { ...nextStyle, fontWeight: "bold" };
     }
 
     if (tag === "i" || tag === "em" || element.style.fontStyle === "italic") {
-      nextStyle.fontStyle = "italic";
+      nextStyle = { ...nextStyle, fontStyle: "italic" };
     }
 
     if (
@@ -190,11 +190,11 @@ function readDomRuns(root: HTMLElement, fallback: Required<EditorTextStyle>) {
       element.style.textDecoration.includes("underline") ||
       element.style.textDecorationLine.includes("underline")
     ) {
-      nextStyle.textDecoration = "underline";
+      nextStyle = { ...nextStyle, textDecoration: "underline" };
     }
 
     if (computedColor) {
-      nextStyle.color = computedColor;
+      nextStyle = { ...nextStyle, color: computedColor };
     }
 
     element.childNodes.forEach((child) => walk(child, nextStyle));

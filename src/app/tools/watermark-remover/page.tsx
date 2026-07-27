@@ -171,10 +171,22 @@ export default function WatermarkRemoverPage() {
 
               <div className="mt-5 grid gap-4 md:grid-cols-3">
                 {[
-                  [ShieldCheck, "Authorized cleanup", "Built for PDFs you own or are allowed to edit."],
-                  [LockKeyhole, "Pro gated", "Connects cleanly to account, plan, and server jobs."],
-                  [Wand2, "Backend ready", "Prepared for deeper text/object/image mark removal."],
-                ].map(([Icon, title, description]) => (
+                  {
+                    icon: ShieldCheck,
+                    title: "Authorized cleanup",
+                    description: "Built for PDFs you own or are allowed to edit.",
+                  },
+                  {
+                    icon: LockKeyhole,
+                    title: "Pro gated",
+                    description: "Connects cleanly to account, plan, and server jobs.",
+                  },
+                  {
+                    icon: Wand2,
+                    title: "Backend ready",
+                    description: "Prepared for deeper text/object/image mark removal.",
+                  },
+                ].map(({ icon: Icon, title, description }) => (
                   <div key={String(title)} className="rounded-[1.5rem] border border-violet-100 bg-slate-50 p-4">
                     <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-100 text-violet-700">
                       <Icon size={20} />

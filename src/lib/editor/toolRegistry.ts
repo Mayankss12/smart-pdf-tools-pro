@@ -87,7 +87,7 @@ export const EDITOR_COMMAND_GROUPS = [
 /* Main editor command registry                                                */
 /* -------------------------------------------------------------------------- */
 
-export const EDITOR_COMMAND_REGISTRY = [
+export const EDITOR_COMMAND_REGISTRY: readonly EditorCommandRegistryItem[] = [
   {
     id: "select",
     label: "Select",
@@ -393,7 +393,7 @@ export const EDITOR_COMMAND_REGISTRY = [
     },
     searchTerms: ["export", "download", "save pdf", "finish"],
   },
-] as const satisfies readonly EditorCommandRegistryItem[];
+];
 
 /* -------------------------------------------------------------------------- */
 /* Registry helpers                                                            */
@@ -404,12 +404,7 @@ export const DEFAULT_EDITOR_RIBBON_TOOL: EditorRibbonToolId = "select";
 export const EDITOR_RIBBON_TOOL_IDS = EDITOR_COMMAND_REGISTRY.filter(
   (command): command is EditorCommandRegistryItem & { id: EditorRibbonToolId } =>
     command.kind === "tool" || command.kind === "menu",
-)
-  .map((command) => command.id)
-  .filter(
-    (id): id is EditorRibbonToolId =>
-      id !== "undo" && id !== "redo" && id !== "export",
-  );
+).map((command) => command.id);
 
 export const EDITOR_RIBBON_ACTION_IDS = EDITOR_COMMAND_REGISTRY.filter(
   (command): command is EditorCommandRegistryItem & { id: EditorRibbonActionId } =>

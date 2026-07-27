@@ -1,7 +1,4 @@
-import type {
-  PageRotation,
-  Size2D,
-} from "@/engines/shared/types";
+import type { Size2D } from "@/engines/shared/types";
 
 /**
  * PDFMantra PDF.js Adapter Types
@@ -69,7 +66,7 @@ export interface PdfJsTextContentLike {
 export interface PdfJsPageGeometrySource {
   readonly pageIndex: number;
   readonly pageNumber?: number;
-  readonly rotation?: PageRotation;
+  readonly rotation?: number;
   readonly pdfPageSize: Size2D;
   readonly viewport: PdfJsViewportLike;
 }

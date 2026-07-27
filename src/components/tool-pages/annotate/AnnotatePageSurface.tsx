@@ -219,11 +219,11 @@ function buildArrowHeadPoints(
 }
 
 function buildAnnotationBounds(annotation: AnnotationLayer): NormalizedRect {
-  if (annotation.kind === "rectangle" || annotation.kind === "ellipse" || annotation.kind === "text-note") {
+  if ("bounds" in annotation) {
     return annotation.bounds;
   }
 
-  if (annotation.kind === "line" || annotation.kind === "arrow") {
+  if ("start" in annotation) {
     return expandNormalizedRect(
       createNormalizedRectFromPoints(annotation.start, annotation.end),
       0.006,

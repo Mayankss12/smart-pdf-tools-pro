@@ -14,8 +14,8 @@ import type {
   EditorObject,
   EditorObjectBox,
   EditorObjectData,
-} from "../../hooks/useEditor";
-import { EditorObjectFrame } from "./EditorObjectFrame";
+} from "../../app/editor/hooks/useEditor";
+import { EditorObjectFrame } from "../../app/editor/components/tools/EditorObjectFrame";
 
 type ShapeType = "rectangle" | "circle" | "line" | "arrow";
 
