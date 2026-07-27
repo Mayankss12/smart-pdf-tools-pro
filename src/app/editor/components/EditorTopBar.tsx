@@ -254,7 +254,10 @@ export function EditorTopBar({
           label: "Note",
           shortcut: "N",
           icon: StickyNote,
-          status: "locked",
+          status: "working",
+          active: editor.activeTool === "note",
+          disabled: !hasDocument,
+          action: () => selectTool("note"),
         },
         {
           id: "whiteout",

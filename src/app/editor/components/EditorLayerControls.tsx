@@ -41,6 +41,7 @@ function getObjectLabel(object: EditorObject) {
   if (object.type === "text") return "Text";
   if (object.type === "highlight") return "Highlight";
   if (object.type === "whiteout") return "Whiteout";
+  if (object.type === "note") return "Note";
 
   return "Object";
 }

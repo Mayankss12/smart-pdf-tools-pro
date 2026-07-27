@@ -11,6 +11,7 @@ import {
 } from "./editor-rich-text-engine";
 import { drawEditorWhiteout } from "./editor-whiteout-engine";
 import { drawEditorImageObject } from "./editor-image-engine";
+import { drawEditorNoteObject } from "./editor-note-engine";
 import { drawEditorSignatureObject } from "./editor-signature-engine";
 import { drawEditorShapeObject } from "./editor-shape-engine";
 import { drawEditorDrawObject } from "./editor-draw-engine";
@@ -222,6 +223,11 @@ async function drawEditorObject({
     drawEditorWhiteout(page, object.box, {
       opacity: object.data.opacity ?? 1,
     });
+    return;
+  }
+
+  if (object.type === "note") {
+    drawEditorNoteObject(page, object, fonts);
     return;
   }
 

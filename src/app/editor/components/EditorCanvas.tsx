@@ -23,6 +23,7 @@ import type { EditorController } from "../hooks/useEditor";
 import { DrawTool } from "./tools/DrawTool";
 import { HighlightTool } from "./tools/HighlightTool";
 import { ImageTool } from "./tools/ImageTool";
+import { NoteTool } from "./tools/NoteTool";
 import { ShapeTool } from "./tools/ShapeTool";
 import { SignatureTool } from "./tools/SignatureTool";
 import { StampTool } from "./tools/StampTool";
@@ -40,7 +41,7 @@ type PageSize = {
   readonly height: number;
 };
 
-type DraftTool = "text" | "highlight" | "whiteout" | "shape";
+type DraftTool = "text" | "highlight" | "whiteout" | "note" | "shape";
 
 type DraftBox = {
   readonly type: DraftTool;
@@ -79,9 +80,11 @@ const DEFAULT_TEXT_BOX = { width: 220, height: 44 };
 const MIN_TEXT_BOX = { width: 72, height: 30 };
 const MIN_IMAGE_BOX = { width: 48, height: 32 };
 const MIN_SIGNATURE_BOX = { width: 72, height: 24 };
+const MIN_NOTE_BOX = { width: 96, height: 72 };
 const MIN_SHAPE_BOX = { width: 24, height: 24 };
 const MIN_DRAW_BOX = { width: 8, height: 8 };
 const DEFAULT_SHAPE_BOX = { width: 160, height: 96 };
+const DEFAULT_NOTE_BOX = { width: 200, height: 140 };
 const DRAW_POINT_DISTANCE = 1.5;
 
 const OPEN_IMAGE_PICKER_EVENT = "pdfmantra:editor-open-image-picker";
@@ -476,6 +479,33 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
     });
   }
 
+  function addNoteObject(box: Box) {
+    const safeBox = clampBoxToPage(
+      {
+        ...box,
+        width: Math.max(MIN_NOTE_BOX.width, box.width),
+        height: Math.max(MIN_NOTE_BOX.height, box.height),
+      },
+      pageSize,
+      editor.zoom,
+      MIN_NOTE_BOX.width,
+      MIN_NOTE_BOX.height,
+    );
+
+    editor.addObject({
+      type: "note",
+      pageNumber: editor.activePageNumber,
+      box: safeBox,
+      data: {
+        text: "Write your note here",
+        fontSize: 14,
+        color: "#78350f",
+        backgroundColor: "#fef3c7",
+        opacity: 1,
+      },
+    });
+  }
+
   function addShapeObject(draft: DraftBox, box: Box) {
     const tooSmall = box.width < 8 || box.height < 8;
     const baseBox = tooSmall
@@ -797,6 +827,7 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
       editor.activeTool === "text" ||
       editor.activeTool === "highlight" ||
       editor.activeTool === "whiteout" ||
+      editor.activeTool === "note" ||
       editor.activeTool === "shape"
     ) {
       event.preventDefault();
@@ -897,6 +928,19 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
       );
     }
 
+    if (draftBox.type === "note") {
+      addNoteObject(
+        tooSmall
+          ? {
+              x: draftBox.startX,
+              y: draftBox.startY,
+              width: DEFAULT_NOTE_BOX.width,
+              height: DEFAULT_NOTE_BOX.height,
+            }
+          : finalBox,
+      );
+    }
+
     if (draftBox.type === "shape") {
       addShapeObject(draftBox, finalBox);
     }
@@ -906,6 +950,7 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
     editor.activeTool === "text" ||
     editor.activeTool === "highlight" ||
     editor.activeTool === "whiteout" ||
+    editor.activeTool === "note" ||
     editor.activeTool === "shape" ||
     editor.activeTool === "draw";
 
@@ -951,11 +996,13 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
                   ? "Drag to highlight"
                   : editor.activeTool === "whiteout"
                     ? "Drag to whiteout"
-                    : editor.activeTool === "shape"
-                      ? "Drag to draw a shape"
-                      : editor.activeTool === "draw"
-                        ? "Draw freehand on the page"
-                        : editor.activeTool.toUpperCase()}
+                    : editor.activeTool === "note"
+                      ? "Click or drag to place a note"
+                      : editor.activeTool === "shape"
+                        ? "Drag to draw a shape"
+                        : editor.activeTool === "draw"
+                          ? "Draw freehand on the page"
+                          : editor.activeTool.toUpperCase()}
         </span>
       </div>
 
@@ -1078,6 +1125,21 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
                 selected={editor.selectedObjectId === object.id}
                 pageScale={editor.zoom}
                 onSelect={editor.selectObject}
+                onUpdateBox={editor.updateObjectBox}
+                onDelete={editor.deleteObject}
+              />
+            );
+          }
+
+          if (object.type === "note") {
+            return (
+              <NoteTool
+                key={object.id}
+                object={object}
+                selected={editor.selectedObjectId === object.id}
+                pageScale={editor.zoom}
+                onSelect={editor.selectObject}
+                onUpdateData={editor.updateObjectData}
                 onUpdateBox={editor.updateObjectBox}
                 onDelete={editor.deleteObject}
               />
@@ -1214,9 +1276,11 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
                 ? "border-yellow-500 bg-yellow-300/40"
                 : draftBox.type === "text"
                   ? "border-violet-500 bg-violet-100/20"
-                  : draftBox.type === "shape"
-                    ? "border-violet-600 bg-violet-500/10"
-                    : "border-violet-500 bg-white/90",
+                  : draftBox.type === "note"
+                    ? "border-amber-500 bg-amber-100/70"
+                    : draftBox.type === "shape"
+                      ? "border-violet-600 bg-violet-500/10"
+                      : "border-violet-500 bg-white/90",
             ].join(" ")}
             style={{
               left: draftBox.x * editor.zoom,
