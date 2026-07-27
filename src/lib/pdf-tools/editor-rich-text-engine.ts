@@ -124,6 +124,94 @@ function getTextRuns(object: EditorRichTextExportObject): readonly ExportTextRun
   ];
 }
 
+function replaceUnsupportedCharacters(text: string, font: PDFFont, fontSize: number) {
+  return Array.from(text)
+    .map((character) => {
+      if (character === "\n" || character === "\r") return character;
+
+      try {
+        font.widthOfTextAtSize(character, fontSize);
+        return character;
+      } catch {
+        return "?";
+      }
+    })
+    .join("");
+}
+
+function measureTextSafely(text: string, font: PDFFont, fontSize: number) {
+  try {
+    return font.widthOfTextAtSize(text, fontSize);
+  } catch {
+    return Array.from(text).reduce((width, character) => {
+      try {
+        return width + font.widthOfTextAtSize(character, fontSize);
+      } catch {
+        return width;
+      }
+    }, 0);
+  }
+}
+
+function drawTextSafely({
+  page,
+  text,
+  x,
+  y,
+  fontSize,
+  font,
+  color,
+  maxWidth,
+  opacity,
+}: {
+  readonly page: PDFPage;
+  readonly text: string;
+  readonly x: number;
+  readonly y: number;
+  readonly fontSize: number;
+  readonly font: PDFFont;
+  readonly color: ReturnType<typeof rgb>;
+  readonly maxWidth: number;
+  readonly opacity: number;
+}) {
+  try {
+    page.drawText(text, {
+      x,
+      y,
+      size: fontSize,
+      font,
+      color,
+      maxWidth,
+      opacity,
+    });
+    return;
+  } catch {
+    // Fall back to drawing only characters that the selected font accepts.
+  }
+
+  let characterX = x;
+
+  Array.from(text).forEach((character) => {
+    try {
+      const characterWidth = font.widthOfTextAtSize(character, fontSize);
+
+      page.drawText(character, {
+        x: characterX,
+        y,
+        size: fontSize,
+        font,
+        color,
+        maxWidth,
+        opacity,
+      });
+
+      characterX += characterWidth;
+    } catch {
+      // Skip a character if it still cannot be measured or encoded.
+    }
+  });
+}
+
 function drawUnderlineSegment({
   page,
   startX,
@@ -187,7 +275,8 @@ export function drawEditorRichTextObject(
     const font = getTextFontFromStyle(style, fonts);
     const colorValue = hexToRgb(style.color);
     const textColor = rgb(colorValue.r, colorValue.g, colorValue.b);
-    const tokens = run.text.split(/(\r\n|\n|\s+)/g).filter((token) => token.length > 0);
+    const safeText = replaceUnsupportedCharacters(run.text, font, fontSize);
+    const tokens = safeText.split(/(\r\n|\n|\s+)/g).filter((token) => token.length > 0);
 
     tokens.forEach((token) => {
       if (token === "\n" || token === "\r\n") {
@@ -195,7 +284,7 @@ export function drawEditorRichTextObject(
         return;
       }
 
-      const tokenWidth = font.widthOfTextAtSize(token, fontSize);
+      const tokenWidth = measureTextSafely(token, font, fontSize);
       const isOnlyWhitespace = /^\s+$/.test(token);
 
       if (!isOnlyWhitespace && cursorX > startX && cursorX + tokenWidth > maxX) {
@@ -203,10 +292,12 @@ export function drawEditorRichTextObject(
       }
 
       if (!isOnlyWhitespace) {
-        page.drawText(token, {
+        drawTextSafely({
+          page,
+          text: token,
           x: cursorX,
           y: baselineY,
-          size: fontSize,
+          fontSize,
           font,
           color: textColor,
           maxWidth: object.box.width,
