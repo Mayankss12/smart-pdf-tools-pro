@@ -1,0 +1,59 @@
+import { NextResponse } from "next/server";
+
+import { isSameSiteStateChangingRequest } from "@/lib/api-security";
+import {
+  conversionApiError,
+  getConversionApiOwner,
+  getProviderError,
+} from "@/lib/conversions/api";
+import {
+  assertSafeJobId,
+  getConversionProvider,
+} from "@/lib/conversions/jobs";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+export async function POST(
+  request: Request,
+  context: { params: Promise<{ id: string }> },
+) {
+  if (!isSameSiteStateChangingRequest(request)) {
+    return conversionApiError(
+      request,
+      403,
+      "ORIGIN_REJECTED",
+      "Request origin is not allowed.",
+    );
+  }
+  const ownerId = await getConversionApiOwner();
+  if (!ownerId) {
+    return conversionApiError(
+      request,
+      401,
+      "AUTHENTICATION_REQUIRED",
+      "Authentication is required.",
+    );
+  }
+  const provider = getConversionProvider();
+  if (!provider) {
+    return conversionApiError(
+      request,
+      503,
+      "PROVIDER_UNAVAILABLE",
+      "The conversion provider is not configured.",
+    );
+  }
+  try {
+    const { id } = await context.params;
+    assertSafeJobId(id);
+    const job = await provider.cancelJob(ownerId, id);
+    return NextResponse.json(
+      { ok: true, job },
+      { headers: { "Cache-Control": "no-store" } },
+    );
+  } catch (error) {
+    const safe = getProviderError(error);
+    return conversionApiError(request, 502, safe.code, safe.message);
+  }
+}

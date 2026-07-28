@@ -110,6 +110,18 @@ export const CORE_TOOL_KEYS = [
   "page-numbers",
   "watermark",
   "fill-sign",
+  "pdf-to-text",
+  "pdf-to-html",
+  "pdf-to-jpg",
+  "pdf-to-png",
+  "pdf-to-webp",
+  "jpg-to-pdf",
+  "png-to-pdf",
+  "webp-to-pdf",
+  "text-to-pdf",
+  "markdown-to-pdf",
+  "html-to-pdf",
+  "csv-to-pdf",
 ] as const;
 
 export const ADVANCED_TOOL_KEYS = [
@@ -123,6 +135,13 @@ export const ADVANCED_TOOL_KEYS = [
 export const BACKEND_TOOL_KEYS = [
   "ocr",
   "pdf-to-word",
+  "pdf-to-excel",
+  "pdf-to-powerpoint",
+  "docx-to-pdf",
+  "xlsx-to-pdf",
+  "pptx-to-pdf",
+  "heic-to-pdf",
+  "webpage-to-pdf",
 ] as const;
 
 export type CoreToolKey = (typeof CORE_TOOL_KEYS)[number];
