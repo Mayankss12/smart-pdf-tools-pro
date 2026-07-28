@@ -2,154 +2,145 @@
 
 import { useEffect, useRef } from "react";
 
-import { getEditorToolForSingleKey } from "@/lib/editor/editor-tool-registry";
+import {
+  EDITOR_TOOL_DEFINITIONS,
+  matchesEditorShortcut,
+  resolveEditorTool,
+  type EditorToolbarItemId,
+  type EditorToolContext,
+} from "@/lib/editor/editor-tool-registry";
 
 import type { EditorController } from "./useEditor";
 
-const OPEN_STAMP_PICKER_EVENT = "pdfmantra:editor-open-stamp-picker";
-
 function isTypingTarget(target: EventTarget | null) {
-  if (!(target instanceof HTMLElement)) {
-    return false;
-  }
+  if (!(target instanceof HTMLElement)) return false;
 
   const tag = target.tagName;
-  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable;
+  return (
+    tag === "INPUT" ||
+    tag === "TEXTAREA" ||
+    tag === "SELECT" ||
+    target.isContentEditable
+  );
 }
 
-export function useEditorKeyboard(editor: EditorController) {
-  const editorRef = useRef(editor);
-  editorRef.current = editor;
+export function useEditorKeyboard({
+  editor,
+  toolContext,
+  onToolAction,
+  onUnavailableTool,
+}: {
+  readonly editor: EditorController;
+  readonly toolContext: EditorToolContext;
+  readonly onToolAction: (toolId: EditorToolbarItemId) => void;
+  readonly onUnavailableTool: (message: string) => void;
+}) {
+  const stateRef = useRef({
+    editor,
+    toolContext,
+    onToolAction,
+    onUnavailableTool,
+  });
+  stateRef.current = {
+    editor,
+    toolContext,
+    onToolAction,
+    onUnavailableTool,
+  };
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      const editor = editorRef.current;
-      const mod = event.ctrlKey || event.metaKey;
+      const state = stateRef.current;
+      const currentEditor = state.editor;
       const typing = isTypingTarget(event.target);
 
-      // Undo / Redo — global, even with no selection.
-      if (mod && event.key.toLowerCase() === "z") {
+      if (event.key === "Escape") {
         if (typing) return;
         event.preventDefault();
-        if (event.shiftKey) {
-          editor.redo();
-        } else {
-          editor.undo();
-        }
+        currentEditor.setActiveTool("select");
+        currentEditor.selectObject(null);
         return;
       }
 
-      if (mod && event.key.toLowerCase() === "y") {
-        if (typing) return;
-        event.preventDefault();
-        editor.redo();
-        return;
-      }
+      if (!typing) {
+        const shortcutTool = EDITOR_TOOL_DEFINITIONS.find(
+          (definition) =>
+            definition.shortcut &&
+            matchesEditorShortcut(event, definition.shortcut),
+        );
 
-      if (mod && !typing && event.key.toLowerCase() === "f" && editor.pdfDocument) {
-        event.preventDefault();
-        editor.setActiveTool("find");
-        editor.selectObject(null);
-        return;
-      }
-
-      if (!mod && !typing && event.key.toLowerCase() === "m" && editor.pdfDocument) {
-        event.preventDefault();
-        editor.setActiveTool("select");
-        window.dispatchEvent(new CustomEvent(OPEN_STAMP_PICKER_EVENT));
-        return;
-      }
-
-      if (!mod && !typing && editor.pdfDocument) {
-        const tool = getEditorToolForSingleKey(event.key);
-
-        if (tool) {
+        if (shortcutTool) {
           event.preventDefault();
-          if (tool === "stamp") {
-            editor.setActiveTool("select");
-            window.dispatchEvent(new CustomEvent(OPEN_STAMP_PICKER_EVENT));
+          const resolved = resolveEditorTool(shortcutTool, state.toolContext);
+
+          if (resolved.enabled) {
+            state.onToolAction(shortcutTool.id);
           } else {
-            editor.setActiveTool(tool);
+            state.onUnavailableTool(
+              resolved.disabledReason ??
+                `${shortcutTool.label} is currently unavailable.`,
+            );
           }
           return;
         }
       }
 
-      if (!typing && event.key === "Escape") {
+      const selectedId = currentEditor.selectedObjectId;
+      const selected = currentEditor.selectedObject;
+      const commandPressed = event.ctrlKey || event.metaKey;
+
+      if (!selectedId || !selected || typing) return;
+
+      if (commandPressed && event.key.toLowerCase() === "l") {
         event.preventDefault();
-        editor.setActiveTool("select");
-        editor.selectObject(null);
+        currentEditor.toggleObjectLock(selectedId);
         return;
       }
 
-      const selectedId = editor.selectedObjectId;
-      const selected = editor.selectedObject;
+      if (selected.locked) return;
 
-      if (!selectedId || !selected || typing) {
-        return;
-      }
-
-      // Lock toggle stays available even when object is locked.
-      if (mod && event.key.toLowerCase() === "l") {
-        event.preventDefault();
-        editor.toggleObjectLock(selectedId);
-        return;
-      }
-
-      if (selected.locked) {
-        return;
-      }
-
-      // Duplicate.
-      if (mod && event.key.toLowerCase() === "d") {
-        event.preventDefault();
-        editor.duplicateObject(selectedId);
-        return;
-      }
-
-      // Z-order: Ctrl+] forward, Ctrl+[ backward, +Shift = front/back.
-      if (mod && event.key === "]") {
+      if (commandPressed && event.key === "]") {
         event.preventDefault();
         if (event.shiftKey) {
-          editor.bringToFront(selectedId);
+          currentEditor.bringToFront(selectedId);
         } else {
-          editor.bringForward(selectedId);
+          currentEditor.bringForward(selectedId);
         }
         return;
       }
 
-      if (mod && event.key === "[") {
+      if (commandPressed && event.key === "[") {
         event.preventDefault();
         if (event.shiftKey) {
-          editor.sendToBack(selectedId);
+          currentEditor.sendToBack(selectedId);
         } else {
-          editor.sendBackward(selectedId);
+          currentEditor.sendBackward(selectedId);
         }
         return;
       }
 
-      // Delete.
-      if (event.key === "Delete" || event.key === "Backspace") {
-        event.preventDefault();
-        editor.deleteObject(selectedId);
-        return;
-      }
-
-      // Arrow nudge (Shift = larger step).
       const step = event.shiftKey ? 10 : 1;
 
       if (event.key === "ArrowUp") {
         event.preventDefault();
-        editor.updateObjectBox(selectedId, { y: selected.box.y - step });
+        currentEditor.updateObjectBox(selectedId, {
+          y: selected.box.y - step,
+        });
       } else if (event.key === "ArrowDown") {
         event.preventDefault();
-        editor.updateObjectBox(selectedId, { y: selected.box.y + step });
+        currentEditor.updateObjectBox(selectedId, {
+          y: selected.box.y + step,
+        });
       } else if (event.key === "ArrowLeft") {
         event.preventDefault();
-        editor.updateObjectBox(selectedId, { x: selected.box.x - step });
+        currentEditor.updateObjectBox(selectedId, {
+          x: selected.box.x - step,
+        });
       } else if (event.key === "ArrowRight") {
         event.preventDefault();
-        editor.updateObjectBox(selectedId, { x: selected.box.x + step });
+        currentEditor.updateObjectBox(selectedId, {
+          x: selected.box.x + step,
+        });
       }
     }
 
