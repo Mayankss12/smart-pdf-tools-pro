@@ -38,6 +38,7 @@ import {
   validatePdfFile,
   type PdfProcessingResult,
 } from "@/lib/pdf-engine";
+import { confirmPdfCompatibility } from "@/lib/pdf-document-safety";
 
 type MergeQueueItem = {
   id: string;
@@ -478,6 +479,16 @@ export default function MergePage() {
     setStatus("Merging PDFs with PDFMantra engine...");
 
     try {
+      const compatibility = await confirmPdfCompatibility(
+        items.map((item) => item.file),
+        "Merge PDFs",
+      );
+      if (!compatibility.confirmed) {
+        setExportProgress(0);
+        setStatus("Merge cancelled. The original PDFs were not modified.");
+        return;
+      }
+
       setExportProgress(35);
       const output = await mergePdfFiles(items.map((item) => item.file));
 

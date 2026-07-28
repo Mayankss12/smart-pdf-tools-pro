@@ -1,23 +1,12 @@
 import { PDFDocument, StandardFonts, degrees, rgb } from "pdf-lib";
+import {
+  copyPdfDocumentMetadata,
+  readValidatedPdfBytes,
+} from "@/lib/pdf-document-safety";
+import { PdfEngineError } from "@/lib/pdf-errors";
 
-export type PdfEngineErrorCode =
-  | "NO_FILE"
-  | "INVALID_FILE_TYPE"
-  | "FILE_TOO_LARGE"
-  | "EMPTY_FILE"
-  | "ENCRYPTED_OR_UNSUPPORTED"
-  | "INVALID_PAGE_RANGE"
-  | "PROCESSING_FAILED";
-
-export class PdfEngineError extends Error {
-  readonly code: PdfEngineErrorCode;
-
-  constructor(code: PdfEngineErrorCode, message: string) {
-    super(message);
-    this.name = "PdfEngineError";
-    this.code = code;
-  }
-}
+export { PdfEngineError } from "@/lib/pdf-errors";
+export type { PdfEngineErrorCode } from "@/lib/pdf-errors";
 
 export type PdfProcessingResult = {
   blob: Blob;
@@ -125,7 +114,11 @@ export async function loadPdfDocument(file: File, options: PdfValidationOptions 
   validatePdfFile(file, options);
 
   try {
-    return await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
+    const bytes = await readValidatedPdfBytes(
+      file,
+      options.maxSizeMb ?? DEFAULT_MAX_SIZE_MB,
+    );
+    return await PDFDocument.load(bytes);
   } catch {
     throw new PdfEngineError(
       "ENCRYPTED_OR_UNSUPPORTED",
@@ -181,6 +174,9 @@ export async function mergePdfFiles(files: File[]): Promise<PdfProcessingResult>
   for (const file of files) {
     originalSize += file.size;
     const sourcePdf = await loadPdfDocument(file);
+    if (outputPdf.getPageCount() === 0) {
+      copyPdfDocumentMetadata(sourcePdf, outputPdf);
+    }
     const copiedPages = await outputPdf.copyPages(sourcePdf, sourcePdf.getPageIndices());
     copiedPages.forEach((page) => outputPdf.addPage(page));
   }
@@ -243,6 +239,7 @@ export async function splitPdfIntoGroups(file: File, groups: PageGroup[]) {
   return Promise.all(
     groups.map(async (group, index) => {
       const outputPdf = await PDFDocument.create();
+      copyPdfDocumentMetadata(sourcePdf, outputPdf);
       const copiedPages = await outputPdf.copyPages(
         sourcePdf,
         group.pages.map((pageNumber) => pageNumber - 1),

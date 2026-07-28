@@ -45,6 +45,7 @@ import {
   type PageGroup,
   type PdfProcessingResult,
 } from "@/lib/pdf-engine";
+import { confirmPdfCompatibility } from "@/lib/pdf-document-safety";
 
 type BusyMode = "idle" | "reading" | "rendering" | "exporting";
 type ThumbnailStatus = "idle" | "loading" | "ready" | "error";
@@ -610,6 +611,13 @@ export default function SplitPage() {
     setStatus(`Creating ${groups.length} split PDF${groups.length > 1 ? "s" : ""}...`);
 
     try {
+      const compatibility = await confirmPdfCompatibility([file], "Split PDF");
+      if (!compatibility.confirmed) {
+        setExportProgress(0);
+        setStatus("Split cancelled. The original PDF was not modified.");
+        return;
+      }
+
       setExportProgress(30);
       const outputs = await splitPdfIntoGroups(file, groups);
 

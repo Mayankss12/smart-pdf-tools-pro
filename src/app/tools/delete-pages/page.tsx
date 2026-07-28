@@ -32,6 +32,7 @@ import {
   type PdfProcessingResult,
 } from "@/lib/pdf-engine";
 import { deletePdfPages } from "@/lib/pdf-page-engine";
+import { confirmPdfCompatibility } from "@/lib/pdf-document-safety";
 
 function getErrorMessage(error: unknown) {
   if (error instanceof PdfEngineError) return error.message;
@@ -224,6 +225,12 @@ export default function DeletePagesPage() {
     setStatus("Creating PDF without selected pages...");
 
     try {
+      const compatibility = await confirmPdfCompatibility([file], "Delete PDF pages");
+      if (!compatibility.confirmed) {
+        setStatus("Page deletion cancelled. The original PDF was not modified.");
+        return;
+      }
+
       const output = await deletePdfPages(file, selectedPages);
 
       setStatus("Checking export allowance...");

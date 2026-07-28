@@ -32,6 +32,7 @@ import {
   type PdfProcessingResult,
 } from "@/lib/pdf-engine";
 import { extractPdfPages } from "@/lib/pdf-page-engine";
+import { confirmPdfCompatibility } from "@/lib/pdf-document-safety";
 
 function getErrorMessage(error: unknown) {
   if (error instanceof PdfEngineError) return error.message;
@@ -233,6 +234,12 @@ export default function ExtractPagesPage() {
     setStatus(`Extracting ${selectedPages.length} page${selectedPages.length > 1 ? "s" : ""}...`);
 
     try {
+      const compatibility = await confirmPdfCompatibility([file], "Extract PDF pages");
+      if (!compatibility.confirmed) {
+        setStatus("Extraction cancelled. The original PDF was not modified.");
+        return;
+      }
+
       const output = await extractPdfPages(file, selectedPages);
 
       setStatus("Checking export allowance...");

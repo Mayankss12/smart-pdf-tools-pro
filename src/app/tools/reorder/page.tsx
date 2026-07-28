@@ -41,6 +41,7 @@ import {
   type PdfProcessingResult,
 } from "@/lib/pdf-engine";
 import { reorderPdfPages } from "@/lib/pdf-page-engine";
+import { confirmPdfCompatibility } from "@/lib/pdf-document-safety";
 
 function getErrorMessage(error: unknown) {
   if (error instanceof PdfEngineError) return error.message;
@@ -493,6 +494,12 @@ export default function ReorderPagesPage() {
     setStatus("Creating reordered PDF...");
 
     try {
+      const compatibility = await confirmPdfCompatibility([file], "Reorder PDF pages");
+      if (!compatibility.confirmed) {
+        setStatus("Reorder cancelled. The original PDF was not modified.");
+        return;
+      }
+
       const output = await reorderPdfPages(file, pageOrder);
 
       setStatus("Checking export allowance...");

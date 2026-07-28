@@ -7,6 +7,7 @@ import {
   savePdfResult,
   type PdfProcessingResult,
 } from "@/lib/pdf-engine";
+import { copyPdfDocumentMetadata } from "@/lib/pdf-document-safety";
 
 function uniqueSortedPageNumbers(pageNumbers: number[]) {
   return Array.from(new Set(pageNumbers)).sort((a, b) => a - b);
@@ -63,6 +64,7 @@ export async function deletePdfPages(
     .filter((pageIndex) => !deleteSet.has(pageIndex + 1));
 
   const outputPdf = await PDFDocument.create();
+  copyPdfDocumentMetadata(sourcePdf, outputPdf);
   const copiedPages = await outputPdf.copyPages(sourcePdf, pagesToKeep);
   copiedPages.forEach((page) => outputPdf.addPage(page));
 
@@ -80,6 +82,7 @@ export async function extractPdfPages(
   validatePageNumbers(cleanExtractPages, totalPages);
 
   const outputPdf = await PDFDocument.create();
+  copyPdfDocumentMetadata(sourcePdf, outputPdf);
   const copiedPages = await outputPdf.copyPages(
     sourcePdf,
     cleanExtractPages.map((pageNumber) => pageNumber - 1),
@@ -99,6 +102,7 @@ export async function reorderPdfPages(
   validateFullPageOrder(pageOrder, totalPages);
 
   const outputPdf = await PDFDocument.create();
+  copyPdfDocumentMetadata(sourcePdf, outputPdf);
   const copiedPages = await outputPdf.copyPages(
     sourcePdf,
     pageOrder.map((pageNumber) => pageNumber - 1),
