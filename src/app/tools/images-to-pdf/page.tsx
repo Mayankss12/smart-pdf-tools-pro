@@ -454,12 +454,13 @@ export default function ImagesToPdfPage({ variant = DEFAULT_IMAGES_TO_PDF_VARIAN
 
   useEffect(() => {
     setLocalOcrRunsUsed(getLocalOcrRunsUsed());
+    const previewUrls = previewUrlsRef.current;
 
     return () => {
       abortControllerRef.current?.abort();
       void terminateOcrWorker();
-      for (const url of previewUrlsRef.current) URL.revokeObjectURL(url);
-      previewUrlsRef.current.clear();
+      for (const url of previewUrls) URL.revokeObjectURL(url);
+      previewUrls.clear();
     };
   }, []);
 

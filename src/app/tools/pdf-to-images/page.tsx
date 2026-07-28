@@ -481,15 +481,18 @@ export default function PdfToImagesPage({ variant = DEFAULT_PDF_TO_IMAGES_VARIAN
 
   useEffect(() => {
     configurePdfWorker();
+    const thumbnailUrls = thumbnailUrlsRef.current;
+    const outputUrls = outputUrlsRef.current;
+
     return () => {
       thumbnailAbortRef.current?.abort();
       exportAbortRef.current?.abort();
       void activePdfRef.current?.destroy();
       activePdfRef.current = null;
-      for (const url of thumbnailUrlsRef.current) URL.revokeObjectURL(url);
-      for (const url of outputUrlsRef.current) URL.revokeObjectURL(url);
-      thumbnailUrlsRef.current.clear();
-      outputUrlsRef.current.clear();
+      for (const url of thumbnailUrls) URL.revokeObjectURL(url);
+      for (const url of outputUrls) URL.revokeObjectURL(url);
+      thumbnailUrls.clear();
+      outputUrls.clear();
     };
   }, []);
 
