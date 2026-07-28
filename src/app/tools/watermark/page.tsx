@@ -28,32 +28,24 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import {
-  StandardFonts,
-  degrees,
-  rgb,
-  type PDFImage,
-  type PDFPage,
-  type PDFFont,
-} from "pdf-lib";
-
 import { Header } from "@/components/Header";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import {
   PdfEngineError,
-  createPdfFileName,
   downloadBlob,
   formatFileSize,
-  loadPdfDocument,
-  savePdfResult,
   validatePdfFile,
   type PdfProcessingResult,
 } from "@/lib/pdf-engine";
-import type { StampFontStyle } from "@/lib/pdf-stamp-engine";
+import {
+  applyWatermark,
+  type WatermarkFontStyle,
+  type WatermarkLayout,
+  type WatermarkMode,
+} from "@/lib/pdf-watermark-engine";
+import { readValidatedPdfBytes } from "@/lib/pdf-document-safety";
 
 type BusyMode = "idle" | "rendering" | "exporting";
-type WatermarkMode = "text" | "image" | "both";
-type WatermarkLayout = "single" | "tile";
 type TargetMode = "all" | "odd" | "even" | "custom";
 type OpenPanel = "mode" | "style" | "position" | "pages" | "image" | "help" | null;
 type PerRow = 1 | 2 | 3 | 4;
@@ -83,38 +75,12 @@ type TargetPlan = {
   error: string | null;
 };
 
-type WatermarkExportOptions = {
-  mode: WatermarkMode;
-  layout: WatermarkLayout;
-  targetPages: number[];
-  text: string;
-  fontSize: number;
-  opacity: number;
-  angle: number;
-  fontStyle: StampFontStyle;
-  color: [number, number, number];
-  position: {
-    xPercent: number;
-    yPercent: number;
-  };
-  tileGap: number;
-  imageFile: File | null;
-  imageScale: number;
-};
-
-const FONT_OPTIONS: Array<{ value: StampFontStyle; label: string; previewClass: string }> = [
+const FONT_OPTIONS: Array<{ value: WatermarkFontStyle; label: string; previewClass: string }> = [
   { value: "regular", label: "Regular", previewClass: "font-medium not-italic" },
   { value: "bold", label: "Bold", previewClass: "font-semibold not-italic" },
   { value: "italic", label: "Italic", previewClass: "font-medium italic" },
   { value: "boldItalic", label: "Bold Italic", previewClass: "font-semibold italic" },
 ];
-
-const FONT_MAP: Record<StampFontStyle, StandardFonts> = {
-  regular: StandardFonts.Helvetica,
-  bold: StandardFonts.HelveticaBold,
-  italic: StandardFonts.HelveticaOblique,
-  boldItalic: StandardFonts.HelveticaBoldOblique,
-};
 
 const POSITION_PRESETS: PositionPreset[] = [
   { id: "top-left", label: "Top Left", shortLabel: "TL", xPercent: 16, yPercent: 12 },
@@ -276,9 +242,15 @@ async function renderPdfPageToPng(
 
   context.setTransform(outputScale, 0, 0, outputScale, 0, 0);
 
-  await page.render({ canvasContext: context, viewport }).promise;
-
-  return canvas.toDataURL("image/png");
+  const renderTask = page.render({ canvasContext: context, viewport });
+  try {
+    await renderTask.promise;
+    return canvas.toDataURL("image/png");
+  } finally {
+    page.cleanup();
+    canvas.width = 0;
+    canvas.height = 0;
+  }
 }
 
 function isSupportedImageFile(file: File) {
@@ -291,173 +263,6 @@ function isSupportedImageFile(file: File) {
     name.endsWith(".jpg") ||
     name.endsWith(".jpeg")
   );
-}
-
-function getTileCenters(width: number, height: number, gap: number) {
-  const safeGap = clamp(gap, 120, 420);
-  const centers: Array<{ x: number; y: number }> = [];
-
-  for (let y = -height * 0.1; y <= height * 1.1; y += safeGap) {
-    for (let x = -width * 0.1; x <= width * 1.1; x += safeGap) {
-      centers.push({ x, y });
-    }
-  }
-
-  return centers;
-}
-
-function drawWatermarkText({
-  page,
-  font,
-  text,
-  fontSize,
-  opacity,
-  angle,
-  color,
-  x,
-  y,
-}: {
-  page: PDFPage;
-  font: PDFFont;
-  text: string;
-  fontSize: number;
-  opacity: number;
-  angle: number;
-  color: [number, number, number];
-  x: number;
-  y: number;
-}) {
-  const textWidth = font.widthOfTextAtSize(text, fontSize);
-  const { width, height } = page.getSize();
-
-  page.drawText(text, {
-    x: clamp(x - textWidth / 2, 10, Math.max(12, width - textWidth - 10)),
-    y: clamp(y - fontSize / 2, 10, Math.max(12, height - fontSize - 10)),
-    size: fontSize,
-    font,
-    color: rgb(color[0], color[1], color[2]),
-    rotate: degrees(angle),
-    opacity,
-  });
-}
-
-function drawWatermarkImage({
-  page,
-  image,
-  imageScale,
-  opacity,
-  angle,
-  x,
-  y,
-}: {
-  page: PDFPage;
-  image: PDFImage;
-  imageScale: number;
-  opacity: number;
-  angle: number;
-  x: number;
-  y: number;
-}) {
-  const { width } = page.getSize();
-  const imageWidth = clamp(width * (imageScale / 100), 60, width * 0.92);
-  const imageHeight = imageWidth * (image.height / image.width);
-
-  page.drawImage(image, {
-    x: clamp(x - imageWidth / 2, -imageWidth * 0.2, width - imageWidth * 0.8),
-    y: y - imageHeight / 2,
-    width: imageWidth,
-    height: imageHeight,
-    rotate: degrees(angle),
-    opacity,
-  });
-}
-
-async function applyAdvancedWatermark(
-  file: File,
-  options: WatermarkExportOptions,
-): Promise<PdfProcessingResult> {
-  const text = options.text.trim();
-  const needsText = options.mode === "text" || options.mode === "both";
-  const needsImage = options.mode === "image" || options.mode === "both";
-
-  if (needsText && !text) {
-    throw new PdfEngineError("PROCESSING_FAILED", "Enter watermark text first.");
-  }
-
-  if (needsImage && !options.imageFile) {
-    throw new PdfEngineError("PROCESSING_FAILED", "Upload a PNG or JPG watermark image first.");
-  }
-
-  if (!options.targetPages.length) {
-    throw new PdfEngineError("INVALID_PAGE_RANGE", "Select at least one target page.");
-  }
-
-  const pdf = await loadPdfDocument(file);
-  const pages = pdf.getPages();
-  const targetPageSet = new Set(options.targetPages);
-  const opacity = clamp(options.opacity, 0.04, 0.85);
-  const angle = clamp(options.angle, -90, 90);
-  const fontSize = clamp(options.fontSize, 8, 220);
-  const xPercent = clamp(options.position.xPercent, 4, 96);
-  const yPercent = clamp(options.position.yPercent, 4, 96);
-  const font = needsText ? await pdf.embedFont(FONT_MAP[options.fontStyle] ?? StandardFonts.HelveticaBold) : null;
-
-  let embeddedImage: PDFImage | null = null;
-
-  if (needsImage && options.imageFile) {
-    const imageBytes = await options.imageFile.arrayBuffer();
-    const lowerName = options.imageFile.name.toLowerCase();
-    const isPng = options.imageFile.type === "image/png" || lowerName.endsWith(".png");
-
-    embeddedImage = isPng ? await pdf.embedPng(imageBytes) : await pdf.embedJpg(imageBytes);
-  }
-
-  pages.forEach((page, index) => {
-    const pageNumber = index + 1;
-
-    if (!targetPageSet.has(pageNumber)) return;
-
-    const { width, height } = page.getSize();
-    const centers =
-      options.layout === "tile"
-        ? getTileCenters(width, height, options.tileGap)
-        : [
-            {
-              x: (xPercent / 100) * width,
-              y: height - (yPercent / 100) * height,
-            },
-          ];
-
-    centers.forEach((center) => {
-      if (needsText && font) {
-        drawWatermarkText({
-          page,
-          font,
-          text,
-          fontSize,
-          opacity,
-          angle,
-          color: options.color,
-          x: center.x,
-          y: center.y,
-        });
-      }
-
-      if (needsImage && embeddedImage) {
-        drawWatermarkImage({
-          page,
-          image: embeddedImage,
-          imageScale: options.imageScale,
-          opacity,
-          angle,
-          x: center.x,
-          y: center.y,
-        });
-      }
-    });
-  });
-
-  return savePdfResult(pdf, file.size, createPdfFileName("watermarked", file.name));
 }
 
 function ProgressBar({ value }: { value: number }) {
@@ -536,7 +341,7 @@ export default function WatermarkPage() {
   const [fontSize, setFontSize] = useState(48);
   const [opacity, setOpacity] = useState(0.18);
   const [angle, setAngle] = useState(-32);
-  const [fontStyle, setFontStyle] = useState<StampFontStyle>("bold");
+  const [fontStyle, setFontStyle] = useState<WatermarkFontStyle>("bold");
   const [colorId, setColorId] = useState("violet");
 
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -741,31 +546,35 @@ export default function WatermarkPage() {
     try {
       validatePdfFile(selectedFile);
 
-      const pdfDocument = await loadPdfDocument(selectedFile);
-      const totalPages = pdfDocument.getPageCount();
-      const pdf = await pdfjsLib.getDocument({ data: await selectedFile.arrayBuffer() }).promise;
+      const bytes = await readValidatedPdfBytes(selectedFile);
+      const pdf = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+      const totalPages = pdf.numPages;
       const nextPreviews: PagePreview[] = [];
 
-      setFile(selectedFile);
-      setPageCount(totalPages);
-      setRenderProgress({ done: 0, total: totalPages });
+      try {
+        setFile(selectedFile);
+        setPageCount(totalPages);
+        setRenderProgress({ done: 0, total: totalPages });
 
-      for (let pageNumber = 1; pageNumber <= totalPages; pageNumber += 1) {
-        if (renderTokenRef.current !== token) return;
+        for (let pageNumber = 1; pageNumber <= totalPages; pageNumber += 1) {
+          if (renderTokenRef.current !== token) return;
 
-        nextPreviews.push({
-          pageNumber,
-          previewUrl: await renderPdfPageToPng(pdf, pageNumber, 0.36),
-        });
+          nextPreviews.push({
+            pageNumber,
+            previewUrl: await renderPdfPageToPng(pdf, pageNumber, 0.36),
+          });
+
+          if (renderTokenRef.current === token) {
+            setPreviews([...nextPreviews]);
+            setRenderProgress({ done: pageNumber, total: totalPages });
+          }
+        }
 
         if (renderTokenRef.current === token) {
-          setPreviews([...nextPreviews]);
-          setRenderProgress({ done: pageNumber, total: totalPages });
+          setStatus(`PDF loaded with ${totalPages} page${totalPages > 1 ? "s" : ""}. Adjust watermark settings.`);
         }
-      }
-
-      if (renderTokenRef.current === token) {
-        setStatus(`PDF loaded with ${totalPages} page${totalPages > 1 ? "s" : ""}. Adjust watermark settings.`);
+      } finally {
+        await pdf.destroy();
       }
     } catch (error) {
       renderTokenRef.current += 1;
@@ -861,7 +670,7 @@ export default function WatermarkPage() {
     try {
       setExportProgress(28);
 
-      const output = await applyAdvancedWatermark(file, {
+      const output = await applyWatermark(file, {
         mode: watermarkMode,
         layout: watermarkLayout,
         targetPages: targetPlan.pages,
@@ -1110,8 +919,8 @@ export default function WatermarkPage() {
                         </span>
                         <input
                           type="range"
-                          min={4}
-                          max={85}
+                          min={0}
+                          max={100}
                           value={Math.round(opacity * 100)}
                           onChange={(event) => {
                             setOpacity(Number(event.target.value) / 100);
@@ -1128,8 +937,8 @@ export default function WatermarkPage() {
                         </span>
                         <input
                           type="range"
-                          min={-90}
-                          max={90}
+                          min={-180}
+                          max={180}
                           value={angle}
                           onChange={(event) => {
                             setAngle(Number(event.target.value));

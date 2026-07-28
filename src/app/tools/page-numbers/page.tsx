@@ -26,20 +26,20 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { StandardFonts, rgb } from "pdf-lib";
-
 import { Header } from "@/components/Header";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import {
   PdfEngineError,
-  createPdfFileName,
   downloadBlob,
   formatFileSize,
-  loadPdfDocument,
-  savePdfResult,
   validatePdfFile,
   type PdfProcessingResult,
 } from "@/lib/pdf-engine";
+import { readValidatedPdfBytes } from "@/lib/pdf-document-safety";
+import {
+  addPageNumbersWithOptions,
+  type PageNumberFont,
+} from "@/lib/pdf-number-engine";
 
 type BusyMode = "idle" | "rendering" | "exporting";
 type TargetMode = "all" | "odd" | "even" | "custom";
@@ -74,16 +74,6 @@ type NumberColor = {
 type TargetPlan = {
   pages: number[];
   error: string | null;
-};
-
-type AdvancedPageNumberOptions = {
-  position: NumberPosition;
-  targetPages: number[];
-  startNumber: number;
-  fontSize: number;
-  prefix: string;
-  suffix: string;
-  color: [number, number, number];
 };
 
 const POSITION_PRESETS: PositionPreset[] = [
@@ -123,6 +113,16 @@ const NUMBER_COLORS: NumberColor[] = [
     previewClassName: "border-black bg-black text-white",
     pdf: [0, 0, 0],
   },
+];
+
+const NUMBER_FONTS: readonly {
+  readonly value: PageNumberFont;
+  readonly label: string;
+  readonly previewFamily: string;
+}[] = [
+  { value: "helvetica", label: "Helvetica", previewFamily: "Arial, sans-serif" },
+  { value: "times", label: "Times", previewFamily: "Georgia, serif" },
+  { value: "courier", label: "Courier", previewFamily: "monospace" },
 ];
 
 function getErrorMessage(error: unknown) {
@@ -240,8 +240,8 @@ async function loadPdfForPreview(file: File) {
   validatePdfFile(file);
   configurePdfWorker();
 
-  const buffer = await file.arrayBuffer();
-  const loadingTask = pdfjsLib.getDocument({ data: buffer.slice(0) });
+  const bytes = await readValidatedPdfBytes(file);
+  const loadingTask = pdfjsLib.getDocument({ data: bytes.slice() });
 
   return loadingTask.promise;
 }
@@ -269,56 +269,15 @@ async function renderPdfPageToPng(
 
   context.setTransform(outputScale, 0, 0, outputScale, 0, 0);
 
-  await page.render({ canvasContext: context, viewport }).promise;
-
-  return canvas.toDataURL("image/png");
-}
-
-async function addAdvancedPageNumbers(
-  file: File,
-  options: AdvancedPageNumberOptions,
-): Promise<PdfProcessingResult> {
-  if (!Number.isInteger(options.startNumber) || options.startNumber < 0) {
-    throw new PdfEngineError("PROCESSING_FAILED", "Start number must be 0 or higher.");
+  const renderTask = page.render({ canvasContext: context, viewport });
+  try {
+    await renderTask.promise;
+    return canvas.toDataURL("image/png");
+  } finally {
+    page.cleanup();
+    canvas.width = 0;
+    canvas.height = 0;
   }
-
-  if (!options.targetPages.length) {
-    throw new PdfEngineError("INVALID_PAGE_RANGE", "Select at least one page to number.");
-  }
-
-  const pdf = await loadPdfDocument(file);
-  const font = await pdf.embedFont(StandardFonts.HelveticaBold);
-  const fontSize = clamp(options.fontSize, 8, 72);
-  const xPercent = clamp(options.position.xPercent, 4, 96);
-  const yPercent = clamp(options.position.yPercent, 4, 96);
-  const targetIndexByPage = new Map(options.targetPages.map((pageNumber, index) => [pageNumber, index]));
-  const totalNumberedPages = options.targetPages.length;
-
-  pdf.getPages().forEach((page, index) => {
-    const documentPageNumber = index + 1;
-    const targetIndex = targetIndexByPage.get(documentPageNumber);
-
-    if (targetIndex === undefined) return;
-
-    const { width, height } = page.getSize();
-    const displayNumber = options.startNumber + targetIndex;
-    const text = buildNumberText(displayNumber, totalNumberedPages, options.prefix, options.suffix);
-    const textWidth = font.widthOfTextAtSize(text, fontSize);
-
-    const x = clamp((xPercent / 100) * width - textWidth / 2, 12, width - textWidth - 12);
-    const y = clamp(height - (yPercent / 100) * height - fontSize / 2, 12, height - fontSize - 12);
-
-    page.drawText(text, {
-      x,
-      y,
-      size: fontSize,
-      font,
-      color: rgb(options.color[0], options.color[1], options.color[2]),
-      opacity: 0.94,
-    });
-  });
-
-  return savePdfResult(pdf, file.size, createPdfFileName("page-numbers", file.name));
 }
 
 function ProgressBar({ value }: { value: number }) {
@@ -400,6 +359,8 @@ export default function PageNumbersPage() {
 
   const [startNumber, setStartNumber] = useState(1);
   const [fontSize, setFontSize] = useState(13);
+  const [font, setFont] = useState<PageNumberFont>("helvetica");
+  const [opacity, setOpacity] = useState(0.94);
   const [prefix, setPrefix] = useState("");
   const [suffix, setSuffix] = useState("");
   const [colorId, setColorId] = useState("slate");
@@ -418,6 +379,10 @@ export default function PageNumbersPage() {
   const selectedColor = useMemo(
     () => NUMBER_COLORS.find((color) => color.id === colorId) ?? NUMBER_COLORS[0],
     [colorId],
+  );
+  const selectedFont = useMemo(
+    () => NUMBER_FONTS.find((option) => option.value === font) ?? NUMBER_FONTS[0],
+    [font],
   );
 
   const targetPlan = useMemo(
@@ -529,6 +494,8 @@ export default function PageNumbersPage() {
     setSkipFirstPage(false);
     setStartNumber(1);
     setFontSize(13);
+    setFont("helvetica");
+    setOpacity(0.94);
     setPrefix("");
     setSuffix("");
     setColorId("slate");
@@ -588,26 +555,30 @@ export default function PageNumbersPage() {
       const pdf = await loadPdfForPreview(selectedFile);
       const nextPreviews: PdfPagePreview[] = [];
 
-      setFile(selectedFile);
-      setPageCount(pdf.numPages);
-      setRenderProgress({ done: 0, total: pdf.numPages });
+      try {
+        setFile(selectedFile);
+        setPageCount(pdf.numPages);
+        setRenderProgress({ done: 0, total: pdf.numPages });
 
-      for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
-        if (renderTokenRef.current !== token) return;
+        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+          if (renderTokenRef.current !== token) return;
 
-        nextPreviews.push({
-          pageNumber,
-          previewUrl: await renderPdfPageToPng(pdf, pageNumber, 0.36),
-        });
+          nextPreviews.push({
+            pageNumber,
+            previewUrl: await renderPdfPageToPng(pdf, pageNumber, 0.36),
+          });
+
+          if (renderTokenRef.current === token) {
+            setPreviews([...nextPreviews]);
+            setRenderProgress({ done: pageNumber, total: pdf.numPages });
+          }
+        }
 
         if (renderTokenRef.current === token) {
-          setPreviews([...nextPreviews]);
-          setRenderProgress({ done: pageNumber, total: pdf.numPages });
+          setStatus(`PDF loaded with ${pdf.numPages} page${pdf.numPages > 1 ? "s" : ""}. Page numbers are ready to preview.`);
         }
-      }
-
-      if (renderTokenRef.current === token) {
-        setStatus(`PDF loaded with ${pdf.numPages} page${pdf.numPages > 1 ? "s" : ""}. Page numbers are ready to preview.`);
+      } finally {
+        await pdf.destroy();
       }
     } catch (error) {
       renderTokenRef.current += 1;
@@ -667,11 +638,13 @@ export default function PageNumbersPage() {
     try {
       setExportProgress(28);
 
-      const output = await addAdvancedPageNumbers(file, {
+      const output = await addPageNumbersWithOptions(file, {
         position,
         targetPages: targetPlan.pages,
         startNumber,
         fontSize,
+        font,
+        opacity,
         prefix,
         suffix,
         color: selectedColor.pdf,
@@ -821,6 +794,52 @@ export default function PageNumbersPage() {
                             }}
                             disabled={busy}
                             className="mt-2 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          />
+                        </label>
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-2 gap-3">
+                        <label className="block">
+                          <span className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
+                            Font
+                          </span>
+                          <select
+                            value={font}
+                            onChange={(event) => {
+                              const nextFont = NUMBER_FONTS.find(
+                                (option) => option.value === event.target.value,
+                              );
+                              if (nextFont) setFont(nextFont.value);
+                              setResult(null);
+                            }}
+                            disabled={busy}
+                            className="mt-2 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {NUMBER_FONTS.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+
+                        <label className="block">
+                          <span className="flex items-center justify-between text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
+                            Opacity
+                            <span>{Math.round(opacity * 100)}%</span>
+                          </span>
+                          <input
+                            type="range"
+                            min={0}
+                            max={100}
+                            step={1}
+                            value={Math.round(opacity * 100)}
+                            onChange={(event) => {
+                              setOpacity(Number(event.target.value) / 100);
+                              setResult(null);
+                            }}
+                            disabled={busy}
+                            className="mt-3 w-full accent-violet-600"
                           />
                         </label>
                       </div>
@@ -1178,7 +1197,11 @@ export default function PageNumbersPage() {
                               >
                                 <div
                                   className={`rounded-full border px-2.5 py-1 text-center text-[11px] font-bold leading-none shadow-sm ${selectedColor.previewClassName}`}
-                                  style={{ fontSize: `${Math.max(10, Math.min(20, fontSize))}px` }}
+                                  style={{
+                                    fontSize: `${Math.max(10, Math.min(20, fontSize))}px`,
+                                    fontFamily: selectedFont.previewFamily,
+                                    opacity,
+                                  }}
                                 >
                                   {pageText}
                                 </div>
