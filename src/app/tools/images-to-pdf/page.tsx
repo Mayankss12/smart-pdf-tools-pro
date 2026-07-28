@@ -92,6 +92,7 @@ type OcrSummary = {
 
 type OpenDropdown = "layout" | "ocr" | "more" | "help" | null;
 type PerRow = 1 | 2 | 3 | 4 | 5;
+const PER_ROW_OPTIONS = [1, 2, 3, 4, 5] satisfies readonly PerRow[];
 
 const OCR_FREE_RUN_LIMIT = 3;
 const OCR_FREE_IMAGE_LIMIT = 20;
@@ -392,6 +393,7 @@ export default function ImagesToPdfPage({ variant = DEFAULT_IMAGES_TO_PDF_VARIAN
   const draggedIndexRef = useRef<number | null>(null);
   const draggedImageIdsRef = useRef<string[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const previewUrlsRef = useRef(new Set<string>());
 
   const { recordExport, isUnlimited, planLabel } = useEntitlement();
 
@@ -407,6 +409,9 @@ export default function ImagesToPdfPage({ variant = DEFAULT_IMAGES_TO_PDF_VARIAN
   const [orientation, setOrientation] = useState<ImageToPdfOrientation>("auto");
   const [fitMode, setFitMode] = useState<ImageToPdfFitMode>("contain");
   const [margin, setMargin] = useState(28);
+  const [backgroundColor, setBackgroundColor] = useState<string | null>(
+    "#ffffff",
+  );
   const [perRow, setPerRow] = useState<PerRow>(4);
 
   const [ocrEnabled, setOcrEnabled] = useState(false);
@@ -453,6 +458,8 @@ export default function ImagesToPdfPage({ variant = DEFAULT_IMAGES_TO_PDF_VARIAN
     return () => {
       abortControllerRef.current?.abort();
       void terminateOcrWorker();
+      for (const url of previewUrlsRef.current) URL.revokeObjectURL(url);
+      previewUrlsRef.current.clear();
     };
   }, []);
 
@@ -482,6 +489,9 @@ export default function ImagesToPdfPage({ variant = DEFAULT_IMAGES_TO_PDF_VARIAN
       file,
       previewUrl: URL.createObjectURL(file),
     }));
+    for (const image of preparedImages) {
+      previewUrlsRef.current.add(image.previewUrl);
+    }
 
     if (preparedImages.length > 0) {
       setImages((current) => [...current, ...preparedImages]);
@@ -571,7 +581,9 @@ export default function ImagesToPdfPage({ variant = DEFAULT_IMAGES_TO_PDF_VARIAN
   function removeImage(id: string) {
     setImages((current) => {
       const item = current.find((image) => image.id === id);
-      if (item) URL.revokeObjectURL(item.previewUrl);
+      if (item && previewUrlsRef.current.delete(item.previewUrl)) {
+        URL.revokeObjectURL(item.previewUrl);
+      }
       return current.filter((image) => image.id !== id);
     });
 
@@ -592,7 +604,12 @@ export default function ImagesToPdfPage({ variant = DEFAULT_IMAGES_TO_PDF_VARIAN
 
     setImages((current) => {
       current.forEach((image) => {
-        if (selected.has(image.id)) URL.revokeObjectURL(image.previewUrl);
+        if (
+          selected.has(image.id) &&
+          previewUrlsRef.current.delete(image.previewUrl)
+        ) {
+          URL.revokeObjectURL(image.previewUrl);
+        }
       });
 
       return current.filter((image) => !selected.has(image.id));
@@ -606,7 +623,11 @@ export default function ImagesToPdfPage({ variant = DEFAULT_IMAGES_TO_PDF_VARIAN
   }
 
   function clearImages() {
-    images.forEach((image) => URL.revokeObjectURL(image.previewUrl));
+    images.forEach((image) => {
+      if (previewUrlsRef.current.delete(image.previewUrl)) {
+        URL.revokeObjectURL(image.previewUrl);
+      }
+    });
     setImages([]);
     setSelectedIds([]);
     setLastSelectedId(null);
@@ -785,7 +806,7 @@ export default function ImagesToPdfPage({ variant = DEFAULT_IMAGES_TO_PDF_VARIAN
 
     setBusy(true);
     setOpenDropdown(null);
-    setExportProgress(8);
+    setExportProgress(0);
     setResult(null);
     setOcrSummary(null);
     setOcrProgress(null);
@@ -799,7 +820,21 @@ export default function ImagesToPdfPage({ variant = DEFAULT_IMAGES_TO_PDF_VARIAN
       orientation,
       fitMode,
       margin,
+      backgroundColor,
       outputFileName: ocrEnabled ? `PDFMantra-searchable-${variant.outputSlug}.pdf` : `PDFMantra-${variant.outputSlug}.pdf`,
+      onProgress(progress: { completed: number; total: number }) {
+        const pagePercent = Math.round(
+          (progress.completed / Math.max(1, progress.total)) * 100,
+        );
+        setExportProgress(
+          ocrEnabled
+            ? 76 + Math.round(pagePercent * 0.08)
+            : Math.round(pagePercent * 0.88),
+        );
+        setStatus(
+          `Adding image ${progress.completed} of ${progress.total} to the PDF...`,
+        );
+      },
     };
 
     try {
@@ -834,17 +869,16 @@ export default function ImagesToPdfPage({ variant = DEFAULT_IMAGES_TO_PDF_VARIAN
           signal: abortController.signal,
           onOverlayProgress(progress) {
             setOcrProgress(progress);
-            setExportProgress(76 + Math.round(progress.percent * 0.16));
+            setExportProgress(84 + Math.round(progress.percent * 0.08));
             setStatus(buildOcrProgressMessage(progress));
           },
         });
       } else {
         setStatus("Converting images with PDFMantra image engine...");
-        setExportProgress(32);
         output = await convertImagesToPdfEngine(orderedFiles, pdfOptions);
       }
 
-      setExportProgress(88);
+      setExportProgress(92);
       setStatus("Checking export allowance...");
 
       const exportRecord = await recordExport({
@@ -1025,7 +1059,10 @@ export default function ImagesToPdfPage({ variant = DEFAULT_IMAGES_TO_PDF_VARIAN
                           <select
                             value={pageSize}
                             onChange={(event) => {
-                              setPageSize(event.target.value as ImageToPdfPageSize);
+                              const next = PAGE_SIZE_OPTIONS.find(
+                                (option) => option.value === event.target.value,
+                              );
+                              if (next) setPageSize(next.value);
                               setResult(null);
                             }}
                             disabled={busy}
@@ -1046,7 +1083,10 @@ export default function ImagesToPdfPage({ variant = DEFAULT_IMAGES_TO_PDF_VARIAN
                           <select
                             value={orientation}
                             onChange={(event) => {
-                              setOrientation(event.target.value as ImageToPdfOrientation);
+                              const next = ORIENTATION_OPTIONS.find(
+                                (option) => option.value === event.target.value,
+                              );
+                              if (next) setOrientation(next.value);
                               setResult(null);
                             }}
                             disabled={busy}
@@ -1067,7 +1107,10 @@ export default function ImagesToPdfPage({ variant = DEFAULT_IMAGES_TO_PDF_VARIAN
                           <select
                             value={fitMode}
                             onChange={(event) => {
-                              setFitMode(event.target.value as ImageToPdfFitMode);
+                              const next = FIT_MODE_OPTIONS.find(
+                                (option) => option.value === event.target.value,
+                              );
+                              if (next) setFitMode(next.value);
                               setResult(null);
                             }}
                             disabled={busy}
@@ -1080,6 +1123,36 @@ export default function ImagesToPdfPage({ variant = DEFAULT_IMAGES_TO_PDF_VARIAN
                             ))}
                           </select>
                         </label>
+
+                        <label className="block">
+                          <span className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
+                            Page background
+                          </span>
+                          <select
+                            value={backgroundColor === null ? "transparent" : "white"}
+                            onChange={(event) => {
+                              setBackgroundColor(
+                                event.target.value === "transparent"
+                                  ? null
+                                  : "#ffffff",
+                              );
+                              setResult(null);
+                            }}
+                            disabled={busy}
+                            className="mt-2 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+                          >
+                            <option value="white">White</option>
+                            <option value="transparent">
+                              Transparent (preserve PNG alpha)
+                            </option>
+                          </select>
+                        </label>
+
+                        {fitMode === "cover" ? (
+                          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold leading-5 text-amber-800">
+                            Cover deliberately crops and clips the image to the content box inside the selected margins.
+                          </div>
+                        ) : null}
 
                         <label className="block">
                           <span className="flex justify-between text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
@@ -1155,7 +1228,10 @@ export default function ImagesToPdfPage({ variant = DEFAULT_IMAGES_TO_PDF_VARIAN
                         <select
                           value={ocrQuality}
                           onChange={(event) => {
-                            setOcrQuality(event.target.value as OcrQuality);
+                            const next = OCR_QUALITY_OPTIONS.find(
+                              (option) => option.value === event.target.value,
+                            );
+                            if (next) setOcrQuality(next.value);
                             setOcrSummary(null);
                           }}
                           disabled={busy || !ocrEnabled}
@@ -1304,7 +1380,7 @@ export default function ImagesToPdfPage({ variant = DEFAULT_IMAGES_TO_PDF_VARIAN
                       Per row
                     </span>
                     <div className="flex rounded-xl border border-slate-200 bg-slate-50 p-1">
-                      {([1, 2, 3, 4, 5] as PerRow[]).map((value) => (
+                      {PER_ROW_OPTIONS.map((value) => (
                         <button
                           key={value}
                           type="button"

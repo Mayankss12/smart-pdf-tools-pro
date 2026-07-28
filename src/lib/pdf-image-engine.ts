@@ -1,4 +1,13 @@
-import { PDFDocument, rgb, type PDFImage } from "pdf-lib";
+import {
+  PDFDocument,
+  clip,
+  endPath,
+  popGraphicsState,
+  pushGraphicsState,
+  rectangle,
+  rgb,
+  type PDFImage,
+} from "pdf-lib";
 
 import {
   PdfEngineError,
@@ -23,8 +32,12 @@ export type ImageToPdfOptions = {
   orientation?: ImageToPdfOrientation;
   fitMode?: ImageToPdfFitMode;
   margin?: number;
-  backgroundColor?: string;
+  backgroundColor?: string | null;
   outputFileName?: string;
+  onProgress?: (progress: {
+    completed: number;
+    total: number;
+  }) => void;
 };
 
 export type ImageValidationResult = {
@@ -42,15 +55,9 @@ export type ImageToPdfBuildResult = {
   fileName: string;
 };
 
-const SUPPORTED_IMAGE_TYPES = new Set([
-  "image/png",
-  "image/jpeg",
-  "image/jpg",
-  "image/webp",
-]);
-
 const MAX_IMAGE_SIZE_MB = 40;
 const MAX_TOTAL_SIZE_MB = 180;
+const MAX_IMAGE_PIXELS = 60_000_000;
 const POINTS_PER_PIXEL_AT_96_DPI = 72 / 96;
 
 const PAGE_SIZES: Record<Exclude<ImageToPdfPageSize, "original">, [number, number]> = {
@@ -68,11 +75,19 @@ type LoadedImage = {
   mimeType: "image/png" | "image/jpeg";
 };
 
+type ExifOrientation = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+
 type DrawBox = {
   x: number;
   y: number;
   width: number;
   height: number;
+};
+
+type NormalizedImageToPdfOptions = Required<
+  Omit<ImageToPdfOptions, "outputFileName" | "onProgress">
+> & {
+  outputFileName?: string;
 };
 
 export function validateImageFiles(files: File[]): ImageValidationResult {
@@ -218,12 +233,37 @@ export async function buildImagePdfDocument(
       fitMode: normalizedOptions.fitMode,
     });
 
+    const pageMargin =
+      normalizedOptions.pageSize === "original" ? 0 : normalizedOptions.margin;
+    if (normalizedOptions.fitMode === "cover") {
+      const safeMargin = clamp(
+        pageMargin,
+        0,
+        Math.min(pageWidth, pageHeight) / 3,
+      );
+      page.pushOperators(
+        pushGraphicsState(),
+        rectangle(
+          safeMargin,
+          safeMargin,
+          Math.max(1, pageWidth - safeMargin * 2),
+          Math.max(1, pageHeight - safeMargin * 2),
+        ),
+        clip(),
+        endPath(),
+      );
+    }
+
     page.drawImage(embeddedImage, {
       x: imageBox.x,
       y: imageBox.y,
       width: imageBox.width,
       height: imageBox.height,
     });
+
+    if (normalizedOptions.fitMode === "cover") {
+      page.pushOperators(popGraphicsState());
+    }
 
     placements.push({
       pageIndex: index,
@@ -236,6 +276,10 @@ export async function buildImagePdfDocument(
       pageWidth,
       pageHeight,
     });
+    options.onProgress?.({
+      completed: index + 1,
+      total: validation.accepted.length,
+    });
   }
 
   return {
@@ -246,15 +290,18 @@ export async function buildImagePdfDocument(
   };
 }
 
-function normalizeOptions(options: ImageToPdfOptions): Required<Omit<ImageToPdfOptions, "outputFileName">> & {
-  outputFileName?: string;
-} {
+function normalizeOptions(
+  options: ImageToPdfOptions,
+): NormalizedImageToPdfOptions {
   return {
     pageSize: options.pageSize || "a4",
     orientation: options.orientation || "auto",
     fitMode: options.fitMode || "contain",
     margin: clamp(Number(options.margin ?? 28), 0, 120),
-    backgroundColor: normalizeHexColor(options.backgroundColor || "#ffffff"),
+    backgroundColor:
+      options.backgroundColor === null
+        ? null
+        : normalizeHexColor(options.backgroundColor || "#ffffff"),
     outputFileName: options.outputFileName,
   };
 }
@@ -263,16 +310,75 @@ function normalizeImageMimeType(file: File): "image/png" | "image/jpeg" | "image
   const type = file.type.toLowerCase();
   const name = file.name.toLowerCase();
 
-  if (SUPPORTED_IMAGE_TYPES.has(type)) {
-    if (type === "image/jpg") return "image/jpeg";
-    return type as "image/png" | "image/jpeg" | "image/webp";
-  }
+  if (type === "image/png") return "image/png";
+  if (type === "image/jpeg" || type === "image/jpg") return "image/jpeg";
+  if (type === "image/webp") return "image/webp";
 
   if (name.endsWith(".png")) return "image/png";
   if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return "image/jpeg";
   if (name.endsWith(".webp")) return "image/webp";
 
   return null;
+}
+
+export function readJpegExifOrientation(bytes: Uint8Array): ExifOrientation {
+  if (bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) return 1;
+
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let offset = 2;
+
+  try {
+    while (offset + 4 <= bytes.length) {
+      if (bytes[offset] !== 0xff) break;
+      const marker = bytes[offset + 1];
+      if (marker === 0xda || marker === 0xd9) break;
+      const segmentLength = view.getUint16(offset + 2, false);
+      if (segmentLength < 2 || offset + 2 + segmentLength > bytes.length) break;
+
+      if (
+        marker === 0xe1 &&
+        bytes[offset + 4] === 0x45 &&
+        bytes[offset + 5] === 0x78 &&
+        bytes[offset + 6] === 0x69 &&
+        bytes[offset + 7] === 0x66 &&
+        bytes[offset + 8] === 0x00 &&
+        bytes[offset + 9] === 0x00
+      ) {
+        const tiffOffset = offset + 10;
+        const littleEndian =
+          bytes[tiffOffset] === 0x49 && bytes[tiffOffset + 1] === 0x49;
+        const bigEndian =
+          bytes[tiffOffset] === 0x4d && bytes[tiffOffset + 1] === 0x4d;
+        if (!littleEndian && !bigEndian) return 1;
+        if (view.getUint16(tiffOffset + 2, littleEndian) !== 42) return 1;
+
+        const directoryOffset =
+          tiffOffset + view.getUint32(tiffOffset + 4, littleEndian);
+        const entryCount = view.getUint16(directoryOffset, littleEndian);
+        for (let index = 0; index < entryCount; index += 1) {
+          const entryOffset = directoryOffset + 2 + index * 12;
+          if (entryOffset + 12 > bytes.length) return 1;
+          if (view.getUint16(entryOffset, littleEndian) !== 0x0112) continue;
+          const orientation = view.getUint16(entryOffset + 8, littleEndian);
+          if (orientation === 1) return 1;
+          if (orientation === 2) return 2;
+          if (orientation === 3) return 3;
+          if (orientation === 4) return 4;
+          if (orientation === 5) return 5;
+          if (orientation === 6) return 6;
+          if (orientation === 7) return 7;
+          if (orientation === 8) return 8;
+          return 1;
+        }
+      }
+
+      offset += 2 + segmentLength;
+    }
+  } catch {
+    return 1;
+  }
+
+  return 1;
 }
 
 async function loadImageForPdf(file: File): Promise<LoadedImage> {
@@ -282,10 +388,14 @@ async function loadImageForPdf(file: File): Promise<LoadedImage> {
     throw new PdfEngineError("INVALID_FILE_TYPE", `${file.name} is not a supported image.`);
   }
 
-  const dimensions = await getImageDimensions(file);
+  const sourceBytes = await file.arrayBuffer();
+  const orientation =
+    mimeType === "image/jpeg"
+      ? readJpegExifOrientation(new Uint8Array(sourceBytes))
+      : 1;
 
-  if (mimeType === "image/webp") {
-    const converted = await convertImageToPng(file);
+  if (mimeType === "image/webp" || orientation !== 1) {
+    const converted = await convertImageToPng(file, orientation);
 
     return {
       file,
@@ -296,9 +406,11 @@ async function loadImageForPdf(file: File): Promise<LoadedImage> {
     };
   }
 
+  const dimensions = await getImageDimensions(file);
+
   return {
     file,
-    bytes: await file.arrayBuffer(),
+    bytes: sourceBytes,
     width: dimensions.width,
     height: dimensions.height,
     mimeType,
@@ -321,50 +433,83 @@ async function embedImage(pdf: PDFDocument, image: LoadedImage): Promise<PDFImag
 }
 
 async function getImageDimensions(file: File) {
-  const objectUrl = URL.createObjectURL(file);
-
+  if (typeof createImageBitmap !== "function") {
+    throw new PdfEngineError(
+      "PROCESSING_FAILED",
+      "This browser cannot decode image dimensions safely. Try a current Chrome, Edge, Firefox, or Safari release.",
+    );
+  }
+  let bitmap: ImageBitmap | null = null;
   try {
-    const image = new Image();
-    image.decoding = "async";
-    image.src = objectUrl;
+    bitmap = await createImageBitmap(file, { imageOrientation: "none" });
 
-    await image.decode();
-
-    if (!image.naturalWidth || !image.naturalHeight) {
+    if (!bitmap.width || !bitmap.height) {
       throw new PdfEngineError("PROCESSING_FAILED", `${file.name} has invalid image dimensions.`);
+    }
+    if (bitmap.width * bitmap.height > MAX_IMAGE_PIXELS) {
+      throw new PdfEngineError(
+        "PROCESSING_FAILED",
+        `${file.name} exceeds the safe ${MAX_IMAGE_PIXELS.toLocaleString()} pixel limit.`,
+      );
     }
 
     return {
-      width: image.naturalWidth,
-      height: image.naturalHeight,
+      width: bitmap.width,
+      height: bitmap.height,
     };
-  } catch {
+  } catch (error) {
+    if (error instanceof PdfEngineError) throw error;
     throw new PdfEngineError("PROCESSING_FAILED", `${file.name} could not be read as an image.`);
   } finally {
-    URL.revokeObjectURL(objectUrl);
+    bitmap?.close();
   }
 }
 
-async function convertImageToPng(file: File) {
-  const objectUrl = URL.createObjectURL(file);
-
+async function convertImageToPng(
+  file: File,
+  orientation: ExifOrientation = 1,
+) {
+  if (typeof createImageBitmap !== "function") {
+    throw new PdfEngineError(
+      "PROCESSING_FAILED",
+      "This browser cannot normalize this image safely. Try a current Chrome, Edge, Firefox, or Safari release.",
+    );
+  }
+  let bitmap: ImageBitmap | null = null;
+  let canvas: HTMLCanvasElement | null = null;
   try {
-    const image = new Image();
-    image.decoding = "async";
-    image.src = objectUrl;
-
-    await image.decode();
-
-    const canvas = document.createElement("canvas");
+    bitmap = await createImageBitmap(file, { imageOrientation: "none" });
+    if (bitmap.width * bitmap.height > MAX_IMAGE_PIXELS) {
+      throw new PdfEngineError(
+        "PROCESSING_FAILED",
+        `${file.name} exceeds the safe ${MAX_IMAGE_PIXELS.toLocaleString()} pixel limit.`,
+      );
+    }
+    const swapsAxes = orientation >= 5 && orientation <= 8;
+    canvas = document.createElement("canvas");
     const context = canvas.getContext("2d");
 
     if (!context) {
       throw new PdfEngineError("PROCESSING_FAILED", "Unable to convert WebP image.");
     }
 
-    canvas.width = image.naturalWidth;
-    canvas.height = image.naturalHeight;
-    context.drawImage(image, 0, 0);
+    canvas.width = swapsAxes ? bitmap.height : bitmap.width;
+    canvas.height = swapsAxes ? bitmap.width : bitmap.height;
+
+    if (orientation === 2) context.setTransform(-1, 0, 0, 1, bitmap.width, 0);
+    else if (orientation === 3) {
+      context.setTransform(-1, 0, 0, -1, bitmap.width, bitmap.height);
+    } else if (orientation === 4) {
+      context.setTransform(1, 0, 0, -1, 0, bitmap.height);
+    } else if (orientation === 5) context.setTransform(0, 1, 1, 0, 0, 0);
+    else if (orientation === 6) {
+      context.setTransform(0, 1, -1, 0, bitmap.height, 0);
+    } else if (orientation === 7) {
+      context.setTransform(0, -1, -1, 0, bitmap.height, bitmap.width);
+    } else if (orientation === 8) {
+      context.setTransform(0, -1, 1, 0, 0, bitmap.width);
+    }
+    context.drawImage(bitmap, 0, 0);
 
     const blob = await new Promise<Blob>((resolve, reject) => {
       canvas.toBlob((outputBlob) => {
@@ -375,22 +520,23 @@ async function convertImageToPng(file: File) {
 
     const bytes = await blob.arrayBuffer();
 
-    canvas.width = 0;
-    canvas.height = 0;
-
     return {
       bytes,
-      width: image.naturalWidth,
-      height: image.naturalHeight,
+      width: canvas.width,
+      height: canvas.height,
     };
   } finally {
-    URL.revokeObjectURL(objectUrl);
+    bitmap?.close();
+    if (canvas) {
+      canvas.width = 0;
+      canvas.height = 0;
+    }
   }
 }
 
 function resolvePageSize(
   image: LoadedImage,
-  options: Required<Omit<ImageToPdfOptions, "outputFileName">>,
+  options: NormalizedImageToPdfOptions,
 ): [number, number] {
   if (options.pageSize === "original") {
     return resolveOriginalImagePageSize(image, options.orientation);
@@ -434,8 +580,9 @@ function drawPageBackground(
   page: ReturnType<PDFDocument["addPage"]>,
   width: number,
   height: number,
-  color: string,
+  color: string | null,
 ) {
+  if (color === null) return;
   const parsed = parseHexColor(color);
 
   page.drawRectangle({
@@ -447,7 +594,7 @@ function drawPageBackground(
   });
 }
 
-function calculateImageDrawBox({
+export function calculateImageDrawBox({
   imageWidth,
   imageHeight,
   pageWidth,

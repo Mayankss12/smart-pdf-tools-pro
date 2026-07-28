@@ -22,6 +22,7 @@ import {
   MoreHorizontal,
   MousePointer2,
   Settings2,
+  StopCircle,
   Upload,
   X,
 } from "lucide-react";
@@ -33,11 +34,17 @@ import {
   PdfEngineError,
   downloadBlob,
   formatFileSize,
-  loadPdfDocument,
   parsePageGroups,
   safeFileBaseName,
   validatePdfFile,
 } from "@/lib/pdf-engine";
+import { readValidatedPdfBytes } from "@/lib/pdf-document-safety";
+import {
+  HIGH_DPI_WARNING_PIXELS,
+  assertSafePdfRenderPixelArea,
+  getPdfRenderScale,
+  getSafePdfThumbnailScale,
+} from "@/lib/pdf-to-image-engine";
 
 type ExportFormat = "png" | "jpeg" | "webp";
 type TargetMode = "all" | "odd" | "even" | "custom" | "visual";
@@ -63,6 +70,7 @@ type TargetPlan = {
 
 type OpenDropdown = "format" | "dpi" | "pages" | "more" | "help" | null;
 type PerRow = 1 | 2 | 3 | 4 | 5;
+const PER_ROW_OPTIONS = [1, 2, 3, 4, 5] satisfies readonly PerRow[];
 
 type PdfToImagesVariant = {
   title: string;
@@ -93,6 +101,7 @@ const FORMAT_OPTIONS: Array<{ id: ExportFormat; label: string; description: stri
 
 function getErrorMessage(error: unknown) {
   if (error instanceof PdfEngineError) return error.message;
+  if (error instanceof Error) return error.message;
   return "Unable to convert this PDF into images. Please try another file.";
 }
 
@@ -121,7 +130,7 @@ function getExtension(format: ExportFormat) {
 }
 
 function getScaleFromDpi(dpi: number) {
-  return clamp(dpi, 72, 450) / 72;
+  return getPdfRenderScale(dpi);
 }
 
 function formatPagesAsRange(pages: number[]) {
@@ -166,8 +175,8 @@ function canvasToBlob(canvas: HTMLCanvasElement, format: ExportFormat, quality: 
 async function loadPdfJsDocument(file: File) {
   validatePdfFile(file);
 
-  const buffer = await file.arrayBuffer();
-  const loadingTask = pdfjsLib.getDocument({ data: buffer.slice(0) });
+  const bytes = await readValidatedPdfBytes(file);
+  const loadingTask = pdfjsLib.getDocument({ data: bytes.slice() });
 
   return loadingTask.promise;
 }
@@ -179,6 +188,7 @@ async function renderPageToImage({
   dpi,
   quality,
   baseName,
+  signal,
 }: {
   pdf: pdfjsLib.PDFDocumentProxy;
   pageNumber: number;
@@ -186,13 +196,32 @@ async function renderPageToImage({
   dpi: number;
   quality: number;
   baseName: string;
+  signal: AbortSignal;
 }) {
+  if (signal.aborted) {
+    throw new PdfEngineError("PROCESSING_FAILED", "PDF-to-images export cancelled.");
+  }
   const page = await pdf.getPage(pageNumber);
+  const baseViewport = page.getViewport({ scale: 1 });
+  try {
+    assertSafePdfRenderPixelArea(
+      pageNumber,
+      baseViewport.width,
+      baseViewport.height,
+      dpi,
+    );
+  } catch (error) {
+    page.cleanup();
+    throw error;
+  }
   const viewport = page.getViewport({ scale: getScaleFromDpi(dpi) });
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("2d", { alpha: format === "png" });
 
   if (!context) {
+    page.cleanup();
+    canvas.width = 0;
+    canvas.height = 0;
     throw new PdfEngineError("PROCESSING_FAILED", "Unable to prepare image rendering canvas.");
   }
 
@@ -204,27 +233,55 @@ async function renderPageToImage({
     context.fillRect(0, 0, canvas.width, canvas.height);
   }
 
-  await page.render({ canvasContext: context, viewport }).promise;
+  const renderTask = page.render({ canvasContext: context, viewport });
+  const cancelRender = () => renderTask.cancel();
+  signal.addEventListener("abort", cancelRender, { once: true });
 
-  const blob = await canvasToBlob(canvas, format, quality);
-  const extension = getExtension(format);
+  try {
+    await renderTask.promise;
+    if (signal.aborted) {
+      throw new PdfEngineError("PROCESSING_FAILED", "PDF-to-images export cancelled.");
+    }
+    const blob = await canvasToBlob(canvas, format, quality);
+    const extension = getExtension(format);
 
-  return {
-    pageNumber,
-    blob,
-    fileName: `PDFMantra-${baseName}-page-${String(pageNumber).padStart(3, "0")}.${extension}`,
-    previewUrl: URL.createObjectURL(blob),
-  };
+    return {
+      pageNumber,
+      blob,
+      fileName: `PDFMantra-${baseName}-page-${String(pageNumber).padStart(3, "0")}.${extension}`,
+      previewUrl: URL.createObjectURL(blob),
+    };
+  } finally {
+    signal.removeEventListener("abort", cancelRender);
+    page.cleanup();
+    canvas.width = 0;
+    canvas.height = 0;
+  }
 }
 
-async function renderPageThumbnail(pdf: pdfjsLib.PDFDocumentProxy, pageNumber: number) {
+async function renderPageThumbnail(
+  pdf: pdfjsLib.PDFDocumentProxy,
+  pageNumber: number,
+  signal: AbortSignal,
+) {
+  if (signal.aborted) {
+    throw new PdfEngineError("PROCESSING_FAILED", "Thumbnail rendering cancelled.");
+  }
   const page = await pdf.getPage(pageNumber);
-  const viewport = page.getViewport({ scale: 0.36 });
+  const baseViewport = page.getViewport({ scale: 1 });
+  const thumbnailScale = getSafePdfThumbnailScale(
+    baseViewport.width,
+    baseViewport.height,
+  );
+  const viewport = page.getViewport({ scale: thumbnailScale });
   const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("2d");
 
   if (!context) {
+    page.cleanup();
+    canvas.width = 0;
+    canvas.height = 0;
     throw new PdfEngineError("PROCESSING_FAILED", "Unable to prepare preview canvas.");
   }
 
@@ -232,9 +289,18 @@ async function renderPageThumbnail(pdf: pdfjsLib.PDFDocumentProxy, pageNumber: n
   canvas.height = Math.ceil(viewport.height * pixelRatio);
   context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
 
-  await page.render({ canvasContext: context, viewport }).promise;
-
-  return URL.createObjectURL(await canvasToBlob(canvas, "png", 1));
+  const renderTask = page.render({ canvasContext: context, viewport });
+  const cancelRender = () => renderTask.cancel();
+  signal.addEventListener("abort", cancelRender, { once: true });
+  try {
+    await renderTask.promise;
+    return URL.createObjectURL(await canvasToBlob(canvas, "png", 1));
+  } finally {
+    signal.removeEventListener("abort", cancelRender);
+    page.cleanup();
+    canvas.width = 0;
+    canvas.height = 0;
+  }
 }
 
 function buildTargetPlan(
@@ -350,6 +416,11 @@ export default function PdfToImagesPage({ variant = DEFAULT_PDF_TO_IMAGES_VARIAN
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const toolbarRef = useRef<HTMLDivElement | null>(null);
   const renderTokenRef = useRef(0);
+  const activePdfRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
+  const thumbnailAbortRef = useRef<AbortController | null>(null);
+  const exportAbortRef = useRef<AbortController | null>(null);
+  const thumbnailUrlsRef = useRef(new Set<string>());
+  const outputUrlsRef = useRef(new Set<string>());
 
   const { recordExport } = useEntitlement();
 
@@ -410,6 +481,16 @@ export default function PdfToImagesPage({ variant = DEFAULT_PDF_TO_IMAGES_VARIAN
 
   useEffect(() => {
     configurePdfWorker();
+    return () => {
+      thumbnailAbortRef.current?.abort();
+      exportAbortRef.current?.abort();
+      void activePdfRef.current?.destroy();
+      activePdfRef.current = null;
+      for (const url of thumbnailUrlsRef.current) URL.revokeObjectURL(url);
+      for (const url of outputUrlsRef.current) URL.revokeObjectURL(url);
+      thumbnailUrlsRef.current.clear();
+      outputUrlsRef.current.clear();
+    };
   }, []);
 
   useEffect(() => {
@@ -427,53 +508,87 @@ export default function PdfToImagesPage({ variant = DEFAULT_PDF_TO_IMAGES_VARIAN
     setOpenDropdown((current) => (current === nextDropdown ? null : nextDropdown));
   }
 
+  function releaseOutputUrls(items: readonly RenderedImage[]) {
+    for (const output of items) {
+      if (outputUrlsRef.current.delete(output.previewUrl)) {
+        URL.revokeObjectURL(output.previewUrl);
+      }
+    }
+  }
+
   function clearOutputs() {
     setOutputs((current) => {
-      current.forEach((output) => URL.revokeObjectURL(output.previewUrl));
+      releaseOutputUrls(current);
       return [];
     });
   }
 
   function clearThumbnails() {
     setThumbnails((current) => {
-      current.forEach((thumbnail) => URL.revokeObjectURL(thumbnail.previewUrl));
+      current.forEach((thumbnail) => {
+        if (thumbnailUrlsRef.current.delete(thumbnail.previewUrl)) {
+          URL.revokeObjectURL(thumbnail.previewUrl);
+        }
+      });
       return [];
     });
   }
 
-  async function renderThumbnails(selectedFile: File, totalPages: number) {
+  async function renderThumbnails(selectedFile: File) {
     const token = renderTokenRef.current + 1;
     renderTokenRef.current = token;
+    thumbnailAbortRef.current?.abort();
+    const controller = new AbortController();
+    thumbnailAbortRef.current = controller;
 
     setBusyMode("rendering");
     setThumbnailStatus("loading");
     clearThumbnails();
-    setRenderProgress({ done: 0, total: totalPages });
+    setRenderProgress({ done: 0, total: 0 });
     setStatus("Rendering real PDF page thumbnails...");
 
     try {
       configurePdfWorker();
 
       const pdf = await loadPdfJsDocument(selectedFile);
+      activePdfRef.current = pdf;
+      const totalPages = pdf.numPages;
       const nextThumbnails: PageThumbnail[] = [];
 
-      for (let pageNumber = 1; pageNumber <= totalPages; pageNumber += 1) {
-        if (renderTokenRef.current !== token) return;
+      try {
+        setFile(selectedFile);
+        setPageCount(totalPages);
+        setPageInput(totalPages === 1 ? "1" : `1-${Math.min(totalPages, 5)}`);
+        setTargetMode("all");
+        setRenderProgress({ done: 0, total: totalPages });
 
-        nextThumbnails.push({
-          pageNumber,
-          previewUrl: await renderPageThumbnail(pdf, pageNumber),
-        });
+        for (let pageNumber = 1; pageNumber <= totalPages; pageNumber += 1) {
+          if (renderTokenRef.current !== token || controller.signal.aborted) return;
+
+          const previewUrl = await renderPageThumbnail(
+            pdf,
+            pageNumber,
+            controller.signal,
+          );
+          thumbnailUrlsRef.current.add(previewUrl);
+          nextThumbnails.push({
+            pageNumber,
+            previewUrl,
+          });
+
+          if (renderTokenRef.current === token) {
+            setThumbnails([...nextThumbnails]);
+            setRenderProgress({ done: pageNumber, total: totalPages });
+          }
+        }
 
         if (renderTokenRef.current === token) {
-          setThumbnails([...nextThumbnails]);
-          setRenderProgress({ done: pageNumber, total: totalPages });
+          setThumbnailStatus("ready");
+          setStatus(`PDF loaded with ${totalPages} page${totalPages > 1 ? "s" : ""}. Choose export format, DPI, and pages.`);
         }
-      }
-
-      if (renderTokenRef.current === token) {
-        setThumbnailStatus("ready");
-        setStatus(`PDF loaded with ${totalPages} page${totalPages > 1 ? "s" : ""}. Choose export format, DPI, and pages.`);
+      } finally {
+        await pdf.destroy();
+        if (activePdfRef.current === pdf) activePdfRef.current = null;
       }
     } catch {
       if (renderTokenRef.current === token) {
@@ -481,6 +596,9 @@ export default function PdfToImagesPage({ variant = DEFAULT_PDF_TO_IMAGES_VARIAN
         setStatus("PDF loaded, but thumbnails could not be rendered. You can still export by page range.");
       }
     } finally {
+      if (thumbnailAbortRef.current === controller) {
+        thumbnailAbortRef.current = null;
+      }
       if (renderTokenRef.current === token) {
         setBusyMode("idle");
       }
@@ -502,15 +620,7 @@ export default function PdfToImagesPage({ variant = DEFAULT_PDF_TO_IMAGES_VARIAN
 
     try {
       validatePdfFile(selectedFile);
-      const pdf = await loadPdfDocument(selectedFile);
-      const totalPages = pdf.getPageCount();
-
-      setFile(selectedFile);
-      setPageCount(totalPages);
-      setPageInput(totalPages === 1 ? "1" : `1-${Math.min(totalPages, 5)}`);
-      setTargetMode("all");
-
-      await renderThumbnails(selectedFile, totalPages);
+      await renderThumbnails(selectedFile);
     } catch (error) {
       renderTokenRef.current += 1;
       setFile(null);
@@ -528,6 +638,12 @@ export default function PdfToImagesPage({ variant = DEFAULT_PDF_TO_IMAGES_VARIAN
 
   function clearFile() {
     renderTokenRef.current += 1;
+    thumbnailAbortRef.current?.abort();
+    thumbnailAbortRef.current = null;
+    exportAbortRef.current?.abort();
+    exportAbortRef.current = null;
+    void activePdfRef.current?.destroy();
+    activePdfRef.current = null;
     setFile(null);
     setPageCount(0);
     setPageInput("1-3");
@@ -629,14 +745,54 @@ export default function PdfToImagesPage({ variant = DEFAULT_PDF_TO_IMAGES_VARIAN
     }
 
     setBusyMode("exporting");
-    setExportProgress(8);
+    setExportProgress(0);
     clearOutputs();
+    exportAbortRef.current?.abort();
+    const controller = new AbortController();
+    exportAbortRef.current = controller;
+    let pdf: pdfjsLib.PDFDocumentProxy | null = null;
+    const rendered: RenderedImage[] = [];
 
     try {
-      const pdf = await loadPdfJsDocument(file);
+      pdf = await loadPdfJsDocument(file);
+      activePdfRef.current = pdf;
       const baseName = safeFileBaseName(file.name);
-      const rendered: RenderedImage[] = [];
       const pages = targetPlan.pages;
+      let needsHighDpiConfirmation = false;
+
+      for (const pageNumber of pages) {
+        if (controller.signal.aborted) {
+          throw new PdfEngineError(
+            "PROCESSING_FAILED",
+            "PDF-to-images export cancelled.",
+          );
+        }
+        const page = await pdf.getPage(pageNumber);
+        try {
+          const baseViewport = page.getViewport({ scale: 1 });
+          const pixelArea = assertSafePdfRenderPixelArea(
+            pageNumber,
+            baseViewport.width,
+            baseViewport.height,
+            dpi,
+          );
+          if (pixelArea > HIGH_DPI_WARNING_PIXELS) {
+            needsHighDpiConfirmation = true;
+          }
+        } finally {
+          page.cleanup();
+        }
+      }
+
+      if (
+        needsHighDpiConfirmation &&
+        !window.confirm(
+          `Some selected pages exceed ${HIGH_DPI_WARNING_PIXELS.toLocaleString()} pixels at ${dpi} DPI and may use substantial memory. Continue?`,
+        )
+      ) {
+        setStatus("High-DPI export cancelled before rendering.");
+        return;
+      }
 
       setStatus(`Rendering ${pages.length} page${pages.length > 1 ? "s" : ""} as ${format.toUpperCase()} at ${dpi} DPI...`);
 
@@ -650,11 +806,37 @@ export default function PdfToImagesPage({ variant = DEFAULT_PDF_TO_IMAGES_VARIAN
           dpi,
           quality,
           baseName,
+          signal: controller.signal,
         });
 
         rendered.push(image);
+        outputUrlsRef.current.add(image.previewUrl);
         setOutputs([...rendered]);
-        setExportProgress(Math.round(((index + 1) / pages.length) * 70) + 12);
+        setExportProgress(Math.round(((index + 1) / pages.length) * 82));
+      }
+
+      let download:
+        | { kind: "image"; blob: Blob; fileName: string }
+        | { kind: "zip"; blob: Blob; fileName: string };
+
+      if (rendered.length === 1 && !downloadAsZip) {
+        download = {
+          kind: "image",
+          blob: rendered[0].blob,
+          fileName: rendered[0].fileName,
+        };
+      } else {
+        setStatus(`Packaging ${rendered.length} image${rendered.length > 1 ? "s" : ""} into ZIP...`);
+        download = {
+          kind: "zip",
+          blob: await createZipBlob(
+            rendered.map((image) => ({
+              fileName: image.fileName,
+              blob: image.blob,
+            })),
+          ),
+          fileName: `PDFMantra-images-${baseName}.zip`,
+        };
       }
 
       setExportProgress(86);
@@ -666,7 +848,8 @@ export default function PdfToImagesPage({ variant = DEFAULT_PDF_TO_IMAGES_VARIAN
       });
 
       if (!exportRecord.allowed) {
-        clearOutputs();
+        releaseOutputUrls(rendered);
+        setOutputs([]);
         setExportProgress(0);
 
         const limitMessage =
@@ -679,33 +862,33 @@ export default function PdfToImagesPage({ variant = DEFAULT_PDF_TO_IMAGES_VARIAN
         return;
       }
 
-      if (rendered.length === 1 && !downloadAsZip) {
-        setExportProgress(94);
-        downloadBlob(rendered[0].blob, rendered[0].fileName);
-        setExportProgress(100);
+      setExportProgress(94);
+      downloadBlob(download.blob, download.fileName);
+      setExportProgress(100);
+
+      if (download.kind === "image") {
         setStatus("Exported 1 image. Download started.");
       } else {
-        setStatus(`Packaging ${rendered.length} image${rendered.length > 1 ? "s" : ""} into ZIP...`);
-
-        const zipBlob = await createZipBlob(
-          rendered.map((image) => ({
-            fileName: image.fileName,
-            blob: image.blob,
-          })),
-        );
-
-        setExportProgress(94);
-        downloadBlob(zipBlob, `PDFMantra-images-${baseName}.zip`);
-        setExportProgress(100);
         setStatus(`Exported ${rendered.length} image${rendered.length > 1 ? "s" : ""} into one ZIP. Download started.`);
       }
     } catch (error) {
-      clearOutputs();
+      releaseOutputUrls(rendered);
+      setOutputs([]);
       setExportProgress(0);
       setStatus(getErrorMessage(error));
     } finally {
+      if (pdf) {
+        await pdf.destroy();
+        if (activePdfRef.current === pdf) activePdfRef.current = null;
+      }
+      if (exportAbortRef.current === controller) exportAbortRef.current = null;
       setBusyMode("idle");
     }
+  }
+
+  function cancelExport() {
+    exportAbortRef.current?.abort();
+    setStatus("Cancelling PDF-to-images export...");
   }
 
   const statusLooksLikeError =
@@ -853,7 +1036,7 @@ export default function PdfToImagesPage({ variant = DEFAULT_PDF_TO_IMAGES_VARIAN
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Per row</span>
                     <div className="flex rounded-xl border border-slate-200 bg-slate-50 p-1">
-                      {([1, 2, 3, 4, 5] as PerRow[]).map((value) => (
+                      {PER_ROW_OPTIONS.map((value) => (
                         <button
                           key={value}
                           type="button"
@@ -887,6 +1070,14 @@ export default function PdfToImagesPage({ variant = DEFAULT_PDF_TO_IMAGES_VARIAN
                       <span>{exportProgress}%</span>
                     </div>
                     <ProgressBar value={exportProgress} />
+                    <button
+                      type="button"
+                      onClick={cancelExport}
+                      className="mt-3 inline-flex items-center gap-2 rounded-xl border border-red-200 bg-white px-3 py-2 text-xs font-bold text-red-600"
+                    >
+                      <StopCircle size={15} />
+                      Cancel export
+                    </button>
                   </div>
                 ) : null}
 
