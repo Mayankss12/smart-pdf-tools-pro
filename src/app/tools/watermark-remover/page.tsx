@@ -36,7 +36,7 @@ export default function WatermarkRemoverPage() {
     if (!selectedFile) return;
 
     setBusy(true);
-    setStatus("Inspecting PDF for pro removal workflow...");
+    setStatus("Inspecting PDF for the planned backend removal workflow...");
 
     try {
       validatePdfFile(selectedFile);
@@ -60,7 +60,7 @@ export default function WatermarkRemoverPage() {
     setStatus("Upload a PDF you own or are authorized to edit.");
   }
 
-  function handleStartProFlow() {
+  function handleStartBackendFlow() {
     if (!file) {
       setStatus("Upload a PDF first.");
       return;
@@ -72,7 +72,7 @@ export default function WatermarkRemoverPage() {
     }
 
     setStatus(
-      "Pro removal workflow is ready for backend processing. Next build step will connect this screen to account gating, secure upload, and server-side removal jobs.",
+      "Watermark removal requires backend configuration. Connect secure upload and server-side removal before enabling this action.",
     );
   }
 
@@ -98,7 +98,7 @@ export default function WatermarkRemoverPage() {
             <div className="max-w-4xl">
               <div className="inline-flex items-center gap-2 rounded-full border border-violet-100 bg-white/88 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-violet-700 shadow-sm backdrop-blur">
                 <Crown size={14} />
-                Pro workflow
+                Backend required
               </div>
 
               <h1 className="display-font mt-5 max-w-4xl text-[2.35rem] font-medium leading-[1.08] tracking-[-0.045em] text-slate-950 sm:text-[2.9rem] lg:text-[3.35rem]">
@@ -106,7 +106,7 @@ export default function WatermarkRemoverPage() {
               </h1>
 
               <p className="mt-4 max-w-2xl text-[15px] font-medium leading-7 text-slate-600 sm:text-base">
-                This pro workflow is designed for documents you own or are allowed to edit. It prepares the secure inspection and backend-removal flow instead of offering unsafe fake overlay hiding.
+                This planned workflow is for documents you own or are allowed to edit. File inspection is available, but removal stays disabled until secure server-side processing is configured.
               </p>
             </div>
           </div>
@@ -178,8 +178,8 @@ export default function WatermarkRemoverPage() {
                   },
                   {
                     icon: LockKeyhole,
-                    title: "Pro gated",
-                    description: "Connects cleanly to account, plan, and server jobs.",
+                    title: "Backend gated",
+                    description: "Requires account checks, secure upload, and server jobs.",
                   },
                   {
                     icon: Wand2,
@@ -224,8 +224,8 @@ export default function WatermarkRemoverPage() {
 
                 <button
                   type="button"
-                  onClick={handleStartProFlow}
-                  disabled={busy || !file}
+                  onClick={handleStartBackendFlow}
+                  disabled
                   className="btn-primary mt-5 w-full"
                 >
                   {busy ? (
@@ -236,7 +236,7 @@ export default function WatermarkRemoverPage() {
                   ) : (
                     <>
                       <Crown size={18} />
-                      Start Pro Removal Flow
+                      Backend configuration required
                     </>
                   )}
                 </button>

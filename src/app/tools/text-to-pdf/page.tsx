@@ -14,6 +14,7 @@ import {
 
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
+import { useEntitlement } from "@/hooks/useEntitlement";
 
 type PageSize = "a4" | "letter";
 type FontChoice = "helvetica" | "times" | "courier";
@@ -117,6 +118,7 @@ function downloadPdf(bytes: Uint8Array, fileName: string) {
 }
 
 export default function TextToPdfPage() {
+  const { recordExport } = useEntitlement();
   const [text, setText] = useState(SAMPLE_TEXT);
   const [title, setTitle] = useState("Text Document");
   const [pageSize, setPageSize] = useState<PageSize>("a4");
@@ -205,6 +207,19 @@ export default function TextToPdfPage() {
           color: rgb(0.45, 0.45, 0.55),
         });
       });
+
+      const exportRecord = await recordExport({
+        toolKey: "text-to-pdf",
+        exportKind: "clean",
+      });
+
+      if (!exportRecord.allowed) {
+        setStatus(
+          exportRecord.error ||
+            `${exportRecord.planLabel} clean export limit reached for today.`,
+        );
+        return;
+      }
 
       const bytes = await pdfDoc.save();
       downloadPdf(bytes, `PDFMantra-${safeFileName(title)}.pdf`);
