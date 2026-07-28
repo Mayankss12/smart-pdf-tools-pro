@@ -1,5 +1,7 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 
+import type { EditorPageGeometry } from "./editor-page-geometry";
+
 export type EmbeddedTextFonts = {
   readonly regular: PDFFont;
   readonly bold: PDFFont;
@@ -46,6 +48,9 @@ export type EditorRichTextExportObject = {
   readonly data: RichTextExportData;
 };
 
+const TEXT_PADDING_X = 4;
+const TEXT_PADDING_Y = 2;
+
 export async function embedEditorTextFonts(pdfDoc: PDFDocument): Promise<EmbeddedTextFonts> {
   return {
     regular: await pdfDoc.embedFont(StandardFonts.Helvetica),
@@ -73,7 +78,7 @@ function hexToRgb(hex: string) {
 function getSafeOpacity(opacity: number | undefined) {
   if (!Number.isFinite(opacity)) return 1;
 
-  return Math.max(0.1, Math.min(1, Number(opacity)));
+  return Math.max(0, Math.min(1, Number(opacity)));
 }
 
 function getTextFontFromStyle(style: Required<ExportTextStyle>, fonts: EmbeddedTextFonts) {
@@ -151,6 +156,33 @@ function measureTextSafely(text: string, font: PDFFont, fontSize: number) {
       }
     }, 0);
   }
+}
+
+function breakLongToken(text: string, font: PDFFont, fontSize: number, maxWidth: number) {
+  if (measureTextSafely(text, font, fontSize) <= maxWidth) {
+    return [text];
+  }
+
+  const fragments: string[] = [];
+  let fragment = "";
+
+  Array.from(text).forEach((character) => {
+    const candidate = fragment + character;
+
+    if (fragment && measureTextSafely(candidate, font, fontSize) > maxWidth) {
+      fragments.push(fragment);
+      fragment = character;
+      return;
+    }
+
+    fragment = candidate;
+  });
+
+  if (fragment) {
+    fragments.push(fragment);
+  }
+
+  return fragments;
 }
 
 function drawTextSafely({
@@ -253,15 +285,19 @@ export function drawEditorRichTextObject(
   page: PDFPage,
   object: EditorRichTextExportObject,
   fonts: EmbeddedTextFonts,
+  geometry: EditorPageGeometry,
 ) {
-  const pageHeight = page.getHeight();
   const fontSize = object.data.fontSize || 16;
   const opacity = getSafeOpacity(object.data.opacity);
+
+  if (opacity <= 0) return;
+
   const lineHeight = fontSize * 1.3;
-  const startX = object.box.x;
-  const maxX = object.box.x + object.box.width;
+  const startX = object.box.x + TEXT_PADDING_X;
+  const maxX = Math.max(startX, object.box.x + object.box.width - TEXT_PADDING_X);
+  const wrappingWidth = Math.max(1, maxX - startX);
   let cursorX = startX;
-  let baselineY = pageHeight - object.box.y - fontSize;
+  let baselineY = geometry.viewportHeight - object.box.y - TEXT_PADDING_Y - fontSize;
 
   const moveToNextLine = () => {
     cursorX = startX;
@@ -284,23 +320,35 @@ export function drawEditorRichTextObject(
         return;
       }
 
-      const tokenWidth = measureTextSafely(token, font, fontSize);
       const isOnlyWhitespace = /^\s+$/.test(token);
 
-      if (!isOnlyWhitespace && cursorX > startX && cursorX + tokenWidth > maxX) {
-        moveToNextLine();
+      if (isOnlyWhitespace) {
+        cursorX += measureTextSafely(token, font, fontSize);
+
+        if (cursorX > maxX) {
+          moveToNextLine();
+        }
+        return;
       }
 
-      if (!isOnlyWhitespace) {
+      const fragments = breakLongToken(token, font, fontSize, wrappingWidth);
+
+      fragments.forEach((fragment, fragmentIndex) => {
+        const fragmentWidth = measureTextSafely(fragment, font, fontSize);
+
+        if (cursorX > startX && cursorX + fragmentWidth > maxX) {
+          moveToNextLine();
+        }
+
         drawTextSafely({
           page,
-          text: token,
+          text: fragment,
           x: cursorX,
           y: baselineY,
           fontSize,
           font,
           color: textColor,
-          maxWidth: object.box.width,
+          maxWidth: wrappingWidth,
           opacity,
         });
 
@@ -308,20 +356,20 @@ export function drawEditorRichTextObject(
           drawUnderlineSegment({
             page,
             startX: cursorX,
-            endX: cursorX + tokenWidth,
+            endX: cursorX + fragmentWidth,
             baselineY,
             fontSize,
             color: textColor,
             opacity,
           });
         }
-      }
 
-      cursorX += tokenWidth;
+        cursorX += fragmentWidth;
 
-      if (isOnlyWhitespace && cursorX > maxX) {
-        moveToNextLine();
-      }
+        if (fragmentIndex < fragments.length - 1) {
+          moveToNextLine();
+        }
+      });
     });
   });
 }

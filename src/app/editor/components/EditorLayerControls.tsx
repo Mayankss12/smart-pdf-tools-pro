@@ -101,7 +101,7 @@ export function EditorLayerControls({ editor }: EditorLayerControlsProps) {
           </span>
           <input
             type="range"
-            min={10}
+            min={0}
             max={100}
             value={opacity}
             onChange={(event) => {

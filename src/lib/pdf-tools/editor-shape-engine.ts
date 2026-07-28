@@ -1,5 +1,7 @@
 import { rgb, type PDFPage } from "pdf-lib";
 
+import type { EditorPageGeometry } from "./editor-page-geometry";
+
 type ShapeType = "rectangle" | "circle" | "line" | "arrow";
 
 type EditorShapeBox = {
@@ -120,9 +122,9 @@ function getFillColor(data: EditorShapeData) {
   return toPdfRgb(normalizeHexColor(data.fillColor, DEFAULT_FILL_COLOR));
 }
 
-function getSafeBox(box: EditorShapeBox, page: PDFPage) {
-  const pageWidth = Math.max(page.getWidth(), 1);
-  const pageHeight = Math.max(page.getHeight(), 1);
+function getSafeBox(box: EditorShapeBox, geometry: EditorPageGeometry) {
+  const pageWidth = Math.max(geometry.viewportWidth, 1);
+  const pageHeight = Math.max(geometry.viewportHeight, 1);
 
   const width = clamp(box.width, 0, pageWidth);
   const height = clamp(box.height, 0, pageHeight);
@@ -152,52 +154,56 @@ function getRelativePoint(
 }
 
 function toPdfPoint({
-  page,
+  geometry,
   box,
   point,
 }: {
-  readonly page: PDFPage;
+  readonly geometry: EditorPageGeometry;
   readonly box: EditorShapeBox;
   readonly point: RelativePoint;
 }) {
-  const pageHeight = page.getHeight();
-
   return {
     x: box.x + point.x,
-    y: pageHeight - (box.y + point.y),
+    y: geometry.viewportHeight - (box.y + point.y),
   };
 }
 
 function getLinePoints({
-  page,
+  geometry,
   box,
+  originalBox,
   data,
 }: {
-  readonly page: PDFPage;
+  readonly geometry: EditorPageGeometry;
   readonly box: EditorShapeBox;
+  readonly originalBox: EditorShapeBox;
   readonly data: EditorShapeData;
 }) {
-  const relativeStart = getRelativePoint(
+  const originalStart = getRelativePoint(
     data.lineStart,
     { x: 0, y: 0 },
-    box.width,
-    box.height,
+    originalBox.width,
+    originalBox.height,
   );
-  const relativeEnd = getRelativePoint(
+  const originalEnd = getRelativePoint(
     data.lineEnd,
-    { x: box.width, y: box.height },
-    box.width,
-    box.height,
+    { x: originalBox.width, y: originalBox.height },
+    originalBox.width,
+    originalBox.height,
   );
+  const scaleX = box.width / Math.max(originalBox.width, 0.01);
+  const scaleY = box.height / Math.max(originalBox.height, 0.01);
+  const relativeStart = { x: originalStart.x * scaleX, y: originalStart.y * scaleY };
+  const relativeEnd = { x: originalEnd.x * scaleX, y: originalEnd.y * scaleY };
 
   return {
     start: toPdfPoint({
-      page,
+      geometry,
       box,
       point: relativeStart,
     }),
     end: toPdfPoint({
-      page,
+      geometry,
       box,
       point: relativeEnd,
     }),
@@ -259,6 +265,7 @@ function drawArrowHead({
 
 function drawRectangleShape({
   page,
+  geometry,
   box,
   data,
   strokeColor,
@@ -266,18 +273,18 @@ function drawRectangleShape({
   opacity,
 }: {
   readonly page: PDFPage;
+  readonly geometry: EditorPageGeometry;
   readonly box: EditorShapeBox;
   readonly data: EditorShapeData;
   readonly strokeColor: ReturnType<typeof rgb>;
   readonly strokeWidth: number;
   readonly opacity: number;
 }) {
-  const pageHeight = page.getHeight();
   const fillColor = getFillColor(data);
 
   page.drawRectangle({
     x: box.x,
-    y: pageHeight - box.y - box.height,
+    y: geometry.viewportHeight - box.y - box.height,
     width: box.width,
     height: box.height,
     color: fillColor,
@@ -290,6 +297,7 @@ function drawRectangleShape({
 
 function drawCircleShape({
   page,
+  geometry,
   box,
   data,
   strokeColor,
@@ -297,18 +305,18 @@ function drawCircleShape({
   opacity,
 }: {
   readonly page: PDFPage;
+  readonly geometry: EditorPageGeometry;
   readonly box: EditorShapeBox;
   readonly data: EditorShapeData;
   readonly strokeColor: ReturnType<typeof rgb>;
   readonly strokeWidth: number;
   readonly opacity: number;
 }) {
-  const pageHeight = page.getHeight();
   const fillColor = getFillColor(data);
 
   page.drawEllipse({
     x: box.x + box.width / 2,
-    y: pageHeight - box.y - box.height / 2,
+    y: geometry.viewportHeight - box.y - box.height / 2,
     xScale: Math.max(0.01, box.width / 2),
     yScale: Math.max(0.01, box.height / 2),
     color: fillColor,
@@ -321,7 +329,9 @@ function drawCircleShape({
 
 function drawLineShape({
   page,
+  geometry,
   box,
+  originalBox,
   data,
   strokeColor,
   strokeWidth,
@@ -329,7 +339,9 @@ function drawLineShape({
   arrow,
 }: {
   readonly page: PDFPage;
+  readonly geometry: EditorPageGeometry;
   readonly box: EditorShapeBox;
+  readonly originalBox: EditorShapeBox;
   readonly data: EditorShapeData;
   readonly strokeColor: ReturnType<typeof rgb>;
   readonly strokeWidth: number;
@@ -337,8 +349,9 @@ function drawLineShape({
   readonly arrow: boolean;
 }) {
   const { start, end } = getLinePoints({
-    page,
+    geometry,
     box,
+    originalBox,
     data,
   });
 
@@ -366,8 +379,12 @@ function drawLineShape({
   }
 }
 
-export function drawEditorShapeObject(page: PDFPage, object: EditorShapeExportObject) {
-  const safeBox = getSafeBox(object.box, page);
+export function drawEditorShapeObject(
+  page: PDFPage,
+  object: EditorShapeExportObject,
+  geometry: EditorPageGeometry,
+) {
+  const safeBox = getSafeBox(object.box, geometry);
   const shapeType = normalizeShapeType(object.data.shapeType);
   const strokeColor = toPdfRgb(
     normalizeHexColor(object.data.strokeColor, DEFAULT_STROKE_COLOR),
@@ -382,6 +399,7 @@ export function drawEditorShapeObject(page: PDFPage, object: EditorShapeExportOb
   if (shapeType === "rectangle") {
     drawRectangleShape({
       page,
+      geometry,
       box: safeBox,
       data: object.data,
       strokeColor,
@@ -394,6 +412,7 @@ export function drawEditorShapeObject(page: PDFPage, object: EditorShapeExportOb
   if (shapeType === "circle") {
     drawCircleShape({
       page,
+      geometry,
       box: safeBox,
       data: object.data,
       strokeColor,
@@ -405,7 +424,9 @@ export function drawEditorShapeObject(page: PDFPage, object: EditorShapeExportOb
 
   drawLineShape({
     page,
+    geometry,
     box: safeBox,
+    originalBox: object.box,
     data: object.data,
     strokeColor,
     strokeWidth,

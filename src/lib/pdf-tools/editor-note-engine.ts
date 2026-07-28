@@ -13,6 +13,7 @@ import {
   drawEditorRichTextObject,
   type EmbeddedTextFonts,
 } from "./editor-rich-text-engine";
+import type { EditorPageGeometry } from "./editor-page-geometry";
 
 type EditorNoteBox = {
   readonly x: number;
@@ -57,9 +58,9 @@ function hexToRgb(hex: string, fallback: string) {
   };
 }
 
-function getSafeBox(box: EditorNoteBox, page: PDFPage) {
-  const pageWidth = Math.max(page.getWidth(), 1);
-  const pageHeight = Math.max(page.getHeight(), 1);
+function getSafeBox(box: EditorNoteBox, geometry: EditorPageGeometry) {
+  const pageWidth = Math.max(geometry.viewportWidth, 1);
+  const pageHeight = Math.max(geometry.viewportHeight, 1);
   const width = clamp(box.width, 0, pageWidth);
   const height = clamp(box.height, 0, pageHeight);
 
@@ -90,15 +91,16 @@ export function drawEditorNoteObject(
   page: PDFPage,
   object: EditorNoteExportObject,
   fonts: EmbeddedTextFonts,
+  geometry: EditorPageGeometry,
 ) {
-  const safeBox = getSafeBox(object.box, page);
+  const safeBox = getSafeBox(object.box, geometry);
   const opacity = clamp(object.data.opacity ?? 1, 0, 1);
 
   if (safeBox.width <= 0 || safeBox.height <= 0 || opacity <= 0) {
     return;
   }
 
-  const pageHeight = page.getHeight();
+  const pageHeight = geometry.viewportHeight;
   const background = hexToRgb(
     object.data.backgroundColor ?? DEFAULT_BACKGROUND_COLOR,
     DEFAULT_BACKGROUND_COLOR,
@@ -165,6 +167,7 @@ export function drawEditorNoteObject(
         },
       },
       fonts,
+      geometry,
     );
   } finally {
     page.pushOperators(popGraphicsState());

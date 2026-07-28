@@ -1,5 +1,7 @@
 import type { PDFDocument, PDFPage } from "pdf-lib";
 
+import type { EditorPageGeometry } from "./editor-page-geometry";
+
 export type EditorImageBox = {
   readonly x: number;
   readonly y: number;
@@ -42,21 +44,24 @@ function base64ToUint8Array(base64: string) {
 function getSafeOpacity(opacity: number | undefined) {
   if (!Number.isFinite(opacity)) return 1;
 
-  return Math.max(0.1, Math.min(1, Number(opacity)));
+  return Math.max(0, Math.min(1, Number(opacity)));
 }
 
 export async function drawEditorImageObject({
   pdfDoc,
   page,
   object,
+  geometry,
 }: {
   readonly pdfDoc: PDFDocument;
   readonly page: PDFPage;
   readonly object: EditorImageObjectLike;
+  readonly geometry: EditorPageGeometry;
 }) {
   const imageDataUrl = object.data.imageDataUrl;
+  const opacity = getSafeOpacity(object.data.opacity);
 
-  if (!imageDataUrl) {
+  if (!imageDataUrl || opacity <= 0) {
     return;
   }
 
@@ -73,9 +78,9 @@ export async function drawEditorImageObject({
 
   page.drawImage(embeddedImage, {
     x: object.box.x,
-    y: page.getHeight() - object.box.y - object.box.height,
+    y: geometry.viewportHeight - object.box.y - object.box.height,
     width: object.box.width,
     height: object.box.height,
-    opacity: getSafeOpacity(object.data.opacity),
+    opacity,
   });
 }

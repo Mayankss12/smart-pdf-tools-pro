@@ -1,5 +1,7 @@
 import { rgb, type PDFPage } from "pdf-lib";
 
+import type { EditorPageGeometry } from "./editor-page-geometry";
+
 type DrawPoint = { readonly x: number; readonly y: number };
 
 type DrawObject = {
@@ -67,7 +69,7 @@ function getDrawDimension(value: unknown, fallback: number) {
   return Math.max(MIN_DRAW_DIMENSION, fallback);
 }
 
-function toPdfPoint(page: PDFPage, object: DrawObject, point: DrawPoint) {
+function toPdfPoint(geometry: EditorPageGeometry, object: DrawObject, point: DrawPoint) {
   const drawWidth = getDrawDimension(object.data.drawWidth, object.box.width);
   const drawHeight = getDrawDimension(object.data.drawHeight, object.box.height);
   const scaleX = object.box.width / drawWidth;
@@ -75,12 +77,12 @@ function toPdfPoint(page: PDFPage, object: DrawObject, point: DrawPoint) {
 
   return {
     x: object.box.x + point.x * scaleX,
-    y: page.getHeight() - (object.box.y + point.y * scaleY),
+    y: geometry.viewportHeight - (object.box.y + point.y * scaleY),
   };
 }
 
-function drawCap(page: PDFPage, object: DrawObject, point: DrawPoint, color: ReturnType<typeof rgb>, thickness: number, opacity: number) {
-  const pdfPoint = toPdfPoint(page, object, point);
+function drawCap(page: PDFPage, geometry: EditorPageGeometry, object: DrawObject, point: DrawPoint, color: ReturnType<typeof rgb>, thickness: number, opacity: number) {
+  const pdfPoint = toPdfPoint(geometry, object, point);
 
   page.drawEllipse({
     x: pdfPoint.x,
@@ -92,7 +94,11 @@ function drawCap(page: PDFPage, object: DrawObject, point: DrawPoint, color: Ret
   });
 }
 
-export function drawEditorDrawObject(page: PDFPage, object: DrawObject) {
+export function drawEditorDrawObject(
+  page: PDFPage,
+  object: DrawObject,
+  geometry: EditorPageGeometry,
+) {
   const points = parsePath(object.data.pathData);
   const thickness = clamp(Number(object.data.strokeWidth ?? DEFAULT_STROKE_WIDTH), 1, 12);
   const opacity = clamp(Number(object.data.opacity ?? 1), 0, 1);
@@ -101,17 +107,17 @@ export function drawEditorDrawObject(page: PDFPage, object: DrawObject) {
   if (points.length === 0 || opacity <= 0) return;
 
   if (points.length === 1) {
-    drawCap(page, object, points[0], color, thickness, opacity);
+    drawCap(page, geometry, object, points[0], color, thickness, opacity);
     return;
   }
 
   for (let index = 1; index < points.length; index += 1) {
-    const start = toPdfPoint(page, object, points[index - 1]);
-    const end = toPdfPoint(page, object, points[index]);
+    const start = toPdfPoint(geometry, object, points[index - 1]);
+    const end = toPdfPoint(geometry, object, points[index]);
 
     page.drawLine({ start, end, thickness, color, opacity });
-    drawCap(page, object, points[index - 1], color, thickness, opacity);
+    drawCap(page, geometry, object, points[index - 1], color, thickness, opacity);
   }
 
-  drawCap(page, object, points[points.length - 1], color, thickness, opacity);
+  drawCap(page, geometry, object, points[points.length - 1], color, thickness, opacity);
 }

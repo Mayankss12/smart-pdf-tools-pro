@@ -7,8 +7,12 @@ import {
   type PDFFont,
 } from "pdf-lib";
 
-import { PdfEngineError } from "@/lib/pdf-engine";
-import type { OcrResult, OcrWord } from "@/lib/pdf-ocr-engine";
+import { PdfEngineError } from "./pdf-engine";
+import type { OcrResult, OcrWord } from "./pdf-ocr-engine";
+import {
+  getEditorPageGeometry,
+  withEditorPageTransform,
+} from "./pdf-tools/editor-page-geometry";
 
 export type PdfImagePlacement = {
   pageIndex: number;
@@ -33,7 +37,7 @@ export type TextOverlayProgress = {
 };
 
 export type TextOverlayOptions = {
-  ocrResults: OcrResult[];
+  ocrResults: readonly (OcrResult | undefined)[];
   placements: PdfImagePlacement[];
   onProgress?: (progress: TextOverlayProgress) => void;
   signal?: AbortSignal;
@@ -57,7 +61,7 @@ type ScriptFonts = {
 
 const MIN_FONT_SIZE = 2.5;
 const MAX_FONT_SIZE = 72;
-const TEXT_OPACITY = 0.01;
+const TEXT_OPACITY = 0;
 
 type FontScript = "latin" | "devanagari" | "arabic";
 
@@ -149,7 +153,7 @@ export async function addSearchableTextLayer(
 ) {
   const { ocrResults, placements, onProgress, signal } = options;
 
-  if (!ocrResults.length) {
+  if (!ocrResults.some(Boolean)) {
     throw new PdfEngineError("PROCESSING_FAILED", "No OCR results available for text overlay.");
   }
 
@@ -160,7 +164,10 @@ export async function addSearchableTextLayer(
   const pages = pdf.getPages();
   const fonts = await embedScriptFonts(pdf);
   const placementByPageIndex = new Map(placements.map((placement) => [placement.pageIndex, placement]));
-  const totalWords = ocrResults.reduce((sum, result) => sum + result.words.length, 0);
+  const totalWords = ocrResults.reduce(
+    (sum, result) => sum + (result?.words.length ?? 0),
+    0,
+  );
 
   let processedWords = 0;
 
@@ -174,25 +181,28 @@ export async function addSearchableTextLayer(
     if (!ocrResult || !placement || !page) continue;
 
     const words = transformOcrWordsToPdfSpace(ocrResult.words, ocrResult.imageData, placement);
+    const geometry = getEditorPageGeometry(page);
 
-    for (const word of words) {
-      throwIfAborted(signal);
+    await withEditorPageTransform(page, geometry, () => {
+      for (const word of words) {
+        throwIfAborted(signal);
 
-      drawInvisibleSearchableWord(page, fonts, word);
-      processedWords += 1;
+        drawInvisibleSearchableWord(page, fonts, word, geometry);
+        processedWords += 1;
 
-      if (processedWords % 25 === 0 || processedWords === totalWords) {
-        reportOverlayProgress(onProgress, {
-          stage: "overlay",
-          pageIndex: pageIndex + 1,
-          totalPages: pages.length,
-          wordsProcessed: processedWords,
-          totalWords,
-          percent: totalWords ? (processedWords / totalWords) * 100 : 100,
-          message: `Adding searchable text layer: ${processedWords}/${totalWords} words...`,
-        });
+        if (processedWords % 25 === 0 || processedWords === totalWords) {
+          reportOverlayProgress(onProgress, {
+            stage: "overlay",
+            pageIndex: pageIndex + 1,
+            totalPages: pages.length,
+            wordsProcessed: processedWords,
+            totalWords,
+            percent: totalWords ? (processedWords / totalWords) * 100 : 100,
+            message: `Adding searchable text layer: ${processedWords}/${totalWords} words...`,
+          });
+        }
       }
-    }
+    });
   }
 
   reportOverlayProgress(onProgress, {
@@ -247,10 +257,14 @@ export function transformOcrWordsToPdfSpace(
     .filter((word): word is TransformedWord => Boolean(word));
 }
 
-function drawInvisibleSearchableWord(page: PDFPage, fonts: ScriptFonts, word: TransformedWord) {
-  const pageSize = page.getSize();
-  const safeX = clamp(word.x, 0, pageSize.width);
-  const safeY = clamp(word.y, 0, pageSize.height);
+function drawInvisibleSearchableWord(
+  page: PDFPage,
+  fonts: ScriptFonts,
+  word: TransformedWord,
+  geometry: ReturnType<typeof getEditorPageGeometry>,
+) {
+  const safeX = clamp(word.x, 0, geometry.viewportWidth);
+  const safeY = clamp(word.y, 0, geometry.viewportHeight);
   const safeFontSize = clamp(word.fontSize, MIN_FONT_SIZE, MAX_FONT_SIZE);
 
   if (!word.text.trim()) return;

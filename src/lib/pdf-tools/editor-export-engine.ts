@@ -1,8 +1,7 @@
 import { PDFDocument, rgb, type PDFPage } from "pdf-lib";
+import type { OcrResult } from "../pdf-ocr-engine";
+import { addSearchableTextLayer } from "../pdf-text-overlay";
 
-import { createHighlightLayer } from "../../engines/highlight/highlightEngine";
-import { prepareHighlightExportPlan } from "../../engines/highlight/highlightExporter";
-import type { PdfPageGeometryContext } from "../../engines/shared/types";
 import {
   drawEditorRichTextObject,
   embedEditorTextFonts,
@@ -15,6 +14,11 @@ import { drawEditorNoteObject } from "./editor-note-engine";
 import { drawEditorSignatureObject } from "./editor-signature-engine";
 import { drawEditorShapeObject } from "./editor-shape-engine";
 import { drawEditorDrawObject } from "./editor-draw-engine";
+import {
+  getEditorPageGeometry,
+  withEditorPageTransform,
+  type EditorPageGeometry,
+} from "./editor-page-geometry";
 
 type EditorExportBox = {
   readonly x: number;
@@ -57,8 +61,12 @@ export type EditorExportObject = {
   readonly data: EditorExportObjectData;
 };
 
-const DEFAULT_HIGHLIGHT_COLOR = "#FDE047";
-const HIGHLIGHT_COLOR_PATTERN = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
+export type EditorExportOcrPage = {
+  readonly pageNumber: number;
+  readonly result: OcrResult;
+};
+
+const DEFAULT_HIGHLIGHT_COLOR = "#fde047";
 
 export function safeEditedName(fileName: string) {
   const cleanName = fileName.replace(/\.pdf$/i, "");
@@ -86,114 +94,36 @@ function hexToRgb(hex: string) {
   return { r, g, b };
 }
 
-function getSafeHighlightColor(color: string | undefined) {
-  if (!color || !HIGHLIGHT_COLOR_PATTERN.test(color)) {
-    return DEFAULT_HIGHLIGHT_COLOR;
-  }
-
-  return color.toUpperCase();
-}
-
 function getSafeOpacity(opacity: number | undefined, fallback: number) {
   if (!Number.isFinite(opacity)) return fallback;
 
   return clamp(Number(opacity), 0, 1);
 }
 
-function getPageGeometryContext(page: PDFPage, pageIndex: number): PdfPageGeometryContext {
-  const width = Math.max(page.getWidth(), 1);
-  const height = Math.max(page.getHeight(), 1);
+function drawHighlightObject(
+  page: PDFPage,
+  object: EditorExportObject,
+  geometry: EditorPageGeometry,
+) {
+  const width = clamp(object.box.width, 0, geometry.viewportWidth);
+  const height = clamp(object.box.height, 0, geometry.viewportHeight);
+  const x = clamp(object.box.x, 0, Math.max(0, geometry.viewportWidth - width));
+  const y = clamp(object.box.y, 0, Math.max(0, geometry.viewportHeight - height));
+  const opacity = getSafeOpacity(object.data.opacity, 0.45);
 
-  return {
-    pageIndex,
-    pageNumber: pageIndex + 1,
-    rotation: 0,
-    pdfSize: {
-      width,
-      height,
-    },
-    viewportSize: {
-      width,
-      height,
-    },
-  };
-}
+  if (width <= 0 || height <= 0 || opacity <= 0) return;
 
-function getNormalizedEditorBox(object: EditorExportObject, page: PDFPage) {
-  const pageWidth = Math.max(page.getWidth(), 1);
-  const pageHeight = Math.max(page.getHeight(), 1);
-
-  const left = clamp(object.box.x / pageWidth, 0, 1);
-  const top = clamp(object.box.y / pageHeight, 0, 1);
-  const right = clamp((object.box.x + object.box.width) / pageWidth, 0, 1);
-  const bottom = clamp((object.box.y + object.box.height) / pageHeight, 0, 1);
-
-  return {
-    x: Math.min(left, right),
-    y: Math.min(top, bottom),
-    width: Math.abs(right - left),
-    height: Math.abs(bottom - top),
-  };
-}
-
-function drawLegacyHighlightFallback(page: PDFPage, object: EditorExportObject) {
-  const pageHeight = page.getHeight();
-  const color = hexToRgb(object.data.backgroundColor || "#fde047");
+  const color = hexToRgb(object.data.backgroundColor || DEFAULT_HIGHLIGHT_COLOR);
 
   page.drawRectangle({
-    x: object.box.x,
-    y: pageHeight - object.box.y - object.box.height,
-    width: object.box.width,
-    height: object.box.height,
+    x,
+    y: geometry.viewportHeight - y - height,
+    width,
+    height,
     color: rgb(color.r, color.g, color.b),
-    opacity: object.data.opacity ?? 0.45,
+    opacity,
+    borderWidth: 0,
   });
-}
-
-function drawHighlightObjectWithSharedEngine(page: PDFPage, object: EditorExportObject, pageIndex: number) {
-  try {
-    const geometry = getPageGeometryContext(page, pageIndex);
-    const normalizedBounds = getNormalizedEditorBox(object, page);
-
-    const layer = createHighlightLayer({
-      id: object.id,
-      pageIndex,
-      creationSource: "freeform-drag",
-      style: {
-        color: getSafeHighlightColor(object.data.backgroundColor),
-        opacity: getSafeOpacity(object.data.opacity, 0.45),
-      },
-      regions: [
-        {
-          id: `${object.id}-region`,
-          pageIndex,
-          bounds: normalizedBounds,
-          source: "freeform",
-          granularity: "freeform",
-          readingOrder: 0,
-        },
-      ],
-    });
-
-    const plan = prepareHighlightExportPlan({
-      layers: [layer],
-      pageGeometryContexts: [geometry],
-    });
-
-    for (const command of plan.flatCommands) {
-      page.drawRectangle({
-        x: command.pdfBounds.x,
-        y: command.pdfBounds.y,
-        width: command.pdfBounds.width,
-        height: command.pdfBounds.height,
-        color: rgb(command.color.r, command.color.g, command.color.b),
-        opacity: command.opacity,
-        borderWidth: 0,
-      });
-    }
-  } catch {
-    drawLegacyHighlightFallback(page, object);
-  }
 }
 
 async function drawEditorObject({
@@ -201,43 +131,43 @@ async function drawEditorObject({
   page,
   object,
   fonts,
+  geometry,
 }: {
   readonly pdfDoc: PDFDocument;
   readonly page: PDFPage;
   readonly object: EditorExportObject;
   readonly fonts: EmbeddedTextFonts;
+  readonly geometry: EditorPageGeometry;
 }) {
-  const pageIndex = object.pageNumber - 1;
-
   if (object.type === "text") {
-    drawEditorRichTextObject(page, object, fonts);
+    drawEditorRichTextObject(page, object, fonts, geometry);
     return;
   }
 
   if (object.type === "highlight") {
-    drawHighlightObjectWithSharedEngine(page, object, pageIndex);
+    drawHighlightObject(page, object, geometry);
     return;
   }
 
   if (object.type === "whiteout") {
-    drawEditorWhiteout(page, object.box, {
+    drawEditorWhiteout(page, object.box, geometry, {
       opacity: object.data.opacity ?? 1,
     });
     return;
   }
 
   if (object.type === "note") {
-    drawEditorNoteObject(page, object, fonts);
+    drawEditorNoteObject(page, object, fonts, geometry);
     return;
   }
 
   if (object.type === "shape") {
-    drawEditorShapeObject(page, object);
+    drawEditorShapeObject(page, object, geometry);
     return;
   }
 
   if (object.type === "draw") {
-    drawEditorDrawObject(page, object);
+    drawEditorDrawObject(page, object, geometry);
     return;
   }
 
@@ -246,6 +176,7 @@ async function drawEditorObject({
       pdfDoc,
       page,
       object,
+      geometry,
     });
     return;
   }
@@ -255,6 +186,7 @@ async function drawEditorObject({
       pdfDoc,
       page,
       object,
+      geometry,
     });
   }
 }
@@ -262,9 +194,11 @@ async function drawEditorObject({
 export async function exportEditorPdfBytes({
   fileBytes,
   objects,
+  ocrPages = [],
 }: {
   readonly fileBytes: Uint8Array;
   readonly objects: readonly EditorExportObject[];
+  readonly ocrPages?: readonly EditorExportOcrPage[];
 }) {
   const pdfDoc = await PDFDocument.load(fileBytes);
   const fonts = await embedEditorTextFonts(pdfDoc);
@@ -273,12 +207,46 @@ export async function exportEditorPdfBytes({
   for (const object of objects) {
     const page = pages[object.pageNumber - 1];
     if (!page) continue;
+    const geometry = getEditorPageGeometry(page);
 
-    await drawEditorObject({
-      pdfDoc,
-      page,
-      object,
-      fonts,
+    await withEditorPageTransform(page, geometry, () =>
+      drawEditorObject({
+        pdfDoc,
+        page,
+        object,
+        fonts,
+        geometry,
+      }),
+    );
+  }
+
+  if (ocrPages.length > 0) {
+    const ocrResults: Array<OcrResult | undefined> = Array.from({
+      length: pages.length,
+    });
+    const placements = ocrPages.flatMap(({ pageNumber, result }) => {
+      const page = pages[pageNumber - 1];
+      if (!page) return [];
+
+      const geometry = getEditorPageGeometry(page);
+      ocrResults[pageNumber - 1] = result;
+
+      return [{
+        pageIndex: pageNumber - 1,
+        imageWidth: result.imageData.width,
+        imageHeight: result.imageData.height,
+        drawX: 0,
+        drawY: 0,
+        drawWidth: geometry.viewportWidth,
+        drawHeight: geometry.viewportHeight,
+        pageWidth: geometry.viewportWidth,
+        pageHeight: geometry.viewportHeight,
+      }];
+    });
+
+    await addSearchableTextLayer(pdfDoc, {
+      ocrResults,
+      placements,
     });
   }
 
