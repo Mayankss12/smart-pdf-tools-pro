@@ -1,4 +1,4 @@
-import { PDFDocument, StandardFonts, degrees, rgb } from "pdf-lib";
+import { PDFDocument, degrees } from "pdf-lib";
 import {
   copyPdfDocumentMetadata,
   readValidatedPdfBytes,
@@ -294,56 +294,4 @@ export async function rotatePdfWithMap(file: File, rotationMap: RotationMap): Pr
   });
 
   return savePdfResult(pdf, file.size, createPdfFileName("rotated", file.name));
-}
-
-export async function addTextWatermark(file: File, text: string): Promise<PdfProcessingResult> {
-  const watermarkText = text.trim();
-
-  if (!watermarkText) {
-    throw new PdfEngineError("PROCESSING_FAILED", "Enter watermark text first.");
-  }
-
-  const pdf = await loadPdfDocument(file);
-  const font = await pdf.embedFont(StandardFonts.HelveticaBold);
-
-  pdf.getPages().forEach((page) => {
-    const { width, height } = page.getSize();
-    const size = Math.max(24, Math.min(width, height) / 9);
-    const textWidth = font.widthOfTextAtSize(watermarkText, size);
-
-    page.drawText(watermarkText, {
-      x: (width - textWidth) / 2,
-      y: height / 2,
-      size,
-      font,
-      color: rgb(0.35, 0.2, 0.7),
-      rotate: degrees(-35),
-      opacity: 0.18,
-    });
-  });
-
-  return savePdfResult(pdf, file.size, createPdfFileName("watermarked", file.name));
-}
-
-export async function addPageNumbersToPdf(file: File): Promise<PdfProcessingResult> {
-  const pdf = await loadPdfDocument(file);
-  const font = await pdf.embedFont(StandardFonts.Helvetica);
-  const total = pdf.getPageCount();
-
-  pdf.getPages().forEach((page, index) => {
-    const { width } = page.getSize();
-    const text = `${index + 1} / ${total}`;
-    const size = 11;
-    const textWidth = font.widthOfTextAtSize(text, size);
-
-    page.drawText(text, {
-      x: (width - textWidth) / 2,
-      y: 20,
-      size,
-      font,
-      color: rgb(0.2, 0.2, 0.25),
-    });
-  });
-
-  return savePdfResult(pdf, file.size, createPdfFileName("numbered", file.name));
 }
