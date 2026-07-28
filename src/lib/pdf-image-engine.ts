@@ -18,7 +18,13 @@ import {
 import { addSearchableTextLayer, type PdfImagePlacement } from "@/lib/pdf-text-overlay";
 import type { OcrResult } from "@/lib/pdf-ocr-engine";
 
-export type ImageToPdfPageSize = "a4" | "letter" | "legal" | "a3" | "original";
+export type ImageToPdfPageSize =
+  | "a4"
+  | "letter"
+  | "legal"
+  | "a3"
+  | "original"
+  | "custom";
 export type ImageToPdfOrientation = "auto" | "portrait" | "landscape";
 export type ImageToPdfFitMode = "contain" | "cover" | "stretch";
 
@@ -33,6 +39,8 @@ export type ImageToPdfOptions = {
   fitMode?: ImageToPdfFitMode;
   margin?: number;
   backgroundColor?: string | null;
+  customPageWidth?: number;
+  customPageHeight?: number;
   outputFileName?: string;
   onProgress?: (progress: {
     completed: number;
@@ -60,7 +68,10 @@ const MAX_TOTAL_SIZE_MB = 180;
 const MAX_IMAGE_PIXELS = 60_000_000;
 const POINTS_PER_PIXEL_AT_96_DPI = 72 / 96;
 
-const PAGE_SIZES: Record<Exclude<ImageToPdfPageSize, "original">, [number, number]> = {
+const PAGE_SIZES: Record<
+  Exclude<ImageToPdfPageSize, "original" | "custom">,
+  [number, number]
+> = {
   a4: [595.28, 841.89],
   letter: [612, 792],
   legal: [612, 1008],
@@ -302,6 +313,16 @@ function normalizeOptions(
       options.backgroundColor === null
         ? null
         : normalizeHexColor(options.backgroundColor || "#ffffff"),
+    customPageWidth: clamp(
+      Number(options.customPageWidth ?? 595.28),
+      144,
+      2200,
+    ),
+    customPageHeight: clamp(
+      Number(options.customPageHeight ?? 841.89),
+      144,
+      2200,
+    ),
     outputFileName: options.outputFileName,
   };
 }
@@ -542,7 +563,10 @@ function resolvePageSize(
     return resolveOriginalImagePageSize(image, options.orientation);
   }
 
-  const baseSize = PAGE_SIZES[options.pageSize] || PAGE_SIZES.a4;
+  const baseSize: [number, number] =
+    options.pageSize === "custom"
+      ? [options.customPageWidth, options.customPageHeight]
+      : PAGE_SIZES[options.pageSize] || PAGE_SIZES.a4;
   const shouldUseLandscape =
     options.orientation === "landscape" ||
     (options.orientation === "auto" && image.width > image.height);

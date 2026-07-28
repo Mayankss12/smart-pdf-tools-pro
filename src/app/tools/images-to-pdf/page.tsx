@@ -103,6 +103,7 @@ const PAGE_SIZE_OPTIONS: Array<{ value: ImageToPdfPageSize; label: string }> = [
   { value: "legal", label: "Legal" },
   { value: "a3", label: "A3" },
   { value: "original", label: "Original" },
+  { value: "custom", label: "Custom" },
 ];
 
 const ORIENTATION_OPTIONS: Array<{ value: ImageToPdfOrientation; label: string }> = [
@@ -409,6 +410,8 @@ export default function ImagesToPdfPage({ variant = DEFAULT_IMAGES_TO_PDF_VARIAN
   const [orientation, setOrientation] = useState<ImageToPdfOrientation>("auto");
   const [fitMode, setFitMode] = useState<ImageToPdfFitMode>("contain");
   const [margin, setMargin] = useState(28);
+  const [customPageWidth, setCustomPageWidth] = useState(595);
+  const [customPageHeight, setCustomPageHeight] = useState(842);
   const [backgroundColor, setBackgroundColor] = useState<string | null>(
     "#ffffff",
   );
@@ -822,6 +825,8 @@ export default function ImagesToPdfPage({ variant = DEFAULT_IMAGES_TO_PDF_VARIAN
       fitMode,
       margin,
       backgroundColor,
+      customPageWidth,
+      customPageHeight,
       outputFileName: ocrEnabled ? `PDFMantra-searchable-${variant.outputSlug}.pdf` : `PDFMantra-${variant.outputSlug}.pdf`,
       onProgress(progress: { completed: number; total: number }) {
         const pagePercent = Math.round(
@@ -1124,6 +1129,61 @@ export default function ImagesToPdfPage({ variant = DEFAULT_IMAGES_TO_PDF_VARIAN
                             ))}
                           </select>
                         </label>
+
+                        {pageSize === "custom" ? (
+                          <div className="grid grid-cols-2 gap-3">
+                            <label className="block">
+                              <span className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
+                                Width (pt)
+                              </span>
+                              <input
+                                type="number"
+                                min={144}
+                                max={2200}
+                                value={customPageWidth}
+                                onChange={(event) => {
+                                  setCustomPageWidth(
+                                    Math.max(
+                                      144,
+                                      Math.min(
+                                        2200,
+                                        Number(event.target.value),
+                                      ),
+                                    ),
+                                  );
+                                  setResult(null);
+                                }}
+                                disabled={busy}
+                                className="mt-2 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm font-semibold"
+                              />
+                            </label>
+                            <label className="block">
+                              <span className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
+                                Height (pt)
+                              </span>
+                              <input
+                                type="number"
+                                min={144}
+                                max={2200}
+                                value={customPageHeight}
+                                onChange={(event) => {
+                                  setCustomPageHeight(
+                                    Math.max(
+                                      144,
+                                      Math.min(
+                                        2200,
+                                        Number(event.target.value),
+                                      ),
+                                    ),
+                                  );
+                                  setResult(null);
+                                }}
+                                disabled={busy}
+                                className="mt-2 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm font-semibold"
+                              />
+                            </label>
+                          </div>
+                        ) : null}
 
                         <label className="block">
                           <span className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">

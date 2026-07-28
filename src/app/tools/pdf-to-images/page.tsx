@@ -87,6 +87,7 @@ const DEFAULT_PDF_TO_IMAGES_VARIANT: PdfToImagesVariant = {
 };
 
 const DPI_PRESETS = [
+  { id: 72, label: "72 DPI", description: "Original PDF scale" },
   { id: 96, label: "96 DPI", description: "Fast preview" },
   { id: 150, label: "150 DPI", description: "Web quality" },
   { id: 200, label: "200 DPI", description: "Sharp sharing" },
@@ -433,6 +434,7 @@ export default function PdfToImagesPage({ variant = DEFAULT_PDF_TO_IMAGES_VARIAN
   const [dpi, setDpi] = useState(200);
   const [quality, setQuality] = useState(0.92);
   const [downloadAsZip, setDownloadAsZip] = useState(true);
+  const [outputBaseName, setOutputBaseName] = useState("converted-pages");
 
   const [thumbnails, setThumbnails] = useState<PageThumbnail[]>([]);
   const [thumbnailStatus, setThumbnailStatus] = useState<ThumbnailStatus>("idle");
@@ -560,6 +562,7 @@ export default function PdfToImagesPage({ variant = DEFAULT_PDF_TO_IMAGES_VARIAN
 
       try {
         setFile(selectedFile);
+        setOutputBaseName(safeFileBaseName(selectedFile.name));
         setPageCount(totalPages);
         setPageInput(totalPages === 1 ? "1" : `1-${Math.min(totalPages, 5)}`);
         setTargetMode("all");
@@ -650,6 +653,7 @@ export default function PdfToImagesPage({ variant = DEFAULT_PDF_TO_IMAGES_VARIAN
     setFile(null);
     setPageCount(0);
     setPageInput("1-3");
+    setOutputBaseName("converted-pages");
     setTargetMode("all");
     setSelectedPages([]);
     setLastSelectedPage(null);
@@ -759,7 +763,8 @@ export default function PdfToImagesPage({ variant = DEFAULT_PDF_TO_IMAGES_VARIAN
     try {
       pdf = await loadPdfJsDocument(file);
       activePdfRef.current = pdf;
-      const baseName = safeFileBaseName(file.name);
+      const baseName =
+        safeFileBaseName(outputBaseName) || safeFileBaseName(file.name);
       const pages = targetPlan.pages;
       let needsHighDpiConfirmation = false;
 
@@ -954,7 +959,7 @@ export default function PdfToImagesPage({ variant = DEFAULT_PDF_TO_IMAGES_VARIAN
                   {format.toUpperCase()}
                 </button>
 
-                <button type="button" onClick={() => setDpi(dpi === 96 ? 150 : dpi === 150 ? 200 : dpi === 200 ? 300 : 96)} disabled={busy} className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-40">
+                <button type="button" onClick={() => setDpi(dpi === 72 ? 96 : dpi === 96 ? 150 : dpi === 150 ? 200 : dpi === 200 ? 300 : 72)} disabled={busy} className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-40">
                   <Settings2 size={15} />
                   {dpi} DPI
                 </button>
@@ -969,6 +974,52 @@ export default function PdfToImagesPage({ variant = DEFAULT_PDF_TO_IMAGES_VARIAN
 
                   {openDropdown === "more" ? (
                     <div className="absolute right-0 z-50 mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl">
+                      <div>
+                        <span className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
+                          DPI presets
+                        </span>
+                        <div className="mt-2 grid grid-cols-5 gap-1">
+                          {DPI_PRESETS.map((preset) => (
+                            <button
+                              key={preset.id}
+                              type="button"
+                              onClick={() => {
+                                setDpi(preset.id);
+                                clearOutputs();
+                              }}
+                              disabled={busy}
+                              title={preset.description}
+                              className={`h-9 rounded-lg text-xs font-bold ${
+                                dpi === preset.id
+                                  ? "bg-violet-600 text-white"
+                                  : "bg-slate-100 text-slate-600"
+                              }`}
+                            >
+                              {preset.id}
+                            </button>
+                          ))}
+                        </div>
+                        <label className="mt-3 block">
+                          <span className="flex justify-between text-xs font-bold text-slate-500">
+                            Custom DPI <span>72–450</span>
+                          </span>
+                          <input
+                            type="number"
+                            min={72}
+                            max={450}
+                            value={dpi}
+                            onChange={(event) => {
+                              setDpi(
+                                clamp(Number(event.target.value), 72, 450),
+                              );
+                              clearOutputs();
+                            }}
+                            disabled={busy}
+                            className="mt-2 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm font-semibold"
+                          />
+                        </label>
+                      </div>
+
                       <label className="block">
                         <span className="flex justify-between text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
                           Quality <span>{Math.round(quality * 100)}%</span>
@@ -984,6 +1035,22 @@ export default function PdfToImagesPage({ variant = DEFAULT_PDF_TO_IMAGES_VARIAN
                           }}
                           disabled={busy || format === "png"}
                           className="mt-2 w-full"
+                        />
+                      </label>
+
+                      <label className="mt-3 block">
+                        <span className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
+                          Output base name
+                        </span>
+                        <input
+                          value={outputBaseName}
+                          onChange={(event) => {
+                            setOutputBaseName(event.target.value);
+                            clearOutputs();
+                          }}
+                          disabled={busy}
+                          maxLength={80}
+                          className="mt-2 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm font-semibold"
                         />
                       </label>
 
