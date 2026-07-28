@@ -60,11 +60,8 @@ export type OcrResult = {
   fullText: string;
 };
 
-type TesseractWorker = {
-  recognize: (image: HTMLCanvasElement | Blob | File | string) => Promise<unknown>;
-  setParameters?: (parameters: Record<string, string>) => Promise<void>;
-  terminate: () => Promise<void>;
-};
+type TesseractModule = typeof import("tesseract.js");
+type TesseractWorker = Awaited<ReturnType<TesseractModule["createWorker"]>>;
 
 type WorkerState = {
   worker: TesseractWorker;
@@ -303,16 +300,8 @@ async function getOcrWorker(workerLanguage: OcrWorkerLanguage, quality: OcrQuali
 async function createWorker(workerLanguage: OcrWorkerLanguage): Promise<TesseractWorker> {
   const tesseract = await import("tesseract.js");
 
-  const workerFactory = tesseract.createWorker as unknown as (
-    language?: string,
-    oem?: number,
-    options?: {
-      logger?: (message: unknown) => void;
-    },
-  ) => Promise<TesseractWorker>;
-
-  return workerFactory(workerLanguage, 1, {
-    logger(message: unknown) {
+  return tesseract.createWorker(workerLanguage, 1, {
+    logger(message) {
       activeTesseractLogger?.(message);
     },
   });
@@ -323,17 +312,16 @@ async function configureWorker(
   quality: OcrQuality,
   workerLanguage: OcrWorkerLanguage,
 ) {
-  if (!worker.setParameters) return;
-
+  const { PSM } = await import("tesseract.js");
   const isMixedLanguage = workerLanguage.includes("+");
   const pageSegmentationMode =
     quality === "fast"
-      ? "6"
+      ? PSM.SINGLE_BLOCK
       : quality === "high"
-        ? "3"
+        ? PSM.AUTO
         : isMixedLanguage
-          ? "6"
-          : "4";
+          ? PSM.SINGLE_BLOCK
+          : PSM.SINGLE_COLUMN;
 
   try {
     await worker.setParameters({

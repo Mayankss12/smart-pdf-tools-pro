@@ -43,7 +43,6 @@ export function StampTool({
       minHeight={32}
       toolbarLabel="Stamp"
       toolbarContent={toolbarContent}
-      directDrag
       preserveAspectRatioOnCornerResize
       onSelect={onSelect}
       onUpdateBox={onUpdateBox}

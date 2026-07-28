@@ -1,15 +1,1 @@
-export type EditorTool =
-  | "select"
-  | "text"
-  | "image"
-  | "signature"
-  | "highlight"
-  | "object"
-  | "note"
-  | "draw"
-  | "shape"
-  | "stamp"
-  | "whiteout"
-  | "ocr"
-  | "translate"
-  | "find";
+export type { EditorToolId as EditorTool } from "@/lib/editor/editor-tool-registry";

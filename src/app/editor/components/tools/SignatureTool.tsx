@@ -43,7 +43,6 @@ export function SignatureTool({
       minHeight={24}
       toolbarLabel="Signature"
       toolbarContent={toolbarContent}
-      directDrag
       preserveAspectRatioOnCornerResize
       onSelect={onSelect}
       onUpdateBox={onUpdateBox}

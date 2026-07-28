@@ -1,7 +1,9 @@
 ﻿"use client";
 
 import * as pdfjsLib from "pdfjs-dist";
+import type { PDFDocumentProxy } from "pdfjs-dist";
 import { useEffect, useRef, useState } from "react";
+import { configurePdfJsWorker } from "@/lib/pdfjs-worker";
 
 import {
   exportEditorPdfBytes,
@@ -11,15 +13,14 @@ import { EditorCanvas } from "./components/EditorCanvas";
 import { EditorLayerControls } from "./components/EditorLayerControls";
 import { EditorLeftPanel } from "./components/EditorLeftPanel";
 import { EditorStatusBar } from "./components/EditorStatusBar";
+import {
+  EditorSmartToolsPanel,
+  type EditorFindHighlight,
+  type EditorOcrPageResult,
+} from "./components/EditorSmartToolsPanel";
 import { EditorTopBar } from "./components/EditorTopBar";
 import { useEditor } from "./hooks/useEditor";
 import { useEditorKeyboard } from "./hooks/useEditorKeyboard";
-
-function configurePdfWorker() {
-  if (typeof window === "undefined") return;
-
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
-}
 
 function isPdfFile(file: File) {
   return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
@@ -40,62 +41,90 @@ function downloadBlob(blob: Blob, filename: string) {
 
 export default function EditorPage() {
   const editor = useEditor();
+  const setLeftPanelCollapsed = editor.setLeftPanelCollapsed;
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const pdfDocumentRef = useRef<PDFDocumentProxy | null>(null);
+  const loadGenerationRef = useRef(0);
 
   const [fileBytes, setFileBytes] = useState<Uint8Array | null>(null);
   const [statusMessage, setStatusMessage] = useState("Open a PDF to start editing.");
   const [loading, setLoading] = useState(false);
+  const [ocrPages, setOcrPages] = useState<EditorOcrPageResult[]>([]);
+  const [findHighlight, setFindHighlight] = useState<EditorFindHighlight | null>(null);
 
   useEditorKeyboard(editor);
 
   useEffect(() => {
-    configurePdfWorker();
+    configurePdfJsWorker(pdfjsLib);
 
     if (typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches) {
-      editor.setLeftPanelCollapsed(true);
+      setLeftPanelCollapsed(true);
     }
-    // Run only once on first mount.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+
+    return () => {
+      loadGenerationRef.current += 1;
+      const documentToDestroy = pdfDocumentRef.current;
+      pdfDocumentRef.current = null;
+      void documentToDestroy?.destroy();
+    };
+  }, [setLeftPanelCollapsed]);
 
   function openFilePicker() {
     fileInputRef.current?.click();
   }
 
   async function loadPdfFile(file: File) {
-    if (loading) return;
-
     if (!isPdfFile(file)) {
       setStatusMessage("Please select a valid PDF file.");
       return;
     }
 
+    const loadGeneration = loadGenerationRef.current + 1;
+    loadGenerationRef.current = loadGeneration;
+    let loadedDocument: PDFDocumentProxy | null = null;
+
     try {
       setLoading(true);
       setStatusMessage("Loading PDF...");
 
-      configurePdfWorker();
+      configurePdfJsWorker(pdfjsLib);
 
       const buffer = await file.arrayBuffer();
       const bytes = new Uint8Array(buffer);
-      const pdfDocument = await pdfjsLib.getDocument({
+      loadedDocument = await pdfjsLib.getDocument({
         data: new Uint8Array(buffer),
       }).promise;
 
+      if (loadGenerationRef.current !== loadGeneration) {
+        await loadedDocument.destroy();
+        return;
+      }
+
+      const previousDocument = pdfDocumentRef.current;
+      pdfDocumentRef.current = loadedDocument;
       setFileBytes(bytes);
+      setOcrPages([]);
+      setFindHighlight(null);
       editor.setFile(file);
-      editor.setPdfDocument(pdfDocument);
+      editor.setPdfDocument(loadedDocument);
       editor.setActivePage(1);
       editor.setActiveTool("select");
-      editor.markSaved();
+      void previousDocument?.destroy();
 
       setStatusMessage(`Ready: ${file.name}`);
     } catch (error) {
+      if (loadGenerationRef.current !== loadGeneration) return;
+
+      if (loadedDocument && pdfDocumentRef.current !== loadedDocument) {
+        await loadedDocument.destroy();
+      }
       setFileBytes(null);
       editor.resetEditor();
       setStatusMessage(error instanceof Error ? error.message : "Unable to load this PDF.");
     } finally {
-      setLoading(false);
+      if (loadGenerationRef.current === loadGeneration) {
+        setLoading(false);
+      }
     }
   }
 
@@ -113,9 +142,10 @@ export default function EditorPage() {
       const editedBytes = await exportEditorPdfBytes({
         fileBytes,
         objects: editor.objects,
+        ocrPages,
       });
 
-      const blob = new Blob([editedBytes as unknown as BlobPart], {
+      const blob = new Blob([new Uint8Array(editedBytes).buffer], {
         type: "application/pdf",
       });
 
@@ -166,6 +196,12 @@ export default function EditorPage() {
       />
 
       <EditorLayerControls editor={editor} />
+      <EditorSmartToolsPanel
+        editor={editor}
+        ocrPages={ocrPages}
+        onOcrPagesChange={setOcrPages}
+        onFindHighlightChange={setFindHighlight}
+      />
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <EditorLeftPanel editor={editor} onOpenFile={openFilePicker} />
@@ -174,6 +210,7 @@ export default function EditorPage() {
           editor={editor}
           onOpenFile={openFilePicker}
           onFileDrop={loadPdfFile}
+          findHighlight={findHighlight}
         />
       </div>
 

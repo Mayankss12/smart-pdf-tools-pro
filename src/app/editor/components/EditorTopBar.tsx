@@ -32,10 +32,15 @@ import {
 } from "lucide-react";
 import type { ComponentType } from "react";
 
+import {
+  getEditorToolDefinition,
+  type EditorToolStatus,
+} from "@/lib/editor/editor-tool-registry";
+
 import type { EditorTool } from "../hooks/useActiveTool";
 import type { EditorController } from "../hooks/useEditor";
 
-type ToolStatus = "working" | "locked";
+type ToolStatus = EditorToolStatus | "locked";
 
 type RibbonTool = {
   readonly id: string;
@@ -67,6 +72,10 @@ type EditorTopBarProps = {
 const OPEN_IMAGE_PICKER_EVENT = "pdfmantra:editor-open-image-picker";
 const OPEN_SIGNATURE_PICKER_EVENT = "pdfmantra:editor-open-signature-picker";
 const OPEN_STAMP_PICKER_EVENT = "pdfmantra:editor-open-stamp-picker";
+
+function getToolShortcut(tool: EditorTool, fallback: string) {
+  return getEditorToolDefinition(tool).shortcut ?? fallback;
+}
 
 function formatPageLabel(editor: EditorController) {
   if (!editor.pdfDocument) return "No PDF";
@@ -101,14 +110,18 @@ function RibbonGroup({
 
 function RibbonButton({ tool }: { readonly tool: RibbonTool }) {
   const Icon = tool.icon;
-  const locked = tool.status === "locked";
+  const locked = tool.status !== "working";
   const disabled = locked || tool.disabled;
 
   return (
     <button
       type="button"
       disabled={disabled}
-      title={`${tool.label} (${tool.shortcut})`}
+      title={
+        tool.status === "backend-required"
+          ? `${tool.label}: Backend configuration required`
+          : `${tool.label} (${tool.shortcut})`
+      }
       onClick={() => {
         if (disabled) return;
         tool.action?.();
@@ -169,7 +182,7 @@ export function EditorTopBar({
         {
           id: "select",
           label: "Select",
-          shortcut: "V",
+          shortcut: getToolShortcut("select", "Click"),
           icon: MousePointer2,
           status: "working",
           active: editor.activeTool === "select",
@@ -179,7 +192,7 @@ export function EditorTopBar({
         {
           id: "text",
           label: "Text",
-          shortcut: "T",
+          shortcut: getToolShortcut("text", "Click"),
           icon: Type,
           status: "working",
           active: editor.activeTool === "text",
@@ -189,7 +202,7 @@ export function EditorTopBar({
         {
           id: "image",
           label: "Image",
-          shortcut: "Browse",
+          shortcut: getToolShortcut("image", "Browse"),
           icon: ImageIcon,
           status: "working",
           disabled: !hasDocument,
@@ -198,7 +211,7 @@ export function EditorTopBar({
         {
           id: "signature",
           label: "Sign",
-          shortcut: "Browse",
+          shortcut: getToolShortcut("signature", "Browse"),
           icon: PenLine,
           status: "working",
           disabled: !hasDocument,
@@ -207,7 +220,7 @@ export function EditorTopBar({
         {
           id: "shape",
           label: "Shape",
-          shortcut: "R",
+          shortcut: getToolShortcut("shape", "Click"),
           icon: Square,
           status: "working",
           active: editor.activeTool === "shape",
@@ -217,7 +230,7 @@ export function EditorTopBar({
         {
           id: "draw",
           label: "Draw",
-          shortcut: "D",
+          shortcut: getToolShortcut("draw", "Click"),
           icon: Pencil,
           status: "working",
           active: editor.activeTool === "draw",
@@ -232,7 +245,7 @@ export function EditorTopBar({
         {
           id: "highlight",
           label: "Highlight",
-          shortcut: "H",
+          shortcut: getToolShortcut("highlight", "Click"),
           icon: Highlighter,
           status: "working",
           active: editor.activeTool === "highlight",
@@ -252,7 +265,7 @@ export function EditorTopBar({
         {
           id: "note",
           label: "Note",
-          shortcut: "N",
+          shortcut: getToolShortcut("note", "Click"),
           icon: StickyNote,
           status: "working",
           active: editor.activeTool === "note",
@@ -262,7 +275,7 @@ export function EditorTopBar({
         {
           id: "whiteout",
           label: "Whiteout",
-          shortcut: "W",
+          shortcut: getToolShortcut("whiteout", "Click"),
           icon: Square,
           status: "working",
           active: editor.activeTool === "whiteout",
@@ -272,7 +285,7 @@ export function EditorTopBar({
         {
           id: "stamp",
           label: "Stamp",
-          shortcut: "M",
+          shortcut: getToolShortcut("stamp", "Browse"),
           icon: Stamp,
           status: "working",
           disabled: !hasDocument,
@@ -283,11 +296,33 @@ export function EditorTopBar({
     {
       label: "Smart",
       tools: [
-        { id: "ocr", label: "OCR", shortcut: "O", icon: Brain, status: "locked" },
-        { id: "object-select", label: "Object AI", shortcut: "AI", icon: MousePointer2, status: "locked" },
-        { id: "text-select", label: "Text Sel", shortcut: "OCR", icon: Type, status: "locked" },
-        { id: "translate", label: "Translate", shortcut: "L", icon: Languages, status: "locked" },
-        { id: "find", label: "Find", shortcut: "F", icon: Search, status: "locked" },
+        {
+          id: "ocr",
+          label: "OCR",
+          shortcut: getToolShortcut("ocr", "Click"),
+          icon: Brain,
+          status: "working",
+          active: editor.activeTool === "ocr",
+          disabled: !hasDocument,
+          action: () => selectTool("ocr"),
+        },
+        {
+          id: "find",
+          label: "Find",
+          shortcut: getToolShortcut("find", "Click"),
+          icon: Search,
+          status: "working",
+          active: editor.activeTool === "find",
+          disabled: !hasDocument,
+          action: () => selectTool("find"),
+        },
+        {
+          id: "translate",
+          label: "Translate",
+          shortcut: "Backend",
+          icon: Languages,
+          status: getEditorToolDefinition("translate").status,
+        },
       ],
     },
     {

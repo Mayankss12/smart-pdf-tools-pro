@@ -2,6 +2,8 @@
 
 import { useEffect, useRef } from "react";
 
+import { getEditorToolForSingleKey } from "@/lib/editor/editor-tool-registry";
+
 import type { EditorController } from "./useEditor";
 
 const OPEN_STAMP_PICKER_EVENT = "pdfmantra:editor-open-stamp-picker";
@@ -44,10 +46,39 @@ export function useEditorKeyboard(editor: EditorController) {
         return;
       }
 
+      if (mod && !typing && event.key.toLowerCase() === "f" && editor.pdfDocument) {
+        event.preventDefault();
+        editor.setActiveTool("find");
+        editor.selectObject(null);
+        return;
+      }
+
       if (!mod && !typing && event.key.toLowerCase() === "m" && editor.pdfDocument) {
         event.preventDefault();
         editor.setActiveTool("select");
         window.dispatchEvent(new CustomEvent(OPEN_STAMP_PICKER_EVENT));
+        return;
+      }
+
+      if (!mod && !typing && editor.pdfDocument) {
+        const tool = getEditorToolForSingleKey(event.key);
+
+        if (tool) {
+          event.preventDefault();
+          if (tool === "stamp") {
+            editor.setActiveTool("select");
+            window.dispatchEvent(new CustomEvent(OPEN_STAMP_PICKER_EVENT));
+          } else {
+            editor.setActiveTool(tool);
+          }
+          return;
+        }
+      }
+
+      if (!typing && event.key === "Escape") {
+        event.preventDefault();
+        editor.setActiveTool("select");
+        editor.selectObject(null);
         return;
       }
 
@@ -62,13 +93,6 @@ export function useEditorKeyboard(editor: EditorController) {
       if (mod && event.key.toLowerCase() === "l") {
         event.preventDefault();
         editor.toggleObjectLock(selectedId);
-        return;
-      }
-
-      // Deselect stays available even when object is locked.
-      if (event.key === "Escape") {
-        event.preventDefault();
-        editor.selectObject(null);
         return;
       }
 

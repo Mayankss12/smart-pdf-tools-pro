@@ -50,7 +50,6 @@ type EditorObjectFrameProps = {
   readonly toolbarLabel?: string;
   readonly toolbarContent?: ReactNode;
   readonly children: ReactNode;
-  readonly directDrag?: boolean;
   readonly preserveAspectRatioOnCornerResize?: boolean;
   readonly onSelect: (id: string) => void;
   readonly onUpdateBox: (id: string, box: Partial<EditorObjectBox>) => void;

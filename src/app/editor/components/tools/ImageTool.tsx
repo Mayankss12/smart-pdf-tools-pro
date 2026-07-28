@@ -43,7 +43,6 @@ export function ImageTool({
       minHeight={32}
       toolbarLabel="Image"
       toolbarContent={toolbarContent}
-      directDrag
       preserveAspectRatioOnCornerResize
       onSelect={onSelect}
       onUpdateBox={onUpdateBox}

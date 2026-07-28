@@ -1,13 +1,11 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { PDFDocumentProxy } from "pdfjs-dist";
 
 import type { EditorTool } from "./useActiveTool";
 
-export type PdfDocumentLike = {
-  readonly numPages: number;
-  readonly getPage: (pageNumber: number) => Promise<any>;
-};
+export type PdfDocumentLike = PDFDocumentProxy;
 
 export type EditorLeftPanelTab = "pages";
 
@@ -151,9 +149,16 @@ const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 4;
 const ZOOM_STEP = 0.1;
 const HISTORY_LIMIT = 100;
-const BOX_COALESCE_MS = 600;
+const HISTORY_COALESCE_MS = 700;
 const AUTO_OFFSET_STEP = 18;
 const AUTO_OFFSET_CYCLE = 8;
+
+type HistorySnapshot = {
+  readonly objects: EditorObject[];
+  readonly selectedObjectId: string | null;
+};
+
+const COALESCED_HISTORY_REASONS = new Set(["box", "data", "opacity"]);
 
 function createId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -246,9 +251,12 @@ export function useEditor(): EditorController {
 
   const objectsRef = useRef<EditorObject[]>(objects);
   objectsRef.current = objects;
+  const selectedObjectIdRef = useRef<string | null>(selectedObjectId);
+  selectedObjectIdRef.current = selectedObjectId;
+  const savedObjectsRef = useRef<EditorObject[]>(objects);
 
-  const undoStackRef = useRef<EditorObject[][]>([]);
-  const redoStackRef = useRef<EditorObject[][]>([]);
+  const undoStackRef = useRef<HistorySnapshot[]>([]);
+  const redoStackRef = useRef<HistorySnapshot[]>([]);
   const lastHistoryRef = useRef<{ reason: string; objectId: string | null; time: number } | null>(
     null,
   );
@@ -265,6 +273,14 @@ export function useEditor(): EditorController {
     [objects, selectedObjectId],
   );
 
+  useEffect(() => {
+    if (saveState === "saving") return;
+
+    const saved = objects === savedObjectsRef.current;
+    setUnsavedChanges(saved ? 0 : 1);
+    setSaveState(saved ? "saved" : "unsaved");
+  }, [objects, saveState]);
+
   const syncHistoryFlags = useCallback(() => {
     setCanUndo(undoStackRef.current.length > 0);
     setCanRedo(redoStackRef.current.length > 0);
@@ -276,17 +292,20 @@ export function useEditor(): EditorController {
       const last = lastHistoryRef.current;
 
       if (
-        reason === "box" &&
+        COALESCED_HISTORY_REASONS.has(reason) &&
         last &&
-        last.reason === "box" &&
+        last.reason === reason &&
         last.objectId === objectId &&
-        now - last.time < BOX_COALESCE_MS
+        now - last.time < HISTORY_COALESCE_MS
       ) {
         lastHistoryRef.current = { reason, objectId, time: now };
         return;
       }
 
-      undoStackRef.current.push(objectsRef.current);
+      undoStackRef.current.push({
+        objects: objectsRef.current,
+        selectedObjectId: selectedObjectIdRef.current,
+      });
       if (undoStackRef.current.length > HISTORY_LIMIT) {
         undoStackRef.current.shift();
       }
@@ -305,8 +324,9 @@ export function useEditor(): EditorController {
   }, [syncHistoryFlags]);
 
   const markChanged = useCallback((count = 1) => {
-    setUnsavedChanges((current) => Math.max(0, current + count));
-    setSaveState("unsaved");
+    const saved = count === 0 && objectsRef.current === savedObjectsRef.current;
+    setUnsavedChanges(saved ? 0 : Math.max(1, count));
+    setSaveState(saved ? "saved" : "unsaved");
   }, []);
 
   const markSaving = useCallback(() => {
@@ -314,6 +334,8 @@ export function useEditor(): EditorController {
   }, []);
 
   const markSaved = useCallback(() => {
+    savedObjectsRef.current = objectsRef.current;
+    lastHistoryRef.current = null;
     setUnsavedChanges(0);
     setLastSavedAt(new Date());
     setSaveState("saved");
@@ -328,7 +350,9 @@ export function useEditor(): EditorController {
       setLastSavedAt(null);
       setSaveState("saved");
       setActiveToolState("select");
-      setObjects([]);
+      const emptyObjects: EditorObject[] = [];
+      savedObjectsRef.current = emptyObjects;
+      setObjects(emptyObjects);
       setSelectedObjectId(null);
       clearHistory();
 
@@ -653,7 +677,7 @@ export function useEditor(): EditorController {
 
   const setObjectOpacity = useCallback(
     (id: string, opacity: number) => {
-      const clamped = clamp(Number(opacity), 0.1, 1);
+      const clamped = clamp(Number(opacity), 0, 1);
 
       recordHistory("opacity", id);
 
@@ -682,13 +706,25 @@ export function useEditor(): EditorController {
       return;
     }
 
-    const previous = undoStackRef.current.pop() as EditorObject[];
-    redoStackRef.current.push(objectsRef.current);
+    const previous = undoStackRef.current.pop();
+    if (!previous) return;
 
-    setObjects(previous);
-    setSelectedObjectId(null);
-    setUnsavedChanges((current) => Math.max(1, current));
-    setSaveState("unsaved");
+    redoStackRef.current.push({
+      objects: objectsRef.current,
+      selectedObjectId: selectedObjectIdRef.current,
+    });
+
+    setObjects(previous.objects);
+    setSelectedObjectId((current) => {
+      if (current && previous.objects.some((object) => object.id === current)) return current;
+      if (
+        previous.selectedObjectId &&
+        previous.objects.some((object) => object.id === previous.selectedObjectId)
+      ) {
+        return previous.selectedObjectId;
+      }
+      return null;
+    });
 
     lastHistoryRef.current = null;
     syncHistoryFlags();
@@ -699,13 +735,25 @@ export function useEditor(): EditorController {
       return;
     }
 
-    const next = redoStackRef.current.pop() as EditorObject[];
-    undoStackRef.current.push(objectsRef.current);
+    const next = redoStackRef.current.pop();
+    if (!next) return;
 
-    setObjects(next);
-    setSelectedObjectId(null);
-    setUnsavedChanges((current) => Math.max(1, current));
-    setSaveState("unsaved");
+    undoStackRef.current.push({
+      objects: objectsRef.current,
+      selectedObjectId: selectedObjectIdRef.current,
+    });
+
+    setObjects(next.objects);
+    setSelectedObjectId((current) => {
+      if (current && next.objects.some((object) => object.id === current)) return current;
+      if (
+        next.selectedObjectId &&
+        next.objects.some((object) => object.id === next.selectedObjectId)
+      ) {
+        return next.selectedObjectId;
+      }
+      return null;
+    });
 
     lastHistoryRef.current = null;
     syncHistoryFlags();
@@ -723,7 +771,9 @@ export function useEditor(): EditorController {
     setLastSavedAt(null);
     setSaveState("saved");
     setActiveToolState("select");
-    setObjects([]);
+    const emptyObjects: EditorObject[] = [];
+    savedObjectsRef.current = emptyObjects;
+    setObjects(emptyObjects);
     setSelectedObjectId(null);
     clearHistory();
   }, [clearHistory]);

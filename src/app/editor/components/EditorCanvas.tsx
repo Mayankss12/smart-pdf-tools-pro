@@ -20,6 +20,7 @@ import {
 import { detectPageImages, type DetectedImage } from "@/lib/editor/pdf-image-detect";
 
 import type { EditorController } from "../hooks/useEditor";
+import type { EditorFindHighlight } from "./EditorSmartToolsPanel";
 import { DrawTool } from "./tools/DrawTool";
 import { HighlightTool } from "./tools/HighlightTool";
 import { ImageTool } from "./tools/ImageTool";
@@ -34,6 +35,7 @@ type EditorCanvasProps = {
   readonly editor: EditorController;
   readonly onOpenFile: () => void;
   readonly onFileDrop: (file: File) => void | Promise<void>;
+  readonly findHighlight?: EditorFindHighlight | null;
 };
 
 type PageSize = {
@@ -74,6 +76,11 @@ type DrawStroke = {
   readonly points: Point[];
   readonly pathData: string;
   readonly box: Box;
+};
+
+type PdfRenderTask = {
+  readonly promise: Promise<void>;
+  readonly cancel: () => void;
 };
 
 const DEFAULT_TEXT_BOX = { width: 220, height: 44 };
@@ -263,7 +270,13 @@ function getImageSize(dataUrl: string) {
   });
 }
 
-function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
+function PdfPageRenderer({
+  editor,
+  findHighlight,
+}: {
+  readonly editor: EditorController;
+  readonly findHighlight?: EditorFindHighlight | null;
+}) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const pageLayerRef = useRef<HTMLDivElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
@@ -273,6 +286,11 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
   const pendingSignaturePointRef = useRef<Point | null>(null);
   const pendingStampPointRef = useRef<Point | null>(null);
   const drawPointsRef = useRef<Point[]>([]);
+  const pickerHandlersRef = useRef<{
+    readonly image: () => void;
+    readonly signature: () => void;
+    readonly stamp: () => void;
+  } | null>(null);
 
   const [isRendering, setIsRendering] = useState(true);
   const [error, setError] = useState("");
@@ -284,7 +302,7 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
 
   useEffect(() => {
     let cancelled = false;
-    let renderTask: any = null;
+    let renderTask: PdfRenderTask | null = null;
 
     async function renderPage() {
       const canvas = canvasRef.current;
@@ -411,10 +429,16 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
     stampInputRef.current?.click();
   }
 
+  pickerHandlersRef.current = {
+    image: openImagePickerAtDefaultPoint,
+    signature: openSignaturePickerAtDefaultPoint,
+    stamp: openStampPickerAtDefaultPoint,
+  };
+
   useEffect(() => {
-    const handleOpenImagePicker = () => openImagePickerAtDefaultPoint();
-    const handleOpenSignaturePicker = () => openSignaturePickerAtDefaultPoint();
-    const handleOpenStampPicker = () => openStampPickerAtDefaultPoint();
+    const handleOpenImagePicker = () => pickerHandlersRef.current?.image();
+    const handleOpenSignaturePicker = () => pickerHandlersRef.current?.signature();
+    const handleOpenStampPicker = () => pickerHandlersRef.current?.stamp();
 
     window.addEventListener(OPEN_IMAGE_PICKER_EVENT, handleOpenImagePicker);
     window.addEventListener(OPEN_SIGNATURE_PICKER_EVENT, handleOpenSignaturePicker);
@@ -425,7 +449,7 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
       window.removeEventListener(OPEN_SIGNATURE_PICKER_EVENT, handleOpenSignaturePicker);
       window.removeEventListener(OPEN_STAMP_PICKER_EVENT, handleOpenStampPicker);
     };
-  });
+  }, []);
 
   function addTextObject(box: Box) {
     const safeBox = clampBoxToPage(box, pageSize, editor.zoom, MIN_TEXT_BOX.width, MIN_TEXT_BOX.height);
@@ -1044,6 +1068,18 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
 
         <canvas ref={canvasRef} className="block bg-white" />
 
+        {findHighlight?.pageNumber === editor.activePageNumber ? (
+          <div
+            className="pointer-events-none absolute z-20 rounded-sm border-2 border-amber-500 bg-yellow-300/45 shadow-[0_0_0_3px_rgba(245,158,11,0.16)]"
+            style={{
+              left: findHighlight.box.x * editor.zoom,
+              top: findHighlight.box.y * editor.zoom,
+              width: findHighlight.box.width * editor.zoom,
+              height: findHighlight.box.height * editor.zoom,
+            }}
+          />
+        ) : null}
+
         {editor.activePageObjects.map((object) => {
           if (object.type === "text") {
             return (
@@ -1319,7 +1355,12 @@ function PdfPageRenderer({ editor }: { readonly editor: EditorController }) {
   );
 }
 
-export function EditorCanvas({ editor, onOpenFile, onFileDrop }: EditorCanvasProps) {
+export function EditorCanvas({
+  editor,
+  onOpenFile,
+  onFileDrop,
+  findHighlight,
+}: EditorCanvasProps) {
   const [dragActive, setDragActive] = useState(false);
 
   function handleDrop(event: DragEvent<HTMLDivElement>) {
@@ -1391,7 +1432,7 @@ export function EditorCanvas({ editor, onOpenFile, onFileDrop }: EditorCanvasPro
       className="min-w-0 flex-1 overflow-auto bg-[radial-gradient(circle_at_top,#eef2ff_0,#f8fafc_42%,#eef2f7_100%)]"
     >
       <div className="flex min-h-full justify-center px-8 py-10">
-        <PdfPageRenderer editor={editor} />
+        <PdfPageRenderer editor={editor} findHighlight={findHighlight} />
       </div>
     </main>
   );
