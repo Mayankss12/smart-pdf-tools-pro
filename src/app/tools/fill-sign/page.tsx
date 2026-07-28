@@ -29,6 +29,8 @@ import {
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
 import { configurePdfJsWorker } from "@/lib/pdfjs-worker";
+import { useEntitlement } from "@/hooks/useEntitlement";
+import { prepareEntitledExport } from "@/lib/export-entitlement";
 import {
   MouseEvent,
   PointerEvent,
@@ -609,6 +611,7 @@ async function applyObjectsToPdf({
 }
 
 export default function FillSignPage() {
+  const { recordExport } = useEntitlement();
   const pdfInputRef = useRef<HTMLInputElement | null>(null);
   const signatureImageInputRef = useRef<HTMLInputElement | null>(null);
   const objectImageInputRef = useRef<HTMLInputElement | null>(null);
@@ -1356,12 +1359,21 @@ export default function FillSignPage() {
     setStatus("Applying fields and exporting PDF...");
 
     try {
-      const blob = await applyObjectsToPdf({
-        file,
-        objects,
+      const prepared = await prepareEntitledExport({
+        toolKey: "fill-sign",
+        recordExport,
+        prepare: () =>
+          applyObjectsToPdf({
+            file,
+            objects,
+          }),
       });
+      if (!prepared.allowed) {
+        setStatus(prepared.message);
+        return;
+      }
 
-      downloadBlob(blob, "PDFMantra-fill-sign.pdf");
+      downloadBlob(prepared.output, "PDFMantra-fill-sign.pdf");
       setStatus(`PDF exported with ${objects.length} added field(s).`);
     } catch (error) {
       console.error(error);

@@ -18,6 +18,8 @@ import {
 import { useMemo, useRef, useState } from "react";
 
 import { Header } from "@/components/Header";
+import { useEntitlement } from "@/hooks/useEntitlement";
+import { prepareEntitledExport } from "@/lib/export-entitlement";
 import { ToolPageHeader } from "@/components/ToolPageHeader";
 import type { NormalizedRect } from "@/engines/shared/types";
 import {
@@ -150,6 +152,7 @@ function dragIntersectsDetectedText(
 }
 
 export function HighlightToolPage() {
+  const { recordExport } = useEntitlement();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [file, setFile] = useState<File | null>(null);
@@ -508,14 +511,23 @@ export function HighlightToolPage() {
     updateStatus("Preparing highlighted PDF export...", "info");
 
     try {
-      const blob = await exportHighlightedPdf({
-        originalBytes: bytes,
-        layers,
-        pages,
+      const prepared = await prepareEntitledExport({
+        toolKey: "highlight-pdf",
+        recordExport,
+        prepare: () =>
+          exportHighlightedPdf({
+            originalBytes: bytes,
+            layers,
+            pages,
+          }),
       });
+      if (!prepared.allowed) {
+        updateStatus(prepared.message, "error");
+        return;
+      }
 
       const safeName = file?.name.replace(/\.pdf$/i, "") || "PDFMantra-highlighted";
-      downloadBlob(blob, `${safeName}-highlighted.pdf`);
+      downloadBlob(prepared.output, `${safeName}-highlighted.pdf`);
       updateStatus("Highlighted PDF exported successfully. Download started.", "success");
     } catch (error) {
       console.error(error);

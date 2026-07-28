@@ -22,6 +22,8 @@ import {
 import { useMemo, useRef, useState } from "react";
 
 import { Header } from "@/components/Header";
+import { useEntitlement } from "@/hooks/useEntitlement";
+import { prepareEntitledExport } from "@/lib/export-entitlement";
 import { ToolPageHeader } from "@/components/ToolPageHeader";
 import type {
   AnnotationLayer,
@@ -217,6 +219,7 @@ function getContinuousToolForAnnotation(annotation: AnnotationLayer): Annotation
 }
 
 export function AnnotateToolPage() {
+  const { recordExport } = useEntitlement();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [file, setFile] = useState<File | null>(null);
@@ -510,14 +513,23 @@ export function AnnotateToolPage() {
     updateStatus("Preparing annotated PDF export...", "info");
 
     try {
-      const blob = await exportAnnotatedPdf({
-        originalBytes: bytes,
-        annotations,
-        pages,
+      const prepared = await prepareEntitledExport({
+        toolKey: "annotate-pdf",
+        recordExport,
+        prepare: () =>
+          exportAnnotatedPdf({
+            originalBytes: bytes,
+            annotations,
+            pages,
+          }),
       });
+      if (!prepared.allowed) {
+        updateStatus(prepared.message, "error");
+        return;
+      }
 
       const safeName = file?.name.replace(/\.pdf$/i, "") || "PDFMantra-annotated";
-      downloadBlob(blob, `${safeName}-annotated.pdf`);
+      downloadBlob(prepared.output, `${safeName}-annotated.pdf`);
       updateStatus("Annotated PDF exported successfully. Download started.", "success");
     } catch (error) {
       console.error(error);
