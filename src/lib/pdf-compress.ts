@@ -10,10 +10,10 @@
 
 import * as pdfjs from 'pdfjs-dist'
 import { PDFDocument } from 'pdf-lib'
+import { configurePdfJsWorker } from '@/lib/pdfjs-worker'
 
 if (typeof window !== 'undefined') {
-  pdfjs.GlobalWorkerOptions.workerSrc =
-    `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
+  configurePdfJsWorker(pdfjs)
 }
 
 export type CompressionLevel = 'low' | 'medium' | 'high'

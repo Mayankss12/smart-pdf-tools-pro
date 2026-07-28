@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import * as pdfjsLib from "pdfjs-dist";
+import { configurePdfJsWorker } from "@/lib/pdfjs-worker";
 import {
   CheckCircle2,
   CircleHelp,
@@ -96,9 +97,7 @@ function getErrorMessage(error: unknown) {
 }
 
 function configurePdfWorker() {
-  if (typeof window === "undefined") return;
-
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+  configurePdfJsWorker(pdfjsLib);
 }
 
 function clamp(value: number, min: number, max: number) {

@@ -1,5 +1,6 @@
 import { PDFDocument, rgb } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
+import { configurePdfJsWorker } from "@/lib/pdfjs-worker";
 
 import type {
   NormalizedRect,
@@ -48,8 +49,7 @@ export function ensurePdfJsWorker(): void {
     return;
   }
 
-  pdfjsLib.GlobalWorkerOptions.workerSrc =
-    `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+  configurePdfJsWorker(pdfjsLib);
 
   pdfJsWorkerConfigured = true;
 }

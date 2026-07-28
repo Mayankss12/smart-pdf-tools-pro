@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
+import { configurePdfJsWorker } from "@/lib/pdfjs-worker";
 import {
   MouseEvent,
   PointerEvent,
@@ -647,7 +648,7 @@ export default function FillSignPage() {
   const [helpOpen, setHelpOpen] = useState(false);
 
   useEffect(() => {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+    configurePdfJsWorker(pdfjsLib);
   }, []);
 
   useEffect(() => {

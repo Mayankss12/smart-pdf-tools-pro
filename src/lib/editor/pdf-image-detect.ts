@@ -1,4 +1,5 @@
 import * as pdfjsLib from "pdfjs-dist";
+import type { PDFPageProxy } from "pdfjs-dist";
 
 export type DetectedImage = {
   readonly x: number;
@@ -22,10 +23,18 @@ function applyMatrix(m: number[], x: number, y: number) {
   return [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]];
 }
 
+function isTransformMatrix(value: unknown): value is number[] {
+  return (
+    Array.isArray(value) &&
+    value.length >= 6 &&
+    value.slice(0, 6).every((entry) => typeof entry === "number")
+  );
+}
+
 // Returns image rectangles in UNSCALED page units (scale = 1), matching the
 // editor's object box coordinate system.
-export async function detectPageImages(page: any): Promise<DetectedImage[]> {
-  const OPS = (pdfjsLib as any).OPS;
+export async function detectPageImages(page: PDFPageProxy): Promise<DetectedImage[]> {
+  const OPS = pdfjsLib.OPS;
 
   if (!OPS) return [];
 
@@ -39,7 +48,6 @@ export async function detectPageImages(page: any): Promise<DetectedImage[]> {
   const IMAGE_OPS = new Set<number>(
     [
       OPS.paintImageXObject,
-      OPS.paintJpegXObject,
       OPS.paintImageMaskXObject,
       OPS.paintInlineImageXObject,
     ].filter((value) => typeof value === "number"),
@@ -53,8 +61,8 @@ export async function detectPageImages(page: any): Promise<DetectedImage[]> {
       stack.push(ctm.slice());
     } else if (fn === OPS.restore) {
       ctm = stack.pop() || ctm;
-    } else if (fn === OPS.transform) {
-      ctm = multiply(ctm, args as number[]);
+    } else if (fn === OPS.transform && isTransformMatrix(args)) {
+      ctm = multiply(ctm, args);
     } else if (IMAGE_OPS.has(fn)) {
       const corners = [
         [0, 0],

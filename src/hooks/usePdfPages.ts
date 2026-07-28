@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as pdfjsLib from "pdfjs-dist";
+import { configurePdfJsWorker } from "@/lib/pdfjs-worker";
 
 import {
   PdfEngineError,
@@ -24,12 +25,6 @@ type UsePdfPagesOptions = {
 type ActiveRenderTask = {
   cancel: () => void;
 };
-
-function configurePdfWorker() {
-  if (typeof window === "undefined") return;
-
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
-}
 
 function createEmptyPages(pageCount: number): PdfPageThumbnail[] {
   return Array.from({ length: pageCount }, (_, index) => ({
@@ -90,7 +85,7 @@ export function usePdfPages(options: UsePdfPagesOptions = {}) {
   }, [cancelActiveRender]);
 
   useEffect(() => {
-    configurePdfWorker();
+    configurePdfJsWorker(pdfjsLib);
 
     return () => {
       renderTokenRef.current += 1;
@@ -113,7 +108,7 @@ export function usePdfPages(options: UsePdfPagesOptions = {}) {
       setError(null);
 
       try {
-        configurePdfWorker();
+        configurePdfJsWorker(pdfjsLib);
 
         validatePdfFile(selectedFile, options.validation);
 
