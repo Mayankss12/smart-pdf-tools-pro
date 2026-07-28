@@ -1,16 +1,23 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Loader2, Search, Square, X } from "lucide-react";
 import {
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+  ChevronLeft,
+  ChevronRight,
+  Languages,
+  Loader2,
+  Search,
+  Square,
+  X,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import type { PDFPageProxy } from "pdfjs-dist";
 
-import type {
-  OcrProgress,
-  OcrResult,
+import { trackEditorEvent } from "@/lib/editor/editor-analytics";
+import {
+  getAvailableOcrLanguages,
+  type OcrLanguage,
+  type OcrProgress,
+  type OcrResult,
 } from "@/lib/pdf-ocr-engine";
 
 import type { EditorController } from "../hooks/useEditor";
@@ -21,7 +28,9 @@ export type EditorOcrPageResult = {
 };
 
 export type EditorFindHighlight = {
+  readonly id: string;
   readonly pageNumber: number;
+  readonly current: boolean;
   readonly box: {
     readonly x: number;
     readonly y: number;
@@ -30,8 +39,12 @@ export type EditorFindHighlight = {
   };
 };
 
-type FindResult = EditorFindHighlight & {
-  readonly id: string;
+export type EditorSmartToolActivity = {
+  readonly toolId: "ocr" | "find" | "translate";
+  readonly progress: number | null;
+};
+
+type FindResult = Omit<EditorFindHighlight, "current"> & {
   readonly preview: string;
   readonly source: "pdf" | "ocr";
 };
@@ -39,9 +52,25 @@ type FindResult = EditorFindHighlight & {
 type EditorSmartToolsPanelProps = {
   readonly editor: EditorController;
   readonly ocrPages: readonly EditorOcrPageResult[];
+  readonly translationConfigured: boolean;
   readonly onOcrPagesChange: (pages: EditorOcrPageResult[]) => void;
-  readonly onFindHighlightChange: (highlight: EditorFindHighlight | null) => void;
+  readonly onFindHighlightChange: (highlights: EditorFindHighlight[]) => void;
+  readonly onActivityChange: (activity: EditorSmartToolActivity | null) => void;
+  readonly onStatusChange: (message: string) => void;
 };
+
+const TRANSLATION_LANGUAGES: readonly {
+  readonly value: string;
+  readonly label: string;
+}[] = [
+  { value: "en", label: "English" },
+  { value: "hi", label: "Hindi" },
+  { value: "zh", label: "Chinese" },
+  { value: "es", label: "Spanish" },
+  { value: "fr", label: "French" },
+  { value: "de", label: "German" },
+  { value: "ar", label: "Arabic" },
+];
 
 function canvasToPngFile(canvas: HTMLCanvasElement, pageNumber: number) {
   return new Promise<File>((resolve, reject) => {
@@ -185,15 +214,58 @@ function findOcrMatches(
   return matches;
 }
 
+function toHighlights(results: readonly FindResult[], currentId: string | null) {
+  return results.map<EditorFindHighlight>((result) => ({
+    id: result.id,
+    pageNumber: result.pageNumber,
+    current: result.id === currentId,
+    box: result.box,
+  }));
+}
+
+function isOcrLanguage(value: string): value is OcrLanguage {
+  return getAvailableOcrLanguages().some((language) => language.value === value);
+}
+
+function getSelectedEditorText(editor: EditorController) {
+  const selected = editor.selectedObject;
+  if (!selected) return "";
+  return selected.data.text ?? selected.data.note ?? "";
+}
+
+async function getPageText(editor: EditorController) {
+  if (!editor.pdfDocument) return "";
+  const page = await editor.pdfDocument.getPage(editor.activePageNumber);
+  try {
+    const content = await page.getTextContent();
+    return content.items
+      .map((item) => ("str" in item ? item.str : ""))
+      .filter(Boolean)
+      .join(" ");
+  } finally {
+    page.cleanup();
+  }
+}
+
+function readTranslationResponse(payload: unknown) {
+  if (!payload || typeof payload !== "object") return "";
+  const translatedText = Reflect.get(payload, "translatedText");
+  return typeof translatedText === "string" ? translatedText : "";
+}
+
 export function EditorSmartToolsPanel({
   editor,
   ocrPages,
+  translationConfigured,
   onOcrPagesChange,
   onFindHighlightChange,
+  onActivityChange,
+  onStatusChange,
 }: EditorSmartToolsPanelProps) {
   const abortControllerRef = useRef<AbortController | null>(null);
   const findInputRef = useRef<HTMLInputElement | null>(null);
   const [ocrScope, setOcrScope] = useState<"current" | "all">("current");
+  const [ocrLanguage, setOcrLanguage] = useState<OcrLanguage>("auto");
   const [ocrProgress, setOcrProgress] = useState<OcrProgress | null>(null);
   const [ocrRunning, setOcrRunning] = useState(false);
   const [message, setMessage] = useState("");
@@ -201,12 +273,18 @@ export function EditorSmartToolsPanel({
   const [findResults, setFindResults] = useState<FindResult[]>([]);
   const [findIndex, setFindIndex] = useState(0);
   const [findRunning, setFindRunning] = useState(false);
+  const [translateMode, setTranslateMode] = useState<"selection" | "page">("selection");
+  const [sourceLanguage, setSourceLanguage] = useState("auto");
+  const [targetLanguage, setTargetLanguage] = useState("es");
+  const [translatedText, setTranslatedText] = useState("");
+  const [translateError, setTranslateError] = useState("");
+  const [translateRunning, setTranslateRunning] = useState(false);
 
   useEffect(() => {
     if (editor.activeTool === "find") {
       window.requestAnimationFrame(() => findInputRef.current?.focus());
     } else {
-      onFindHighlightChange(null);
+      onFindHighlightChange([]);
     }
   }, [editor.activeTool, onFindHighlightChange]);
 
@@ -218,6 +296,14 @@ export function EditorSmartToolsPanel({
       );
     };
   }, []);
+
+  function clearFind() {
+    setQuery("");
+    setFindResults([]);
+    setFindIndex(0);
+    setMessage("");
+    onFindHighlightChange([]);
+  }
 
   async function runOcr() {
     if (!editor.pdfDocument || ocrRunning) return;
@@ -233,6 +319,13 @@ export function EditorSmartToolsPanel({
         ? Array.from({ length: editor.totalPages }, (_, index) => index + 1)
         : [editor.activePageNumber];
 
+    trackEditorEvent({
+      type: "ocr_started",
+      scope: ocrScope,
+      pageCount: pageNumbers.length,
+    });
+    onActivityChange({ toolId: "ocr", progress: 0 });
+
     try {
       const { runOcrPipeline } = await import("@/lib/pdf-ocr-engine");
       const completed: EditorOcrPageResult[] = [];
@@ -242,17 +335,20 @@ export function EditorSmartToolsPanel({
         const page = await editor.pdfDocument.getPage(pageNumber);
         const file = await renderPageForOcr(page, pageNumber, controller.signal);
         const [result] = await runOcrPipeline([file], {
-          language: "auto",
+          language: ocrLanguage,
           quality: "balanced",
           signal: controller.signal,
           onProgress(progress) {
+            const percent =
+              ((index + progress.percent / 100) / pageNumbers.length) * 100;
             setOcrProgress({
               ...progress,
               imageIndex: index + 1,
               totalImages: pageNumbers.length,
-              percent: ((index + progress.percent / 100) / pageNumbers.length) * 100,
+              percent,
               message: `Page ${pageNumber}: ${progress.message}`,
             });
+            onActivityChange({ toolId: "ocr", progress: percent });
           },
         });
 
@@ -270,22 +366,39 @@ export function EditorSmartToolsPanel({
         }
       }
 
-      setMessage(
-        `OCR completed for ${completed.length} page${completed.length === 1 ? "" : "s"}. Searchable text will be included on export.`,
-      );
+      const successMessage =
+        `OCR completed for ${completed.length} page${completed.length === 1 ? "" : "s"}. Searchable text will be included on export.`;
+      setMessage(successMessage);
+      onStatusChange(successMessage);
+      trackEditorEvent({
+        type: "ocr_completed",
+        scope: ocrScope,
+        pageCount: completed.length,
+      });
     } catch (error) {
-      setMessage(
-        controller.signal.aborted
-          ? "OCR cancelled."
-          : error instanceof Error
-            ? error.message
-            : "OCR failed.",
-      );
+      const cancelled = controller.signal.aborted;
+      const errorMessage = cancelled
+        ? "OCR cancelled."
+        : error instanceof Error
+          ? error.message
+          : "OCR failed.";
+      setMessage(errorMessage);
+      onStatusChange(errorMessage);
+      if (cancelled) {
+        trackEditorEvent({
+          type: "ocr_cancelled",
+          scope: ocrScope,
+          pageCount: pageNumbers.length,
+        });
+      } else {
+        trackEditorEvent({ type: "tool_error", toolId: "ocr", errorCode: "ocr_failed" });
+      }
     } finally {
       const { terminateOcrWorker } = await import("@/lib/pdf-ocr-engine");
       await terminateOcrWorker();
       abortControllerRef.current = null;
       setOcrRunning(false);
+      onActivityChange(null);
     }
   }
 
@@ -295,12 +408,13 @@ export function EditorSmartToolsPanel({
     if (!editor.pdfDocument || !normalizedQuery) {
       setFindResults([]);
       setFindIndex(0);
-      onFindHighlightChange(null);
+      onFindHighlightChange([]);
       return;
     }
 
     setFindRunning(true);
     setMessage("");
+    onActivityChange({ toolId: "find", progress: null });
 
     try {
       const results: FindResult[] = [];
@@ -323,25 +437,38 @@ export function EditorSmartToolsPanel({
             ),
           );
         }
+        onActivityChange({
+          toolId: "find",
+          progress: (pageNumber / editor.totalPages) * 100,
+        });
       }
 
       setFindResults(results);
       setFindIndex(0);
 
       const first = results[0] ?? null;
-      onFindHighlightChange(first);
+      onFindHighlightChange(toHighlights(results, first?.id ?? null));
       if (first) editor.setActivePage(first.pageNumber);
-      setMessage(
-        results.length
-          ? `${results.length} result${results.length === 1 ? "" : "s"} found.`
-          : "No results found.",
-      );
+      const resultMessage = results.length
+        ? `${results.length} result${results.length === 1 ? "" : "s"} found.`
+        : "No results found.";
+      setMessage(resultMessage);
+      onStatusChange(resultMessage);
+      trackEditorEvent({
+        type: "find_performed",
+        resultCount: results.length,
+        includedOcr: ocrPages.length > 0,
+      });
     } catch (error) {
       setFindResults([]);
-      onFindHighlightChange(null);
-      setMessage(error instanceof Error ? error.message : "Search failed.");
+      onFindHighlightChange([]);
+      const errorMessage = error instanceof Error ? error.message : "Search failed.";
+      setMessage(errorMessage);
+      onStatusChange(errorMessage);
+      trackEditorEvent({ type: "tool_error", toolId: "find", errorCode: "find_failed" });
     } finally {
       setFindRunning(false);
+      onActivityChange(null);
     }
   }
 
@@ -354,10 +481,109 @@ export function EditorSmartToolsPanel({
 
     setFindIndex(normalized);
     editor.setActivePage(result.pageNumber);
-    onFindHighlightChange(result);
+    onFindHighlightChange(toHighlights(findResults, result.id));
   }
 
-  if (editor.activeTool !== "ocr" && editor.activeTool !== "find") {
+  async function runTranslation() {
+    if (!translationConfigured || translateRunning) return;
+    setTranslateRunning(true);
+    setTranslateError("");
+    setTranslatedText("");
+    onActivityChange({ toolId: "translate", progress: null });
+    trackEditorEvent({
+      type: "translate_attempted",
+      mode: translateMode,
+      configured: translationConfigured,
+    });
+
+    try {
+      const text =
+        translateMode === "selection"
+          ? getSelectedEditorText(editor)
+          : await getPageText(editor);
+      if (!text.trim()) {
+        throw new Error(
+          translateMode === "selection"
+            ? "Select a text or note object with content first."
+            : "No native text was found on the current page. Run OCR first if this is a scanned page.",
+        );
+      }
+
+      const response = await fetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({
+          text,
+          sourceLanguage: sourceLanguage === "auto" ? undefined : sourceLanguage,
+          targetLanguage,
+        }),
+      });
+      const payload: unknown = await response.json();
+      const result = readTranslationResponse(payload);
+      if (!response.ok || !result) {
+        const providerError =
+          payload && typeof payload === "object"
+            ? Reflect.get(payload, "error")
+            : null;
+        throw new Error(
+          typeof providerError === "string"
+            ? providerError
+            : "Translation failed.",
+        );
+      }
+      setTranslatedText(result);
+      onStatusChange("Translation ready to review.");
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Translation failed.";
+      setTranslateError(errorMessage);
+      onStatusChange(errorMessage);
+      trackEditorEvent({
+        type: "tool_error",
+        toolId: "translate",
+        errorCode: "translation_failed",
+      });
+    } finally {
+      setTranslateRunning(false);
+      onActivityChange(null);
+    }
+  }
+
+  function applyTranslation() {
+    if (!translatedText) return;
+    const selected = editor.selectedObject;
+    const box = selected
+      ? {
+          x: selected.box.x + 18,
+          y: selected.box.y + 18,
+          width: selected.box.width,
+          height: Math.max(48, selected.box.height),
+        }
+      : { x: 48, y: 48, width: 280, height: 96 };
+
+    editor.addObject({
+      type: "text",
+      pageNumber: editor.activePageNumber,
+      box,
+      data: {
+        text: translatedText,
+        fontSize: selected?.data.fontSize ?? 14,
+        color: selected?.data.color ?? "#111827",
+        opacity: 1,
+      },
+      locked: false,
+    });
+    setTranslatedText("");
+    setTranslateError("");
+    onStatusChange("Translation added as a new editable text object.");
+  }
+
+  if (
+    editor.activeTool !== "ocr" &&
+    editor.activeTool !== "find" &&
+    editor.activeTool !== "translate"
+  ) {
     return null;
   }
 
@@ -373,26 +599,43 @@ export function EditorSmartToolsPanel({
               value={ocrScope}
               onChange={(event) => setOcrScope(event.target.value === "all" ? "all" : "current")}
               disabled={ocrRunning}
-              className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700"
+              className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-500"
               aria-label="OCR page scope"
             >
               <option value="current">Current page</option>
               <option value="all">All pages</option>
             </select>
+            <select
+              value={ocrLanguage}
+              onChange={(event) => {
+                if (isOcrLanguage(event.target.value)) {
+                  setOcrLanguage(event.target.value);
+                }
+              }}
+              disabled={ocrRunning}
+              className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-500"
+              aria-label="OCR language"
+            >
+              {getAvailableOcrLanguages().map((language) => (
+                <option key={language.value} value={language.value}>
+                  {language.label}
+                </option>
+              ))}
+            </select>
             <button
               type="button"
               onClick={() => void runOcr()}
               disabled={ocrRunning}
-              className="inline-flex h-9 items-center gap-2 rounded-xl bg-violet-600 px-4 text-xs font-black text-white disabled:opacity-50"
+              className="inline-flex h-9 items-center gap-2 rounded-xl bg-violet-600 px-4 text-xs font-black text-white focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 disabled:cursor-wait disabled:bg-slate-400"
             >
               {ocrRunning ? <Loader2 size={14} className="animate-spin" /> : <Square size={13} />}
-              {ocrRunning ? "Processing" : "Run OCR"}
+              {ocrRunning ? "Processing" : message && !ocrPages.length ? "Retry OCR" : "Run OCR"}
             </button>
             {ocrRunning ? (
               <button
                 type="button"
                 onClick={() => abortControllerRef.current?.abort()}
-                className="inline-flex h-9 items-center gap-1 rounded-xl border border-red-200 bg-white px-3 text-xs font-black text-red-600"
+                className="inline-flex h-9 items-center gap-1 rounded-xl border border-red-200 bg-white px-3 text-xs font-black text-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
               >
                 <X size={14} />
                 Cancel
@@ -416,7 +659,9 @@ export function EditorSmartToolsPanel({
               </details>
             ) : null}
           </>
-        ) : (
+        ) : null}
+
+        {editor.activeTool === "find" ? (
           <>
             <Search size={16} className="ml-1 text-violet-600" />
             <input
@@ -424,11 +669,7 @@ export function EditorSmartToolsPanel({
               value={query}
               onChange={(event) => {
                 setQuery(event.target.value);
-                if (!event.target.value) {
-                  setFindResults([]);
-                  setFindIndex(0);
-                  onFindHighlightChange(null);
-                }
+                if (!event.target.value) clearFind();
               }}
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
@@ -439,19 +680,17 @@ export function EditorSmartToolsPanel({
                     void runFind();
                   }
                 }
-                if (event.key === "Escape") {
-                  editor.setActiveTool("select");
-                }
+                if (event.key === "Escape") clearFind();
               }}
               placeholder="Find text in PDF and OCR results"
-              className="h-9 min-w-[240px] flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-violet-400"
+              className="h-9 min-w-[240px] flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-200"
               aria-label="Find in PDF"
             />
             <button
               type="button"
               onClick={() => void runFind()}
               disabled={findRunning || !query.trim()}
-              className="inline-flex h-9 items-center gap-2 rounded-xl bg-violet-600 px-4 text-xs font-black text-white disabled:opacity-50"
+              className="inline-flex h-9 items-center gap-2 rounded-xl bg-violet-600 px-4 text-xs font-black text-white focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:cursor-wait disabled:bg-slate-400"
             >
               {findRunning ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
               Find
@@ -463,7 +702,7 @@ export function EditorSmartToolsPanel({
               type="button"
               onClick={() => showFindResult(findIndex - 1)}
               disabled={!findResults.length}
-              className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white disabled:opacity-40"
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:cursor-not-allowed disabled:border-dashed disabled:bg-slate-100"
               aria-label="Previous search result"
             >
               <ChevronLeft size={15} />
@@ -472,14 +711,109 @@ export function EditorSmartToolsPanel({
               type="button"
               onClick={() => showFindResult(findIndex + 1)}
               disabled={!findResults.length}
-              className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white disabled:opacity-40"
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:cursor-not-allowed disabled:border-dashed disabled:bg-slate-100"
               aria-label="Next search result"
             >
               <ChevronRight size={15} />
             </button>
+            <button
+              type="button"
+              onClick={clearFind}
+              disabled={!query && !findResults.length}
+              className="inline-flex h-9 items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-600 focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:cursor-not-allowed disabled:border-dashed disabled:bg-slate-100"
+            >
+              <X size={14} />
+              Clear
+            </button>
             <span className="w-full text-xs font-bold text-slate-500">{message}</span>
           </>
-        )}
+        ) : null}
+
+        {editor.activeTool === "translate" ? (
+          <>
+            <span className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-black text-violet-700 ring-1 ring-slate-200">
+              <Languages size={14} />
+              Translate
+            </span>
+            <select
+              value={translateMode}
+              onChange={(event) =>
+                setTranslateMode(event.target.value === "page" ? "page" : "selection")
+              }
+              className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-violet-500"
+              aria-label="Translation source mode"
+            >
+              <option value="selection">Selected object text</option>
+              <option value="page">Current page text</option>
+            </select>
+            <select
+              value={sourceLanguage}
+              onChange={(event) => setSourceLanguage(event.target.value)}
+              className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-violet-500"
+              aria-label="Source language"
+            >
+              <option value="auto">Auto detect</option>
+              {TRANSLATION_LANGUAGES.map((language) => (
+                <option key={language.value} value={language.value}>{language.label}</option>
+              ))}
+            </select>
+            <select
+              value={targetLanguage}
+              onChange={(event) => setTargetLanguage(event.target.value)}
+              className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-violet-500"
+              aria-label="Target language"
+            >
+              {TRANSLATION_LANGUAGES.map((language) => (
+                <option key={language.value} value={language.value}>{language.label}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => void runTranslation()}
+              disabled={translateRunning}
+              className="inline-flex h-9 items-center gap-2 rounded-xl bg-violet-600 px-4 text-xs font-black text-white focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:cursor-wait disabled:bg-slate-400"
+            >
+              {translateRunning ? <Loader2 size={14} className="animate-spin" /> : <Languages size={14} />}
+              {translateError ? "Retry" : "Translate"}
+            </button>
+            {translatedText || translateError ? (
+              <div className="w-full rounded-xl border border-slate-200 bg-white p-3">
+                {translateError ? (
+                  <p className="text-xs font-bold text-red-600">{translateError}</p>
+                ) : (
+                  <>
+                    <div className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                      Translation preview
+                    </div>
+                    <p className="mt-2 max-h-32 overflow-auto whitespace-pre-wrap text-sm text-slate-700">
+                      {translatedText}
+                    </p>
+                    <div className="mt-3 flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setTranslatedText("")}
+                        className="h-9 rounded-xl border border-slate-200 px-3 text-xs font-black text-slate-600 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={applyTranslation}
+                        className="h-9 rounded-xl bg-violet-600 px-4 text-xs font-black text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                      >
+                        Add as new text
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            ) : (
+              <span className="min-w-0 flex-1 text-xs font-bold text-slate-500">
+                Original content is preserved. Review before adding the translation.
+              </span>
+            )}
+          </>
+        ) : null}
       </div>
     </section>
   );

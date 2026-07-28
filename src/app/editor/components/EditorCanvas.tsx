@@ -35,7 +35,7 @@ type EditorCanvasProps = {
   readonly editor: EditorController;
   readonly onOpenFile: () => void;
   readonly onFileDrop: (file: File) => void | Promise<void>;
-  readonly findHighlight?: EditorFindHighlight | null;
+  readonly findHighlights?: readonly EditorFindHighlight[];
 };
 
 type PageSize = {
@@ -272,10 +272,10 @@ function getImageSize(dataUrl: string) {
 
 function PdfPageRenderer({
   editor,
-  findHighlight,
+  findHighlights = [],
 }: {
   readonly editor: EditorController;
-  readonly findHighlight?: EditorFindHighlight | null;
+  readonly findHighlights?: readonly EditorFindHighlight[];
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const pageLayerRef = useRef<HTMLDivElement | null>(null);
@@ -1068,17 +1068,25 @@ function PdfPageRenderer({
 
         <canvas ref={canvasRef} className="block bg-white" />
 
-        {findHighlight?.pageNumber === editor.activePageNumber ? (
-          <div
-            className="pointer-events-none absolute z-20 rounded-sm border-2 border-amber-500 bg-yellow-300/45 shadow-[0_0_0_3px_rgba(245,158,11,0.16)]"
-            style={{
-              left: findHighlight.box.x * editor.zoom,
-              top: findHighlight.box.y * editor.zoom,
-              width: findHighlight.box.width * editor.zoom,
-              height: findHighlight.box.height * editor.zoom,
-            }}
-          />
-        ) : null}
+        {findHighlights
+          .filter((highlight) => highlight.pageNumber === editor.activePageNumber)
+          .map((highlight) => (
+            <div
+              key={highlight.id}
+              className={[
+                "pointer-events-none absolute z-20 rounded-sm border-2",
+                highlight.current
+                  ? "border-amber-500 bg-yellow-300/55 shadow-[0_0_0_3px_rgba(245,158,11,0.18)]"
+                  : "border-yellow-400/80 bg-yellow-200/30",
+              ].join(" ")}
+              style={{
+                left: highlight.box.x * editor.zoom,
+                top: highlight.box.y * editor.zoom,
+                width: highlight.box.width * editor.zoom,
+                height: highlight.box.height * editor.zoom,
+              }}
+            />
+          ))}
 
         {editor.activePageObjects.map((object) => {
           if (object.type === "text") {
@@ -1359,7 +1367,7 @@ export function EditorCanvas({
   editor,
   onOpenFile,
   onFileDrop,
-  findHighlight,
+  findHighlights,
 }: EditorCanvasProps) {
   const [dragActive, setDragActive] = useState(false);
 
@@ -1432,7 +1440,7 @@ export function EditorCanvas({
       className="min-w-0 flex-1 overflow-auto bg-[radial-gradient(circle_at_top,#eef2ff_0,#f8fafc_42%,#eef2f7_100%)]"
     >
       <div className="flex min-h-full justify-center px-8 py-10">
-        <PdfPageRenderer editor={editor} findHighlight={findHighlight} />
+        <PdfPageRenderer editor={editor} findHighlights={findHighlights} />
       </div>
     </main>
   );
