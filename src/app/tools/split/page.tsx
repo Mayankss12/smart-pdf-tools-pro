@@ -605,7 +605,7 @@ export default function SplitPage() {
     }
 
     setBusyMode("exporting");
-    setExportProgress(8);
+    setExportProgress(0);
     setResults([]);
     setOpenPanel(null);
     setStatus(`Creating ${groups.length} split PDF${groups.length > 1 ? "s" : ""}...`);
@@ -618,10 +618,41 @@ export default function SplitPage() {
         return;
       }
 
-      setExportProgress(30);
-      const outputs = await splitPdfIntoGroups(file, groups);
+      const outputs = await splitPdfIntoGroups(
+        file,
+        groups,
+        ({ completed, total }) => {
+          setExportProgress(
+            Math.round((completed / Math.max(1, total)) * 100),
+          );
+          setStatus(`Created ${completed} of ${total} split PDFs...`);
+        },
+      );
 
-      setExportProgress(72);
+      let download:
+        | { kind: "pdf"; blob: Blob; fileName: string }
+        | { kind: "zip"; blob: Blob; fileName: string };
+
+      if (outputs.length === 1) {
+        download = {
+          kind: "pdf",
+          blob: outputs[0].blob,
+          fileName: outputs[0].fileName,
+        };
+      } else {
+        setStatus(`Packaging ${outputs.length} PDFs into one ZIP...`);
+        download = {
+          kind: "zip",
+          blob: await createZipBlob(
+            outputs.map((output) => ({
+              fileName: output.fileName,
+              blob: output.blob,
+            })),
+          ),
+          fileName: `PDFMantra-split-${safeFileBaseName(file.name)}.zip`,
+        };
+      }
+
       setStatus("Checking export allowance...");
 
       const exportRecord = await recordExport({
@@ -644,26 +675,11 @@ export default function SplitPage() {
       }
 
       setResults(outputs);
+      downloadBlob(download.blob, download.fileName);
 
-      if (outputs.length === 1) {
-        setExportProgress(86);
-        downloadBlob(outputs[0].blob, outputs[0].fileName);
-        setExportProgress(100);
+      if (download.kind === "pdf") {
         setStatus("Split completed. Downloaded 1 PDF.");
       } else {
-        setExportProgress(80);
-        setStatus(`Packaging ${outputs.length} PDFs into one ZIP...`);
-
-        const zipBlob = await createZipBlob(
-          outputs.map((output) => ({
-            fileName: output.fileName,
-            blob: output.blob,
-          })),
-        );
-
-        setExportProgress(94);
-        downloadBlob(zipBlob, `PDFMantra-split-${safeFileBaseName(file.name)}.zip`);
-        setExportProgress(100);
         setStatus(`Split completed. Downloaded 1 ZIP containing ${outputs.length} PDFs.`);
       }
     } catch (error) {

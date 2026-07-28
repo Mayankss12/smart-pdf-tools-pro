@@ -29,6 +29,10 @@ export type PageNumberOptions = {
   readonly prefix: string;
   readonly suffix: string;
   readonly color: readonly [number, number, number];
+  readonly onProgress?: (progress: {
+    readonly completed: number;
+    readonly total: number;
+  }) => void;
 };
 
 const FONT_MAP: Record<PageNumberFont, StandardFonts> = {
@@ -80,7 +84,8 @@ export async function addPageNumbersWithOptions(
   const targetIndexByPage = new Map(
     options.targetPages.map((pageNumber, index) => [pageNumber, index]),
   );
-  const totalNumberedPages = options.targetPages.length;
+  const totalNumberedPages = targetIndexByPage.size;
+  let completedPages = 0;
 
   for (let index = 0; index < pages.length; index += 1) {
     const page = pages[index];
@@ -124,6 +129,8 @@ export async function addPageNumbersWithOptions(
         opacity,
       });
     });
+    completedPages += 1;
+    options.onProgress?.({ completed: completedPages, total: totalNumberedPages });
   }
 
   return savePdfResult(

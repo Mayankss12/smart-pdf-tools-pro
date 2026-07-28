@@ -161,7 +161,15 @@ export async function optimizePdfStructure(file: File): Promise<PdfProcessingRes
   return savePdfResult(pdf, file.size, createPdfFileName("compressed", file.name));
 }
 
-export async function mergePdfFiles(files: File[]): Promise<PdfProcessingResult> {
+export type PdfOperationProgress = {
+  readonly completed: number;
+  readonly total: number;
+};
+
+export async function mergePdfFiles(
+  files: File[],
+  onProgress?: (progress: PdfOperationProgress) => void,
+): Promise<PdfProcessingResult> {
   validatePdfFiles(files);
 
   if (files.length < 2) {
@@ -171,7 +179,8 @@ export async function mergePdfFiles(files: File[]): Promise<PdfProcessingResult>
   const outputPdf = await PDFDocument.create();
   let originalSize = 0;
 
-  for (const file of files) {
+  for (let index = 0; index < files.length; index += 1) {
+    const file = files[index];
     originalSize += file.size;
     const sourcePdf = await loadPdfDocument(file);
     if (outputPdf.getPageCount() === 0) {
@@ -179,6 +188,7 @@ export async function mergePdfFiles(files: File[]): Promise<PdfProcessingResult>
     }
     const copiedPages = await outputPdf.copyPages(sourcePdf, sourcePdf.getPageIndices());
     copiedPages.forEach((page) => outputPdf.addPage(page));
+    onProgress?.({ completed: index + 1, total: files.length });
   }
 
   return savePdfResult(outputPdf, originalSize, "PDFMantra-merged.pdf");
@@ -232,28 +242,37 @@ export function parsePageGroups(input: string, totalPages: number): PageGroup[] 
     });
 }
 
-export async function splitPdfIntoGroups(file: File, groups: PageGroup[]) {
+export async function splitPdfIntoGroups(
+  file: File,
+  groups: PageGroup[],
+  onProgress?: (progress: PdfOperationProgress) => void,
+) {
   const sourcePdf = await loadPdfDocument(file);
   const cleanBaseName = safeFileBaseName(file.name);
+  const results: PdfProcessingResult[] = [];
 
-  return Promise.all(
-    groups.map(async (group, index) => {
-      const outputPdf = await PDFDocument.create();
-      copyPdfDocumentMetadata(sourcePdf, outputPdf);
-      const copiedPages = await outputPdf.copyPages(
-        sourcePdf,
-        group.pages.map((pageNumber) => pageNumber - 1),
-      );
+  for (let index = 0; index < groups.length; index += 1) {
+    const group = groups[index];
+    const outputPdf = await PDFDocument.create();
+    copyPdfDocumentMetadata(sourcePdf, outputPdf);
+    const copiedPages = await outputPdf.copyPages(
+      sourcePdf,
+      group.pages.map((pageNumber) => pageNumber - 1),
+    );
 
-      copiedPages.forEach((page) => outputPdf.addPage(page));
+    copiedPages.forEach((page) => outputPdf.addPage(page));
 
-      return savePdfResult(
+    results.push(
+      await savePdfResult(
         outputPdf,
         file.size,
         `PDFMantra-${cleanBaseName}-split-${index + 1}-${group.label}.pdf`,
-      );
-    }),
-  );
+      ),
+    );
+    onProgress?.({ completed: index + 1, total: groups.length });
+  }
+
+  return results;
 }
 
 export async function rotatePdfPages(file: File, rotation: 90 | 180 | 270): Promise<PdfProcessingResult> {

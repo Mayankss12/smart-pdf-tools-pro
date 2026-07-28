@@ -473,7 +473,7 @@ export default function MergePage() {
     }
 
     setBusy(true);
-    setExportProgress(8);
+    setExportProgress(0);
     setResult(null);
     setOpenPanel(null);
     setStatus("Merging PDFs with PDFMantra engine...");
@@ -489,10 +489,16 @@ export default function MergePage() {
         return;
       }
 
-      setExportProgress(35);
-      const output = await mergePdfFiles(items.map((item) => item.file));
+      const output = await mergePdfFiles(
+        items.map((item) => item.file),
+        ({ completed, total }) => {
+          setExportProgress(
+            Math.round((completed / Math.max(1, total)) * 100),
+          );
+          setStatus(`Merged ${completed} of ${total} PDFs...`);
+        },
+      );
 
-      setExportProgress(82);
       setStatus("Checking export allowance...");
 
       const exportRecord = await recordExport({
@@ -514,11 +520,9 @@ export default function MergePage() {
         return;
       }
 
-      setExportProgress(92);
       setResult(output);
       downloadBlob(output.blob, output.fileName);
 
-      setExportProgress(100);
       setStatus(`Merged ${items.length} PDFs successfully. Download started.`);
     } catch (error) {
       console.error(error);

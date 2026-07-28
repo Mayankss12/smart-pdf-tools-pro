@@ -663,13 +663,11 @@ export default function WatermarkPage() {
     }
 
     setBusyMode("exporting");
-    setExportProgress(8);
+    setExportProgress(0);
     setResult(null);
     setStatus("Applying watermark with PDFMantra engine...");
 
     try {
-      setExportProgress(28);
-
       const output = await applyWatermark(file, {
         mode: watermarkMode,
         layout: watermarkLayout,
@@ -684,9 +682,14 @@ export default function WatermarkPage() {
         tileGap,
         imageFile,
         imageScale,
+        onProgress({ completed, total }) {
+          setExportProgress(
+            Math.round((completed / Math.max(1, total)) * 100),
+          );
+          setStatus(`Watermarked ${completed} of ${total} selected pages...`);
+        },
       });
 
-      setExportProgress(82);
       setStatus("Checking export allowance...");
 
       const exportRecord = await recordExport({
@@ -710,7 +713,6 @@ export default function WatermarkPage() {
       setResult(output);
       downloadBlob(output.blob, output.fileName);
 
-      setExportProgress(100);
       setStatus("Watermarked PDF exported successfully. Download started.");
     } catch (error) {
       setResult(null);

@@ -46,6 +46,10 @@ export type WatermarkExportOptions = {
   readonly tileGap: number;
   readonly imageFile: File | null;
   readonly imageScale: number;
+  readonly onProgress?: (progress: {
+    readonly completed: number;
+    readonly total: number;
+  }) => void;
 };
 
 const FONT_MAP: Record<WatermarkFontStyle, StandardFonts> = {
@@ -312,6 +316,7 @@ export async function applyWatermark(
     ? await pdf.embedFont(FONT_MAP[options.fontStyle])
     : null;
   let embeddedImage: PDFImage | null = null;
+  let completedPages = 0;
 
   if (needsImage && options.imageFile) {
     const imageBytes = await options.imageFile.arrayBuffer();
@@ -375,6 +380,11 @@ export async function applyWatermark(
           });
         }
       }
+    });
+    completedPages += 1;
+    options.onProgress?.({
+      completed: completedPages,
+      total: targetPageSet.size,
     });
   }
 

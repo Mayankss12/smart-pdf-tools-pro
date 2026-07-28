@@ -11,6 +11,10 @@ import {
   extractPdfPages,
   reorderPdfPages,
 } from "../src/lib/pdf-page-engine.ts";
+import {
+  mergePdfFiles,
+  splitPdfIntoGroups,
+} from "../src/lib/pdf-engine.ts";
 
 async function createSourceFile() {
   const pdf = await PDFDocument.create();
@@ -62,11 +66,37 @@ assert.deepEqual(reorderedPdf.getPage(0).getSize(), {
 });
 assert.equal(reorderedPdf.getPage(0).getRotation().angle, 90);
 
+const mergeProgress = [];
+await mergePdfFiles([sourceFile, sourceFile], (progress) => {
+  mergeProgress.push(progress);
+});
+assert.deepEqual(mergeProgress, [
+  { completed: 1, total: 2 },
+  { completed: 2, total: 2 },
+]);
+
+const splitProgress = [];
+await splitPdfIntoGroups(
+  sourceFile,
+  [
+    { label: "first", pages: [1] },
+    { label: "second", pages: [2] },
+  ],
+  (progress) => {
+    splitProgress.push(progress);
+  },
+);
+assert.deepEqual(splitProgress, [
+  { completed: 1, total: 2 },
+  { completed: 2, total: 2 },
+]);
+
 console.log(
   JSON.stringify({
     compatibilityWarning: "passed",
     invalidMagicBytes: "passed",
     metadataPreservation: "passed",
     pageSizeOrderRotation: "passed",
+    rebuildProgress: "passed",
   }),
 );

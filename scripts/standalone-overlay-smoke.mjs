@@ -16,6 +16,7 @@ const sourceFile = new File([await source.save()], "rotations.pdf", {
   type: "application/pdf",
 });
 
+const numberProgress = [];
 const numbered = await addPageNumbersWithOptions(sourceFile, {
   position: { xPercent: 22, yPercent: 31 },
   targetPages: [1, 2, 3, 4],
@@ -26,7 +27,11 @@ const numbered = await addPageNumbersWithOptions(sourceFile, {
   prefix: "P",
   suffix: " / {total}",
   color: [0.1, 0.2, 0.3],
+  onProgress(progress) {
+    numberProgress.push(progress);
+  },
 });
+assert.deepEqual(numberProgress.at(-1), { completed: 4, total: 4 });
 const numberedBytes = new Uint8Array(await numbered.blob.arrayBuffer());
 const numberedPdf = await PDFDocument.load(numberedBytes);
 assert.deepEqual(
@@ -74,6 +79,7 @@ for (const position of numberPositions) {
   assert.ok(position.yRatio > 0.15 && position.yRatio < 0.5);
 }
 
+const watermarkProgress = [];
 const watermarked = await applyWatermark(sourceFile, {
   mode: "text",
   layout: "single",
@@ -88,7 +94,11 @@ const watermarked = await applyWatermark(sourceFile, {
   tileGap: 220,
   imageFile: null,
   imageScale: 36,
+  onProgress(progress) {
+    watermarkProgress.push(progress);
+  },
 });
+assert.deepEqual(watermarkProgress.at(-1), { completed: 4, total: 4 });
 const watermarkedBytes = new Uint8Array(await watermarked.blob.arrayBuffer());
 const watermarkedPdf = await PDFDocument.load(watermarkedBytes);
 assert.deepEqual(
@@ -124,5 +134,6 @@ console.log(
     pageNumberFontOpacityRange: "passed",
     watermarkFullAngleOpacityRange: "passed",
     mixedRotationPreservation: "passed",
+    overlayProgress: "passed",
   }),
 );

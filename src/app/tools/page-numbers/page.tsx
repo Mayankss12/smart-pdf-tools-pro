@@ -631,13 +631,11 @@ export default function PageNumbersPage() {
     }
 
     setBusyMode("exporting");
-    setExportProgress(8);
+    setExportProgress(0);
     setResult(null);
     setStatus("Adding page numbers with PDFMantra engine...");
 
     try {
-      setExportProgress(28);
-
       const output = await addPageNumbersWithOptions(file, {
         position,
         targetPages: targetPlan.pages,
@@ -648,9 +646,14 @@ export default function PageNumbersPage() {
         prefix,
         suffix,
         color: selectedColor.pdf,
+        onProgress({ completed, total }) {
+          setExportProgress(
+            Math.round((completed / Math.max(1, total)) * 100),
+          );
+          setStatus(`Numbered ${completed} of ${total} selected pages...`);
+        },
       });
 
-      setExportProgress(84);
       setStatus("Checking export allowance...");
 
       const exportRecord = await recordExport({
@@ -675,7 +678,6 @@ export default function PageNumbersPage() {
       setResult(output);
       downloadBlob(output.blob, output.fileName);
 
-      setExportProgress(100);
       setStatus("Page numbered PDF exported successfully. Download started.");
     } catch (error) {
       setResult(null);
