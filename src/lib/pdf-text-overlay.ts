@@ -1,3 +1,5 @@
+import "regenerator-runtime/runtime.js";
+
 import fontkit from "@pdf-lib/fontkit";
 import {
   PDFDocument,

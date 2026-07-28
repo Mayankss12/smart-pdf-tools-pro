@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import {
   AlignLeft,
   Download,
@@ -15,9 +14,12 @@ import {
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { useEntitlement } from "@/hooks/useEntitlement";
+import { prepareEntitledExport } from "@/lib/export-entitlement";
+import type { UnicodeBaseFont } from "@/lib/pdf-unicode-fonts";
+import { createTextPdf } from "@/lib/text-to-pdf-engine";
 
 type PageSize = "a4" | "letter";
-type FontChoice = "helvetica" | "times" | "courier";
+type FontChoice = UnicodeBaseFont;
 
 const PAGE_SIZES: Record<PageSize, { label: string; width: number; height: number }> = {
   a4: { label: "A4", width: 595.28, height: 841.89 },
@@ -27,12 +29,6 @@ const PAGE_SIZES: Record<PageSize, { label: string; width: number; height: numbe
 const SAMPLE_TEXT =
   "Paste or type your text here.\n\nThis tool converts plain text into a clean PDF document in your browser.";
 
-function getFont(fontChoice: FontChoice) {
-  if (fontChoice === "times") return StandardFonts.TimesRoman;
-  if (fontChoice === "courier") return StandardFonts.Courier;
-  return StandardFonts.Helvetica;
-}
-
 function safeFileName(value: string) {
   const cleaned = value
     .trim()
@@ -41,66 +37,6 @@ function safeFileName(value: string) {
     .slice(0, 60);
 
   return cleaned || "text-to-pdf";
-}
-
-function splitLongWord(
-  word: string,
-  maxWidth: number,
-  font: { widthOfTextAtSize: (text: string, size: number) => number },
-  fontSize: number,
-) {
-  const parts: string[] = [];
-  let current = "";
-
-  for (const character of word) {
-    const next = current + character;
-
-    if (font.widthOfTextAtSize(next, fontSize) <= maxWidth) {
-      current = next;
-    } else {
-      if (current) parts.push(current);
-      current = character;
-    }
-  }
-
-  if (current) parts.push(current);
-  return parts;
-}
-
-function wrapTextLine(
-  line: string,
-  maxWidth: number,
-  font: { widthOfTextAtSize: (text: string, size: number) => number },
-  fontSize: number,
-) {
-  if (!line.trim()) return [""];
-
-  const words = line.split(/\s+/);
-  const wrapped: string[] = [];
-  let currentLine = "";
-
-  for (const word of words) {
-    const candidate = currentLine ? `${currentLine} ${word}` : word;
-
-    if (font.widthOfTextAtSize(candidate, fontSize) <= maxWidth) {
-      currentLine = candidate;
-      continue;
-    }
-
-    if (currentLine) {
-      wrapped.push(currentLine);
-      currentLine = "";
-    }
-
-    if (font.widthOfTextAtSize(word, fontSize) > maxWidth) {
-      wrapped.push(...splitLongWord(word, maxWidth, font, fontSize));
-    } else {
-      currentLine = word;
-    }
-  }
-
-  if (currentLine) wrapped.push(currentLine);
-  return wrapped;
 }
 
 function downloadPdf(bytes: Uint8Array, fileName: string) {
@@ -114,7 +50,7 @@ function downloadPdf(bytes: Uint8Array, fileName: string) {
   link.click();
   link.remove();
 
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export default function TextToPdfPage() {
@@ -145,88 +81,43 @@ export default function TextToPdfPage() {
     setStatus("Creating PDF from text...");
 
     try {
-      const pdfDoc = await PDFDocument.create();
-      const font = await pdfDoc.embedFont(getFont(fontChoice));
-      const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-
-      const usableWidth = pageMeta.width - margin * 2;
-      const titleHeight = title.trim() ? 32 : 0;
-      const lineStep = Math.max(lineHeight, fontSize + 4);
-
-      let page = pdfDoc.addPage([pageMeta.width, pageMeta.height]);
-      let cursorY = pageMeta.height - margin;
-
-      if (title.trim()) {
-        page.drawText(title.trim(), {
-          x: margin,
-          y: cursorY,
-          size: Math.max(fontSize + 5, 16),
-          font: boldFont,
-          color: rgb(0.08, 0.07, 0.18),
-        });
-        cursorY -= titleHeight;
-      }
-
-      const rawLines = text.replace(/\r\n/g, "\n").split("\n");
-
-      for (const rawLine of rawLines) {
-        const wrappedLines = wrapTextLine(rawLine, usableWidth, font, fontSize);
-
-        for (const line of wrappedLines) {
-          if (cursorY < margin) {
-            page = pdfDoc.addPage([pageMeta.width, pageMeta.height]);
-            cursorY = pageMeta.height - margin;
-          }
-
-          if (line) {
-            page.drawText(line, {
-              x: margin,
-              y: cursorY,
-              size: fontSize,
-              font,
-              color: rgb(0.12, 0.13, 0.18),
-            });
-          }
-
-          cursorY -= lineStep;
-        }
-      }
-
-      const pageCount = pdfDoc.getPageCount();
-      const pages = pdfDoc.getPages();
-
-      pages.forEach((pdfPage, index) => {
-        const footer = `Page ${index + 1} of ${pageCount}`;
-        const footerWidth = font.widthOfTextAtSize(footer, 9);
-
-        pdfPage.drawText(footer, {
-          x: pageMeta.width - margin - footerWidth,
-          y: Math.max(22, margin / 2),
-          size: 9,
-          font,
-          color: rgb(0.45, 0.45, 0.55),
-        });
-      });
-
-      const exportRecord = await recordExport({
+      const prepared = await prepareEntitledExport({
         toolKey: "text-to-pdf",
-        exportKind: "clean",
+        recordExport,
+        prepare: () =>
+          createTextPdf({
+            text,
+            title,
+            pageSize: pageMeta,
+            font: fontChoice,
+            fontSize,
+            lineHeight,
+            margin,
+          }),
       });
 
-      if (!exportRecord.allowed) {
-        setStatus(
-          exportRecord.error ||
-            `${exportRecord.planLabel} clean export limit reached for today.`,
-        );
+      if (!prepared.allowed) {
+        setStatus(prepared.message);
         return;
       }
 
-      const bytes = await pdfDoc.save();
-      downloadPdf(bytes, `PDFMantra-${safeFileName(title)}.pdf`);
+      downloadPdf(
+        prepared.output.bytes,
+        `PDFMantra-${safeFileName(title)}.pdf`,
+      );
 
-      setStatus(`PDF created successfully with ${pageCount} page${pageCount === 1 ? "" : "s"}. Download started.`);
-    } catch {
-      setStatus("Unable to create PDF from this text. Please try again.");
+      const fallbackMessage = prepared.output.replacementCount
+        ? ` ${prepared.output.replacementCount} unsupported glyph${prepared.output.replacementCount === 1 ? " was" : "s were"} replaced with a visible fallback.`
+        : "";
+      setStatus(
+        `PDF created successfully with ${prepared.output.pageCount} page${prepared.output.pageCount === 1 ? "" : "s"}. Download started.${fallbackMessage}`,
+      );
+    } catch (error) {
+      setStatus(
+        error instanceof Error
+          ? error.message
+          : "Unable to create PDF from this text. Please try again.",
+      );
     } finally {
       setBusy(false);
     }
@@ -307,7 +198,12 @@ export default function TextToPdfPage() {
                   <span className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Page size</span>
                   <select
                     value={pageSize}
-                    onChange={(event) => setPageSize(event.target.value as PageSize)}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      if (value === "a4" || value === "letter") {
+                        setPageSize(value);
+                      }
+                    }}
                     className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
                   >
                     <option value="a4">A4</option>
@@ -319,7 +215,16 @@ export default function TextToPdfPage() {
                   <span className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Font</span>
                   <select
                     value={fontChoice}
-                    onChange={(event) => setFontChoice(event.target.value as FontChoice)}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      if (
+                        value === "helvetica" ||
+                        value === "times" ||
+                        value === "courier"
+                      ) {
+                        setFontChoice(value);
+                      }
+                    }}
                     className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
                   >
                     <option value="helvetica">Helvetica</option>
@@ -372,7 +277,7 @@ export default function TextToPdfPage() {
               </div>
 
               <div className="mt-5 rounded-2xl bg-slate-50 p-3 text-xs font-semibold leading-5 text-slate-500">
-                {estimatedLines} source line{estimatedLines === 1 ? "" : "s"} - {pageMeta.label} - Browser-side PDF creation
+                {estimatedLines} source line{estimatedLines === 1 ? "" : "s"} - {pageMeta.label} - Browser-side PDF creation. Latin and Devanagari fonts are embedded; unsupported Chinese or emoji glyphs are visibly replaced.
               </div>
 
               <div className="mt-5 grid gap-2">

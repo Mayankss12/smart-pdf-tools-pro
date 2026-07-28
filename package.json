@@ -19,6 +19,7 @@
     "pdfjs-dist": "4.10.38",
     "react": "19.0.1",
     "react-dom": "19.0.1",
+    "regenerator-runtime": "0.13.11",
     "sortablejs": "1.15.6",
     "tesseract.js": "6.0.0",
     "zod": "3.24.1",
