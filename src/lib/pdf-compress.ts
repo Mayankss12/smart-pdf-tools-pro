@@ -1,189 +1,412 @@
-// src/lib/pdf-compress.ts
-//
-// Advanced PDF compression using PDF.js + pdf-lib.
-// Two modes:
-//   1. Level mode  — Low / Medium / High with quality-preserving settings
-//   2. Target mode — binary searches JPEG quality to hit a file size target
-//
-// Renders each page to canvas as JPEG, then reassembles into a new PDF.
-// Note: text becomes rasterised (not selectable) after compression.
+import * as pdfjs from "pdfjs-dist";
+import { degrees, PDFDocument } from "pdf-lib";
 
-import * as pdfjs from 'pdfjs-dist'
-import { PDFDocument } from 'pdf-lib'
-import { configurePdfJsWorker } from '@/lib/pdfjs-worker'
+import { PdfEngineError } from "@/lib/pdf-errors";
+import { readValidatedPdfBytes } from "@/lib/pdf-document-safety";
+import { configurePdfJsWorker } from "@/lib/pdfjs-worker";
 
-if (typeof window !== 'undefined') {
-  configurePdfJsWorker(pdfjs)
+if (typeof window !== "undefined") {
+  configurePdfJsWorker(pdfjs);
 }
 
-export type CompressionLevel = 'low' | 'medium' | 'high'
+export type CompressionLevel = "low" | "medium" | "high";
+export type CompressionMode = "auto" | "structural" | "scan";
+export type CompressionMethod = Exclude<CompressionMode, "auto">;
 
-// Revised quality floors — previous values were too aggressive.
-// scale = render DPI multiplier  |  quality = JPEG quality 0–1
-const LEVEL_CONFIG: Record<CompressionLevel, { scale: number; quality: number }> = {
-  low:    { scale: 2.0, quality: 0.95 }, // near-lossless, subtle reduction
-  medium: { scale: 1.5, quality: 0.85 }, // balanced — good quality, real reduction
-  high:   { scale: 1.2, quality: 0.72 }, // compressed but still clean
-}
+export type CompressionProgress = {
+  readonly percent: number | null;
+  readonly message: string;
+  readonly pageNumber?: number;
+  readonly pageCount?: number;
+};
 
-const MIN_QUALITY = 0.35 // floor — below this JPEG looks broken
-const MIN_SCALE   = 1.0  // floor scale used when target is very aggressive
+export type CompressionAnalysis = {
+  readonly selectedMethod: CompressionMethod;
+  readonly reason: string;
+  readonly pageCount: number;
+  readonly textCharacters: number;
+  readonly imageOperations: number;
+};
 
-export interface CanvasCompressResult {
-  blob:          Blob
-  originalSize:  number
-  compressedSize: number
-  qualityUsed:   number
-  targetMet:     boolean
-}
+export type PdfCompressionOptions = {
+  readonly mode: CompressionMode;
+  readonly level: CompressionLevel;
+  readonly targetBytes?: number | null;
+  readonly removeMetadata?: boolean;
+  readonly signal?: AbortSignal;
+  readonly onProgress?: (progress: CompressionProgress) => void;
+};
 
-// ── Phase 1: Render all PDF pages to in-memory canvases ──────────
-async function renderPages(
-  pdfDoc:   pdfjs.PDFDocumentProxy,
-  scale:    number,
-  onProg:   (n: number) => void,
-  pStart:   number,
-  pEnd:     number
-): Promise<HTMLCanvasElement[]> {
-  const total   = pdfDoc.numPages
-  const canvases: HTMLCanvasElement[] = []
+export type PdfCompressionResult = {
+  readonly blob: Blob;
+  readonly originalSize: number;
+  readonly compressedSize: number;
+  readonly qualityUsed: number;
+  readonly targetMet: boolean;
+  readonly method: CompressionMethod;
+  readonly analysis: CompressionAnalysis;
+  readonly usedOriginal: boolean;
+};
 
-  for (let i = 1; i <= total; i++) {
-    onProg(Math.round(pStart + ((i - 1) / total) * (pEnd - pStart)))
+const LEVEL_CONFIG: Record<
+  CompressionLevel,
+  { readonly scale: number; readonly quality: number }
+> = {
+  low: { scale: 2, quality: 0.94 },
+  medium: { scale: 1.5, quality: 0.84 },
+  high: { scale: 1.15, quality: 0.7 },
+};
 
-    const page     = await pdfDoc.getPage(i)
-    const viewport = page.getViewport({ scale })
-    const canvas   = document.createElement('canvas')
-    canvas.width   = Math.floor(viewport.width)
-    canvas.height  = Math.floor(viewport.height)
+const MAX_CANVAS_PIXELS = 40_000_000;
 
-    const ctx = canvas.getContext('2d')!
-    ctx.fillStyle = '#ffffff' // white bg — JPEG has no transparency
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
-    await page.render({
-      canvasContext: ctx as unknown as CanvasRenderingContext2D,
-      viewport,
-    }).promise
-
-    canvases.push(canvas)
+function throwIfAborted(signal: AbortSignal | undefined) {
+  if (signal?.aborted) {
+    throw new DOMException("Compression cancelled.", "AbortError");
   }
-  return canvases
 }
 
-// ── Phase 2: Encode canvases → JPEG bytes at a given quality ────
-function encodeJpeg(canvases: HTMLCanvasElement[], quality: number): Uint8Array[] {
-  return canvases.map((c) => {
-    const b64 = c.toDataURL('image/jpeg', quality).split(',')[1]
-    return Uint8Array.from(atob(b64), (ch) => ch.charCodeAt(0))
-  })
+function report(
+  callback: PdfCompressionOptions["onProgress"],
+  progress: CompressionProgress,
+) {
+  callback?.(progress);
 }
 
-// ── Phase 3: Assemble JPEG pages into a new PDF ──────────────────
-async function buildPdf(
-  pages:    Uint8Array[],
-  canvases: HTMLCanvasElement[]
-): Promise<Uint8Array> {
-  const doc = await PDFDocument.create()
-  for (let i = 0; i < pages.length; i++) {
-    const img  = await doc.embedJpg(pages[i])
-    const page = doc.addPage([canvases[i].width, canvases[i].height])
-    page.drawImage(img, { x: 0, y: 0, width: canvases[i].width, height: canvases[i].height })
+function canvasToJpeg(canvas: HTMLCanvasElement, quality: number) {
+  return new Promise<Uint8Array>((resolve, reject) => {
+    canvas.toBlob(
+      async (blob) => {
+        if (!blob) {
+          reject(
+            new PdfEngineError(
+              "PROCESSING_FAILED",
+              "The browser could not encode a compressed page image.",
+            ),
+          );
+          return;
+        }
+        resolve(new Uint8Array(await blob.arrayBuffer()));
+      },
+      "image/jpeg",
+      quality,
+    );
+  });
+}
+
+function getSafeRenderScale(width: number, height: number, requestedScale: number) {
+  const requestedPixels = width * requestedScale * height * requestedScale;
+  if (requestedPixels <= MAX_CANVAS_PIXELS) return requestedScale;
+
+  return Math.sqrt(MAX_CANVAS_PIXELS / Math.max(1, width * height));
+}
+
+async function analyzePdfComposition(
+  pdf: pdfjs.PDFDocumentProxy,
+  signal: AbortSignal | undefined,
+  onProgress: PdfCompressionOptions["onProgress"],
+) {
+  let textCharacters = 0;
+  let imageOperations = 0;
+
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+    throwIfAborted(signal);
+    const page = await pdf.getPage(pageNumber);
+    try {
+      const [text, operators] = await Promise.all([
+        page.getTextContent(),
+        page.getOperatorList(),
+      ]);
+      textCharacters += text.items.reduce(
+        (sum, item) => sum + ("str" in item ? item.str.length : 0),
+        0,
+      );
+      imageOperations += operators.fnArray.filter(
+        (operation) =>
+          operation === pdfjs.OPS.paintImageXObject ||
+          operation === pdfjs.OPS.paintInlineImageXObject ||
+          operation === pdfjs.OPS.paintImageMaskXObject,
+      ).length;
+    } finally {
+      page.cleanup();
+    }
+    report(onProgress, {
+      percent: null,
+      message: `Inspected page ${pageNumber} of ${pdf.numPages}.`,
+      pageNumber,
+      pageCount: pdf.numPages,
+    });
   }
-  return doc.save()
+
+  const averageText = textCharacters / Math.max(1, pdf.numPages);
+  const averageImages = imageOperations / Math.max(1, pdf.numPages);
+  const imageHeavy = averageText < 80 && averageImages >= 1;
+
+  return {
+    selectedMethod: imageHeavy ? "scan" : "structural",
+    reason: imageHeavy
+      ? "Auto selected Scan Compression because pages contain little selectable text and are image-heavy."
+      : "Auto selected Preserve Text because selectable text or vector structure was detected.",
+    pageCount: pdf.numPages,
+    textCharacters,
+    imageOperations,
+  } satisfies CompressionAnalysis;
 }
 
-// ── Estimate PDF size from JPEG bytes (avoids full assembly) ─────
-function estimateSize(pages: Uint8Array[]): number {
-  return pages.reduce((s, p) => s + p.length, 0) + 65536 // +64 KB PDF overhead
+function clearMetadata(pdf: PDFDocument) {
+  pdf.setTitle("");
+  pdf.setAuthor("");
+  pdf.setSubject("");
+  pdf.setKeywords([]);
+  pdf.setCreator("PDFMantra");
+  pdf.setProducer("PDFMantra");
 }
 
-// ── Binary search: find highest quality that fits target bytes ───
-function binarySearchQuality(canvases: HTMLCanvasElement[], targetBytes: number): number {
-  let lo = MIN_QUALITY, hi = 0.95, best = MIN_QUALITY
-
-  for (let i = 0; i < 8; i++) {
-    const mid  = (lo + hi) / 2
-    const size = estimateSize(encodeJpeg(canvases, mid))
-
-    if (size <= targetBytes) { best = mid; lo = mid }
-    else                      { hi = mid }
-
-    if (hi - lo < 0.008) break
+async function structurallyCompress(
+  bytes: Uint8Array,
+  removeMetadata: boolean,
+  signal: AbortSignal | undefined,
+  onProgress: PdfCompressionOptions["onProgress"],
+) {
+  throwIfAborted(signal);
+  report(onProgress, {
+    percent: null,
+    message: "Optimizing PDF structure while preserving text, vectors, links, forms, and page geometry…",
+  });
+  const pdf = await PDFDocument.load(bytes);
+  if (pdf.getPageCount() === 0) {
+    throw new PdfEngineError(
+      "PROCESSING_FAILED",
+      "This PDF has no pages to compress.",
+    );
   }
-  return best
+  if (removeMetadata) clearMetadata(pdf);
+  throwIfAborted(signal);
+  return pdf.save({
+    useObjectStreams: true,
+    addDefaultPage: false,
+    objectsPerTick: 40,
+  });
 }
 
-// ── Main export ──────────────────────────────────────────────────
-export async function canvasCompressPdf(
-  file:        File,
-  level:       CompressionLevel,
-  onProgress:  (n: number) => void,
-  targetBytes: number | null = null
-): Promise<CanvasCompressResult> {
-  onProgress(5)
-
-  const buf     = await file.arrayBuffer()
-  const pdfDoc  = await pdfjs.getDocument({ data: new Uint8Array(buf) }).promise
-
-  let blob:        Blob
-  let qualityUsed: number
-  let targetMet:   boolean
-
-  if (targetBytes !== null) {
-    // ── TARGET SIZE MODE ────────────────────────────────────────
-    // Render at scale 1.5 first (good quality baseline)
-    const canvases = await renderPages(pdfDoc, 1.5, onProgress, 8, 65)
-    onProgress(65)
-
-    // Check if max quality already fits
-    const maxJpeg = encodeJpeg(canvases, 0.95)
-    if (estimateSize(maxJpeg) <= targetBytes) {
-      const bytes = await buildPdf(maxJpeg, canvases)
-      qualityUsed = 0.95
-      targetMet   = true
-      blob        = new Blob([bytes], { type: 'application/pdf' })
-    } else {
-      // Binary search on scale 1.5 canvases
-      onProgress(68)
-      qualityUsed = binarySearchQuality(canvases, targetBytes)
-      const jpeg  = encodeJpeg(canvases, qualityUsed)
-      targetMet   = estimateSize(jpeg) <= targetBytes
-
-      if (!targetMet) {
-        // Scale 1.5 not enough — re-render at scale 1.0 (smaller pages)
-        onProgress(72)
-        const small = await renderPages(pdfDoc, MIN_SCALE, onProgress, 72, 88)
-        qualityUsed = binarySearchQuality(small, targetBytes)
-        const sJpeg = encodeJpeg(small, qualityUsed)
-        targetMet   = estimateSize(sJpeg) <= targetBytes
-        onProgress(90)
-        const bytes = await buildPdf(sJpeg, small)
-        blob        = new Blob([bytes], { type: 'application/pdf' })
-      } else {
-        onProgress(88)
-        const bytes = await buildPdf(jpeg, canvases)
-        blob        = new Blob([bytes], { type: 'application/pdf' })
+async function scanCompress(
+  sourceBytes: Uint8Array,
+  level: CompressionLevel,
+  targetBytes: number | null,
+  signal: AbortSignal | undefined,
+  onProgress: PdfCompressionOptions["onProgress"],
+) {
+  const source = await pdfjs.getDocument({ data: sourceBytes.slice() }).promise;
+  const baseProfile = LEVEL_CONFIG[level];
+  const profiles = targetBytes
+    ? [
+        baseProfile,
+        {
+          scale: Math.max(0.8, baseProfile.scale * 0.8),
+          quality: Math.max(0.55, baseProfile.quality - 0.14),
+        },
+        {
+          scale: Math.max(0.65, baseProfile.scale * 0.62),
+          quality: Math.max(0.42, baseProfile.quality - 0.28),
+        },
+        {
+          scale: Math.max(0.5, baseProfile.scale * 0.48),
+          quality: 0.34,
+        },
+      ]
+    : [baseProfile];
+  let smallest:
+    | {
+        readonly bytes: Uint8Array;
+        readonly quality: number;
       }
+    | undefined;
+
+  try {
+    for (let profileIndex = 0; profileIndex < profiles.length; profileIndex += 1) {
+      const profile = profiles[profileIndex];
+      const output = await PDFDocument.create();
+
+      for (let pageNumber = 1; pageNumber <= source.numPages; pageNumber += 1) {
+        throwIfAborted(signal);
+        const page = await source.getPage(pageNumber);
+        const baseViewport = page.getViewport({ scale: 1, rotation: 0 });
+        const scale = getSafeRenderScale(
+          baseViewport.width,
+          baseViewport.height,
+          profile.scale,
+        );
+        const viewport = page.getViewport({ scale, rotation: 0 });
+        const canvas = document.createElement("canvas");
+        const context = canvas.getContext("2d", { alpha: false });
+
+        if (!context) {
+          throw new PdfEngineError(
+            "PROCESSING_FAILED",
+            "The browser could not allocate a page-rendering canvas.",
+          );
+        }
+
+        canvas.width = Math.max(1, Math.floor(viewport.width));
+        canvas.height = Math.max(1, Math.floor(viewport.height));
+        context.fillStyle = "#ffffff";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        const renderTask = page.render({ canvasContext: context, viewport });
+        const cancelRender = () => renderTask.cancel();
+        signal?.addEventListener("abort", cancelRender, { once: true });
+
+        try {
+          await renderTask.promise;
+          throwIfAborted(signal);
+          const jpegBytes = await canvasToJpeg(canvas, profile.quality);
+          const image = await output.embedJpg(jpegBytes);
+          const outputPage = output.addPage([
+            baseViewport.width,
+            baseViewport.height,
+          ]);
+          outputPage.setRotation(degrees(page.rotate));
+          outputPage.drawImage(image, {
+            x: 0,
+            y: 0,
+            width: baseViewport.width,
+            height: baseViewport.height,
+          });
+        } finally {
+          signal?.removeEventListener("abort", cancelRender);
+          page.cleanup();
+          canvas.width = 0;
+          canvas.height = 0;
+        }
+
+        const completedPages = profileIndex * source.numPages + pageNumber;
+        const maximumPages = profiles.length * source.numPages;
+        report(onProgress, {
+          percent: Math.round((completedPages / maximumPages) * 92),
+          message:
+            profiles.length > 1
+              ? `Target attempt ${profileIndex + 1} of ${profiles.length}: page ${pageNumber} of ${source.numPages}.`
+              : `Compressed page ${pageNumber} of ${source.numPages}.`,
+          pageNumber,
+          pageCount: source.numPages,
+        });
+      }
+
+      throwIfAborted(signal);
+      const candidateBytes = await output.save({
+        useObjectStreams: true,
+        addDefaultPage: false,
+        objectsPerTick: 30,
+      });
+      if (!smallest || candidateBytes.length < smallest.bytes.length) {
+        smallest = {
+          bytes: candidateBytes,
+          quality: profile.quality,
+        };
+      }
+      if (targetBytes && candidateBytes.length <= targetBytes) break;
+    }
+
+    if (!smallest) {
+      throw new PdfEngineError(
+        "PROCESSING_FAILED",
+        "Scan compression produced no output.",
+      );
+    }
+
+    report(onProgress, {
+      percent: 96,
+      message: "Finalizing scan-compressed PDF…",
+    });
+    return smallest;
+  } finally {
+    await source.destroy();
+  }
+}
+
+export async function compressPdf(
+  file: File,
+  options: PdfCompressionOptions,
+): Promise<PdfCompressionResult> {
+  configurePdfJsWorker(pdfjs);
+  const bytes = await readValidatedPdfBytes(file);
+  throwIfAborted(options.signal);
+
+  let analysis: CompressionAnalysis;
+  if (options.mode === "auto") {
+    report(options.onProgress, {
+      percent: null,
+      message: "Inspecting page text and image composition…",
+    });
+    const inspectionDocument = await pdfjs.getDocument({
+      data: bytes.slice(),
+    }).promise;
+    try {
+      analysis = await analyzePdfComposition(
+        inspectionDocument,
+        options.signal,
+        options.onProgress,
+      );
+    } finally {
+      await inspectionDocument.destroy();
     }
   } else {
-    // ── LEVEL MODE ──────────────────────────────────────────────
-    const { scale, quality } = LEVEL_CONFIG[level]
-    const canvases = await renderPages(pdfDoc, scale, onProgress, 8, 88)
-    const jpeg     = encodeJpeg(canvases, quality)
-    onProgress(90)
-    const bytes = await buildPdf(jpeg, canvases)
-    qualityUsed  = quality
-    targetMet    = true
-    blob         = new Blob([bytes], { type: 'application/pdf' })
+    const pdf = await PDFDocument.load(bytes);
+    analysis = {
+      selectedMethod: options.mode,
+      reason:
+        options.mode === "structural"
+          ? "Preserve Text was selected. Text, vectors, links, forms, page sizes, and rotations remain structural."
+          : "Scan Compression was selected. Pages are rasterized and text, links, forms, and vectors are flattened.",
+      pageCount: pdf.getPageCount(),
+      textCharacters: 0,
+      imageOperations: 0,
+    };
   }
 
-  onProgress(100)
+  const method = analysis.selectedMethod;
+  const structural =
+    method === "structural"
+      ? await structurallyCompress(
+          bytes,
+          Boolean(options.removeMetadata),
+          options.signal,
+          options.onProgress,
+        )
+      : null;
+  const scan =
+    method === "scan"
+      ? await scanCompress(
+          bytes,
+          options.level,
+          options.targetBytes ?? null,
+          options.signal,
+          options.onProgress,
+        )
+      : null;
+  const outputBytes = structural ?? scan?.bytes;
+  if (!outputBytes) {
+    throw new PdfEngineError("PROCESSING_FAILED", "Compression produced no output.");
+  }
+
+  const outputLarger = outputBytes.length >= bytes.length;
+  const finalBytes = outputLarger ? bytes : outputBytes;
+  const blob = new Blob([finalBytes], { type: "application/pdf" });
+  const targetBytes = options.targetBytes ?? null;
+
+  report(options.onProgress, {
+    percent: 100,
+    message: outputLarger
+      ? "The optimized output was not smaller, so the original PDF was preserved."
+      : "Compression complete.",
+  });
 
   return {
     blob,
-    originalSize:   file.size,
+    originalSize: bytes.length,
     compressedSize: blob.size,
-    qualityUsed,
-    targetMet,
-  }
+    qualityUsed: method === "scan" ? scan?.quality ?? 1 : 1,
+    targetMet: targetBytes === null || blob.size <= targetBytes,
+    method,
+    analysis,
+    usedOriginal: outputLarger,
+  };
 }

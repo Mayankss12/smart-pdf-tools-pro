@@ -19,13 +19,19 @@ import {
   Settings2,
   SlidersHorizontal,
   Sparkles,
+  StopCircle,
   Upload,
   X,
 } from "lucide-react";
 
 import { Header } from "@/components/Header";
 import { useEntitlement } from "@/hooks/useEntitlement";
-import { useCompress, type CompressionLevel } from "@/hooks/useCompress";
+import {
+  useCompress,
+  type CompressionLevel,
+  type CompressionMode,
+} from "@/hooks/useCompress";
+import { readValidatedPdfBytes } from "@/lib/pdf-document-safety";
 import { formatFileSize, validatePdfFile } from "@/lib/pdf-engine";
 
 type OpenPanel = "level" | "target" | "help" | null;
@@ -49,21 +55,21 @@ const LEVELS: LevelOption[] = [
     value: "low",
     label: "High Quality",
     shortLabel: "Quality",
-    desc: "Near-lossless compression with the cleanest visual output.",
+    desc: "Scan mode: about 144 DPI at 94% JPEG quality.",
     badge: "Best quality",
   },
   {
     value: "medium",
     label: "Balanced",
     shortLabel: "Balanced",
-    desc: "Good reduction while keeping the PDF clear for daily sharing.",
+    desc: "Scan mode: about 108 DPI at 84% JPEG quality.",
     badge: "Recommended",
   },
   {
     value: "high",
     label: "Smallest Size",
     shortLabel: "Small",
-    desc: "Strong compression for smaller files with a quality trade-off.",
+    desc: "Scan mode: about 83 DPI at 70% JPEG quality.",
     badge: "Max reduction",
   },
 ];
@@ -75,6 +81,28 @@ const TARGET_SIZES: TargetOption[] = [
   { label: "Under 500 KB", value: 500 * 1024, desc: "Small upload portals." },
   { label: "Under 200 KB", value: 200 * 1024, desc: "Aggressive compression." },
   { label: "Under 100 KB", value: 100 * 1024, desc: "Very aggressive target." },
+];
+
+const COMPRESSION_MODES: readonly {
+  readonly value: CompressionMode;
+  readonly label: string;
+  readonly description: string;
+}[] = [
+  {
+    value: "auto",
+    label: "Auto",
+    description: "Inspect the PDF and choose the safest effective method.",
+  },
+  {
+    value: "structural",
+    label: "Preserve Text",
+    description: "Keep selectable text, vectors, links, forms, dimensions, and rotation.",
+  },
+  {
+    value: "scan",
+    label: "Scan Compression",
+    description: "Rasterize scanned pages. Text, links, forms, and vectors are flattened.",
+  },
 ];
 
 function IconButton({
@@ -137,12 +165,24 @@ export default function CompressPage() {
 
   const [file, setFile] = useState<File | null>(null);
   const [level, setLevel] = useState<CompressionLevel>("medium");
+  const [mode, setMode] = useState<CompressionMode>("auto");
   const [targetBytes, setTargetBytes] = useState<number | null>(null);
+  const [removeMetadata, setRemoveMetadata] = useState(false);
   const [status, setStatus] = useState("Upload a PDF to compress and download.");
   const [openPanel, setOpenPanel] = useState<OpenPanel>(null);
 
   const { recordExport } = useEntitlement();
-  const { compress, download, reset, isLoading, progress, result, error } = useCompress();
+  const {
+    compress,
+    cancel,
+    download,
+    reset,
+    isLoading,
+    progress,
+    progressMessage,
+    result,
+    error,
+  } = useCompress();
 
   const selectedLevel = useMemo(() => {
     return LEVELS.find((item) => item.value === level) ?? LEVELS[1];
@@ -172,11 +212,12 @@ export default function CompressPage() {
     setOpenPanel((current) => (current === nextPanel ? null : nextPanel));
   }
 
-  function handleFile(selectedFile?: File) {
+  async function handleFile(selectedFile?: File) {
     if (!selectedFile || isLoading) return;
 
     try {
       validatePdfFile(selectedFile);
+      await readValidatedPdfBytes(selectedFile);
       setFile(selectedFile);
       reset();
       setOpenPanel(null);
@@ -204,7 +245,9 @@ export default function CompressPage() {
 
   function resetSettings() {
     setLevel("medium");
+    setMode("auto");
     setTargetBytes(null);
+    setRemoveMetadata(false);
     reset();
     setOpenPanel(null);
     setStatus(file ? "Compression settings reset." : "Upload a PDF to compress and download.");
@@ -221,7 +264,13 @@ export default function CompressPage() {
     );
 
     try {
-      const compressedResult = await compress(file, level, targetBytes);
+      const compressedResult = await compress({
+        file,
+        level,
+        mode,
+        targetBytes: mode === "scan" ? targetBytes : null,
+        removeMetadata,
+      });
 
       if (compressedResult) {
         setStatus("Checking export allowance...");
@@ -244,7 +293,11 @@ export default function CompressPage() {
 
         download(compressedResult);
 
-        if (targetBytes) {
+        if (compressedResult.usedOriginal) {
+          setStatus(
+            "The optimized output was not smaller, so the original PDF was preserved and downloaded instead.",
+          );
+        } else if (targetBytes && compressedResult.method === "scan") {
           setStatus(
             compressedResult.targetMet
               ? `Target reached. Output: ${formatFileSize(compressedResult.compressedSize)} (${compressedResult.savedPercent}% saved). Download started.`
@@ -254,7 +307,7 @@ export default function CompressPage() {
           setStatus(
             compressedResult.savedBytes > 0
               ? `Compressed by ${compressedResult.savedPercent}% — saved ${formatFileSize(compressedResult.savedBytes)}. Download started.`
-              : "PDF already optimized — minimal reduction possible. Download started.",
+              : "PDF already optimized — the original was preserved. Download started.",
           );
         }
       } else {
@@ -302,7 +355,7 @@ export default function CompressPage() {
                   Original {formatFileSize(file.size)}
                 </span>
                 <span className="rounded-full bg-violet-100 px-3 py-1.5 text-xs font-bold text-violet-700">
-                  {selectedLevel.shortLabel}
+                  {COMPRESSION_MODES.find((item) => item.value === mode)?.label}
                 </span>
                 <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">
                   {formatTargetLabel(targetBytes)}
@@ -369,7 +422,7 @@ export default function CompressPage() {
                   <button
                     type="button"
                     onClick={() => togglePanel("target")}
-                    disabled={isLoading}
+                    disabled={isLoading || mode !== "scan"}
                     className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <Gauge size={15} />
@@ -403,7 +456,7 @@ export default function CompressPage() {
 
                       {targetBytes ? (
                         <div className="mt-3 rounded-xl border border-amber-100 bg-amber-50 p-3 text-xs font-semibold leading-5 text-amber-800">
-                          Target mode may reduce quality more aggressively to reach the selected size.
+                          The engine makes up to four progressively smaller scan passes and reports honestly if the target cannot be reached.
                         </div>
                       ) : (
                         <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs font-semibold leading-5 text-slate-500">
@@ -443,13 +496,19 @@ export default function CompressPage() {
                   className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 text-sm font-bold text-white shadow-[0_12px_26px_rgba(101,80,232,0.22)] transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {isLoading ? <Loader2 className="animate-spin" size={17} /> : <Download size={17} />}
-                  {isLoading ? `Compressing ${progress}%` : result ? "Compress Again" : "Compress"}
+                  {isLoading
+                    ? typeof progress === "number"
+                      ? `Compressing ${progress}%`
+                      : "Compressing…"
+                    : result
+                      ? "Compress Again"
+                      : "Compress"}
                 </button>
               </div>
 
               {openPanel === "help" ? (
                 <div className="absolute right-3 top-full z-50 mt-2 w-80 rounded-2xl border border-slate-200 bg-white p-3 text-xs font-semibold leading-5 text-slate-600 shadow-xl">
-                  This tool uses browser-side canvas compression. Some already-optimized PDFs may show little reduction. Target-size mode tries harder but can reduce visual quality.
+                  Preserve Text keeps document structure. Scan Compression is intended for scanned PDFs and deliberately flattens text, links, forms, and vectors. Auto inspects the document before choosing.
                 </div>
               ) : null}
             </div>
@@ -473,7 +532,7 @@ export default function CompressPage() {
                 <div className="mt-5 text-lg font-bold text-slate-900">Drop PDF here</div>
                 <div className="mt-2 text-sm font-medium text-slate-500">Browse file or drag and drop</div>
                 <div className="mt-4 rounded-full bg-white px-4 py-2 text-xs font-bold text-slate-500 shadow-sm">
-                  Browser-side compression · Quality presets · Target size
+                  Preserve Text · Scan Compression · Auto detection
                 </div>
               </button>
             ) : (
@@ -504,10 +563,24 @@ export default function CompressPage() {
                   {isLoading ? (
                     <div className="mt-5 rounded-2xl border border-violet-200 bg-violet-50 p-3">
                       <div className="mb-2 flex items-center justify-between gap-3 text-sm font-bold text-violet-700">
-                        <span>Compressing PDF...</span>
-                        <span>{progress}%</span>
+                        <span>{progressMessage || "Compressing PDF…"}</span>
+                        <span>{typeof progress === "number" ? `${progress}%` : "Working"}</span>
                       </div>
-                      <ProgressBar value={progress} />
+                      {typeof progress === "number" ? (
+                        <ProgressBar value={progress} />
+                      ) : (
+                        <div className="h-2 overflow-hidden rounded-full bg-white/75">
+                          <div className="h-full w-1/3 animate-pulse rounded-full bg-violet-600" />
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={cancel}
+                        className="mt-3 inline-flex items-center gap-2 rounded-xl border border-red-200 bg-white px-3 py-2 text-xs font-bold text-red-600"
+                      >
+                        <StopCircle size={15} />
+                        Cancel compression
+                      </button>
                     </div>
                   ) : null}
 
@@ -555,14 +628,65 @@ export default function CompressPage() {
                       </div>
                       <p className="mt-1 text-sm font-semibold leading-6">{outputMessage}</p>
                       <p className="mt-1 text-xs font-semibold opacity-80">
-                        Quality used: {Math.round(result.qualityUsed * 100)}% · Mode: {selectedLevel.label}
+                        Method: {result.method === "structural" ? "Preserve Text" : "Scan Compression"}
+                        {result.method === "scan"
+                          ? ` · JPEG quality: ${Math.round(result.qualityUsed * 100)}%`
+                          : ""}
                         {targetBytes ? ` · Target: ${formatTargetLabel(targetBytes)}` : ""}
+                      </p>
+                      <p className="mt-2 text-xs font-semibold opacity-80">
+                        {result.analysis.reason}
                       </p>
                     </div>
                   ) : null}
                 </div>
 
                 <aside className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
+                      Method
+                    </div>
+                    <div className="mt-3 grid gap-2">
+                      {COMPRESSION_MODES.map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => {
+                            setMode(option.value);
+                            if (option.value !== "scan") setTargetBytes(null);
+                            reset();
+                            setStatus(`${option.label} compression selected.`);
+                          }}
+                          disabled={isLoading}
+                          className={`rounded-xl border p-3 text-left ${
+                            mode === option.value
+                              ? "border-violet-500 bg-violet-50 text-violet-700"
+                              : "border-slate-200 bg-white text-slate-600"
+                          }`}
+                        >
+                          <span className="text-sm font-bold">{option.label}</span>
+                          <span className="mt-1 block text-xs leading-5">{option.description}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {mode !== "scan" ? (
+                    <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={removeMetadata}
+                        onChange={(event) => {
+                          setRemoveMetadata(event.target.checked);
+                          reset();
+                        }}
+                        disabled={isLoading}
+                        className="mt-1"
+                      />
+                      Remove document title, author, subject, keywords, and other basic metadata.
+                    </label>
+                  ) : null}
+
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                     <div className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
                       Compression profile
@@ -578,8 +702,10 @@ export default function CompressPage() {
                     <div className="mt-2 text-lg font-bold text-slate-900">{formatTargetLabel(targetBytes)}</div>
                     <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
                       {targetBytes
-                        ? "The engine will try to meet this size using stronger compression."
-                        : "No forced size limit. Uses selected compression quality only."}
+                        ? mode === "scan"
+                          ? "The scan engine reports whether this target was reached."
+                          : "Target size applies only to Scan Compression."
+                        : "No forced size limit. Uses the selected method safely."}
                     </p>
                   </div>
 
@@ -590,7 +716,13 @@ export default function CompressPage() {
                     className="flex w-full items-center justify-center gap-2 rounded-2xl bg-violet-600 px-4 py-3 text-sm font-bold text-white shadow-[0_14px_30px_rgba(101,80,232,0.22)] transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {isLoading ? <Loader2 className="animate-spin" size={18} /> : <Download size={18} />}
-                    {isLoading ? `Compressing ${progress}%` : result ? "Compress Again" : "Compress & Download"}
+                    {isLoading
+                      ? typeof progress === "number"
+                        ? `Compressing ${progress}%`
+                        : "Compressing…"
+                      : result
+                        ? "Compress Again"
+                        : "Compress & Download"}
                   </button>
                 </aside>
               </div>
@@ -601,7 +733,7 @@ export default function CompressPage() {
             {file && !isError && !isLoading
               ? result
                 ? outputMessage
-                : `${selectedLevel.label} · ${formatTargetLabel(targetBytes)} · ready to compress`
+                : `${COMPRESSION_MODES.find((item) => item.value === mode)?.label} · ${selectedLevel.label} · ready to compress`
               : status}
           </div>
         </section>
