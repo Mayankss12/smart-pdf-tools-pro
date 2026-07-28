@@ -21,12 +21,14 @@ export type BundledUnicodeFontBytes = {
 export type EmbeddedUnicodeFonts = {
   readonly base: PDFFont;
   readonly boldBase: PDFFont;
+  readonly italicBase: PDFFont;
   readonly latin: PDFFont;
   readonly devanagari: PDFFont;
   readonly replacement: string;
   readonly supportedCodePoints: {
     readonly base: ReadonlySet<number>;
     readonly boldBase: ReadonlySet<number>;
+    readonly italicBase: ReadonlySet<number>;
     readonly latin: ReadonlySet<number>;
     readonly devanagari: ReadonlySet<number>;
   };
@@ -44,19 +46,26 @@ type FontRun = {
 
 const BASE_FONT_MAP: Record<
   UnicodeBaseFont,
-  { readonly regular: StandardFonts; readonly bold: StandardFonts }
+  {
+    readonly regular: StandardFonts;
+    readonly bold: StandardFonts;
+    readonly italic: StandardFonts;
+  }
 > = {
   helvetica: {
     regular: StandardFonts.Helvetica,
     bold: StandardFonts.HelveticaBold,
+    italic: StandardFonts.HelveticaOblique,
   },
   times: {
     regular: StandardFonts.TimesRoman,
     bold: StandardFonts.TimesRomanBold,
+    italic: StandardFonts.TimesRomanItalic,
   },
   courier: {
     regular: StandardFonts.Courier,
     bold: StandardFonts.CourierBold,
+    italic: StandardFonts.CourierOblique,
   },
 };
 
@@ -90,15 +99,17 @@ export async function embedUnicodeFonts(
   const fontBytes = bytes ?? (await loadBundledUnicodeFontBytes());
   pdf.registerFontkit(fontkit);
 
-  const [base, boldBase, latin, devanagari] = await Promise.all([
+  const [base, boldBase, italicBase, latin, devanagari] = await Promise.all([
     pdf.embedFont(BASE_FONT_MAP[baseFont].regular),
     pdf.embedFont(BASE_FONT_MAP[baseFont].bold),
+    pdf.embedFont(BASE_FONT_MAP[baseFont].italic),
     pdf.embedFont(fontBytes.latin, { subset: true }),
     pdf.embedFont(fontBytes.devanagari, { subset: true }),
   ]);
   const supportedCodePoints = {
     base: new Set(base.getCharacterSet()),
     boldBase: new Set(boldBase.getCharacterSet()),
+    italicBase: new Set(italicBase.getCharacterSet()),
     latin: new Set(latin.getCharacterSet()),
     devanagari: new Set(devanagari.getCharacterSet()),
   };
@@ -107,6 +118,7 @@ export async function embedUnicodeFonts(
   return {
     base,
     boldBase,
+    italicBase,
     latin,
     devanagari,
     replacement,
@@ -125,12 +137,15 @@ function supportsCharacter(
   character: string,
   fonts: EmbeddedUnicodeFonts,
   bold: boolean,
+  italic = false,
 ) {
   const codePoint = character.codePointAt(0);
   if (codePoint === undefined) return false;
   const baseSet = bold
     ? fonts.supportedCodePoints.boldBase
-    : fonts.supportedCodePoints.base;
+    : italic
+      ? fonts.supportedCodePoints.italicBase
+      : fonts.supportedCodePoints.base;
 
   return (
     baseSet.has(codePoint) ||
@@ -171,6 +186,7 @@ function getFontForCharacter(
   character: string,
   fonts: EmbeddedUnicodeFonts,
   bold: boolean,
+  italic: boolean,
 ) {
   const codePoint = character.codePointAt(0) ?? 0;
   if (
@@ -181,10 +197,16 @@ function getFontForCharacter(
     return fonts.devanagari;
   }
 
-  const baseFont = bold ? fonts.boldBase : fonts.base;
+  const baseFont = bold
+    ? fonts.boldBase
+    : italic
+      ? fonts.italicBase
+      : fonts.base;
   const baseSet = bold
     ? fonts.supportedCodePoints.boldBase
-    : fonts.supportedCodePoints.base;
+    : italic
+      ? fonts.supportedCodePoints.italicBase
+      : fonts.supportedCodePoints.base;
   if (baseSet.has(codePoint)) return baseFont;
   if (fonts.supportedCodePoints.latin.has(codePoint)) return fonts.latin;
   return fonts.latin;
@@ -194,11 +216,12 @@ function splitFontRuns(
   text: string,
   fonts: EmbeddedUnicodeFonts,
   bold: boolean,
+  italic: boolean,
 ) {
   const runs: FontRun[] = [];
 
   for (const character of text) {
-    const font = getFontForCharacter(character, fonts, bold);
+    const font = getFontForCharacter(character, fonts, bold, italic);
     const previous = runs.at(-1);
     if (previous?.font === font) {
       runs[runs.length - 1] = {
@@ -218,8 +241,9 @@ export function measureUnicodeText(
   size: number,
   fonts: EmbeddedUnicodeFonts,
   bold = false,
+  italic = false,
 ) {
-  return splitFontRuns(text, fonts, bold).reduce(
+  return splitFontRuns(text, fonts, bold, italic).reduce(
     (width, run) => width + run.font.widthOfTextAtSize(run.text, size),
     0,
   );
@@ -233,6 +257,7 @@ export function drawUnicodeTextLine({
   size,
   fonts,
   bold = false,
+  italic = false,
   color,
 }: {
   readonly page: PDFPage;
@@ -242,11 +267,12 @@ export function drawUnicodeTextLine({
   readonly size: number;
   readonly fonts: EmbeddedUnicodeFonts;
   readonly bold?: boolean;
+  readonly italic?: boolean;
   readonly color: RGB;
 }) {
   let cursorX = x;
 
-  for (const run of splitFontRuns(text, fonts, bold)) {
+  for (const run of splitFontRuns(text, fonts, bold, italic)) {
     try {
       const width = run.font.widthOfTextAtSize(run.text, size);
       page.drawText(run.text, {
@@ -260,11 +286,16 @@ export function drawUnicodeTextLine({
     } catch {
       for (const character of run.text) {
         const fallback =
-          supportsCharacter(character, fonts, bold)
+          supportsCharacter(character, fonts, bold, italic)
             ? character
             : fonts.replacement;
         try {
-          const fallbackFont = getFontForCharacter(fallback, fonts, bold);
+          const fallbackFont = getFontForCharacter(
+            fallback,
+            fonts,
+            bold,
+            italic,
+          );
           const width = fallbackFont.widthOfTextAtSize(fallback, size);
           page.drawText(fallback, {
             x: cursorX,

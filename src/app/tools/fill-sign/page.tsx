@@ -26,11 +26,26 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
 import { configurePdfJsWorker } from "@/lib/pdfjs-worker";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import { prepareEntitledExport } from "@/lib/export-entitlement";
+import {
+  applyFillSignExport,
+  inspectFillSignForm,
+  type AcroFormFieldInfo,
+  type AcroFormFieldValue,
+  type FillSignFormMode,
+  type FillSignImage,
+  type FillSignObject,
+  type FillSignObjectBox,
+  type FillSignObjectKind,
+  type FillSignTextStyle,
+} from "@/lib/fill-sign-engine";
+import {
+  inspectPdfCompatibility,
+  readValidatedPdfBytes,
+} from "@/lib/pdf-document-safety";
 import {
   MouseEvent,
   PointerEvent,
@@ -56,39 +71,14 @@ type ToolMode =
   | "whiteout"
   | "image";
 
-type ObjectKind = Exclude<ToolMode, "select">;
+type ObjectKind = FillSignObjectKind;
 
 type SignatureSource = "typed" | "drawn" | "uploaded";
 
-type TextStyle = "clean" | "bold" | "italic";
-
-type ObjectBox = {
-  xPercent: number;
-  yPercent: number;
-  widthPercent: number;
-  heightPercent: number;
-};
-
-type ImportedImage = {
-  id: string;
-  fileName: string;
-  previewUrl: string;
-  pngBytes: Uint8Array;
-  width: number;
-  height: number;
-};
-
-type FillObject = {
-  id: string;
-  pageNumber: number;
-  kind: ObjectKind;
-  box: ObjectBox;
-  text: string;
-  style: TextStyle;
-  fontSize: number;
-  image?: ImportedImage;
-  signatureSource?: SignatureSource;
-};
+type TextStyle = FillSignTextStyle;
+type ObjectBox = FillSignObjectBox;
+type ImportedImage = FillSignImage;
+type FillObject = FillSignObject;
 
 type DragState =
   | {
@@ -111,25 +101,21 @@ type DragState =
 const TEXT_STYLES: Array<{
   value: TextStyle;
   label: string;
-  font: StandardFonts;
   previewClass: string;
 }> = [
   {
     value: "clean",
     label: "Clean",
-    font: StandardFonts.Helvetica,
     previewClass: "font-semibold not-italic",
   },
   {
     value: "bold",
     label: "Bold",
-    font: StandardFonts.HelveticaBold,
     previewClass: "font-black not-italic",
   },
   {
     value: "italic",
     label: "Italic",
-    font: StandardFonts.HelveticaOblique,
     previewClass: "font-semibold italic",
   },
 ];
@@ -195,20 +181,13 @@ function downloadBlob(blob: Blob, fileName: string) {
   link.click();
   link.remove();
 
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function getTextPreviewClass(style: TextStyle) {
   return (
     TEXT_STYLES.find((option) => option.value === style)?.previewClass ||
     TEXT_STYLES[0].previewClass
-  );
-}
-
-function getPdfFont(style: TextStyle) {
-  return (
-    TEXT_STYLES.find((option) => option.value === style)?.font ||
-    TEXT_STYLES[0].font
   );
 }
 
@@ -312,10 +291,10 @@ function getObjectLabel(kind: ObjectKind) {
 }
 
 async function loadPdfFromFile(file: File) {
-  const buffer = await file.arrayBuffer();
+  const bytes = await readValidatedPdfBytes(file);
 
   const loadingTask = pdfjsLib.getDocument({
-    data: buffer.slice(0),
+    data: bytes.slice(),
   });
 
   return loadingTask.promise;
@@ -345,16 +324,23 @@ async function renderPdfPageToPng(
 
   context.setTransform(outputScale, 0, 0, outputScale, 0, 0);
 
-  await page.render({
+  const renderTask = page.render({
     canvasContext: context,
     viewport,
-  }).promise;
-
-  return canvas.toDataURL("image/png");
+  });
+  try {
+    await renderTask.promise;
+    return canvas.toDataURL("image/png");
+  } finally {
+    page.cleanup();
+    canvas.width = 0;
+    canvas.height = 0;
+  }
 }
 
 async function convertImageToPng(file: File): Promise<ImportedImage> {
   const objectUrl = URL.createObjectURL(file);
+  let canvas: HTMLCanvasElement | null = null;
 
   try {
     const image = await new Promise<HTMLImageElement>((resolve, reject) => {
@@ -365,7 +351,7 @@ async function convertImageToPng(file: File): Promise<ImportedImage> {
       img.src = objectUrl;
     });
 
-    const canvas = document.createElement("canvas");
+    canvas = document.createElement("canvas");
     const context = canvas.getContext("2d");
 
     if (!context) {
@@ -390,6 +376,8 @@ async function convertImageToPng(file: File): Promise<ImportedImage> {
     });
 
     const arrayBuffer = await blob.arrayBuffer();
+    canvas.width = 0;
+    canvas.height = 0;
 
     return {
       id: createId(),
@@ -400,6 +388,10 @@ async function convertImageToPng(file: File): Promise<ImportedImage> {
       height: image.naturalHeight,
     };
   } finally {
+    if (canvas) {
+      canvas.width = 0;
+      canvas.height = 0;
+    }
     URL.revokeObjectURL(objectUrl);
   }
 }
@@ -428,186 +420,10 @@ async function canvasToImportedImage(canvas: HTMLCanvasElement) {
   };
 }
 
-async function applyObjectsToPdf({
-  file,
-  objects,
-}: {
-  file: File;
-  objects: FillObject[];
-}) {
-  const arrayBuffer = await file.arrayBuffer();
-  const pdfDoc = await PDFDocument.load(arrayBuffer);
-  const pages = pdfDoc.getPages();
-
-  if (pages.length === 0) {
-    throw new Error("This PDF has no pages.");
-  }
-
-  const fontCache = new Map<
-    string,
-    Awaited<ReturnType<typeof pdfDoc.embedFont>>
-  >();
-  const imageCache = new Map<
-    string,
-    Awaited<ReturnType<typeof pdfDoc.embedPng>>
-  >();
-
-  async function getFont(style: TextStyle) {
-    const key = style;
-
-    let font = fontCache.get(key);
-
-    if (!font) {
-      font = await pdfDoc.embedFont(getPdfFont(style));
-      fontCache.set(key, font);
-    }
-
-    return font;
-  }
-
-  async function getImage(image: ImportedImage) {
-    let embeddedImage = imageCache.get(image.id);
-
-    if (!embeddedImage) {
-      embeddedImage = await pdfDoc.embedPng(image.pngBytes);
-      imageCache.set(image.id, embeddedImage);
-    }
-
-    return embeddedImage;
-  }
-
-  for (const object of objects) {
-    const pageIndex = clamp(object.pageNumber - 1, 0, pages.length - 1);
-    const targetPage = pages[pageIndex];
-    const { width: pageWidth, height: pageHeight } = targetPage.getSize();
-
-    const boxWidth = (object.box.widthPercent / 100) * pageWidth;
-    const boxHeight = (object.box.heightPercent / 100) * pageHeight;
-    const boxX = (object.box.xPercent / 100) * pageWidth;
-    const boxYFromTop = (object.box.yPercent / 100) * pageHeight;
-
-    const pdfX = clamp(boxX, 0, Math.max(0, pageWidth - boxWidth));
-    const pdfY = clamp(
-      pageHeight - boxYFromTop - boxHeight,
-      0,
-      Math.max(0, pageHeight - boxHeight)
-    );
-
-    if (object.kind === "whiteout") {
-      targetPage.drawRectangle({
-        x: pdfX,
-        y: pdfY,
-        width: boxWidth,
-        height: boxHeight,
-        color: rgb(1, 1, 1),
-        opacity: 1,
-      });
-
-      continue;
-    }
-
-    if (
-      object.kind === "image" ||
-      (object.kind === "signature" && object.image)
-    ) {
-      if (!object.image) continue;
-
-      const embeddedImage = await getImage(object.image);
-
-      targetPage.drawImage(embeddedImage, {
-        x: pdfX,
-        y: pdfY,
-        width: boxWidth,
-        height: boxHeight,
-        opacity: 0.98,
-      });
-
-      continue;
-    }
-
-    if (object.kind === "check") {
-      const startX = pdfX + boxWidth * 0.18;
-      const midX = pdfX + boxWidth * 0.42;
-      const endX = pdfX + boxWidth * 0.84;
-      const startY = pdfY + boxHeight * 0.48;
-      const midY = pdfY + boxHeight * 0.22;
-      const endY = pdfY + boxHeight * 0.78;
-
-      targetPage.drawLine({
-        start: { x: startX, y: startY },
-        end: { x: midX, y: midY },
-        thickness: 2,
-        color: rgb(0.08, 0.12, 0.26),
-      });
-      targetPage.drawLine({
-        start: { x: midX, y: midY },
-        end: { x: endX, y: endY },
-        thickness: 2,
-        color: rgb(0.08, 0.12, 0.26),
-      });
-
-      continue;
-    }
-
-    if (object.kind === "cross") {
-      targetPage.drawLine({
-        start: { x: pdfX + boxWidth * 0.18, y: pdfY + boxHeight * 0.18 },
-        end: { x: pdfX + boxWidth * 0.82, y: pdfY + boxHeight * 0.82 },
-        thickness: 2,
-        color: rgb(0.08, 0.12, 0.26),
-      });
-      targetPage.drawLine({
-        start: { x: pdfX + boxWidth * 0.82, y: pdfY + boxHeight * 0.18 },
-        end: { x: pdfX + boxWidth * 0.18, y: pdfY + boxHeight * 0.82 },
-        thickness: 2,
-        color: rgb(0.08, 0.12, 0.26),
-      });
-
-      continue;
-    }
-
-    if (object.kind === "dot") {
-      targetPage.drawEllipse({
-        x: pdfX + boxWidth / 2,
-        y: pdfY + boxHeight / 2,
-        xScale: Math.max(2, boxWidth * 0.34),
-        yScale: Math.max(2, boxHeight * 0.34),
-        color: rgb(0.08, 0.12, 0.26),
-      });
-
-      continue;
-    }
-
-    if (!object.text.trim()) continue;
-
-    const font = await getFont(object.style);
-    const safeFontSize = clamp(object.fontSize, 8, 48);
-    const textWidth = font.widthOfTextAtSize(object.text, safeFontSize);
-    const textX = clamp(pdfX + 5, 0, Math.max(0, pageWidth - textWidth - 4));
-    const textY = clamp(
-      pdfY + boxHeight / 2 - safeFontSize / 2,
-      0,
-      Math.max(0, pageHeight - safeFontSize)
-    );
-
-    targetPage.drawText(object.text, {
-      x: textX,
-      y: textY,
-      size: safeFontSize,
-      font,
-      color:
-        object.kind === "signature"
-          ? rgb(0.18, 0.14, 0.52)
-          : rgb(0.08, 0.12, 0.26),
-      opacity: 0.96,
-    });
-  }
-
-  const pdfBytes = await pdfDoc.save();
-
-  return new Blob([pdfBytes], {
-    type: "application/pdf",
-  });
+function createFormValueMap(fields: readonly AcroFormFieldInfo[]) {
+  const values: Record<string, AcroFormFieldValue> = {};
+  for (const field of fields) values[field.name] = field.value;
+  return values;
 }
 
 export default function FillSignPage() {
@@ -619,6 +435,8 @@ export default function FillSignPage() {
   const dragStateRef = useRef<DragState>(null);
   const drawCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawingRef = useRef(false);
+  const pdfDocumentRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
+  const imageUrlsRef = useRef(new Set<string>());
 
   const [file, setFile] = useState<File | null>(null);
   const [pageCount, setPageCount] = useState(0);
@@ -644,6 +462,11 @@ export default function FillSignPage() {
     null
   );
   const [objectImage, setObjectImage] = useState<ImportedImage | null>(null);
+  const [formFields, setFormFields] = useState<AcroFormFieldInfo[]>([]);
+  const [formValues, setFormValues] = useState<
+    Record<string, AcroFormFieldValue>
+  >({});
+  const [formMode, setFormMode] = useState<FillSignFormMode>("preserve");
 
   const [status, setStatus] = useState(DEFAULT_STATUS);
   const [busy, setBusy] = useState(false);
@@ -652,6 +475,16 @@ export default function FillSignPage() {
 
   useEffect(() => {
     configurePdfJsWorker(pdfjsLib);
+  }, []);
+
+  useEffect(() => {
+    const imageUrls = imageUrlsRef.current;
+    return () => {
+      void pdfDocumentRef.current?.destroy();
+      pdfDocumentRef.current = null;
+      for (const url of imageUrls) URL.revokeObjectURL(url);
+      imageUrls.clear();
+    };
   }, []);
 
   useEffect(() => {
@@ -816,6 +649,28 @@ export default function FillSignPage() {
     signerName,
   ]);
 
+  function trackImage(image: ImportedImage) {
+    imageUrlsRef.current.add(image.previewUrl);
+  }
+
+  function revokeImage(image: ImportedImage) {
+    if (!imageUrlsRef.current.delete(image.previewUrl)) return;
+    URL.revokeObjectURL(image.previewUrl);
+  }
+
+  function sourceUsesImage(image: ImportedImage) {
+    return (
+      signatureImage?.id === image.id ||
+      drawnSignature?.id === image.id ||
+      objectImage?.id === image.id
+    );
+  }
+
+  function updateFormValue(name: string, value: AcroFormFieldValue) {
+    setFormValues((current) => ({ ...current, [name]: value }));
+    setStatus(`Existing form field "${name}" updated. Export to apply it.`);
+  }
+
   function pushHistory(snapshot = objects) {
     setHistory((current) => [...current.slice(-19), snapshot]);
   }
@@ -863,35 +718,65 @@ export default function FillSignPage() {
     setStatus("Rendering PDF pages...");
 
     try {
-      setFile(selectedFile);
+      await pdfDocumentRef.current?.destroy();
+      pdfDocumentRef.current = null;
       setPageCount(0);
       setPreviews([]);
       setObjects([]);
       setHistory([]);
       setSelectedObjectId(null);
       setActivePageNumber(1);
+      setFormFields([]);
+      setFormValues({});
+      setFormMode("preserve");
+
+      const [fields, compatibility] = await Promise.all([
+        inspectFillSignForm(selectedFile),
+        inspectPdfCompatibility(selectedFile),
+      ]);
+      if (
+        compatibility.hasDigitalSignature &&
+        !window.confirm(
+          "This PDF contains a digital-signature field or signed byte range. Filling, signing, flattening, or adding overlays invalidates existing digital signatures. Continue?",
+        )
+      ) {
+        setFile(null);
+        setStatus("Fill & Sign cancelled. The signed PDF was not modified.");
+        return;
+      }
 
       const pdf = await loadPdfFromFile(selectedFile);
+      pdfDocumentRef.current = pdf;
       const pageTotal = pdf.numPages;
       const pagesToPreview = Math.min(pageTotal, 30);
       const nextPreviews: PdfPagePreview[] = [];
 
+      setFile(selectedFile);
       setPageCount(pageTotal);
+      setFormFields(fields);
+      setFormValues(createFormValueMap(fields));
 
-      for (let pageNumber = 1; pageNumber <= pagesToPreview; pageNumber += 1) {
-        const previewUrl = await renderPdfPageToPng(pdf, pageNumber, 0.62);
+      try {
+        for (let pageNumber = 1; pageNumber <= pagesToPreview; pageNumber += 1) {
+          const previewUrl = await renderPdfPageToPng(pdf, pageNumber, 0.62);
 
-        nextPreviews.push({
-          pageNumber,
-          previewUrl,
-        });
+          nextPreviews.push({
+            pageNumber,
+            previewUrl,
+          });
+        }
+      } finally {
+        await pdf.destroy();
+        if (pdfDocumentRef.current === pdf) pdfDocumentRef.current = null;
       }
 
       setPreviews(nextPreviews);
       setStatus(
         `PDF loaded with ${pageTotal} page${
           pageTotal > 1 ? "s" : ""
-        }. Choose Text, Sign, Date, Check, Whiteout, or Image, then click on the page.`
+        } and ${fields.length} existing form field${
+          fields.length === 1 ? "" : "s"
+        }. Fill existing fields or add overlays; typed signatures are visual only, not cryptographic.`
       );
     } catch (error) {
       console.error(error);
@@ -901,7 +786,13 @@ export default function FillSignPage() {
       setObjects([]);
       setHistory([]);
       setSelectedObjectId(null);
-      setStatus("Unable to read this PDF. Please try another file.");
+      setFormFields([]);
+      setFormValues({});
+      setStatus(
+        error instanceof Error
+          ? error.message
+          : "Unable to read this PDF. It may be encrypted, damaged, or unsupported.",
+      );
     } finally {
       setBusy(false);
     }
@@ -923,13 +814,26 @@ export default function FillSignPage() {
 
     try {
       const importedImage = await convertImageToPng(selectedFile);
+      trackImage(importedImage);
 
       if (target === "signature") {
+        if (
+          signatureImage &&
+          !objects.some((object) => object.image?.id === signatureImage.id)
+        ) {
+          revokeImage(signatureImage);
+        }
         setSignatureImage(importedImage);
         setSignatureSource("uploaded");
         setActiveTool("signature");
         setStatus("Signature image imported. Click on the PDF page to place it.");
       } else {
+        if (
+          objectImage &&
+          !objects.some((object) => object.image?.id === objectImage.id)
+        ) {
+          revokeImage(objectImage);
+        }
         setObjectImage(importedImage);
         setActiveTool("image");
         setStatus("Image imported. Click on the PDF page to place it.");
@@ -943,6 +847,18 @@ export default function FillSignPage() {
   }
 
   function clearPdf() {
+    void pdfDocumentRef.current?.destroy();
+    pdfDocumentRef.current = null;
+    const sourceIds = new Set(
+      [signatureImage, drawnSignature, objectImage]
+        .filter((image): image is ImportedImage => Boolean(image))
+        .map((image) => image.id),
+    );
+    for (const object of objects) {
+      if (object.image && !sourceIds.has(object.image.id)) {
+        revokeImage(object.image);
+      }
+    }
     setFile(null);
     setPageCount(0);
     setPreviews([]);
@@ -950,6 +866,9 @@ export default function FillSignPage() {
     setHistory([]);
     setSelectedObjectId(null);
     setActivePageNumber(1);
+    setFormFields([]);
+    setFormValues({});
+    setFormMode("preserve");
     setStatus(DEFAULT_STATUS);
   }
 
@@ -959,7 +878,12 @@ export default function FillSignPage() {
       return;
     }
 
-    updateObjects(() => [], "All added fields removed.");
+    for (const object of objects) {
+      if (object.image && !sourceUsesImage(object.image)) {
+        revokeImage(object.image);
+      }
+    }
+    updateObjects(() => [], "All added overlay fields removed.");
     setSelectedObjectId(null);
   }
 
@@ -1221,6 +1145,18 @@ export default function FillSignPage() {
       return;
     }
 
+    const image = selectedObject?.image;
+    if (
+      image &&
+      !sourceUsesImage(image) &&
+      !objects.some(
+        (object) =>
+          object.id !== selectedObjectId && object.image?.id === image.id,
+      )
+    ) {
+      revokeImage(image);
+    }
+
     updateObjects(
       (current) => current.filter((object) => object.id !== selectedObjectId),
       "Selected field deleted."
@@ -1271,6 +1207,13 @@ export default function FillSignPage() {
 
     try {
       const importedImage = await canvasToImportedImage(canvas);
+      trackImage(importedImage);
+      if (
+        drawnSignature &&
+        !objects.some((object) => object.image?.id === drawnSignature.id)
+      ) {
+        revokeImage(drawnSignature);
+      }
       setDrawnSignature(importedImage);
       setSignatureSource("drawn");
       setActiveTool("signature");
@@ -1340,6 +1283,12 @@ export default function FillSignPage() {
       context.clearRect(0, 0, canvas.width, canvas.height);
     }
 
+    if (
+      drawnSignature &&
+      !objects.some((object) => object.image?.id === drawnSignature.id)
+    ) {
+      revokeImage(drawnSignature);
+    }
     setDrawnSignature(null);
     setStatus("Drawn signature cleared.");
   }
@@ -1350,8 +1299,8 @@ export default function FillSignPage() {
       return;
     }
 
-    if (objects.length === 0) {
-      setStatus("Add at least one field before export.");
+    if (objects.length === 0 && formFields.length === 0) {
+      setStatus("Fill an existing form field or add at least one overlay before export.");
       return;
     }
 
@@ -1363,9 +1312,11 @@ export default function FillSignPage() {
         toolKey: "fill-sign",
         recordExport,
         prepare: () =>
-          applyObjectsToPdf({
+          applyFillSignExport({
             file,
             objects,
+            formValues,
+            formMode,
           }),
       });
       if (!prepared.allowed) {
@@ -1373,8 +1324,15 @@ export default function FillSignPage() {
         return;
       }
 
-      downloadBlob(prepared.output, "PDFMantra-fill-sign.pdf");
-      setStatus(`PDF exported with ${objects.length} added field(s).`);
+      downloadBlob(prepared.output.blob, "PDFMantra-fill-sign.pdf");
+      const replacementMessage = prepared.output.replacementCount
+        ? ` ${prepared.output.replacementCount} unsupported glyph${prepared.output.replacementCount === 1 ? " was" : "s were"} replaced safely.`
+        : "";
+      setStatus(
+        `PDF exported with ${prepared.output.filledFieldCount} existing form field update${
+          prepared.output.filledFieldCount === 1 ? "" : "s"
+        } and ${objects.length} visual overlay${objects.length === 1 ? "" : "s"}. Typed or drawn signatures are visual marks, not cryptographic digital signatures.${replacementMessage}`,
+      );
     } catch (error) {
       console.error(error);
       setStatus(error instanceof Error ? error.message : "PDF export failed.");
@@ -1680,7 +1638,9 @@ export default function FillSignPage() {
               <button
                 type="button"
                 onClick={handleExport}
-                disabled={busy || !file || objects.length === 0}
+                disabled={
+                  busy || !file || (objects.length === 0 && formFields.length === 0)
+                }
                 className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[var(--violet-600)] px-4 text-sm font-bold text-white shadow-[0_14px_30px_rgba(101,80,232,0.22)] transition hover:bg-[var(--violet-500)] disabled:cursor-not-allowed disabled:bg-slate-300"
               >
                 {busy ? (
@@ -1795,6 +1755,147 @@ export default function FillSignPage() {
                   </div>
                 </div>
 
+                {formFields.length > 0 && (
+                  <details
+                    open
+                    className="rounded-2xl border border-[var(--border-light)] bg-white p-3"
+                  >
+                    <summary className="cursor-pointer text-sm font-bold text-[var(--text-primary)]">
+                      Fill existing PDF form fields ({formFields.length})
+                    </summary>
+                    <p className="mt-2 text-xs font-semibold leading-5 text-[var(--text-muted)]">
+                      These controls update the PDF&apos;s existing AcroForm fields. Signature placeholders are listed, but this tool does not create cryptographic digital signatures.
+                    </p>
+
+                    <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                      {formFields.map((field) => {
+                        const value = formValues[field.name] ?? field.value;
+                        const label = (
+                          <span className="flex items-center justify-between gap-2 text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]">
+                            <span className="truncate">{field.name}</span>
+                            <span>{field.kind}</span>
+                          </span>
+                        );
+
+                        if (field.kind === "checkbox") {
+                          return (
+                            <label
+                              key={field.name}
+                              className="flex items-center gap-3 rounded-xl border border-[var(--border-light)] p-3 text-sm font-semibold"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={typeof value === "boolean" && value}
+                                onChange={(event) =>
+                                  updateFormValue(field.name, event.target.checked)
+                                }
+                                disabled={busy || field.readOnly}
+                              />
+                              <span className="min-w-0 flex-1">{label}</span>
+                            </label>
+                          );
+                        }
+
+                        if (
+                          field.kind === "radio" ||
+                          field.kind === "dropdown"
+                        ) {
+                          const selected = Array.isArray(value)
+                            ? value[0] ?? ""
+                            : typeof value === "string"
+                              ? value
+                              : "";
+                          return (
+                            <label key={field.name} className="block">
+                              {label}
+                              <select
+                                value={selected}
+                                onChange={(event) =>
+                                  updateFormValue(field.name, event.target.value)
+                                }
+                                disabled={busy || field.readOnly}
+                                className="mt-2 h-11 w-full rounded-xl border border-[var(--border-light)] bg-white px-3 text-sm font-semibold outline-none focus:border-[var(--border-focus)]"
+                              >
+                                <option value="">Select an option</option>
+                                {field.options.map((option) => (
+                                  <option key={option} value={option}>
+                                    {option}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                          );
+                        }
+
+                        if (field.kind === "text") {
+                          return (
+                            <label key={field.name} className="block">
+                              {label}
+                              <input
+                                value={typeof value === "string" ? value : ""}
+                                onChange={(event) =>
+                                  updateFormValue(field.name, event.target.value)
+                                }
+                                disabled={busy || field.readOnly}
+                                className="mt-2 h-11 w-full rounded-xl border border-[var(--border-light)] bg-white px-3 text-sm font-semibold outline-none focus:border-[var(--border-focus)]"
+                              />
+                            </label>
+                          );
+                        }
+
+                        return (
+                          <div
+                            key={field.name}
+                            className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold leading-5 text-amber-800"
+                          >
+                            {label}
+                            <div className="mt-2">
+                              {field.kind === "signature"
+                                ? "Signature placeholder detected. Add a visual signature overlay if appropriate; no certificate-based signing is performed."
+                                : "This form field structure is listed but cannot be edited safely in this browser workflow."}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                      <label className="flex items-start gap-3 rounded-xl border border-[var(--border-light)] p-3 text-xs font-semibold leading-5 text-[var(--text-secondary)]">
+                        <input
+                          type="radio"
+                          name="form-export-mode"
+                          checked={formMode === "preserve"}
+                          onChange={() => setFormMode("preserve")}
+                          disabled={busy}
+                          className="mt-1"
+                        />
+                        <span>
+                          <strong className="block text-[var(--text-primary)]">
+                            Preserve interactive fields
+                          </strong>
+                          Keep the AcroForm editable after export where pdf-lib supports it.
+                        </span>
+                      </label>
+                      <label className="flex items-start gap-3 rounded-xl border border-[var(--border-light)] p-3 text-xs font-semibold leading-5 text-[var(--text-secondary)]">
+                        <input
+                          type="radio"
+                          name="form-export-mode"
+                          checked={formMode === "flatten"}
+                          onChange={() => setFormMode("flatten")}
+                          disabled={busy}
+                          className="mt-1"
+                        />
+                        <span>
+                          <strong className="block text-[var(--text-primary)]">
+                            Flatten fields deliberately
+                          </strong>
+                          Convert field appearances to page content so they are no longer editable.
+                        </span>
+                      </label>
+                    </div>
+                  </details>
+                )}
+
                 {activeTool === "signature" && (
                   <div className="rounded-2xl border border-[var(--border-light)] bg-white p-3">
                     <div className="grid gap-3 lg:grid-cols-[1fr_1fr_1.3fr]">
@@ -1890,7 +1991,12 @@ export default function FillSignPage() {
                       </span>
                       <select
                         value={textStyle}
-                        onChange={(event) => setTextStyle(event.target.value as TextStyle)}
+                        onChange={(event) => {
+                          const nextStyle = TEXT_STYLES.find(
+                            (style) => style.value === event.target.value,
+                          );
+                          if (nextStyle) setTextStyle(nextStyle.value);
+                        }}
                         className="mt-2 h-11 w-full rounded-xl border border-[var(--border-light)] px-3 text-sm font-bold outline-none transition focus:border-[var(--border-focus)] focus:ring-4 focus:ring-[rgba(101,80,232,0.12)]"
                       >
                         {TEXT_STYLES.map((style) => (
@@ -2055,7 +2161,9 @@ export default function FillSignPage() {
                   {file
                     ? `${pageCount} page${pageCount > 1 ? "s" : ""} • ${
                         objects.length
-                      } field${objects.length !== 1 ? "s" : ""}`
+                      } overlay${objects.length !== 1 ? "s" : ""} • ${
+                        formFields.length
+                      } existing form field${formFields.length !== 1 ? "s" : ""}`
                     : "No PDF loaded"}
                 </div>
               </div>
