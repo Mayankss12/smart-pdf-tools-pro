@@ -18,6 +18,9 @@ export type TextPdfPageSize = {
 export type TextToPdfOptions = {
   readonly text: string;
   readonly title: string;
+  readonly headerText?: string;
+  readonly footerText?: string;
+  readonly showPageNumbers?: boolean;
   readonly pageSize: TextPdfPageSize;
   readonly font: UnicodeBaseFont;
   readonly fontSize: number;
@@ -98,6 +101,23 @@ function wrapTextLine(
   return wrapped;
 }
 
+function fitTextToWidth(
+  text: string,
+  maxWidth: number,
+  fonts: EmbeddedUnicodeFonts,
+  fontSize: number,
+) {
+  if (measureUnicodeText(text, fontSize, fonts) <= maxWidth) return text;
+  const ellipsis = "...";
+  let fitted = "";
+  for (const character of text) {
+    const candidate = `${fitted}${character}${ellipsis}`;
+    if (measureUnicodeText(candidate, fontSize, fonts) > maxWidth) break;
+    fitted += character;
+  }
+  return `${fitted}${ellipsis}`;
+}
+
 export async function createTextPdf(
   options: TextToPdfOptions,
 ): Promise<TextToPdfResult> {
@@ -112,15 +132,30 @@ export async function createTextPdf(
   const usableWidth = Math.max(24, pageWidth - margin * 2);
   const sanitizedBody = sanitizeUnicodeText(options.text, fonts);
   const sanitizedTitle = sanitizeUnicodeText(options.title.trim(), fonts, true);
+  const sanitizedHeader = sanitizeUnicodeText(
+    options.headerText?.trim() ?? "",
+    fonts,
+    true,
+  );
+  const sanitizedFooter = sanitizeUnicodeText(
+    options.footerText?.trim() ?? "",
+    fonts,
+  );
   let replacementCount =
-    sanitizedBody.replacementCount + sanitizedTitle.replacementCount;
+    sanitizedBody.replacementCount +
+    sanitizedTitle.replacementCount +
+    sanitizedHeader.replacementCount +
+    sanitizedFooter.replacementCount;
+  const contentTop =
+    pageHeight - margin - (sanitizedHeader.text ? 16 : 0);
+  const showPageNumbers = options.showPageNumbers !== false;
 
   pdf.setTitle(sanitizedTitle.text || "Text document");
   pdf.setCreator("PDFMantra");
   pdf.setProducer("PDFMantra");
 
   let page = pdf.addPage([pageWidth, pageHeight]);
-  let cursorY = pageHeight - margin;
+  let cursorY = contentTop;
 
   if (sanitizedTitle.text) {
     const titleSize = Math.max(fontSize + 5, 16);
@@ -136,7 +171,7 @@ export async function createTextPdf(
     for (const line of titleLines) {
       if (cursorY < margin + titleStep) {
         page = pdf.addPage([pageWidth, pageHeight]);
-        cursorY = pageHeight - margin;
+        cursorY = contentTop;
       }
       drawUnicodeTextLine({
         page,
@@ -153,48 +188,97 @@ export async function createTextPdf(
     cursorY -= 8;
   }
 
-  for (const rawLine of sanitizedBody.text.split("\n")) {
-    const wrappedLines = wrapTextLine(
-      rawLine,
-      usableWidth,
-      fonts,
-      fontSize,
-    );
+  const pageSections = sanitizedBody.text.split("\f");
+  for (
+    let sectionIndex = 0;
+    sectionIndex < pageSections.length;
+    sectionIndex += 1
+  ) {
+    if (sectionIndex > 0) {
+      page = pdf.addPage([pageWidth, pageHeight]);
+      cursorY = contentTop;
+    }
+    for (const rawLine of pageSections[sectionIndex].split("\n")) {
+      const wrappedLines = wrapTextLine(
+        rawLine,
+        usableWidth,
+        fonts,
+        fontSize,
+      );
 
-    for (const line of wrappedLines) {
-      if (cursorY < margin) {
-        page = pdf.addPage([pageWidth, pageHeight]);
-        cursorY = pageHeight - margin;
-      }
+      for (const line of wrappedLines) {
+        if (cursorY < margin) {
+          page = pdf.addPage([pageWidth, pageHeight]);
+          cursorY = contentTop;
+        }
 
-      if (line) {
-        drawUnicodeTextLine({
-          page,
-          text: line,
-          x: margin,
-          y: cursorY,
-          size: fontSize,
-          fonts,
-          color: rgb(0.12, 0.13, 0.18),
-        });
+        if (line) {
+          drawUnicodeTextLine({
+            page,
+            text: line,
+            x: margin,
+            y: cursorY,
+            size: fontSize,
+            fonts,
+            color: rgb(0.12, 0.13, 0.18),
+          });
+        }
+        cursorY -= lineStep;
       }
-      cursorY -= lineStep;
     }
   }
 
   const pages = pdf.getPages();
   for (let index = 0; index < pages.length; index += 1) {
-    const footer = `Page ${index + 1} of ${pages.length}`;
-    const footerWidth = measureUnicodeText(footer, 9, fonts);
-    drawUnicodeTextLine({
-      page: pages[index],
-      text: footer,
-      x: pageWidth - margin - footerWidth,
-      y: Math.max(22, margin / 2),
-      size: 9,
-      fonts,
-      color: rgb(0.45, 0.45, 0.55),
-    });
+    if (sanitizedHeader.text) {
+      drawUnicodeTextLine({
+        page: pages[index],
+        text: fitTextToWidth(
+          sanitizedHeader.text,
+          usableWidth,
+          fonts,
+          9,
+        ),
+        x: margin,
+        y: pageHeight - Math.max(22, margin / 2),
+        size: 9,
+        fonts,
+        bold: true,
+        color: rgb(0.4, 0.4, 0.5),
+      });
+    }
+
+    const footerY = Math.max(22, margin / 2);
+    if (sanitizedFooter.text) {
+      drawUnicodeTextLine({
+        page: pages[index],
+        text: fitTextToWidth(
+          sanitizedFooter.text,
+          showPageNumbers ? usableWidth * 0.62 : usableWidth,
+          fonts,
+          9,
+        ),
+        x: margin,
+        y: footerY,
+        size: 9,
+        fonts,
+        color: rgb(0.45, 0.45, 0.55),
+      });
+    }
+
+    if (showPageNumbers) {
+      const pageNumber = `Page ${index + 1} of ${pages.length}`;
+      const pageNumberWidth = measureUnicodeText(pageNumber, 9, fonts);
+      drawUnicodeTextLine({
+        page: pages[index],
+        text: pageNumber,
+        x: pageWidth - margin - pageNumberWidth,
+        y: footerY,
+        size: 9,
+        fonts,
+        color: rgb(0.45, 0.45, 0.55),
+      });
+    }
   }
 
   if (!Number.isFinite(replacementCount)) replacementCount = 0;

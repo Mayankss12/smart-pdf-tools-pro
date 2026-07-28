@@ -1,5 +1,6 @@
 import { isSameOriginRequest } from "@/lib/api-security";
 import {
+  ConversionIdentityError,
   conversionApiError,
   getConversionApiOwner,
   getProviderError,
@@ -24,15 +25,6 @@ export async function GET(
       "Request origin is not allowed.",
     );
   }
-  const ownerId = await getConversionApiOwner();
-  if (!ownerId) {
-    return conversionApiError(
-      request,
-      401,
-      "AUTHENTICATION_REQUIRED",
-      "Authentication is required.",
-    );
-  }
   const provider = getConversionProvider();
   if (!provider) {
     return conversionApiError(
@@ -43,6 +35,15 @@ export async function GET(
     );
   }
   try {
+    const ownerId = await getConversionApiOwner();
+    if (!ownerId) {
+      return conversionApiError(
+        request,
+        401,
+        "AUTHENTICATION_REQUIRED",
+        "Authentication is required.",
+      );
+    }
     const { id } = await context.params;
     assertSafeJobId(id);
     const output = await provider.downloadJob(ownerId, id);
@@ -55,6 +56,14 @@ export async function GET(
       },
     });
   } catch (error) {
+    if (error instanceof ConversionIdentityError) {
+      return conversionApiError(
+        request,
+        503,
+        "IDENTITY_UNAVAILABLE",
+        error.message,
+      );
+    }
     const safe = getProviderError(error);
     return conversionApiError(request, 502, safe.code, safe.message);
   }

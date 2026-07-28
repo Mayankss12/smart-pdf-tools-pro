@@ -176,6 +176,10 @@ export function getDailyCleanExportLimit(tier: string | null | undefined) {
   return getEntitlementPlan(tier).dailyCleanExportLimit;
 }
 
+function includesToolKey(keys: readonly string[], toolKey: string) {
+  return keys.includes(toolKey);
+}
+
 export function canUseToolByTier({
   tier,
   toolKey,
@@ -185,15 +189,15 @@ export function canUseToolByTier({
 }) {
   const plan = getEntitlementPlan(tier);
 
-  if ((CORE_TOOL_KEYS as readonly string[]).includes(toolKey)) {
+  if (includesToolKey(CORE_TOOL_KEYS, toolKey)) {
     return plan.canUseCoreTools;
   }
 
-  if ((ADVANCED_TOOL_KEYS as readonly string[]).includes(toolKey)) {
+  if (includesToolKey(ADVANCED_TOOL_KEYS, toolKey)) {
     return plan.canUseAdvancedTools;
   }
 
-  if ((BACKEND_TOOL_KEYS as readonly string[]).includes(toolKey)) {
+  if (includesToolKey(BACKEND_TOOL_KEYS, toolKey)) {
     return plan.canUseBackendTools;
   }
 

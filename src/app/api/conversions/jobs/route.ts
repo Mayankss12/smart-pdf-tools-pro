@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { isSameSiteStateChangingRequest } from "@/lib/api-security";
 import {
+  ConversionIdentityError,
   conversionApiError,
   getConversionApiIdentity,
   getProviderError,
@@ -10,6 +11,7 @@ import { getPublicConversionCapability } from "@/lib/conversions/capabilities";
 import { getConversionProvider } from "@/lib/conversions/jobs";
 import { getConversionById } from "@/lib/conversions/registry";
 import {
+  ConversionValidationError,
   validateConversionFiles,
   validatePublicWebpageUrl,
 } from "@/lib/conversions/security";
@@ -38,16 +40,6 @@ export async function POST(request: Request) {
       "Conversion upload exceeds the server request limit.",
     );
   }
-  const identity = await getConversionApiIdentity();
-  if (!identity) {
-    return conversionApiError(
-      request,
-      401,
-      "AUTHENTICATION_REQUIRED",
-      "Sign in with an eligible plan to start backend conversions.",
-    );
-  }
-  const ownerId = identity.ownerId;
   const provider = getConversionProvider();
   if (!provider) {
     return conversionApiError(
@@ -59,6 +51,16 @@ export async function POST(request: Request) {
   }
 
   try {
+    const identity = await getConversionApiIdentity();
+    if (!identity) {
+      return conversionApiError(
+        request,
+        401,
+        "AUTHENTICATION_REQUIRED",
+        "Sign in with an eligible plan to start backend conversions.",
+      );
+    }
+    const ownerId = identity.ownerId;
     const form = await request.formData();
     const conversionId = form.get("conversionId");
     if (typeof conversionId !== "string") {
@@ -141,6 +143,17 @@ export async function POST(request: Request) {
       },
     );
   } catch (error) {
+    if (error instanceof ConversionValidationError) {
+      return conversionApiError(request, 400, error.code, error.message);
+    }
+    if (error instanceof ConversionIdentityError) {
+      return conversionApiError(
+        request,
+        503,
+        "IDENTITY_UNAVAILABLE",
+        error.message,
+      );
+    }
     const safe = getProviderError(error);
     return conversionApiError(request, 502, safe.code, safe.message);
   }

@@ -1,12 +1,12 @@
 import Link from "next/link";
 import {
   ArrowRight,
-  FileWarning,
   LockKeyhole,
   ServerCog,
   ShieldCheck,
 } from "lucide-react";
 
+import { BackendConversionClient } from "@/components/BackendConversionClient";
 import { Header } from "@/components/Header";
 import { getPublicConversionCapability } from "@/lib/conversions/capabilities";
 import { getConversionById } from "@/lib/conversions/registry";
@@ -47,24 +47,16 @@ export function ConversionCapabilityShell({
 
             <div className="grid gap-0 lg:grid-cols-[1fr_360px]">
               <section className="p-6 sm:p-8">
-                <div className="rounded-3xl border-2 border-dashed border-slate-200 bg-slate-50 p-8 text-center">
-                  <FileWarning className="mx-auto text-amber-600" size={38} />
-                  <h2 className="mt-4 text-xl font-bold">
-                    {enabled
-                      ? "Provider capability detected"
-                      : "Conversion is not enabled"}
-                  </h2>
-                  <p className="mx-auto mt-3 max-w-xl text-sm font-medium leading-7 text-slate-600">
-                    {reason}
-                  </p>
-                  <button
-                    type="button"
-                    disabled
-                    className="mt-6 inline-flex min-w-48 items-center justify-center rounded-2xl bg-slate-200 px-5 py-3 text-sm font-bold text-slate-500"
-                  >
-                    Upload unavailable
-                  </button>
-                </div>
+                <BackendConversionClient
+                  conversionId={conversion.id}
+                  enabled={enabled}
+                  disabledReason={reason}
+                  acceptedExtensions={conversion.acceptedExtensions}
+                  maxFileSize={capability?.limits.maxFileSize ?? conversion.maxFileSize}
+                  sourceFormat={conversion.sourceFormat}
+                  destinationFormat={conversion.destinationFormat}
+                  isUrlSource={conversion.sourceFormat === "url"}
+                />
 
                 <div className="mt-5 grid gap-4 sm:grid-cols-2">
                   <div className="rounded-2xl border border-slate-200 p-4">
@@ -92,6 +84,24 @@ export function ConversionCapabilityShell({
                 <div className="mt-5 rounded-2xl border border-violet-100 bg-violet-50 p-4 text-sm font-semibold leading-6 text-violet-800">
                   {conversion.privacyMessage}
                 </div>
+                {!enabled ? (
+                  <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+                    <div className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">
+                      Required configuration
+                    </div>
+                    <ul className="mt-2 space-y-1 break-all font-mono text-[11px] leading-5 text-slate-600">
+                      <li>PDFMANTRA_PROCESSING_API_BASE_URL</li>
+                      <li>PDFMANTRA_PROCESSING_API_TOKEN</li>
+                      <li>
+                        PDFMANTRA_PROCESSING_CAPABILITIES={conversion.capabilityKey}
+                      </li>
+                      <li>PDFMANTRA_CONVERSION_OVERRIDES_JSON</li>
+                      <li>NEXT_PUBLIC_SUPABASE_URL</li>
+                      <li>NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY</li>
+                      <li>SUPABASE_SECRET_KEY</li>
+                    </ul>
+                  </div>
+                ) : null}
                 <Link
                   href="/tools"
                   className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-violet-700"

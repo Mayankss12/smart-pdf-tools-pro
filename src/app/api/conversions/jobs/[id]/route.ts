@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import {
+  ConversionIdentityError,
   conversionApiError,
   getConversionApiOwner,
   getProviderError,
@@ -17,15 +18,6 @@ export async function GET(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const ownerId = await getConversionApiOwner();
-  if (!ownerId) {
-    return conversionApiError(
-      request,
-      401,
-      "AUTHENTICATION_REQUIRED",
-      "Authentication is required.",
-    );
-  }
   const provider = getConversionProvider();
   if (!provider) {
     return conversionApiError(
@@ -36,6 +28,15 @@ export async function GET(
     );
   }
   try {
+    const ownerId = await getConversionApiOwner();
+    if (!ownerId) {
+      return conversionApiError(
+        request,
+        401,
+        "AUTHENTICATION_REQUIRED",
+        "Authentication is required.",
+      );
+    }
     const { id } = await context.params;
     assertSafeJobId(id);
     const job = await provider.getJob(ownerId, id);
@@ -44,6 +45,14 @@ export async function GET(
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
+    if (error instanceof ConversionIdentityError) {
+      return conversionApiError(
+        request,
+        503,
+        "IDENTITY_UNAVAILABLE",
+        error.message,
+      );
+    }
     const safe = getProviderError(error);
     return conversionApiError(request, 502, safe.code, safe.message);
   }

@@ -71,7 +71,7 @@ export interface ConversionDefinition {
 
 const BROWSER_PRIVACY = "Your files stay in your browser.";
 const BACKEND_PRIVACY =
-  "This conversion requires a configured secure processing service. Upload is disabled until that service is available.";
+  "When enabled, your file is sent to the configured private processing provider. Output access is authenticated and expires according to the provider job policy.";
 const MB = 1024 * 1024;
 
 function clientConversion(
@@ -273,7 +273,7 @@ export const CONVERSION_REGISTRY = [
       route: `/tools/pdf-to-${format}`,
       capabilityKey: "browser-pdf-render",
       supportsBatch: false,
-      supportsProgress: false,
+      supportsProgress: true,
       supportsCancellation: true,
       preservesText: "no",
       preservesLayout: "yes",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   AlignLeft,
   Download,
@@ -9,21 +9,25 @@ import {
   RefreshCcw,
   Settings2,
   Type,
+  Upload,
 } from "lucide-react";
 
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import { prepareEntitledExport } from "@/lib/export-entitlement";
+import { formatFileSize } from "@/lib/pdf-engine";
 import type { UnicodeBaseFont } from "@/lib/pdf-unicode-fonts";
 import { createTextPdf } from "@/lib/text-to-pdf-engine";
 
-type PageSize = "a4" | "letter";
+type PageSize = "a4" | "letter" | "legal";
+type PageOrientation = "portrait" | "landscape";
 type FontChoice = UnicodeBaseFont;
 
 const PAGE_SIZES: Record<PageSize, { label: string; width: number; height: number }> = {
   a4: { label: "A4", width: 595.28, height: 841.89 },
   letter: { label: "Letter", width: 612, height: 792 },
+  legal: { label: "Legal", width: 612, height: 1008 },
 };
 
 const SAMPLE_TEXT =
@@ -53,11 +57,30 @@ function downloadPdf(bytes: Uint8Array, fileName: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+function decodeTextFile(bytes: ArrayBuffer) {
+  const utf8 = new TextDecoder("utf-8").decode(bytes);
+  const replacementRatio =
+    (utf8.match(/\uFFFD/g)?.length ?? 0) / Math.max(1, utf8.length);
+  return replacementRatio > 0.01
+    ? new TextDecoder("windows-1252").decode(bytes)
+    : utf8;
+}
+
 export default function TextToPdfPage() {
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const { recordExport } = useEntitlement();
   const [text, setText] = useState(SAMPLE_TEXT);
   const [title, setTitle] = useState("Text Document");
+  const [headerText, setHeaderText] = useState("");
+  const [footerText, setFooterText] = useState("");
+  const [showPageNumbers, setShowPageNumbers] = useState(true);
+  const [sourceFile, setSourceFile] = useState<{
+    readonly name: string;
+    readonly size: number;
+  } | null>(null);
   const [pageSize, setPageSize] = useState<PageSize>("a4");
+  const [orientation, setOrientation] =
+    useState<PageOrientation>("portrait");
   const [fontChoice, setFontChoice] = useState<FontChoice>("helvetica");
   const [fontSize, setFontSize] = useState(12);
   const [lineHeight, setLineHeight] = useState(18);
@@ -65,11 +88,49 @@ export default function TextToPdfPage() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("Type or paste text to convert it into PDF.");
 
-  const pageMeta = PAGE_SIZES[pageSize];
+  const selectedPage = PAGE_SIZES[pageSize];
+  const pageMeta =
+    orientation === "landscape"
+      ? {
+          label: `${selectedPage.label} landscape`,
+          width: selectedPage.height,
+          height: selectedPage.width,
+        }
+      : {
+          label: `${selectedPage.label} portrait`,
+          width: selectedPage.width,
+          height: selectedPage.height,
+        };
 
   const estimatedLines = useMemo(() => {
     return text.split("\n").length;
   }, [text]);
+
+  async function loadTextFile(file: File | undefined) {
+    if (!file) return;
+    if (
+      !file.name.toLowerCase().endsWith(".txt") &&
+      file.type !== "text/plain"
+    ) {
+      setStatus("Only plain-text (.txt) files are supported.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setStatus("Text files are limited to 5 MB.");
+      return;
+    }
+    try {
+      const decoded = decodeTextFile(await file.arrayBuffer());
+      setText(decoded);
+      setSourceFile({ name: file.name, size: file.size });
+      setTitle(file.name.replace(/\.txt$/i, "") || "Text Document");
+      setStatus(
+        `${file.name} loaded with ${decoded.length.toLocaleString()} characters.`,
+      );
+    } catch {
+      setStatus("Unable to read this text file.");
+    }
+  }
 
   async function handleCreatePdf() {
     if (!text.trim()) {
@@ -88,6 +149,9 @@ export default function TextToPdfPage() {
           createTextPdf({
             text,
             title,
+            headerText,
+            footerText,
+            showPageNumbers,
             pageSize: pageMeta,
             font: fontChoice,
             fontSize,
@@ -126,7 +190,12 @@ export default function TextToPdfPage() {
   function resetTool() {
     setText(SAMPLE_TEXT);
     setTitle("Text Document");
+    setHeaderText("");
+    setFooterText("");
+    setShowPageNumbers(true);
+    setSourceFile(null);
     setPageSize("a4");
+    setOrientation("portrait");
     setFontChoice("helvetica");
     setFontSize(12);
     setLineHeight(18);
@@ -151,7 +220,47 @@ export default function TextToPdfPage() {
           </div>
 
           <div className="grid gap-5 lg:grid-cols-[1fr_340px]">
-            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <section
+              className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                event.preventDefault();
+                void loadTextFile(event.dataTransfer.files[0]);
+              }}
+            >
+              <input
+                ref={inputRef}
+                type="file"
+                accept=".txt,text/plain"
+                className="sr-only"
+                onChange={(event) => {
+                  void loadTextFile(event.target.files?.[0]);
+                  event.currentTarget.value = "";
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => inputRef.current?.click()}
+                disabled={busy}
+                className="mb-4 flex w-full items-center justify-between rounded-2xl border border-dashed border-violet-300 bg-violet-50 px-4 py-3 text-left transition hover:border-violet-500 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <span>
+                  <span className="block text-sm font-bold text-violet-800">
+                    Upload or drop a TXT file
+                  </span>
+                  <span className="mt-1 block text-xs font-semibold text-violet-600">
+                    UTF-8 and common Windows text encodings, up to 5 MB
+                  </span>
+                </span>
+                <Upload size={20} className="shrink-0 text-violet-700" />
+              </button>
+
+              {sourceFile ? (
+                <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">
+                  {sourceFile.name} · {formatFileSize(sourceFile.size)}
+                </div>
+              ) : null}
+
               <label className="block">
                 <span className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-700">
                   <Type size={16} />
@@ -164,6 +273,31 @@ export default function TextToPdfPage() {
                   placeholder="Enter document title"
                 />
               </label>
+
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <label className="block">
+                  <span className="mb-2 block text-sm font-bold text-slate-700">
+                    Header (optional)
+                  </span>
+                  <input
+                    value={headerText}
+                    onChange={(event) => setHeaderText(event.target.value)}
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+                    placeholder="Shown on every page"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-2 block text-sm font-bold text-slate-700">
+                    Footer (optional)
+                  </span>
+                  <input
+                    value={footerText}
+                    onChange={(event) => setFooterText(event.target.value)}
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+                    placeholder="Shown on every page"
+                  />
+                </label>
+              </div>
 
               <label className="mt-4 block">
                 <span className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-700">
@@ -200,7 +334,11 @@ export default function TextToPdfPage() {
                     value={pageSize}
                     onChange={(event) => {
                       const value = event.target.value;
-                      if (value === "a4" || value === "letter") {
+                      if (
+                        value === "a4" ||
+                        value === "letter" ||
+                        value === "legal"
+                      ) {
                         setPageSize(value);
                       }
                     }}
@@ -208,6 +346,24 @@ export default function TextToPdfPage() {
                   >
                     <option value="a4">A4</option>
                     <option value="letter">Letter</option>
+                    <option value="legal">Legal</option>
+                  </select>
+                </label>
+
+                <label className="block">
+                  <span className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Orientation</span>
+                  <select
+                    value={orientation}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      if (value === "portrait" || value === "landscape") {
+                        setOrientation(value);
+                      }
+                    }}
+                    className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+                  >
+                    <option value="portrait">Portrait</option>
+                    <option value="landscape">Landscape</option>
                   </select>
                 </label>
 
@@ -274,10 +430,22 @@ export default function TextToPdfPage() {
                     className="mt-3 w-full"
                   />
                 </label>
+
+                <label className="flex items-center gap-3 rounded-xl border border-slate-200 px-3 py-3 text-sm font-semibold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={showPageNumbers}
+                    onChange={(event) =>
+                      setShowPageNumbers(event.target.checked)
+                    }
+                    className="h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                  />
+                  Include page numbers
+                </label>
               </div>
 
               <div className="mt-5 rounded-2xl bg-slate-50 p-3 text-xs font-semibold leading-5 text-slate-500">
-                {estimatedLines} source line{estimatedLines === 1 ? "" : "s"} - {pageMeta.label} - Browser-side PDF creation. Latin and Devanagari fonts are embedded; unsupported Chinese or emoji glyphs are visibly replaced.
+                {estimatedLines} source line{estimatedLines === 1 ? "" : "s"} - {pageMeta.label} - Browser-side PDF creation. Form-feed characters create page breaks. Latin and Devanagari fonts are embedded; unsupported Chinese or emoji glyphs are visibly replaced.
               </div>
 
               <div className="mt-5 grid gap-2">

@@ -31,8 +31,15 @@ import {
 
 const routes = CONVERSION_REGISTRY.map((conversion) => conversion.route);
 assert.equal(new Set(routes).size, routes.length);
+assert.equal(CONVERSION_REGISTRY.length, 23);
 assert.ok(getConversionsFromPdf().length >= 9);
 assert.ok(getConversionsToPdf().length >= 10);
+const toolsSource = await readFile(
+  join(process.cwd(), "src/lib/tools.ts"),
+  "utf8",
+);
+assert.doesNotMatch(toolsSource, /id:\s*"pdf-to-word"/);
+assert.doesNotMatch(toolsSource, /id:\s*"images-to-pdf"/);
 for (const conversion of CONVERSION_REGISTRY) {
   assert.ok(conversion.id);
   assert.ok(conversion.entitlementToolKey);
@@ -80,6 +87,47 @@ await assert.rejects(
     [new File(["not-pdf"], "fake.pdf", { type: "application/pdf" })],
   ),
   /valid PDF signature/,
+);
+
+const heicConversion = CONVERSION_REGISTRY.find(
+  (conversion) => conversion.id === "heic-to-pdf",
+);
+assert.ok(heicConversion);
+await assert.rejects(
+  validateConversionFiles(heicConversion, [
+    new File(["not-heic"], "fake.heic", { type: "image/heic" }),
+  ]),
+  /recognized HEIC/,
+);
+
+const wordConversion = CONVERSION_REGISTRY.find(
+  (conversion) => conversion.id === "docx-to-pdf",
+);
+assert.ok(wordConversion);
+const officeMime =
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+const officeHeader = Uint8Array.from([0x50, 0x4b, 0x03, 0x04]);
+await assert.doesNotReject(
+  validateConversionFiles(wordConversion, [
+    new File(
+      [officeHeader, "[Content_Types].xml word/document.xml"],
+      "valid.docx",
+      { type: officeMime },
+    ),
+  ]),
+);
+await assert.rejects(
+  validateConversionFiles(wordConversion, [
+    new File(
+      [
+        officeHeader,
+        "[Content_Types].xml word/document.xml word/vbaProject.bin",
+      ],
+      "macro.docx",
+      { type: officeMime },
+    ),
+  ]),
+  /VBA projects/,
 );
 
 const extracted = {
@@ -154,10 +202,13 @@ assert.equal(outputPdf.getPageCount(), 2);
 console.log(
   JSON.stringify({
     registryDefinitions: CONVERSION_REGISTRY.length,
+    canonicalCatalogSource: "passed",
     uniqueRoutes: "passed",
     routeCoverage: "passed",
     backendBlockers: "passed",
     magicBytes: "passed",
+    heicSignature: "passed",
+    officeStructureAndMacroBlock: "passed",
     ssrfValidation: "passed",
     pdfTextAndHtml: "passed",
     markdownHtmlCsvParsing: "passed",

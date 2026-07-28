@@ -116,7 +116,7 @@ class HttpConversionProvider implements ConversionProvider {
     const url = new URL(path, `${this.baseUrl.replace(/\/+$/, "")}/`);
     const headers = new Headers(init.headers);
     headers.set("Authorization", `Bearer ${this.token}`);
-    headers.set("Accept", "application/json");
+    if (!headers.has("Accept")) headers.set("Accept", "application/json");
     const response = await fetch(url, {
       ...init,
       headers,
@@ -185,6 +185,7 @@ class HttpConversionProvider implements ConversionProvider {
         headers: {
           "X-PDFMantra-Owner": ownerId,
           "X-PDFMantra-Record-Export": "once",
+          Accept: "application/octet-stream",
         },
       },
     );

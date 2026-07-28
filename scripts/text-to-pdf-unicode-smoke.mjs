@@ -23,12 +23,16 @@ const content = [
   "Emoji 😀 fallback",
   longWord,
   ...Array.from({ length: 95 }, (_, index) => `Wrapped line ${index + 1}`),
+  "\fExplicit page break",
 ].join("\n");
 
 const result = await createTextPdf({
   text: content,
   title: "Unicode document",
-  pageSize: { width: 360, height: 420 },
+  headerText: "Unicode header",
+  footerText: "Private browser conversion",
+  showPageNumbers: true,
+  pageSize: { width: 420, height: 360 },
   font: "helvetica",
   fontSize: 12,
   lineHeight: 18,
@@ -73,6 +77,9 @@ for (const character of new Set("दुनिया")) {
 assert.doesNotMatch(extracted, /你好|😀/);
 assert.match(extracted, /LongUnbrokenWord/);
 assert.match(extracted, /Wrapped line 95/);
+assert.match(extracted, /Explicit page break/);
+assert.match(extracted, /Unicode header/);
+assert.match(extracted, /Private browser conversion/);
 
 console.log(
   JSON.stringify({
@@ -82,6 +89,9 @@ console.log(
     unsupportedChineseAndEmojiFallback: "passed",
     longWordWrapping: "passed",
     multiPageWrapping: "passed",
+    explicitPageBreak: "passed",
+    headerFooter: "passed",
+    landscapePageSize: "passed",
     selectableText: "passed",
   }),
 );
