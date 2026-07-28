@@ -1,8 +1,42 @@
-﻿"use client";
+"use client";
 
 import * as pdfjsLib from "pdfjs-dist";
 import type { PDFDocumentProxy } from "pdfjs-dist";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+import { useEntitlement } from "@/hooks/useEntitlement";
+import { trackEditorEvent } from "@/lib/editor/editor-analytics";
+import {
+  getDefaultEditorCapabilities,
+  type EditorCapabilityResponse,
+} from "@/lib/editor/editor-feature-control";
+import {
+  DEFAULT_EDITOR_PAGE_NUMBER_SETTINGS,
+  createEditorPageNumberObjects,
+  type EditorPageNumberSettings,
+} from "@/lib/editor/editor-page-numbering";
+import {
+  remapObjectsAfterPageInsertion,
+  remapObjectsAfterPageReorder,
+  remapObjectsAfterPageRotation,
+  remapPageResults,
+  shiftPageResultsAfterInsertion,
+} from "@/lib/editor/editor-page-object-mapping";
+import {
+  getEditorToolDefinition,
+  resolveEditorTool,
+  type EditorToolbarItemId,
+  type EditorToolContext,
+} from "@/lib/editor/editor-tool-registry";
+import { getEntitlementPlan } from "@/lib/entitlements";
+import {
+  addEditorBlankPage,
+  reorderEditorPages,
+  rotateEditorPage,
+  type EditorBlankPageSize,
+  type EditorPageInsertion,
+  type EditorPageRotationDirection,
+} from "@/lib/pdf-tools/editor-page-management";
 import { configurePdfJsWorker } from "@/lib/pdfjs-worker";
 
 import {
@@ -12,15 +46,24 @@ import {
 import { EditorCanvas } from "./components/EditorCanvas";
 import { EditorLayerControls } from "./components/EditorLayerControls";
 import { EditorLeftPanel } from "./components/EditorLeftPanel";
+import {
+  EditorPageToolsDialog,
+  type EditorPageDialogMode,
+} from "./components/EditorPageToolsDialog";
 import { EditorStatusBar } from "./components/EditorStatusBar";
 import {
   EditorSmartToolsPanel,
   type EditorFindHighlight,
   type EditorOcrPageResult,
+  type EditorSmartToolActivity,
 } from "./components/EditorSmartToolsPanel";
 import { EditorTopBar } from "./components/EditorTopBar";
 import { useEditor } from "./hooks/useEditor";
 import { useEditorKeyboard } from "./hooks/useEditorKeyboard";
+
+const OPEN_IMAGE_PICKER_EVENT = "pdfmantra:editor-open-image-picker";
+const OPEN_SIGNATURE_PICKER_EVENT = "pdfmantra:editor-open-signature-picker";
+const OPEN_STAMP_PICKER_EVENT = "pdfmantra:editor-open-stamp-picker";
 
 function isPdfFile(file: File) {
   return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
@@ -39,8 +82,17 @@ function downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
+function getPickerEvent(toolId: EditorToolbarItemId) {
+  if (toolId === "image") return OPEN_IMAGE_PICKER_EVENT;
+  if (toolId === "signature") return OPEN_SIGNATURE_PICKER_EVENT;
+  if (toolId === "stamp") return OPEN_STAMP_PICKER_EVENT;
+  return null;
+}
+
 export default function EditorPage() {
   const editor = useEditor();
+  const entitlement = useEntitlement();
+  const plan = getEntitlementPlan(entitlement.tier);
   const setLeftPanelCollapsed = editor.setLeftPanelCollapsed;
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const pdfDocumentRef = useRef<PDFDocumentProxy | null>(null);
@@ -50,9 +102,55 @@ export default function EditorPage() {
   const [statusMessage, setStatusMessage] = useState("Open a PDF to start editing.");
   const [loading, setLoading] = useState(false);
   const [ocrPages, setOcrPages] = useState<EditorOcrPageResult[]>([]);
-  const [findHighlight, setFindHighlight] = useState<EditorFindHighlight | null>(null);
+  const [findHighlights, setFindHighlights] = useState<EditorFindHighlight[]>([]);
+  const [pageDialogMode, setPageDialogMode] = useState<EditorPageDialogMode>(null);
+  const [pageActionBusy, setPageActionBusy] = useState(false);
+  const [pageNumberSettings, setPageNumberSettings] =
+    useState<EditorPageNumberSettings>(DEFAULT_EDITOR_PAGE_NUMBER_SETTINGS);
+  const [smartActivity, setSmartActivity] =
+    useState<EditorSmartToolActivity | null>(null);
+  const [capabilities, setCapabilities] = useState<EditorCapabilityResponse>(
+    getDefaultEditorCapabilities,
+  );
 
-  useEditorKeyboard(editor);
+  const toolContext = useMemo<EditorToolContext>(
+    () => ({
+      hasDocument: Boolean(editor.pdfDocument),
+      hasPage: Boolean(editor.pdfDocument && editor.totalPages > 0),
+      pageCount: editor.totalPages,
+      hasSelection: Boolean(editor.selectedObjectId),
+      hasObject: Boolean(editor.selectedObject),
+      selectedObjectLocked: Boolean(editor.selectedObject?.locked),
+      canUndo: editor.canUndo,
+      canRedo: editor.canRedo,
+      backendCapabilities: capabilities.backendCapabilities,
+      userTier: entitlement.tier,
+      canUseCoreTools: plan.canUseCoreTools,
+      canUseAdvancedTools: plan.canUseAdvancedTools,
+      canUseBackendTools: plan.canUseBackendTools,
+      featureControl: capabilities.featureControl,
+    }),
+    [
+      capabilities,
+      editor.canRedo,
+      editor.canUndo,
+      editor.pdfDocument,
+      editor.selectedObject,
+      editor.selectedObjectId,
+      editor.totalPages,
+      entitlement.tier,
+      plan.canUseAdvancedTools,
+      plan.canUseBackendTools,
+      plan.canUseCoreTools,
+    ],
+  );
+
+  useEditorKeyboard({
+    editor,
+    toolContext,
+    onToolAction: handleToolAction,
+    onUnavailableTool: handleUnavailableTool,
+  });
 
   useEffect(() => {
     configurePdfJsWorker(pdfjsLib);
@@ -69,8 +167,86 @@ export default function EditorPage() {
     };
   }, [setLeftPanelCollapsed]);
 
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadCapabilities() {
+      try {
+        const response = await fetch("/api/editor/capabilities", {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        if (!response.ok) return;
+        const payload: unknown = await response.json();
+        if (!payload || typeof payload !== "object") return;
+
+        const configured = Reflect.get(payload, "configured");
+        const backendCapabilities = Reflect.get(payload, "backendCapabilities");
+        const featureControl = Reflect.get(payload, "featureControl");
+        if (
+          typeof configured === "boolean" &&
+          backendCapabilities &&
+          typeof backendCapabilities === "object" &&
+          typeof Reflect.get(backendCapabilities, "translation") === "boolean" &&
+          featureControl &&
+          typeof featureControl === "object"
+        ) {
+          setCapabilities({
+            configured,
+            backendCapabilities: {
+              translation: Reflect.get(backendCapabilities, "translation") === true,
+            },
+            featureControl: {
+              globalEditorEnabled:
+                Reflect.get(featureControl, "globalEditorEnabled") !== false,
+              maintenanceMode: Reflect.get(featureControl, "maintenanceMode") === true,
+              flags:
+                Reflect.get(featureControl, "flags") &&
+                typeof Reflect.get(featureControl, "flags") === "object"
+                  ? parseFeatureFlags(Reflect.get(featureControl, "flags"))
+                  : {},
+            },
+          });
+        }
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+      }
+    }
+
+    void loadCapabilities();
+    return () => controller.abort();
+  }, []);
+
+  function parseFeatureFlags(value: object) {
+    const flags: Record<string, boolean> = {};
+    for (const [key, flagValue] of Object.entries(value)) {
+      if (typeof flagValue === "boolean") flags[key] = flagValue;
+    }
+    return flags;
+  }
+
   function openFilePicker() {
     fileInputRef.current?.click();
+  }
+
+  async function replacePdfDocument(bytes: Uint8Array, activePageNumber: number) {
+    const loadGeneration = loadGenerationRef.current + 1;
+    loadGenerationRef.current = loadGeneration;
+    const loadedDocument = await pdfjsLib.getDocument({
+      data: new Uint8Array(bytes),
+    }).promise;
+
+    if (loadGenerationRef.current !== loadGeneration) {
+      await loadedDocument.destroy();
+      return;
+    }
+
+    const previousDocument = pdfDocumentRef.current;
+    pdfDocumentRef.current = loadedDocument;
+    setFileBytes(bytes);
+    editor.setPdfDocument(loadedDocument);
+    editor.setActivePage(activePageNumber);
+    void previousDocument?.destroy();
   }
 
   async function loadPdfFile(file: File) {
@@ -104,7 +280,9 @@ export default function EditorPage() {
       pdfDocumentRef.current = loadedDocument;
       setFileBytes(bytes);
       setOcrPages([]);
-      setFindHighlight(null);
+      setFindHighlights([]);
+      setPageDialogMode(null);
+      setPageNumberSettings(DEFAULT_EDITOR_PAGE_NUMBER_SETTINGS);
       editor.setFile(file);
       editor.setPdfDocument(loadedDocument);
       editor.setActivePage(1);
@@ -134,6 +312,12 @@ export default function EditorPage() {
       return;
     }
 
+    trackEditorEvent({
+      type: "export_started",
+      pageCount: editor.totalPages,
+      objectCount: editor.objects.length,
+    });
+
     try {
       setLoading(true);
       editor.markSaving();
@@ -152,9 +336,19 @@ export default function EditorPage() {
       downloadBlob(blob, safeEditedName(editor.file.name));
 
       editor.markSaved();
+      trackEditorEvent({
+        type: "export_completed",
+        pageCount: editor.totalPages,
+        objectCount: editor.objects.length,
+      });
       setStatusMessage("Edited PDF exported successfully.");
     } catch (error) {
       editor.markChanged(0);
+      trackEditorEvent({
+        type: "export_failed",
+        pageCount: editor.totalPages,
+        objectCount: editor.objects.length,
+      });
       setStatusMessage(error instanceof Error ? error.message : "Unable to export edited PDF.");
     } finally {
       setLoading(false);
@@ -162,11 +356,195 @@ export default function EditorPage() {
   }
 
   function handleShare() {
-    setStatusMessage("Share will be connected in backend phase.");
+    setStatusMessage("Share requires a configured sharing backend.");
   }
 
-  function handleUnavailableTool(label: string) {
-    setStatusMessage(`${label} is locked in this private editor build.`);
+  function handleUnavailableTool(message: string) {
+    setStatusMessage(message);
+  }
+
+  function handleToolAction(toolId: EditorToolbarItemId) {
+    const definition = getEditorToolDefinition(toolId);
+    const resolved = resolveEditorTool(definition, toolContext);
+    if (!resolved.enabled) {
+      handleUnavailableTool(
+        resolved.disabledReason ?? `${definition.label} is currently unavailable.`,
+      );
+      return;
+    }
+
+    if (definition.kind === "tool") {
+      editor.setActiveTool(definition.id);
+      const pickerEvent = getPickerEvent(toolId);
+      if (pickerEvent) window.dispatchEvent(new Event(pickerEvent));
+      setStatusMessage(`${definition.label} tool selected.`);
+      return;
+    }
+
+    if (toolId === "undo") {
+      editor.undo();
+      setStatusMessage("Last editor action undone.");
+    } else if (toolId === "redo") {
+      editor.redo();
+      setStatusMessage("Editor action restored.");
+    } else if (toolId === "duplicate" && editor.selectedObjectId) {
+      const duplicateId = editor.duplicateObject(editor.selectedObjectId);
+      setStatusMessage(duplicateId ? "Object duplicated." : "Unable to duplicate object.");
+    } else if (toolId === "delete" && editor.selectedObjectId) {
+      editor.deleteObject(editor.selectedObjectId);
+      setStatusMessage("Object deleted.");
+    } else if (toolId === "add-page") {
+      setPageDialogMode("add");
+    } else if (toolId === "reorder-pages") {
+      setPageDialogMode("reorder");
+    } else if (toolId === "rotate-page") {
+      setPageDialogMode("rotate");
+    } else if (toolId === "page-numbers") {
+      setPageDialogMode("numbers");
+    }
+  }
+
+  async function handleAddPage(options: {
+    readonly insertion: EditorPageInsertion;
+    readonly size: EditorBlankPageSize;
+  }) {
+    if (!fileBytes) return;
+    setPageActionBusy(true);
+    try {
+      const result = await addEditorBlankPage({
+        fileBytes,
+        currentPageNumber: editor.activePageNumber,
+        insertion: options.insertion,
+        size: options.size,
+      });
+      editor.remapDocumentObjects((objects) =>
+        remapObjectsAfterPageInsertion(objects, result.activePageNumber),
+      );
+      setOcrPages((current) =>
+        shiftPageResultsAfterInsertion(current, result.activePageNumber),
+      );
+      setFindHighlights([]);
+      await replacePdfDocument(result.bytes, result.activePageNumber);
+      trackEditorEvent({
+        type: "page_added",
+        pageNumber: result.activePageNumber,
+        size: options.size,
+      });
+      setPageDialogMode(null);
+      setStatusMessage(`Blank page ${result.activePageNumber} added.`);
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : "Unable to add a page.");
+    } finally {
+      setPageActionBusy(false);
+    }
+  }
+
+  async function handleReorderPages(pageOrder: readonly number[]) {
+    if (!fileBytes) return;
+    setPageActionBusy(true);
+    try {
+      const result = await reorderEditorPages({
+        fileBytes,
+        pageOrder,
+        activePageNumber: editor.activePageNumber,
+      });
+      editor.remapDocumentObjects((objects) =>
+        remapObjectsAfterPageReorder(objects, pageOrder),
+      );
+      setOcrPages((current) => remapPageResults(current, pageOrder));
+      setFindHighlights([]);
+      await replacePdfDocument(result.bytes, result.activePageNumber);
+      trackEditorEvent({ type: "pages_reordered", pageCount: pageOrder.length });
+      setPageDialogMode(null);
+      setStatusMessage("Page order updated.");
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : "Unable to reorder pages.");
+    } finally {
+      setPageActionBusy(false);
+    }
+  }
+
+  async function handleRotatePage(direction: EditorPageRotationDirection) {
+    if (!fileBytes) return;
+    const pageNumber = editor.activePageNumber;
+    setPageActionBusy(true);
+    try {
+      const result = await rotateEditorPage({
+        fileBytes,
+        pageNumber,
+        direction,
+      });
+      editor.remapDocumentObjects((objects) =>
+        remapObjectsAfterPageRotation({
+          objects,
+          pageNumber,
+          oldViewportWidth: result.oldViewportWidth,
+          oldViewportHeight: result.oldViewportHeight,
+          direction,
+        }),
+      );
+      setOcrPages((current) => current.filter((item) => item.pageNumber !== pageNumber));
+      setFindHighlights([]);
+      await replacePdfDocument(result.bytes, result.activePageNumber);
+      trackEditorEvent({ type: "page_rotated", pageNumber, direction });
+      setPageDialogMode(null);
+      setStatusMessage(`Page ${pageNumber} rotated. Run OCR again for this page if needed.`);
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : "Unable to rotate this page.");
+    } finally {
+      setPageActionBusy(false);
+    }
+  }
+
+  async function handleApplyPageNumbers(settings: EditorPageNumberSettings) {
+    if (!editor.pdfDocument) return;
+    setPageActionBusy(true);
+    try {
+      const pageSizes = await Promise.all(
+        Array.from({ length: editor.totalPages }, async (_, index) => {
+          const pageNumber = index + 1;
+          const page = await editor.pdfDocument?.getPage(pageNumber);
+          if (!page) throw new Error(`Unable to read page ${pageNumber}.`);
+          const viewport = page.getViewport({ scale: 1 });
+          page.cleanup();
+          return { pageNumber, width: viewport.width, height: viewport.height };
+        }),
+      );
+      const setId = `page-number-${Date.now()}`;
+      const pageNumberObjects = createEditorPageNumberObjects({
+        settings,
+        pageSizes,
+        setId,
+      });
+      const retainedObjects = editor.objects.filter(
+        (object) => !object.data.pageNumberSetId,
+      );
+      editor.applyObjectBatch([...retainedObjects, ...pageNumberObjects]);
+      setPageNumberSettings(settings);
+      setPageDialogMode(null);
+      trackEditorEvent({
+        type: "pages_numbered",
+        pageCount: pageNumberObjects.length,
+      });
+      setStatusMessage(
+        `Page numbering applied to ${pageNumberObjects.length} page${pageNumberObjects.length === 1 ? "" : "s"}.`,
+      );
+    } catch (error) {
+      setStatusMessage(
+        error instanceof Error ? error.message : "Unable to apply page numbers.",
+      );
+    } finally {
+      setPageActionBusy(false);
+    }
+  }
+
+  function handleRemovePageNumbers() {
+    const retainedObjects = editor.objects.filter(
+      (object) => !object.data.pageNumberSetId,
+    );
+    editor.applyObjectBatch(retainedObjects);
+    setPageDialogMode(null);
+    setStatusMessage("Page numbers removed.");
   }
 
   return (
@@ -189,9 +567,13 @@ export default function EditorPage() {
 
       <EditorTopBar
         editor={editor}
+        toolContext={toolContext}
+        busyToolId={smartActivity?.toolId ?? null}
+        busyProgress={smartActivity?.progress ?? null}
         onOpenFile={openFilePicker}
         onExport={exportEditedPdf}
         onShare={handleShare}
+        onToolAction={handleToolAction}
         onUnavailableTool={handleUnavailableTool}
       />
 
@@ -199,8 +581,11 @@ export default function EditorPage() {
       <EditorSmartToolsPanel
         editor={editor}
         ocrPages={ocrPages}
+        translationConfigured={capabilities.backendCapabilities.translation}
         onOcrPagesChange={setOcrPages}
-        onFindHighlightChange={setFindHighlight}
+        onFindHighlightChange={setFindHighlights}
+        onActivityChange={setSmartActivity}
+        onStatusChange={setStatusMessage}
       />
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
@@ -210,16 +595,35 @@ export default function EditorPage() {
           editor={editor}
           onOpenFile={openFilePicker}
           onFileDrop={loadPdfFile}
-          findHighlight={findHighlight}
+          findHighlights={findHighlights}
         />
       </div>
 
-      <div className="border-t border-slate-200 bg-white px-4 py-1.5 text-[11px] font-black text-slate-500">
-        {loading ? "Please wait - " : ""}
+      <div
+        className="border-t border-slate-200 bg-white px-4 py-1.5 text-[11px] font-black text-slate-600"
+        role="status"
+        aria-live="polite"
+      >
+        {loading ? "Please wait — " : ""}
         {statusMessage}
       </div>
 
       <EditorStatusBar editor={editor} />
+      <EditorPageToolsDialog
+        mode={pageDialogMode}
+        pdfDocument={editor.pdfDocument}
+        activePageNumber={editor.activePageNumber}
+        pageCount={editor.totalPages}
+        busy={pageActionBusy}
+        pageNumberSettings={pageNumberSettings}
+        hasPageNumbers={editor.objects.some((object) => Boolean(object.data.pageNumberSetId))}
+        onClose={() => setPageDialogMode(null)}
+        onAdd={handleAddPage}
+        onReorder={handleReorderPages}
+        onRotate={handleRotatePage}
+        onApplyPageNumbers={handleApplyPageNumbers}
+        onRemovePageNumbers={handleRemovePageNumbers}
+      />
     </div>
   );
 }

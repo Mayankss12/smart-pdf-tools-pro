@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 
+import { trackEditorEvent } from "@/lib/editor/editor-analytics";
+import { getEditorToolDefinition } from "@/lib/editor/editor-tool-registry";
+
 import type { EditorTool } from "./useActiveTool";
 
 export type PdfDocumentLike = PDFDocumentProxy;
@@ -68,6 +71,7 @@ export type EditorObjectData = {
   readonly fillColor?: string;
   readonly lineStart?: EditorPoint;
   readonly lineEnd?: EditorPoint;
+  readonly pageNumberSetId?: string;
 };
 
 export type EditorObject = {
@@ -140,8 +144,16 @@ export type EditorController = {
   readonly redo: () => void;
 
   readonly markChanged: (count?: number) => void;
+  readonly markDocumentChanged: () => void;
   readonly markSaving: () => void;
   readonly markSaved: () => void;
+  readonly remapDocumentObjects: (
+    mapper: (objects: readonly EditorObject[]) => EditorObject[],
+  ) => void;
+  readonly applyObjectBatch: (
+    objects: EditorObject[],
+    selectedObjectId?: string | null,
+  ) => void;
   readonly resetEditor: () => void;
 };
 
@@ -254,6 +266,7 @@ export function useEditor(): EditorController {
   const selectedObjectIdRef = useRef<string | null>(selectedObjectId);
   selectedObjectIdRef.current = selectedObjectId;
   const savedObjectsRef = useRef<EditorObject[]>(objects);
+  const documentDirtyRef = useRef(false);
 
   const undoStackRef = useRef<HistorySnapshot[]>([]);
   const redoStackRef = useRef<HistorySnapshot[]>([]);
@@ -276,7 +289,8 @@ export function useEditor(): EditorController {
   useEffect(() => {
     if (saveState === "saving") return;
 
-    const saved = objects === savedObjectsRef.current;
+    const saved =
+      objects === savedObjectsRef.current && !documentDirtyRef.current;
     setUnsavedChanges(saved ? 0 : 1);
     setSaveState(saved ? "saved" : "unsaved");
   }, [objects, saveState]);
@@ -333,8 +347,15 @@ export function useEditor(): EditorController {
     setSaveState("saving");
   }, []);
 
+  const markDocumentChanged = useCallback(() => {
+    documentDirtyRef.current = true;
+    setUnsavedChanges((current) => Math.max(1, current + 1));
+    setSaveState("unsaved");
+  }, []);
+
   const markSaved = useCallback(() => {
     savedObjectsRef.current = objectsRef.current;
+    documentDirtyRef.current = false;
     lastHistoryRef.current = null;
     setUnsavedChanges(0);
     setLastSavedAt(new Date());
@@ -352,6 +373,7 @@ export function useEditor(): EditorController {
       setActiveToolState("select");
       const emptyObjects: EditorObject[] = [];
       savedObjectsRef.current = emptyObjects;
+      documentDirtyRef.current = false;
       setObjects(emptyObjects);
       setSelectedObjectId(null);
       clearHistory();
@@ -396,10 +418,26 @@ export function useEditor(): EditorController {
   const setActiveTool = useCallback((tool: EditorTool) => {
     setActiveToolState(tool);
 
-    if (tool !== "select") {
+    const definition = getEditorToolDefinition(tool);
+
+    if (definition.placementMode === "canvas") {
       setSelectedObjectId(null);
     }
-  }, []);
+
+    trackEditorEvent({
+      type: "tool_selected",
+      toolId: tool,
+      pageNumber: activePageNumber,
+    });
+
+    if (definition.placementMode === "canvas" || definition.placementMode === "picker") {
+      trackEditorEvent({
+        type: "tool_placement_started",
+        toolId: tool,
+        pageNumber: activePageNumber,
+      });
+    }
+  }, [activePageNumber]);
 
   const addObject = useCallback(
     (object: Omit<EditorObject, "id"> & { readonly id?: string }) => {
@@ -424,6 +462,11 @@ export function useEditor(): EditorController {
       ]);
       setSelectedObjectId(id);
       markChanged();
+      trackEditorEvent({
+        type: "tool_placement_completed",
+        toolId: object.type,
+        pageNumber: object.pageNumber,
+      });
 
       return id;
     },
@@ -701,6 +744,44 @@ export function useEditor(): EditorController {
     [markChanged, recordHistory],
   );
 
+  const remapDocumentObjects = useCallback(
+    (mapper: (items: readonly EditorObject[]) => EditorObject[]) => {
+      const nextObjects = mapper(objectsRef.current);
+
+      undoStackRef.current = undoStackRef.current.map((snapshot) => ({
+        ...snapshot,
+        objects: mapper(snapshot.objects),
+      }));
+      redoStackRef.current = redoStackRef.current.map((snapshot) => ({
+        ...snapshot,
+        objects: mapper(snapshot.objects),
+      }));
+      savedObjectsRef.current = mapper(savedObjectsRef.current);
+      objectsRef.current = nextObjects;
+      setObjects(nextObjects);
+      setSelectedObjectId((current) =>
+        current && nextObjects.some((object) => object.id === current)
+          ? current
+          : null,
+      );
+      lastHistoryRef.current = null;
+      markDocumentChanged();
+      syncHistoryFlags();
+    },
+    [markDocumentChanged, syncHistoryFlags],
+  );
+
+  const applyObjectBatch = useCallback(
+    (nextObjects: EditorObject[], nextSelectedObjectId: string | null = null) => {
+      recordHistory("batch");
+      objectsRef.current = nextObjects;
+      setObjects(nextObjects);
+      setSelectedObjectId(nextSelectedObjectId);
+      markChanged();
+    },
+    [markChanged, recordHistory],
+  );
+
   const undo = useCallback(() => {
     if (undoStackRef.current.length === 0) {
       return;
@@ -773,6 +854,7 @@ export function useEditor(): EditorController {
     setActiveToolState("select");
     const emptyObjects: EditorObject[] = [];
     savedObjectsRef.current = emptyObjects;
+    documentDirtyRef.current = false;
     setObjects(emptyObjects);
     setSelectedObjectId(null);
     clearHistory();
@@ -832,8 +914,11 @@ export function useEditor(): EditorController {
     redo,
 
     markChanged,
+    markDocumentChanged,
     markSaving,
     markSaved,
+    remapDocumentObjects,
+    applyObjectBatch,
     resetEditor,
   };
 }
