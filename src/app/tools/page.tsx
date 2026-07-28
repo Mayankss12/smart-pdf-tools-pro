@@ -6,7 +6,12 @@ import { Layers, Search, X } from "lucide-react";
 
 import { Header } from "@/components/Header";
 import { ToolGlyph, type ToolGlyphTone } from "@/components/ToolGlyph";
-import { tools, type Tool, type ToolCategory } from "@/lib/tools";
+import {
+  STATUS_CONFIG,
+  tools,
+  type Tool,
+  type ToolCategory,
+} from "@/lib/tools";
 
 type CategoryFilter = "all" | ToolCategory;
 
@@ -45,7 +50,8 @@ function toneForCategory(category: string): ToolGlyphTone {
 function getStatusRank(status: Tool["status"]) {
   if (status === "working") return 1;
   if (status === "beta") return 2;
-  return 3;
+  if (status === "backend-required") return 3;
+  return 4;
 }
 
 function getVisibleTools() {
@@ -100,9 +106,15 @@ function ToolCard({ tool }: { readonly tool: Tool }) {
   return (
     <Link
       href={tool.href}
-      className="group mx-auto grid h-[172px] w-full max-w-[172px] grid-rows-[auto_auto_1fr] justify-items-center overflow-hidden rounded-[1.35rem] border border-[var(--border-light)] bg-[var(--bg-card)] px-3 py-4 text-center shadow-[var(--shadow-soft)] transition duration-200 hover:-translate-y-1 hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] hover:shadow-[var(--shadow-card-hover)]"
+      className="group relative mx-auto grid h-[172px] w-full max-w-[172px] grid-rows-[auto_auto_1fr] justify-items-center overflow-hidden rounded-[1.35rem] border border-[var(--border-light)] bg-[var(--bg-card)] px-3 py-4 text-center shadow-[var(--shadow-soft)] transition duration-200 hover:-translate-y-1 hover:border-[var(--border-focus)] hover:bg-[var(--violet-50)] hover:shadow-[var(--shadow-card-hover)]"
     >
       <ToolGlyph icon={tool.icon} tone={toneForCategory(tool.category)} size="sm" />
+
+      {tool.status !== "working" ? (
+        <span className={`absolute right-2 top-2 ${STATUS_CONFIG[tool.status].className}`}>
+          {STATUS_CONFIG[tool.status].label}
+        </span>
+      ) : null}
 
       <h3 className="display-font mt-2 line-clamp-2 min-h-[44px] text-center text-[1.02rem] font-bold leading-[1.22] tracking-[-0.02em] text-[var(--text-primary)] transition group-hover:text-[var(--violet-600)]">
         {tool.title}

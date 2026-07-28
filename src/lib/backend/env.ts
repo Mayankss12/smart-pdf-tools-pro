@@ -6,6 +6,8 @@ export interface PdfMantraBackendEnvironment {
   readonly outputsBucket: string;
   readonly signaturesBucket: string;
   readonly processingApiBaseUrl: string | null;
+  readonly processingApiToken: string | null;
+  readonly processingCapabilities: readonly string[];
 }
 
 export interface PdfMantraBackendStatus {
@@ -31,6 +33,13 @@ export function getBackendEnvironment(): PdfMantraBackendEnvironment {
     outputsBucket: cleanEnvValue(process.env.PDFMANTRA_OUTPUTS_BUCKET) ?? "pdf-outputs",
     signaturesBucket: cleanEnvValue(process.env.PDFMANTRA_SIGNATURES_BUCKET) ?? "pdf-signatures",
     processingApiBaseUrl: cleanEnvValue(process.env.PDFMANTRA_PROCESSING_API_BASE_URL),
+    processingApiToken: cleanEnvValue(process.env.PDFMANTRA_PROCESSING_API_TOKEN),
+    processingCapabilities: (
+      cleanEnvValue(process.env.PDFMANTRA_PROCESSING_CAPABILITIES) ?? ""
+    )
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean),
   };
 }
 
@@ -43,7 +52,9 @@ export function getBackendStatus(): PdfMantraBackendStatus {
     supabasePublicConfigured,
     supabaseAdminConfigured,
     storageConfigured: supabaseAdminConfigured,
-    processingApiConfigured: Boolean(env.processingApiBaseUrl),
+    processingApiConfigured: Boolean(
+      env.processingApiBaseUrl && env.processingApiToken,
+    ),
   };
 }
 

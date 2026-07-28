@@ -21,8 +21,16 @@ import {
   Wand2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import {
+  CONVERSION_REGISTRY,
+  type ConversionDefinition,
+} from "@/lib/conversions/registry";
 
-export type ToolStatus = "working" | "beta" | "coming-soon";
+export type ToolStatus =
+  | "working"
+  | "beta"
+  | "backend-required"
+  | "coming-soon";
 export type ToolCategory = "edit" | "organize" | "convert" | "optimize" | "security";
 export type ToolProcessingMode = "browser" | "backend" | "hybrid";
 export type ToolExperience = "workspace" | "quick-action" | "guided-processing";
@@ -186,10 +194,16 @@ export const STATUS_CONFIG: Record<ToolStatus, { label: string; className: strin
     className: "rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700",
     rank: 2,
   },
+  "backend-required": {
+    label: "Backend required",
+    className:
+      "rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700",
+    rank: 3,
+  },
   "coming-soon": {
     label: "Coming Soon",
     className: "rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500",
-    rank: 3,
+    rank: 4,
   },
 };
 
@@ -232,7 +246,7 @@ function searchMeta(aliases: string[], keywords: string[], useCases: string[], r
   return { aliases, keywords, useCases, resultPriority };
 }
 
-export const tools: Tool[] = [
+const existingTools: Tool[] = [
   {
     id: "pdf-editor",
     title: "PDF Editor",
@@ -645,6 +659,125 @@ export const tools: Tool[] = [
   },
 ];
 
+function conversionIcon(conversion: ConversionDefinition): LucideIcon {
+  if (
+    conversion.sourceFormat === "pdf" &&
+    (conversion.destinationFormat === "jpg" ||
+      conversion.destinationFormat === "png" ||
+      conversion.destinationFormat === "webp")
+  ) {
+    return Image;
+  }
+  if (
+    conversion.sourceFormat === "jpg" ||
+    conversion.sourceFormat === "png" ||
+    conversion.sourceFormat === "webp" ||
+    conversion.sourceFormat === "heic"
+  ) {
+    return FileImage;
+  }
+  if (conversion.id === "pdf-to-searchable-pdf") return Brain;
+  if (
+    conversion.destinationFormat === "docx" ||
+    conversion.destinationFormat === "xlsx" ||
+    conversion.destinationFormat === "pptx" ||
+    conversion.sourceFormat === "docx" ||
+    conversion.sourceFormat === "xlsx" ||
+    conversion.sourceFormat === "pptx"
+  ) {
+    return Wand2;
+  }
+  return FileText;
+}
+
+function conversionStatus(
+  conversion: ConversionDefinition,
+): ToolStatus {
+  if (conversion.status === "available") return "working";
+  if (conversion.status === "maintenance") return "beta";
+  if (conversion.status === "backend-required") {
+    return "backend-required";
+  }
+  return "coming-soon";
+}
+
+function conversionTool(
+  conversion: ConversionDefinition,
+): Tool {
+  const source = conversion.sourceFormat.toUpperCase();
+  const destination = conversion.destinationFormat.toUpperCase();
+  const available = conversion.status === "available";
+  const supportsMultipleFiles =
+    conversion.supportsBatch && conversion.maxFileCount > 1;
+
+  return {
+    id: conversion.id,
+    title: conversion.title,
+    description: conversion.description,
+    menuDescription: available
+      ? conversion.description
+      : conversion.disabledReason ?? conversion.description,
+    category:
+      conversion.id === "pdf-to-searchable-pdf" ? "optimize" : "convert",
+    href: conversion.route,
+    icon: conversionIcon(conversion),
+    status: conversionStatus(conversion),
+    isClientOnly: conversion.processingMode === "client",
+    maxFiles: conversion.maxFileCount || undefined,
+    popular:
+      conversion.id === "images-to-pdf" ||
+      conversion.id === "pdf-to-jpg" ||
+      conversion.id === "jpg-to-pdf",
+    featured:
+      conversion.id === "images-to-pdf" ||
+      conversion.id === "pdf-to-images" ||
+      conversion.id === "pdf-to-text",
+    newTool:
+      conversion.id !== "images-to-pdf" &&
+      conversion.id !== "jpg-to-pdf" &&
+      conversion.id !== "png-to-pdf" &&
+      conversion.id !== "pdf-to-images" &&
+      conversion.id !== "pdf-to-jpg" &&
+      conversion.id !== "pdf-to-png" &&
+      conversion.id !== "txt-to-pdf",
+    search: searchMeta(
+      [
+        `${source} to ${destination}`,
+        conversion.title,
+        `convert ${source}`,
+      ],
+      [
+        conversion.sourceFormat,
+        conversion.destinationFormat,
+        conversion.processingMode,
+        conversion.capabilityKey,
+      ],
+      [
+        conversion.description,
+        conversion.qualityNotice,
+      ],
+      available ? 96 : 78,
+    ),
+    visibility: directoryOnly,
+    capabilities: {
+      processingMode:
+        conversion.processingMode === "client" ? "browser" : "backend",
+      experience: "guided-processing",
+      launchTier: available ? "available-now" : "backend-roadmap",
+      needsBackendProcessing: conversion.processingMode !== "client",
+      supportsMultipleFiles: supportsMultipleFiles || undefined,
+      recommendedEntry: "tool-page",
+    },
+  };
+}
+
+export const tools: Tool[] = [
+  ...existingTools.filter(
+    (tool) => tool.category !== "convert" && tool.id !== "ocr-pdf",
+  ),
+  ...CONVERSION_REGISTRY.map(conversionTool),
+];
+
 function normalizeSearchValue(value: string): string {
   return value
     .normalize("NFKD")
@@ -792,6 +925,12 @@ export function getWorkingTools(): Tool[] {
 
 export function getComingSoonTools(): Tool[] {
   return tools.filter((tool) => tool.status === "coming-soon").sort(sortToolsForDiscovery);
+}
+
+export function getBackendRequiredTools(): Tool[] {
+  return tools
+    .filter((tool) => tool.status === "backend-required")
+    .sort(sortToolsForDiscovery);
 }
 
 export function getPopularTools(limit?: number): Tool[] {
