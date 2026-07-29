@@ -171,6 +171,29 @@ async function drawEditorObject({
     return;
   }
 
+  if (
+    object.type === "stamp" &&
+    !object.data.imageDataUrl &&
+    object.data.stampLabel
+  ) {
+    drawEditorRichTextObject(
+      page,
+      {
+        box: object.box,
+        data: {
+          text: object.data.stampLabel,
+          fontSize: Math.max(10, Math.min(28, object.box.height * 0.4)),
+          fontWeight: "bold",
+          color: object.data.color ?? "#92400e",
+          opacity: object.data.opacity,
+        },
+      },
+      fonts,
+      geometry,
+    );
+    return;
+  }
+
   if (object.type === "image" || object.type === "stamp") {
     await drawEditorImageObject({
       pdfDoc,

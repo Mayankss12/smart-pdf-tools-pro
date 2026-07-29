@@ -120,27 +120,40 @@ export function useEditorKeyboard({
       }
 
       const step = event.shiftKey ? 10 : 1;
+      const resize = event.altKey;
 
       if (event.key === "ArrowUp") {
         event.preventDefault();
-        currentEditor.updateObjectBox(selectedId, {
-          y: selected.box.y - step,
-        });
+        currentEditor.updateObjectBox(
+          selectedId,
+          resize
+            ? { height: Math.max(1, selected.box.height - step) }
+            : { y: selected.box.y - step },
+        );
       } else if (event.key === "ArrowDown") {
         event.preventDefault();
-        currentEditor.updateObjectBox(selectedId, {
-          y: selected.box.y + step,
-        });
+        currentEditor.updateObjectBox(
+          selectedId,
+          resize
+            ? { height: selected.box.height + step }
+            : { y: selected.box.y + step },
+        );
       } else if (event.key === "ArrowLeft") {
         event.preventDefault();
-        currentEditor.updateObjectBox(selectedId, {
-          x: selected.box.x - step,
-        });
+        currentEditor.updateObjectBox(
+          selectedId,
+          resize
+            ? { width: Math.max(1, selected.box.width - step) }
+            : { x: selected.box.x - step },
+        );
       } else if (event.key === "ArrowRight") {
         event.preventDefault();
-        currentEditor.updateObjectBox(selectedId, {
-          x: selected.box.x + step,
-        });
+        currentEditor.updateObjectBox(
+          selectedId,
+          resize
+            ? { width: selected.box.width + step }
+            : { x: selected.box.x + step },
+        );
       }
     }
 

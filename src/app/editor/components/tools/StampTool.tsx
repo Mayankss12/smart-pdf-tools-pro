@@ -57,7 +57,7 @@ export function StampTool({
         />
       ) : (
         <div className="flex h-full w-full items-center justify-center rounded-sm border border-dashed border-amber-300 bg-amber-50 text-[11px] font-black text-amber-500">
-          Stamp
+          {object.data.stampLabel || "Stamp"}
         </div>
       )}
     </EditorObjectFrame>

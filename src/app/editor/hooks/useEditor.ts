@@ -140,8 +140,14 @@ export type EditorController = {
   readonly toggleObjectLock: (id: string) => void;
   readonly setObjectOpacity: (id: string, opacity: number) => void;
 
-  readonly undo: () => void;
-  readonly redo: () => void;
+  readonly undo: () => Promise<void>;
+  readonly redo: () => Promise<void>;
+  readonly recordDocumentTransaction: (
+    transaction: EditorDocumentHistoryTransaction,
+  ) => void;
+  readonly replaceDocumentEditorState: (
+    state: EditorDocumentEditorState,
+  ) => void;
 
   readonly markChanged: (count?: number) => void;
   readonly markDocumentChanged: () => void;
@@ -157,6 +163,20 @@ export type EditorController = {
   readonly resetEditor: () => void;
 };
 
+export type EditorDocumentEditorState = {
+  readonly objects: EditorObject[];
+  readonly selectedObjectId: string | null;
+  readonly activePageNumber: number;
+  readonly saveState: Exclude<EditorSaveState, "saving">;
+  readonly lastSavedAt: Date | null;
+};
+
+export type EditorDocumentHistoryTransaction = {
+  readonly label: string;
+  readonly undo: () => Promise<void>;
+  readonly redo: () => Promise<void>;
+};
+
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 4;
 const ZOOM_STEP = 0.1;
@@ -165,10 +185,18 @@ const HISTORY_COALESCE_MS = 700;
 const AUTO_OFFSET_STEP = 18;
 const AUTO_OFFSET_CYCLE = 8;
 
-type HistorySnapshot = {
+type ObjectHistorySnapshot = {
+  readonly kind: "objects";
   readonly objects: EditorObject[];
   readonly selectedObjectId: string | null;
 };
+
+type DocumentHistoryEntry = {
+  readonly kind: "document";
+  readonly transaction: EditorDocumentHistoryTransaction;
+};
+
+type HistoryEntry = ObjectHistorySnapshot | DocumentHistoryEntry;
 
 const COALESCED_HISTORY_REASONS = new Set(["box", "data", "opacity"]);
 
@@ -268,8 +296,8 @@ export function useEditor(): EditorController {
   const savedObjectsRef = useRef<EditorObject[]>(objects);
   const documentDirtyRef = useRef(false);
 
-  const undoStackRef = useRef<HistorySnapshot[]>([]);
-  const redoStackRef = useRef<HistorySnapshot[]>([]);
+  const undoStackRef = useRef<HistoryEntry[]>([]);
+  const redoStackRef = useRef<HistoryEntry[]>([]);
   const lastHistoryRef = useRef<{ reason: string; objectId: string | null; time: number } | null>(
     null,
   );
@@ -317,6 +345,7 @@ export function useEditor(): EditorController {
       }
 
       undoStackRef.current.push({
+        kind: "objects",
         objects: objectsRef.current,
         selectedObjectId: selectedObjectIdRef.current,
       });
@@ -748,14 +777,16 @@ export function useEditor(): EditorController {
     (mapper: (items: readonly EditorObject[]) => EditorObject[]) => {
       const nextObjects = mapper(objectsRef.current);
 
-      undoStackRef.current = undoStackRef.current.map((snapshot) => ({
-        ...snapshot,
-        objects: mapper(snapshot.objects),
-      }));
-      redoStackRef.current = redoStackRef.current.map((snapshot) => ({
-        ...snapshot,
-        objects: mapper(snapshot.objects),
-      }));
+      undoStackRef.current = undoStackRef.current.map((snapshot) =>
+        snapshot.kind === "objects"
+          ? { ...snapshot, objects: mapper(snapshot.objects) }
+          : snapshot,
+      );
+      redoStackRef.current = redoStackRef.current.map((snapshot) =>
+        snapshot.kind === "objects"
+          ? { ...snapshot, objects: mapper(snapshot.objects) }
+          : snapshot,
+      );
       savedObjectsRef.current = mapper(savedObjectsRef.current);
       objectsRef.current = nextObjects;
       setObjects(nextObjects);
@@ -782,7 +813,44 @@ export function useEditor(): EditorController {
     [markChanged, recordHistory],
   );
 
-  const undo = useCallback(() => {
+  const recordDocumentTransaction = useCallback(
+    (transaction: EditorDocumentHistoryTransaction) => {
+      undoStackRef.current.push({ kind: "document", transaction });
+      if (undoStackRef.current.length > HISTORY_LIMIT) {
+        undoStackRef.current.shift();
+      }
+      redoStackRef.current = [];
+      lastHistoryRef.current = null;
+      syncHistoryFlags();
+    },
+    [syncHistoryFlags],
+  );
+
+  const replaceDocumentEditorState = useCallback(
+    (state: EditorDocumentEditorState) => {
+      objectsRef.current = state.objects;
+      selectedObjectIdRef.current = state.selectedObjectId;
+      setObjects(state.objects);
+      setSelectedObjectId(
+        state.selectedObjectId &&
+          state.objects.some((object) => object.id === state.selectedObjectId)
+          ? state.selectedObjectId
+          : null,
+      );
+      setActivePageNumber(state.activePageNumber);
+      documentDirtyRef.current = state.saveState === "unsaved";
+      if (state.saveState === "saved") {
+        savedObjectsRef.current = state.objects;
+      }
+      setUnsavedChanges(state.saveState === "saved" ? 0 : 1);
+      setSaveState(state.saveState);
+      setLastSavedAt(state.lastSavedAt);
+      lastHistoryRef.current = null;
+    },
+    [],
+  );
+
+  const undo = useCallback(async () => {
     if (undoStackRef.current.length === 0) {
       return;
     }
@@ -790,28 +858,39 @@ export function useEditor(): EditorController {
     const previous = undoStackRef.current.pop();
     if (!previous) return;
 
-    redoStackRef.current.push({
-      objects: objectsRef.current,
-      selectedObjectId: selectedObjectIdRef.current,
-    });
-
-    setObjects(previous.objects);
-    setSelectedObjectId((current) => {
-      if (current && previous.objects.some((object) => object.id === current)) return current;
-      if (
-        previous.selectedObjectId &&
-        previous.objects.some((object) => object.id === previous.selectedObjectId)
-      ) {
-        return previous.selectedObjectId;
+    if (previous.kind === "document") {
+      try {
+        await previous.transaction.undo();
+        redoStackRef.current.push(previous);
+      } catch {
+        undoStackRef.current.push(previous);
+        syncHistoryFlags();
+        throw new Error(`Unable to undo ${previous.transaction.label}.`);
       }
-      return null;
-    });
+    } else {
+      redoStackRef.current.push({
+        kind: "objects",
+        objects: objectsRef.current,
+        selectedObjectId: selectedObjectIdRef.current,
+      });
+      objectsRef.current = previous.objects;
+      selectedObjectIdRef.current = previous.selectedObjectId;
+      setObjects(previous.objects);
+      setSelectedObjectId(
+        previous.selectedObjectId &&
+          previous.objects.some(
+            (object) => object.id === previous.selectedObjectId,
+          )
+          ? previous.selectedObjectId
+          : null,
+      );
+    }
 
     lastHistoryRef.current = null;
     syncHistoryFlags();
   }, [syncHistoryFlags]);
 
-  const redo = useCallback(() => {
+  const redo = useCallback(async () => {
     if (redoStackRef.current.length === 0) {
       return;
     }
@@ -819,22 +898,31 @@ export function useEditor(): EditorController {
     const next = redoStackRef.current.pop();
     if (!next) return;
 
-    undoStackRef.current.push({
-      objects: objectsRef.current,
-      selectedObjectId: selectedObjectIdRef.current,
-    });
-
-    setObjects(next.objects);
-    setSelectedObjectId((current) => {
-      if (current && next.objects.some((object) => object.id === current)) return current;
-      if (
-        next.selectedObjectId &&
-        next.objects.some((object) => object.id === next.selectedObjectId)
-      ) {
-        return next.selectedObjectId;
+    if (next.kind === "document") {
+      try {
+        await next.transaction.redo();
+        undoStackRef.current.push(next);
+      } catch {
+        redoStackRef.current.push(next);
+        syncHistoryFlags();
+        throw new Error(`Unable to redo ${next.transaction.label}.`);
       }
-      return null;
-    });
+    } else {
+      undoStackRef.current.push({
+        kind: "objects",
+        objects: objectsRef.current,
+        selectedObjectId: selectedObjectIdRef.current,
+      });
+      objectsRef.current = next.objects;
+      selectedObjectIdRef.current = next.selectedObjectId;
+      setObjects(next.objects);
+      setSelectedObjectId(
+        next.selectedObjectId &&
+          next.objects.some((object) => object.id === next.selectedObjectId)
+          ? next.selectedObjectId
+          : null,
+      );
+    }
 
     lastHistoryRef.current = null;
     syncHistoryFlags();
@@ -912,6 +1000,8 @@ export function useEditor(): EditorController {
 
     undo,
     redo,
+    recordDocumentTransaction,
+    replaceDocumentEditorState,
 
     markChanged,
     markDocumentChanged,

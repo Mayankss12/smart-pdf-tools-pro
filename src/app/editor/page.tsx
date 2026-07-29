@@ -22,6 +22,7 @@ import {
   remapPageResults,
   shiftPageResultsAfterInsertion,
 } from "@/lib/editor/editor-page-object-mapping";
+import { rotateEditorOcrResult } from "@/lib/editor/editor-ocr-rotation";
 import {
   getEditorToolDefinition,
   resolveEditorTool,
@@ -58,7 +59,11 @@ import {
   type EditorSmartToolActivity,
 } from "./components/EditorSmartToolsPanel";
 import { EditorTopBar } from "./components/EditorTopBar";
-import { useEditor } from "./hooks/useEditor";
+import {
+  useEditor,
+  type EditorDocumentEditorState,
+  type EditorObject,
+} from "./hooks/useEditor";
 import { useEditorKeyboard } from "./hooks/useEditorKeyboard";
 
 const OPEN_IMAGE_PICKER_EVENT = "pdfmantra:editor-open-image-picker";
@@ -89,6 +94,15 @@ function getPickerEvent(toolId: EditorToolbarItemId) {
   return null;
 }
 
+type EditorDocumentCheckpoint = {
+  readonly bytes: Uint8Array;
+  readonly editorState: EditorDocumentEditorState;
+  readonly ocrPages: EditorOcrPageResult[];
+  readonly findHighlights: EditorFindHighlight[];
+  readonly pageNumberSettings: EditorPageNumberSettings;
+  readonly pageNumberSetId: string | null;
+};
+
 export default function EditorPage() {
   const editor = useEditor();
   const entitlement = useEntitlement();
@@ -107,6 +121,8 @@ export default function EditorPage() {
   const [pageActionBusy, setPageActionBusy] = useState(false);
   const [pageNumberSettings, setPageNumberSettings] =
     useState<EditorPageNumberSettings>(DEFAULT_EDITOR_PAGE_NUMBER_SETTINGS);
+  const [pageNumberSetId, setPageNumberSetId] = useState<string | null>(null);
+  const [documentIdentity, setDocumentIdentity] = useState(0);
   const [smartActivity, setSmartActivity] =
     useState<EditorSmartToolActivity | null>(null);
   const [capabilities, setCapabilities] = useState<EditorCapabilityResponse>(
@@ -229,7 +245,7 @@ export default function EditorPage() {
     fileInputRef.current?.click();
   }
 
-  async function replacePdfDocument(bytes: Uint8Array, activePageNumber: number) {
+  async function preparePdfDocument(bytes: Uint8Array) {
     const loadGeneration = loadGenerationRef.current + 1;
     loadGenerationRef.current = loadGeneration;
     const loadedDocument = await pdfjsLib.getDocument({
@@ -238,15 +254,111 @@ export default function EditorPage() {
 
     if (loadGenerationRef.current !== loadGeneration) {
       await loadedDocument.destroy();
-      return;
+      return null;
     }
+    return loadedDocument;
+  }
 
+  function commitPdfDocument(
+    loadedDocument: PDFDocumentProxy,
+    bytes: Uint8Array,
+    activePageNumber: number,
+  ) {
     const previousDocument = pdfDocumentRef.current;
     pdfDocumentRef.current = loadedDocument;
     setFileBytes(bytes);
     editor.setPdfDocument(loadedDocument);
     editor.setActivePage(activePageNumber);
     void previousDocument?.destroy();
+  }
+
+  async function replacePdfDocument(bytes: Uint8Array, activePageNumber: number) {
+    const loadedDocument = await preparePdfDocument(bytes);
+    if (!loadedDocument) return;
+    commitPdfDocument(loadedDocument, bytes, activePageNumber);
+  }
+
+  function createDocumentCheckpoint(
+    bytes: Uint8Array,
+    overrides?: {
+      readonly objects?: EditorObject[];
+      readonly selectedObjectId?: string | null;
+      readonly activePageNumber?: number;
+      readonly ocrPages?: EditorOcrPageResult[];
+      readonly findHighlights?: EditorFindHighlight[];
+      readonly pageNumberSettings?: EditorPageNumberSettings;
+      readonly pageNumberSetId?: string | null;
+      readonly saveState?: "saved" | "unsaved";
+    },
+  ): EditorDocumentCheckpoint {
+    return {
+      bytes,
+      editorState: {
+        objects: overrides?.objects ?? editor.objects,
+        selectedObjectId:
+          overrides?.selectedObjectId === undefined
+            ? editor.selectedObjectId
+            : overrides.selectedObjectId,
+        activePageNumber:
+          overrides?.activePageNumber ?? editor.activePageNumber,
+        saveState:
+          overrides?.saveState ??
+          (editor.saveState === "saved" ? "saved" : "unsaved"),
+        lastSavedAt: editor.lastSavedAt,
+      },
+      ocrPages: overrides?.ocrPages ?? [...ocrPages],
+      findHighlights: overrides?.findHighlights ?? [...findHighlights],
+      pageNumberSettings:
+        overrides?.pageNumberSettings ?? pageNumberSettings,
+      pageNumberSetId:
+        overrides?.pageNumberSetId === undefined
+          ? pageNumberSetId
+          : overrides.pageNumberSetId,
+    };
+  }
+
+  async function restoreDocumentCheckpoint(
+    checkpoint: EditorDocumentCheckpoint,
+  ) {
+    const loadedDocument = await preparePdfDocument(checkpoint.bytes);
+    if (!loadedDocument) {
+      throw new Error("Document history restoration was superseded.");
+    }
+    commitPdfDocument(
+      loadedDocument,
+      checkpoint.bytes,
+      checkpoint.editorState.activePageNumber,
+    );
+    editor.replaceDocumentEditorState(checkpoint.editorState);
+    setOcrPages(checkpoint.ocrPages);
+    setFindHighlights(checkpoint.findHighlights);
+    setPageNumberSettings(checkpoint.pageNumberSettings);
+    setPageNumberSetId(checkpoint.pageNumberSetId);
+  }
+
+  async function regenerateManagedPageNumbers(
+    document: PDFDocumentProxy,
+    objects: readonly EditorObject[],
+    settings: EditorPageNumberSettings,
+    setId: string | null,
+  ) {
+    if (!setId) return [...objects];
+    const pageSizes = await Promise.all(
+      Array.from({ length: document.numPages }, async (_, index) => {
+        const pageNumber = index + 1;
+        const page = await document.getPage(pageNumber);
+        try {
+          const viewport = page.getViewport({ scale: 1 });
+          return { pageNumber, width: viewport.width, height: viewport.height };
+        } finally {
+          page.cleanup();
+        }
+      }),
+    );
+    return [
+      ...objects.filter((object) => !object.data.pageNumberSetId),
+      ...createEditorPageNumberObjects({ settings, pageSizes, setId }),
+    ];
   }
 
   async function loadPdfFile(file: File) {
@@ -283,6 +395,8 @@ export default function EditorPage() {
       setFindHighlights([]);
       setPageDialogMode(null);
       setPageNumberSettings(DEFAULT_EDITOR_PAGE_NUMBER_SETTINGS);
+      setPageNumberSetId(null);
+      setDocumentIdentity((identity) => identity + 1);
       editor.setFile(file);
       editor.setPdfDocument(loadedDocument);
       editor.setActivePage(1);
@@ -297,6 +411,10 @@ export default function EditorPage() {
         await loadedDocument.destroy();
       }
       setFileBytes(null);
+      setOcrPages([]);
+      setFindHighlights([]);
+      setPageNumberSetId(null);
+      setDocumentIdentity((identity) => identity + 1);
       editor.resetEditor();
       setStatusMessage(error instanceof Error ? error.message : "Unable to load this PDF.");
     } finally {
@@ -382,11 +500,23 @@ export default function EditorPage() {
     }
 
     if (toolId === "undo") {
-      editor.undo();
-      setStatusMessage("Last editor action undone.");
+      void editor
+        .undo()
+        .then(() => setStatusMessage("Last editor action undone."))
+        .catch((error: unknown) =>
+          setStatusMessage(
+            error instanceof Error ? error.message : "Unable to undo.",
+          ),
+        );
     } else if (toolId === "redo") {
-      editor.redo();
-      setStatusMessage("Editor action restored.");
+      void editor
+        .redo()
+        .then(() => setStatusMessage("Editor action restored."))
+        .catch((error: unknown) =>
+          setStatusMessage(
+            error instanceof Error ? error.message : "Unable to redo.",
+          ),
+        );
     } else if (toolId === "duplicate" && editor.selectedObjectId) {
       const duplicateId = editor.duplicateObject(editor.selectedObjectId);
       setStatusMessage(duplicateId ? "Object duplicated." : "Unable to duplicate object.");
@@ -409,7 +539,9 @@ export default function EditorPage() {
     readonly size: EditorBlankPageSize;
   }) {
     if (!fileBytes) return;
+    const before = createDocumentCheckpoint(fileBytes);
     setPageActionBusy(true);
+    let preparedDocument: PDFDocumentProxy | null = null;
     try {
       const result = await addEditorBlankPage({
         fileBytes,
@@ -417,14 +549,51 @@ export default function EditorPage() {
         insertion: options.insertion,
         size: options.size,
       });
-      editor.remapDocumentObjects((objects) =>
-        remapObjectsAfterPageInsertion(objects, result.activePageNumber),
+      preparedDocument = await preparePdfDocument(result.bytes);
+      if (!preparedDocument) {
+        throw new Error("The page operation was superseded.");
+      }
+      const remappedObjects = remapObjectsAfterPageInsertion(
+        editor.objects,
+        result.activePageNumber,
       );
-      setOcrPages((current) =>
-        shiftPageResultsAfterInsertion(current, result.activePageNumber),
+      const nextObjects = await regenerateManagedPageNumbers(
+        preparedDocument,
+        remappedObjects,
+        pageNumberSettings,
+        pageNumberSetId,
       );
+      const nextOcrPages = shiftPageResultsAfterInsertion(
+        ocrPages,
+        result.activePageNumber,
+      );
+      const nextSelectedObjectId =
+        editor.selectedObjectId &&
+        nextObjects.some((object) => object.id === editor.selectedObjectId)
+          ? editor.selectedObjectId
+          : null;
+      const after = createDocumentCheckpoint(result.bytes, {
+        objects: nextObjects,
+        selectedObjectId: nextSelectedObjectId,
+        activePageNumber: result.activePageNumber,
+        ocrPages: nextOcrPages,
+        findHighlights: [],
+        saveState: "unsaved",
+      });
+      commitPdfDocument(
+        preparedDocument,
+        result.bytes,
+        result.activePageNumber,
+      );
+      preparedDocument = null;
+      editor.replaceDocumentEditorState(after.editorState);
+      setOcrPages(nextOcrPages);
       setFindHighlights([]);
-      await replacePdfDocument(result.bytes, result.activePageNumber);
+      editor.recordDocumentTransaction({
+        label: "add page",
+        undo: () => restoreDocumentCheckpoint(before),
+        redo: () => restoreDocumentCheckpoint(after),
+      });
       trackEditorEvent({
         type: "page_added",
         pageNumber: result.activePageNumber,
@@ -433,6 +602,7 @@ export default function EditorPage() {
       setPageDialogMode(null);
       setStatusMessage(`Blank page ${result.activePageNumber} added.`);
     } catch (error) {
+      if (preparedDocument) await preparedDocument.destroy();
       setStatusMessage(error instanceof Error ? error.message : "Unable to add a page.");
     } finally {
       setPageActionBusy(false);
@@ -441,23 +611,57 @@ export default function EditorPage() {
 
   async function handleReorderPages(pageOrder: readonly number[]) {
     if (!fileBytes) return;
+    const before = createDocumentCheckpoint(fileBytes);
     setPageActionBusy(true);
+    let preparedDocument: PDFDocumentProxy | null = null;
     try {
       const result = await reorderEditorPages({
         fileBytes,
         pageOrder,
         activePageNumber: editor.activePageNumber,
       });
-      editor.remapDocumentObjects((objects) =>
-        remapObjectsAfterPageReorder(objects, pageOrder),
+      preparedDocument = await preparePdfDocument(result.bytes);
+      if (!preparedDocument) {
+        throw new Error("The page operation was superseded.");
+      }
+      const remappedObjects = remapObjectsAfterPageReorder(
+        editor.objects,
+        pageOrder,
       );
-      setOcrPages((current) => remapPageResults(current, pageOrder));
+      const nextObjects = await regenerateManagedPageNumbers(
+        preparedDocument,
+        remappedObjects,
+        pageNumberSettings,
+        pageNumberSetId,
+      );
+      const nextOcrPages = remapPageResults(ocrPages, pageOrder);
+      const after = createDocumentCheckpoint(result.bytes, {
+        objects: nextObjects,
+        selectedObjectId: editor.selectedObjectId,
+        activePageNumber: result.activePageNumber,
+        ocrPages: nextOcrPages,
+        findHighlights: [],
+        saveState: "unsaved",
+      });
+      commitPdfDocument(
+        preparedDocument,
+        result.bytes,
+        result.activePageNumber,
+      );
+      preparedDocument = null;
+      editor.replaceDocumentEditorState(after.editorState);
+      setOcrPages(nextOcrPages);
       setFindHighlights([]);
-      await replacePdfDocument(result.bytes, result.activePageNumber);
+      editor.recordDocumentTransaction({
+        label: "reorder pages",
+        undo: () => restoreDocumentCheckpoint(before),
+        redo: () => restoreDocumentCheckpoint(after),
+      });
       trackEditorEvent({ type: "pages_reordered", pageCount: pageOrder.length });
       setPageDialogMode(null);
       setStatusMessage("Page order updated.");
     } catch (error) {
+      if (preparedDocument) await preparedDocument.destroy();
       setStatusMessage(error instanceof Error ? error.message : "Unable to reorder pages.");
     } finally {
       setPageActionBusy(false);
@@ -466,30 +670,67 @@ export default function EditorPage() {
 
   async function handleRotatePage(direction: EditorPageRotationDirection) {
     if (!fileBytes) return;
+    const before = createDocumentCheckpoint(fileBytes);
     const pageNumber = editor.activePageNumber;
     setPageActionBusy(true);
+    let preparedDocument: PDFDocumentProxy | null = null;
     try {
       const result = await rotateEditorPage({
         fileBytes,
         pageNumber,
         direction,
       });
-      editor.remapDocumentObjects((objects) =>
-        remapObjectsAfterPageRotation({
-          objects,
+      preparedDocument = await preparePdfDocument(result.bytes);
+      if (!preparedDocument) {
+        throw new Error("The page operation was superseded.");
+      }
+      const remappedObjects = remapObjectsAfterPageRotation({
+          objects: editor.objects,
           pageNumber,
           oldViewportWidth: result.oldViewportWidth,
           oldViewportHeight: result.oldViewportHeight,
           direction,
-        }),
+        });
+      const nextObjects = await regenerateManagedPageNumbers(
+        preparedDocument,
+        remappedObjects,
+        pageNumberSettings,
+        pageNumberSetId,
       );
-      setOcrPages((current) => current.filter((item) => item.pageNumber !== pageNumber));
+      const nextOcrPages = ocrPages.map((item) =>
+        item.pageNumber === pageNumber
+          ? { ...item, result: rotateEditorOcrResult(item.result, direction) }
+          : item,
+      );
+      const after = createDocumentCheckpoint(result.bytes, {
+        objects: nextObjects,
+        selectedObjectId: editor.selectedObjectId,
+        activePageNumber: result.activePageNumber,
+        ocrPages: nextOcrPages,
+        findHighlights: [],
+        saveState: "unsaved",
+      });
+      commitPdfDocument(
+        preparedDocument,
+        result.bytes,
+        result.activePageNumber,
+      );
+      preparedDocument = null;
+      editor.replaceDocumentEditorState(after.editorState);
+      setOcrPages(nextOcrPages);
       setFindHighlights([]);
-      await replacePdfDocument(result.bytes, result.activePageNumber);
+      editor.recordDocumentTransaction({
+        label: "rotate page",
+        undo: () => restoreDocumentCheckpoint(before),
+        redo: () => restoreDocumentCheckpoint(after),
+      });
       trackEditorEvent({ type: "page_rotated", pageNumber, direction });
       setPageDialogMode(null);
-      setStatusMessage(`Page ${pageNumber} rotated. Run OCR again for this page if needed.`);
+      setStatusMessage(
+        `Page ${pageNumber} rotated${nextOcrPages.some((item) => item.pageNumber === pageNumber) ? " with OCR coordinates preserved" : ""}.`,
+      );
     } catch (error) {
+      if (preparedDocument) await preparedDocument.destroy();
       setStatusMessage(error instanceof Error ? error.message : "Unable to rotate this page.");
     } finally {
       setPageActionBusy(false);
@@ -521,6 +762,7 @@ export default function EditorPage() {
       );
       editor.applyObjectBatch([...retainedObjects, ...pageNumberObjects]);
       setPageNumberSettings(settings);
+      setPageNumberSetId(setId);
       setPageDialogMode(null);
       trackEditorEvent({
         type: "pages_numbered",
@@ -543,6 +785,7 @@ export default function EditorPage() {
       (object) => !object.data.pageNumberSetId,
     );
     editor.applyObjectBatch(retainedObjects);
+    setPageNumberSetId(null);
     setPageDialogMode(null);
     setStatusMessage("Page numbers removed.");
   }
@@ -579,6 +822,7 @@ export default function EditorPage() {
 
       <EditorLayerControls editor={editor} />
       <EditorSmartToolsPanel
+        documentIdentity={documentIdentity}
         editor={editor}
         ocrPages={ocrPages}
         translationConfigured={capabilities.backendCapabilities.translation}

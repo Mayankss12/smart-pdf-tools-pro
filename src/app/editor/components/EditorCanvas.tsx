@@ -16,6 +16,7 @@ import {
   type DragEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
+import type { PDFPageProxy } from "pdfjs-dist";
 
 import { detectPageImages, type DetectedImage } from "@/lib/editor/pdf-image-detect";
 
@@ -303,6 +304,7 @@ function PdfPageRenderer({
   useEffect(() => {
     let cancelled = false;
     let renderTask: PdfRenderTask | null = null;
+    let renderedPage: PDFPageProxy | null = null;
 
     async function renderPage() {
       const canvas = canvasRef.current;
@@ -314,6 +316,7 @@ function PdfPageRenderer({
         setError("");
 
         const page = await editor.pdfDocument.getPage(editor.activePageNumber);
+        renderedPage = page;
         const viewport = page.getViewport({ scale: editor.zoom });
         const ratio = Math.min(window.devicePixelRatio || 1, 2);
         const context = canvas.getContext("2d", { alpha: false });
@@ -354,6 +357,12 @@ function PdfPageRenderer({
         renderTask?.cancel();
       } catch {
         // Ignore cancelled render task.
+      }
+      renderedPage?.cleanup();
+      const canvas = canvasRef.current;
+      if (canvas) {
+        canvas.width = 0;
+        canvas.height = 0;
       }
     };
   }, [editor.pdfDocument, editor.activePageNumber, editor.zoom]);

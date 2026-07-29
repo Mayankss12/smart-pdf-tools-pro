@@ -3,6 +3,7 @@
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { editorThumbnailRenderQueue } from "@/lib/editor/thumbnail-render-queue";
 import type { EditorController, PdfDocumentLike } from "../hooks/useEditor";
 
 type ThumbnailProps = {
@@ -14,10 +15,38 @@ type ThumbnailProps = {
 
 function PageThumbnail({ documentProxy, pageNumber, active, onSelect }: ThumbnailProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const rootRef = useRef<HTMLButtonElement | null>(null);
   const [loading, setLoading] = useState(true);
+  const [shouldRender, setShouldRender] = useState(active);
 
   useEffect(() => {
-    let cancelled = false;
+    const root = rootRef.current;
+    if (!root || typeof IntersectionObserver === "undefined") {
+      setShouldRender(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.some((entry) => entry.isIntersecting);
+        setShouldRender(visible || active);
+      },
+      { rootMargin: "240px 0px" },
+    );
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, [active]);
+
+  useEffect(() => {
+    if (!shouldRender) {
+      const canvas = canvasRef.current;
+      if (canvas) {
+        canvas.width = 0;
+        canvas.height = 0;
+      }
+      setLoading(true);
+      return;
+    }
+    const controller = new AbortController();
     let renderTask: { cancel: () => void; promise: Promise<void> } | null = null;
 
     async function renderThumbnail() {
@@ -26,46 +55,52 @@ function PageThumbnail({ documentProxy, pageNumber, active, onSelect }: Thumbnai
 
       try {
         setLoading(true);
-
-        const page = await documentProxy.getPage(pageNumber);
-        const viewport = page.getViewport({ scale: 0.26 });
-        const ratio = Math.min(window.devicePixelRatio || 1, 2);
-        const context = canvas.getContext("2d");
-
-        if (!context || cancelled) return;
-
-        canvas.width = Math.ceil(viewport.width * ratio);
-        canvas.height = Math.ceil(viewport.height * ratio);
-        canvas.style.width = `${viewport.width}px`;
-        canvas.style.height = `${viewport.height}px`;
-
-        context.setTransform(ratio, 0, 0, ratio, 0, 0);
-        context.clearRect(0, 0, viewport.width, viewport.height);
-
-        renderTask = page.render({ canvasContext: context, viewport });
-        await renderTask.promise;
-
-        if (!cancelled) setLoading(false);
+        await editorThumbnailRenderQueue.run(async () => {
+          const page = await documentProxy.getPage(pageNumber);
+          try {
+            const viewport = page.getViewport({ scale: 0.26 });
+            const ratio = Math.min(window.devicePixelRatio || 1, 2);
+            const context = canvas.getContext("2d");
+            if (!context || controller.signal.aborted) return;
+            canvas.width = Math.ceil(viewport.width * ratio);
+            canvas.height = Math.ceil(viewport.height * ratio);
+            canvas.style.width = `${viewport.width}px`;
+            canvas.style.height = `${viewport.height}px`;
+            context.setTransform(ratio, 0, 0, ratio, 0, 0);
+            context.clearRect(0, 0, viewport.width, viewport.height);
+            renderTask = page.render({ canvasContext: context, viewport });
+            await renderTask.promise;
+          } finally {
+            page.cleanup();
+          }
+        }, controller.signal);
+        if (!controller.signal.aborted) setLoading(false);
       } catch {
-        if (!cancelled) setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     }
 
     renderThumbnail();
 
     return () => {
-      cancelled = true;
+      controller.abort();
 
       try {
         renderTask?.cancel();
       } catch {
         // Ignore cancelled render task.
       }
+      const canvas = canvasRef.current;
+      if (canvas) {
+        canvas.width = 0;
+        canvas.height = 0;
+      }
     };
-  }, [documentProxy, pageNumber]);
+  }, [documentProxy, pageNumber, shouldRender]);
 
   return (
     <button
+      ref={rootRef}
       type="button"
       onClick={onSelect}
       title={`Page ${pageNumber}`}

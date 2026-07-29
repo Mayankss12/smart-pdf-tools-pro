@@ -1,4 +1,15 @@
-import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
+import {
+  PDFDocument,
+  StandardFonts,
+  clip,
+  endPath,
+  popGraphicsState,
+  pushGraphicsState,
+  rectangle,
+  rgb,
+  type PDFFont,
+  type PDFPage,
+} from "pdf-lib";
 
 import type { EditorPageGeometry } from "./editor-page-geometry";
 
@@ -50,6 +61,18 @@ export type EditorRichTextExportObject = {
 
 const TEXT_PADDING_X = 4;
 const TEXT_PADDING_Y = 2;
+
+export function getEditorTextClipBox(
+  box: RichTextExportBox,
+  geometry: EditorPageGeometry,
+) {
+  return {
+    x: box.x,
+    y: geometry.viewportHeight - box.y - box.height,
+    width: Math.max(0, box.width),
+    height: Math.max(0, box.height),
+  };
+}
 
 export async function embedEditorTextFonts(pdfDoc: PDFDocument): Promise<EmbeddedTextFonts> {
   return {
@@ -291,6 +314,14 @@ export function drawEditorRichTextObject(
   const opacity = getSafeOpacity(object.data.opacity);
 
   if (opacity <= 0) return;
+  const clipBox = getEditorTextClipBox(object.box, geometry);
+  if (clipBox.width <= 0 || clipBox.height <= 0) return;
+  page.pushOperators(
+    pushGraphicsState(),
+    rectangle(clipBox.x, clipBox.y, clipBox.width, clipBox.height),
+    clip(),
+    endPath(),
+  );
 
   const lineHeight = fontSize * 1.3;
   const startX = object.box.x + TEXT_PADDING_X;
@@ -372,4 +403,5 @@ export function drawEditorRichTextObject(
       });
     });
   });
+  page.pushOperators(popGraphicsState());
 }

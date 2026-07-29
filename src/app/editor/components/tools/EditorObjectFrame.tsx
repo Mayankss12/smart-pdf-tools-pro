@@ -409,7 +409,7 @@ export function EditorObjectFrame({
     <div
       ref={rootRef}
       className={[
-        "absolute z-30 transition duration-200",
+        "absolute z-30 transition duration-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-300",
         locked ? "cursor-default" : "cursor-move touch-none",
         selected
           ? locked
@@ -427,6 +427,17 @@ export function EditorObjectFrame({
       onPointerMove={locked ? undefined : handleRootPointerMove}
       onPointerUp={locked ? undefined : handleRootPointerUp}
       onPointerCancel={locked ? undefined : handleRootPointerUp}
+      tabIndex={0}
+      role="button"
+      aria-pressed={selected}
+      aria-label={`${toolbarLabel} object, ${selected ? "selected" : "not selected"}, ${locked ? "locked" : "unlocked"}, page ${object.pageNumber}, position ${Math.round(object.box.x)} by ${Math.round(object.box.y)}, size ${Math.round(object.box.width)} by ${Math.round(object.box.height)}`}
+      onFocus={() => onSelect(object.id)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelect(object.id);
+        }
+      }}
     >
       <div
         className={["h-full w-full overflow-hidden", locked ? "pointer-events-none" : ""].join(" ")}
@@ -454,7 +465,7 @@ export function EditorObjectFrame({
                 "absolute z-40 h-3 w-3 rounded-full border-2 border-white bg-violet-600 shadow-[0_2px_8px_rgba(79,70,229,0.32)] transition duration-200 hover:scale-125 hover:bg-violet-700",
                 HANDLE_STYLES[handle],
               ].join(" ")}
-              aria-label={`Resize ${toolbarLabel}`}
+              aria-label={`Resize ${toolbarLabel} from ${handle}`}
               title={
                 preserveAspectRatioOnCornerResize && isCornerHandle(handle)
                   ? `Resize ${toolbarLabel} proportionally`
@@ -492,7 +503,7 @@ export function EditorObjectFrame({
               event.stopPropagation();
               onDelete(object.id);
             }}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-slate-500 transition duration-200 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-slate-500 transition duration-200 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:border disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-400"
             aria-label={`Delete ${toolbarLabel}`}
             title={locked ? `Unlock ${toolbarLabel} before deleting` : `Delete ${toolbarLabel}`}
           >

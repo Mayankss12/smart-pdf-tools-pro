@@ -14,6 +14,11 @@ import type { PDFPageProxy } from "pdfjs-dist";
 
 import { trackEditorEvent } from "@/lib/editor/editor-analytics";
 import {
+  deduplicateFindRegions,
+  findNormalizedSubstringRanges,
+  getPdfSubstringBox,
+} from "@/lib/editor/editor-find-geometry";
+import {
   getAvailableOcrLanguages,
   type OcrLanguage,
   type OcrProgress,
@@ -50,6 +55,7 @@ type FindResult = Omit<EditorFindHighlight, "current"> & {
 };
 
 type EditorSmartToolsPanelProps = {
+  readonly documentIdentity: number;
   readonly editor: EditorController;
   readonly ocrPages: readonly EditorOcrPageResult[];
   readonly translationConfigured: boolean;
@@ -123,22 +129,6 @@ async function renderPageForOcr(
   }
 }
 
-function countOccurrences(text: string, query: string) {
-  const positions: number[] = [];
-  const haystack = text.toLocaleLowerCase();
-  const needle = query.toLocaleLowerCase();
-  let fromIndex = 0;
-
-  while (needle && fromIndex < haystack.length) {
-    const index = haystack.indexOf(needle, fromIndex);
-    if (index < 0) break;
-    positions.push(index);
-    fromIndex = index + Math.max(1, needle.length);
-  }
-
-  return positions;
-}
-
 async function findNativePdfMatches(
   page: PDFPageProxy,
   pageNumber: number,
@@ -151,8 +141,8 @@ async function findNativePdfMatches(
   textContent.items.forEach((item, itemIndex) => {
     if (!("str" in item) || !item.str) return;
 
-    const positions = countOccurrences(item.str, query);
-    if (positions.length === 0) return;
+    const ranges = findNormalizedSubstringRanges(item.str, query);
+    if (ranges.length === 0) return;
 
     const [x, baselineY] = viewport.convertToViewportPoint(
       item.transform[4] ?? 0,
@@ -161,20 +151,24 @@ async function findNativePdfMatches(
     const height = Math.max(10, Math.abs(item.height || item.transform[3] || 12));
     const width = Math.max(8, Math.abs(item.width || 8));
 
-    for (let occurrenceIndex = 0; occurrenceIndex < positions.length; occurrenceIndex += 1) {
+    ranges.forEach((range, occurrenceIndex) => {
       results.push({
         id: `pdf-${pageNumber}-${itemIndex}-${occurrenceIndex}`,
         pageNumber,
         source: "pdf",
         preview: item.str,
-        box: {
+        box: getPdfSubstringBox({
+          text: item.str,
+          start: range.start,
+          length: range.length,
           x,
           y: Math.max(0, baselineY - height),
           width,
           height,
-        },
+          direction: item.dir === "rtl" ? "rtl" : "ltr",
+        }),
       });
-    }
+    });
   });
 
   page.cleanup();
@@ -193,11 +187,10 @@ function findOcrMatches(
   const matches: FindResult[] = [];
 
   result.words.forEach((word, wordIndex) => {
-    const positions = countOccurrences(word.text, query);
-
-    for (let occurrenceIndex = 0; occurrenceIndex < positions.length; occurrenceIndex += 1) {
+    const ranges = findNormalizedSubstringRanges(word.text, query);
+    if (ranges.length > 0) {
       matches.push({
-        id: `ocr-${pageNumber}-${wordIndex}-${occurrenceIndex}`,
+        id: `ocr-${pageNumber}-${wordIndex}`,
         pageNumber,
         source: "ocr",
         preview: word.text,
@@ -247,6 +240,29 @@ async function getPageText(editor: EditorController) {
   }
 }
 
+async function getPageTranslationText(
+  editor: EditorController,
+  ocrPages: readonly EditorOcrPageResult[],
+) {
+  const nativeText = (await getPageText(editor)).trim();
+  const ocrText =
+    ocrPages
+      .find((item) => item.pageNumber === editor.activePageNumber)
+      ?.result.fullText.trim() ?? "";
+  const meaningfulNative = nativeText.replace(/\s+/g, "").length >= 12;
+  if (meaningfulNative) {
+    return { text: nativeText, source: "native text" } as const;
+  }
+  if (nativeText && ocrText) {
+    return {
+      text: `${nativeText}\n${ocrText}`,
+      source: "mixed native and OCR text",
+    } as const;
+  }
+  if (ocrText) return { text: ocrText, source: "OCR text" } as const;
+  return { text: nativeText, source: "native text" } as const;
+}
+
 function readTranslationResponse(payload: unknown) {
   if (!payload || typeof payload !== "object") return "";
   const translatedText = Reflect.get(payload, "translatedText");
@@ -254,6 +270,7 @@ function readTranslationResponse(payload: unknown) {
 }
 
 export function EditorSmartToolsPanel({
+  documentIdentity,
   editor,
   ocrPages,
   translationConfigured,
@@ -263,6 +280,7 @@ export function EditorSmartToolsPanel({
   onStatusChange,
 }: EditorSmartToolsPanelProps) {
   const abortControllerRef = useRef<AbortController | null>(null);
+  const findRunRef = useRef(0);
   const findInputRef = useRef<HTMLInputElement | null>(null);
   const [ocrScope, setOcrScope] = useState<"current" | "all">("current");
   const [ocrLanguage, setOcrLanguage] = useState<OcrLanguage>("auto");
@@ -279,6 +297,27 @@ export function EditorSmartToolsPanel({
   const [translatedText, setTranslatedText] = useState("");
   const [translateError, setTranslateError] = useState("");
   const [translateRunning, setTranslateRunning] = useState(false);
+  const [translationSource, setTranslationSource] = useState("");
+  const [translatedDocumentIdentity, setTranslatedDocumentIdentity] =
+    useState<number | null>(null);
+
+  useEffect(() => {
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    findRunRef.current += 1;
+    setQuery("");
+    setFindResults([]);
+    setFindIndex(0);
+    setFindRunning(false);
+    setTranslatedText("");
+    setTranslateError("");
+    setTranslateRunning(false);
+    setTranslationSource("");
+    setTranslatedDocumentIdentity(null);
+    setMessage("");
+    onFindHighlightChange([]);
+    onActivityChange(null);
+  }, [documentIdentity, onActivityChange, onFindHighlightChange]);
 
   useEffect(() => {
     if (editor.activeTool === "find") {
@@ -298,6 +337,7 @@ export function EditorSmartToolsPanel({
   }, []);
 
   function clearFind() {
+    findRunRef.current += 1;
     setQuery("");
     setFindResults([]);
     setFindIndex(0);
@@ -413,6 +453,8 @@ export function EditorSmartToolsPanel({
     }
 
     setFindRunning(true);
+    const runId = findRunRef.current + 1;
+    findRunRef.current = runId;
     setMessage("");
     onActivityChange({ toolId: "find", progress: null });
 
@@ -420,6 +462,7 @@ export function EditorSmartToolsPanel({
       const results: FindResult[] = [];
 
       for (let pageNumber = 1; pageNumber <= editor.totalPages; pageNumber += 1) {
+        if (findRunRef.current !== runId) return;
         const page = await editor.pdfDocument.getPage(pageNumber);
         const viewport = page.getViewport({ scale: 1 });
         results.push(
@@ -441,22 +484,32 @@ export function EditorSmartToolsPanel({
           toolId: "find",
           progress: (pageNumber / editor.totalPages) * 100,
         });
+        if (pageNumber % 20 === 0) {
+          await new Promise<void>((resolve) =>
+            window.requestAnimationFrame(() => resolve()),
+          );
+        }
+        if (results.length >= 5_000) break;
       }
 
-      setFindResults(results);
+      if (findRunRef.current !== runId) return;
+      const uniqueResults = deduplicateFindRegions(results);
+      setFindResults(uniqueResults);
       setFindIndex(0);
 
-      const first = results[0] ?? null;
-      onFindHighlightChange(toHighlights(results, first?.id ?? null));
+      const first = uniqueResults[0] ?? null;
+      onFindHighlightChange(
+        toHighlights(uniqueResults, first?.id ?? null),
+      );
       if (first) editor.setActivePage(first.pageNumber);
-      const resultMessage = results.length
-        ? `${results.length} result${results.length === 1 ? "" : "s"} found.`
+      const resultMessage = uniqueResults.length
+        ? `${uniqueResults.length} result${uniqueResults.length === 1 ? "" : "s"} found.`
         : "No results found.";
       setMessage(resultMessage);
       onStatusChange(resultMessage);
       trackEditorEvent({
         type: "find_performed",
-        resultCount: results.length,
+        resultCount: uniqueResults.length,
         includedOcr: ocrPages.length > 0,
       });
     } catch (error) {
@@ -489,6 +542,8 @@ export function EditorSmartToolsPanel({
     setTranslateRunning(true);
     setTranslateError("");
     setTranslatedText("");
+    setTranslationSource("");
+    setTranslatedDocumentIdentity(null);
     onActivityChange({ toolId: "translate", progress: null });
     trackEditorEvent({
       type: "translate_attempted",
@@ -497,15 +552,22 @@ export function EditorSmartToolsPanel({
     });
 
     try {
+      abortControllerRef.current?.abort();
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+      const pageSource =
+        translateMode === "page"
+          ? await getPageTranslationText(editor, ocrPages)
+          : null;
       const text =
         translateMode === "selection"
           ? getSelectedEditorText(editor)
-          : await getPageText(editor);
+          : pageSource?.text ?? "";
       if (!text.trim()) {
         throw new Error(
           translateMode === "selection"
             ? "Select a text or note object with content first."
-            : "No native text was found on the current page. Run OCR first if this is a scanned page.",
+            : "No native or OCR text was found on the current page. Run OCR first if this is a scanned page.",
         );
       }
 
@@ -513,6 +575,7 @@ export function EditorSmartToolsPanel({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         cache: "no-store",
+        signal: controller.signal,
         body: JSON.stringify({
           text,
           sourceLanguage: sourceLanguage === "auto" ? undefined : sourceLanguage,
@@ -533,10 +596,26 @@ export function EditorSmartToolsPanel({
         );
       }
       setTranslatedText(result);
-      onStatusChange("Translation ready to review.");
+      setTranslationSource(
+        translateMode === "selection"
+          ? "selected editor text"
+          : (pageSource?.source ?? "native text"),
+      );
+      setTranslatedDocumentIdentity(documentIdentity);
+      onStatusChange(
+        `Translation ready from ${
+          translateMode === "selection"
+            ? "selected editor text"
+            : (pageSource?.source ?? "native text")
+        }.`,
+      );
     } catch (error) {
       const errorMessage =
-        error instanceof Error ? error.message : "Translation failed.";
+        error instanceof DOMException && error.name === "AbortError"
+          ? "Translation cancelled."
+          : error instanceof Error
+            ? error.message
+            : "Translation failed.";
       setTranslateError(errorMessage);
       onStatusChange(errorMessage);
       trackEditorEvent({
@@ -545,13 +624,22 @@ export function EditorSmartToolsPanel({
         errorCode: "translation_failed",
       });
     } finally {
+      abortControllerRef.current = null;
       setTranslateRunning(false);
       onActivityChange(null);
     }
   }
 
   function applyTranslation() {
-    if (!translatedText) return;
+    if (
+      !translatedText ||
+      translatedDocumentIdentity !== documentIdentity
+    ) {
+      setTranslateError(
+        "This translation belongs to a different document. Translate again.",
+      );
+      return;
+    }
     const selected = editor.selectedObject;
     const box = selected
       ? {
@@ -576,6 +664,8 @@ export function EditorSmartToolsPanel({
     });
     setTranslatedText("");
     setTranslateError("");
+    setTranslationSource("");
+    setTranslatedDocumentIdentity(null);
     onStatusChange("Translation added as a new editable text object.");
   }
 
@@ -785,6 +875,11 @@ export function EditorSmartToolsPanel({
                     <div className="text-[10px] font-black uppercase tracking-wider text-slate-500">
                       Translation preview
                     </div>
+                    {translationSource ? (
+                      <div className="mt-1 text-[10px] font-bold text-slate-500">
+                        Source: {translationSource}
+                      </div>
+                    ) : null}
                     <p className="mt-2 max-h-32 overflow-auto whitespace-pre-wrap text-sm text-slate-700">
                       {translatedText}
                     </p>
