@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
+    ,"test:smoke": "node --experimental-loader ./scripts/ts-extension-loader.mjs ./scripts/run-smoke.mjs"
   },
   "dependencies": {
     "@pdf-lib/fontkit": "1.1.1",

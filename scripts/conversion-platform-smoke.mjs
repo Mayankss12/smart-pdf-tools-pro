@@ -15,7 +15,19 @@ import {
 } from "../src/lib/conversions/security.ts";
 import {
   assertSafeJobId,
+  ConversionJobIdError,
+  validateProviderOutput,
 } from "../src/lib/conversions/jobs.ts";
+import {
+  PROVIDER_REQUEST_LIMIT_BYTES,
+  PROVIDER_UPLOAD_FILE_LIMIT_BYTES,
+  isWithinProviderUploadLimit,
+} from "../src/lib/conversions/limits.ts";
+import {
+  getConversionPollDelay,
+  isTransientPollStatus,
+} from "../src/lib/conversions/polling.ts";
+import { validateAndResolvePublicWebpageUrl } from "../src/lib/conversions/webpage-security.server.ts";
 import { canUseToolByTier } from "../src/lib/entitlements.ts";
 import {
   createPlainTextOutput,
@@ -71,11 +83,74 @@ assert.equal(
 );
 
 assert.equal(validatePublicWebpageUrl("file:///etc/passwd").allowed, false);
+assert.equal(validatePublicWebpageUrl("http://[::1]/").allowed, false);
+assert.equal(validatePublicWebpageUrl("http://[fc00::1]/").allowed, false);
+assert.equal(validatePublicWebpageUrl("http://[fe80::1]/").allowed, false);
+assert.equal(validatePublicWebpageUrl("http://[::ffff:127.0.0.1]/").allowed, false);
+assert.equal(validatePublicWebpageUrl("http://[::ffff:10.0.0.1]/").allowed, false);
 assert.equal(validatePublicWebpageUrl("http://127.0.0.1/admin").allowed, false);
+assert.equal(validatePublicWebpageUrl("http://10.0.0.1").allowed, false);
+assert.equal(validatePublicWebpageUrl("http://172.16.0.1").allowed, false);
 assert.equal(validatePublicWebpageUrl("http://192.168.1.2").allowed, false);
+assert.equal(validatePublicWebpageUrl("http://2130706433").allowed, false);
+assert.equal(validatePublicWebpageUrl("http://0x7f000001").allowed, false);
 assert.equal(validatePublicWebpageUrl("https://example.com").allowed, true);
-assert.throws(() => assertSafeJobId("../../unsafe"));
+assert.throws(
+  () => assertSafeJobId("../../unsafe"),
+  (error) =>
+    error instanceof ConversionJobIdError &&
+    error.code === "INVALID_JOB_ID",
+);
 assert.doesNotThrow(() => assertSafeJobId("job_12345678"));
+
+const privateDns = await validateAndResolvePublicWebpageUrl(
+  "https://private.example",
+  { resolver: async () => ["10.0.0.2"] },
+);
+assert.equal(privateDns.allowed, false);
+const publicDns = await validateAndResolvePublicWebpageUrl(
+  "https://public.example/path",
+  { resolver: async () => ["93.184.216.34", "2606:2800:220:1:248:1893:25c8:1946"] },
+);
+assert.equal(publicDns.allowed, true);
+if (publicDns.allowed) {
+  assert.equal(publicDns.policy.dnsPinningRequired, true);
+  assert.equal(publicDns.policy.redirectRevalidationRequired, true);
+  assert.equal(publicDns.policy.maxRedirects, 5);
+  assert.deepEqual(publicDns.policy.pinnedAddresses, [
+    "93.184.216.34",
+    "2606:2800:220:1:248:1893:25c8:1946",
+  ]);
+}
+assert.equal(
+  PROVIDER_REQUEST_LIMIT_BYTES - PROVIDER_UPLOAD_FILE_LIMIT_BYTES,
+  1024 * 1024,
+);
+assert.equal(isWithinProviderUploadLimit(PROVIDER_UPLOAD_FILE_LIMIT_BYTES), true);
+assert.equal(isWithinProviderUploadLimit(PROVIDER_UPLOAD_FILE_LIMIT_BYTES + 1), false);
+assert.equal(getConversionPollDelay(0, 0), 1500);
+assert.ok(getConversionPollDelay(20, 1) <= 15_000);
+assert.equal(isTransientPollStatus(503), true);
+assert.equal(isTransientPollStatus(401), false);
+
+const webpageConversion = CONVERSION_REGISTRY.find(
+  (conversion) => conversion.id === "webpage-to-pdf",
+);
+assert.ok(webpageConversion);
+assert.doesNotThrow(() =>
+  validateProviderOutput(webpageConversion, {
+    body: Uint8Array.from([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31]).buffer,
+    mimeType: "application/pdf",
+    fileName: "page.pdf",
+  }),
+);
+assert.throws(() =>
+  validateProviderOutput(webpageConversion, {
+    body: Uint8Array.from([1, 2, 3]).buffer,
+    mimeType: "application/pdf",
+    fileName: "page.pdf",
+  }),
+);
 
 const pdfConversion = CONVERSION_REGISTRY.find(
   (conversion) => conversion.id === "pdf-to-text",
@@ -210,6 +285,10 @@ console.log(
     heicSignature: "passed",
     officeStructureAndMacroBlock: "passed",
     ssrfValidation: "passed",
+    dnsAndRedirectContract: "passed",
+    canonicalProviderUploadLimit: "passed",
+    pollingBackoff: "passed",
+    providerOutputValidation: "passed",
     pdfTextAndHtml: "passed",
     markdownHtmlCsvParsing: "passed",
     structuredUnicodePdf: "passed",
