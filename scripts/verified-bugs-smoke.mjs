@@ -188,6 +188,31 @@ releaseFirst();
 await Promise.all([first, second, third]);
 assert.equal(queue.activeCount, 0);
 
+async function verifyLargeThumbnailQueue(pageCount) {
+  const largeQueue = new ThumbnailRenderQueue(3);
+  const largeController = new AbortController();
+  let running = 0;
+  let maxRunning = 0;
+  const rendered = await Promise.all(
+    Array.from({ length: pageCount }, (_, index) =>
+      largeQueue.run(async () => {
+        running += 1;
+        maxRunning = Math.max(maxRunning, running);
+        await Promise.resolve();
+        running -= 1;
+        return index + 1;
+      }, largeController.signal),
+    ),
+  );
+  assert.equal(rendered.length, pageCount);
+  assert.equal(maxRunning, 3);
+  assert.equal(largeQueue.activeCount, 0);
+  assert.equal(largeQueue.pendingCount, 0);
+}
+
+await verifyLargeThumbnailQueue(100);
+await verifyLargeThumbnailQueue(500);
+
 const [
   editorPage,
   editorHook,
@@ -251,6 +276,7 @@ console.log(
     smartToolDocumentIdentity: "passed",
     textClipGeometry: "passed",
     lazyThumbnailQueue: "passed",
+    largeThumbnailQueues: "100/500 passed",
     objectKeyboardAccessibility: "passed",
     imageRouteIdentityAndQueueLimit: "passed",
     malformedPdfReplacement: "passed",
