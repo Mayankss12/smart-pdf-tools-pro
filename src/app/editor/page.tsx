@@ -380,7 +380,7 @@ export default function EditorPage() {
       const buffer = await file.arrayBuffer();
       const bytes = new Uint8Array(buffer);
       loadedDocument = await pdfjsLib.getDocument({
-        data: new Uint8Array(buffer),
+        data: bytes.slice(),
       }).promise;
 
       if (loadGenerationRef.current !== loadGeneration) {

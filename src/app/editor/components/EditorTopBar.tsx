@@ -15,7 +15,7 @@ import {
   Share2,
   X,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   EDITOR_TOOL_DEFINITIONS,
@@ -154,6 +154,8 @@ export function EditorTopBar({
 }: EditorTopBarProps) {
   const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
   const [rovingIndex, setRovingIndex] = useState(0);
+  const mobileToolsButtonRef = useRef<HTMLButtonElement | null>(null);
+  const mobileToolsPanelRef = useRef<HTMLDivElement | null>(null);
   const desktopButtonRefs = useRef(
     new Map<EditorToolbarItemId, HTMLButtonElement>(),
   );
@@ -163,6 +165,52 @@ export function EditorTopBar({
   const resolvedTools = EDITOR_TOOL_DEFINITIONS.map((definition) =>
     resolveEditorTool(definition, toolContext),
   ).filter((tool) => tool.visible);
+
+  useEffect(() => {
+    if (!mobileToolsOpen) return;
+
+    const focusableSelector =
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const focusFirst = () => {
+      mobileToolsPanelRef.current
+        ?.querySelector<HTMLElement>(focusableSelector)
+        ?.focus();
+    };
+    const frame = window.requestAnimationFrame(focusFirst);
+
+    function handleMobileDialogKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMobileToolsOpen(false);
+        window.requestAnimationFrame(() =>
+          mobileToolsButtonRef.current?.focus(),
+        );
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = Array.from(
+        mobileToolsPanelRef.current?.querySelectorAll<HTMLElement>(
+          focusableSelector,
+        ) ?? [],
+      );
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (!first || !last) return;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    window.addEventListener("keydown", handleMobileDialogKeyDown);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("keydown", handleMobileDialogKeyDown);
+    };
+  }, [mobileToolsOpen]);
 
   function activateTool(tool: ResolvedEditorTool) {
     if (!tool.enabled) {
@@ -310,6 +358,7 @@ export function EditorTopBar({
           </button>
 
           <button
+            ref={mobileToolsButtonRef}
             type="button"
             onClick={() => setMobileToolsOpen((current) => !current)}
             className="inline-flex h-9 items-center gap-1 rounded-xl border border-slate-200 bg-white px-2 text-xs font-black text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-500 lg:hidden"
@@ -389,10 +438,17 @@ export function EditorTopBar({
 
       {mobileToolsOpen ? (
         <div
+          ref={mobileToolsPanelRef}
           id="editor-mobile-tools"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="editor-mobile-tools-title"
           className="absolute left-0 right-0 top-full max-h-[72vh] overflow-y-auto border-t border-slate-200 bg-white p-3 shadow-2xl lg:hidden"
         >
-          <div className="mb-3 flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-500">
+          <div
+            id="editor-mobile-tools-title"
+            className="mb-3 flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-500"
+          >
             <ListFilter size={15} />
             Editor tools
           </div>

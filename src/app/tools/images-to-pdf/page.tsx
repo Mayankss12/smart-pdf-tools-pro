@@ -977,10 +977,10 @@ export default function ImagesToPdfPage({ variant = DEFAULT_IMAGES_TO_PDF_VARIAN
             </div>
             <div>
               <h1 className="text-xl font-bold text-slate-900">
-                Images to PDF
+                {variant.title}
               </h1>
               <p className="text-sm text-slate-500">
-                Convert images into a PDF document.
+                {variant.subtitle}
               </p>
             </div>
           </div>
@@ -1441,7 +1441,12 @@ export default function ImagesToPdfPage({ variant = DEFAULT_IMAGES_TO_PDF_VARIAN
                   Browse files or drag and drop
                 </div>
                 <div className="mt-4 rounded-full bg-white px-4 py-2 text-xs font-bold text-slate-500 shadow-sm">
-                  JPG, PNG, WebP supported · Multiple OK
+                  {variant.source === "mixed"
+                    ? "JPG, PNG, WebP"
+                    : variant.source === "jpg"
+                      ? "JPG and JPEG"
+                      : variant.source.toUpperCase()}{" "}
+                  supported · Multiple OK
                 </div>
               </button>
             ) : (

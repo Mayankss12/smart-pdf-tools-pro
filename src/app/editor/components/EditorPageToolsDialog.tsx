@@ -163,12 +163,30 @@ export function EditorPageToolsDialog({
   onRemovePageNumbers,
 }: EditorPageToolsDialogProps) {
   const dialogRef = useRef<HTMLElement | null>(null);
+  const invokerRef = useRef<HTMLElement | null>(null);
   const [insertion, setInsertion] = useState<EditorPageInsertion>("after");
   const [size, setSize] = useState<EditorBlankPageSize>("same");
   const [pageOrder, setPageOrder] = useState<number[]>([]);
   const [draggedPage, setDraggedPage] = useState<number | null>(null);
   const [numberSettings, setNumberSettings] =
     useState<EditorPageNumberSettings>(pageNumberSettings);
+
+  useEffect(() => {
+    if (mode) {
+      if (
+        !invokerRef.current &&
+        document.activeElement instanceof HTMLElement
+      ) {
+        invokerRef.current = document.activeElement;
+      }
+      return;
+    }
+    const invoker = invokerRef.current;
+    invokerRef.current = null;
+    if (invoker?.isConnected) {
+      window.requestAnimationFrame(() => invoker.focus());
+    }
+  }, [mode]);
 
   useEffect(() => {
     if (!mode) return;

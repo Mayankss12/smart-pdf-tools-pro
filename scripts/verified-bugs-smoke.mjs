@@ -193,6 +193,8 @@ const [
   editorHook,
   smartTools,
   objectFrame,
+  editorTopBar,
+  pageDialog,
   thumbnailPanel,
   translateRoute,
   jobRoute,
@@ -204,6 +206,8 @@ const [
   readFile(new URL("../src/app/editor/hooks/useEditor.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/app/editor/components/EditorSmartToolsPanel.tsx", import.meta.url), "utf8"),
   readFile(new URL("../src/app/editor/components/tools/EditorObjectFrame.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../src/app/editor/components/EditorTopBar.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../src/app/editor/components/EditorPageToolsDialog.tsx", import.meta.url), "utf8"),
   readFile(new URL("../src/app/editor/components/EditorLeftPanel.tsx", import.meta.url), "utf8"),
   readFile(new URL("../src/app/api/translate/route.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/app/api/conversions/jobs/route.ts", import.meta.url), "utf8"),
@@ -213,6 +217,7 @@ const [
 ]);
 assert.match(editorPage, /recordDocumentTransaction/);
 assert.match(editorPage, /preparePdfDocument\(result\.bytes\)/);
+assert.match(editorPage, /data: bytes\.slice\(\)/);
 assert.match(editorHook, /kind: "document"/);
 assert.match(editorHook, /redoStackRef\.current = \[\]/);
 assert.match(smartTools, /findRunRef/);
@@ -220,6 +225,10 @@ assert.match(smartTools, /translatedDocumentIdentity !== documentIdentity/);
 assert.match(smartTools, /getPageTranslationText/);
 assert.match(objectFrame, /tabIndex=\{0\}/);
 assert.match(objectFrame, /aria-pressed=\{selected\}/);
+assert.match(editorTopBar, /role="dialog"/);
+assert.match(editorTopBar, /aria-modal="true"/);
+assert.match(editorTopBar, /handleMobileDialogKeyDown/);
+assert.match(pageDialog, /invokerRef/);
 assert.match(thumbnailPanel, /IntersectionObserver/);
 assert.match(thumbnailPanel, /page\.cleanup\(\)/);
 assert.match(translateRoute, /getConversionApiIdentity/);
