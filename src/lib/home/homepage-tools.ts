@@ -137,6 +137,21 @@ export const HOMEPAGE_FAQS = [
   },
 ] as const;
 
+export function getHomepageFaqStructuredData() {
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: HOMEPAGE_FAQS.map((faq) => ({
+      "@type": "Question",
+      name: faq.question,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: faq.answer,
+      },
+    })),
+  };
+}
+
 function requireTool(id: string, collectionName: string): Tool {
   const tool = getToolById(id);
   if (!tool) {
@@ -288,4 +303,3 @@ export function assertHomepageCuratedIds() {
     getHomepageWorkflowTools(workflow.toolIds);
   }
 }
-

@@ -278,13 +278,13 @@ export function Header() {
           </nav>
 
           <div className="hidden shrink-0 items-center gap-2 xl:flex">
-            <a
+            <Link
               href="/#tool-explorer"
               className="inline-flex h-11 w-11 items-center justify-center rounded-full text-slate-600 transition hover:bg-violet-50 hover:text-violet-700"
               aria-label="Search PDF tools"
             >
               <Search size={18} />
-            </a>
+            </Link>
             <HeaderAuthLinks />
             <Link href="/editor" className="header-cta min-h-11 px-4 text-xs">
               Open Editor
@@ -401,4 +401,3 @@ export function Header() {
     </header>
   );
 }
-

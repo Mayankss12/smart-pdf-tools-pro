@@ -5,6 +5,7 @@ const suites = [
   "editor-export-smoke.mjs",
   "export-entitlement-smoke.mjs",
   "fill-sign-smoke.mjs",
+  "homepage-smoke.mjs",
   "images-to-pdf-smoke.mjs",
   "pdf-rebuild-safety-smoke.mjs",
   "pdf-to-images-smoke.mjs",

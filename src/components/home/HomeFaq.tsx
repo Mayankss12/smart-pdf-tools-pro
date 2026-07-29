@@ -1,20 +1,12 @@
 import { ChevronDown } from "lucide-react";
 
-import { HOMEPAGE_FAQS } from "@/lib/home/homepage-tools";
+import {
+  getHomepageFaqStructuredData,
+  HOMEPAGE_FAQS,
+} from "@/lib/home/homepage-tools";
 
 export function HomeFaq() {
-  const faqStructuredData = {
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    mainEntity: HOMEPAGE_FAQS.map((faq) => ({
-      "@type": "Question",
-      name: faq.question,
-      acceptedAnswer: {
-        "@type": "Answer",
-        text: faq.answer,
-      },
-    })),
-  };
+  const faqStructuredData = getHomepageFaqStructuredData();
 
   return (
     <section className="bg-[#fbfaf7] py-16 sm:py-20">
@@ -57,4 +49,3 @@ export function HomeFaq() {
     </section>
   );
 }
-
