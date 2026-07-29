@@ -45,6 +45,7 @@ import {
   getPdfRenderScale,
   getSafePdfThumbnailScale,
 } from "@/lib/pdf-to-image-engine";
+import { getPdfDocumentLoadErrorMessage } from "@/lib/conversions/pdf-load-errors";
 
 type ExportFormat = "png" | "jpeg" | "webp";
 type TargetMode = "all" | "odd" | "even" | "custom" | "visual";
@@ -555,7 +556,24 @@ export default function PdfToImagesPage({ variant = DEFAULT_PDF_TO_IMAGES_VARIAN
     try {
       configurePdfWorker();
 
-      const pdf = await loadPdfJsDocument(selectedFile);
+      let pdf: pdfjsLib.PDFDocumentProxy;
+      try {
+        pdf = await loadPdfJsDocument(selectedFile);
+      } catch (error) {
+        if (renderTokenRef.current === token) {
+          setFile(null);
+          setPageCount(0);
+          setPageInput("1-3");
+          setOutputBaseName("converted-pages");
+          setTargetMode("all");
+          setSelectedPages([]);
+          setLastSelectedPage(null);
+          clearThumbnails();
+          setThumbnailStatus("error");
+          setStatus(getPdfDocumentLoadErrorMessage(error));
+        }
+        return;
+      }
       activePdfRef.current = pdf;
       const totalPages = pdf.numPages;
       const nextThumbnails: PageThumbnail[] = [];

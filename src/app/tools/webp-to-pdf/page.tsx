@@ -11,6 +11,7 @@ export default function WebpToPdfPage() {
         initialStatus: "Upload WebP images to convert into PDF.",
         accept: "image/webp",
         outputSlug: "webp-to-pdf",
+        source: "webp",
       }}
     />
   );

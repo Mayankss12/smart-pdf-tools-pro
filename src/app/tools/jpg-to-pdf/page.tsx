@@ -11,6 +11,7 @@ export default function JpgToPdfPage() {
         initialStatus: "Upload JPG or JPEG images to convert into PDF.",
         accept: "image/jpeg,image/jpg",
         outputSlug: "jpg-to-pdf",
+        source: "jpg",
       }}
     />
   );

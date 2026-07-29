@@ -36,6 +36,10 @@ import {
 
 import { Header } from "@/components/Header";
 import { useEntitlement } from "@/hooks/useEntitlement";
+import {
+  selectImageQueueCandidates,
+  type ImageRouteSource,
+} from "@/lib/conversions/image-route-policy";
 import { PdfEngineError, downloadBlob, formatFileSize, type PdfProcessingResult } from "@/lib/pdf-engine";
 import {
   convertImagesToPdfEngine,
@@ -70,6 +74,7 @@ type ImagesToPdfVariant = {
   initialStatus: string;
   accept: string;
   outputSlug: string;
+  source: ImageRouteSource;
 };
 
 const DEFAULT_IMAGES_TO_PDF_VARIANT: ImagesToPdfVariant = {
@@ -78,6 +83,7 @@ const DEFAULT_IMAGES_TO_PDF_VARIANT: ImagesToPdfVariant = {
   initialStatus: "Upload JPG, PNG, or WebP images to convert into PDF.",
   accept: "image/png,image/jpeg,image/jpg,image/webp",
   outputSlug: "images-to-pdf",
+  source: "mixed",
 };
 
 type OcrSummary = {
@@ -487,7 +493,12 @@ export default function ImagesToPdfPage({ variant = DEFAULT_IMAGES_TO_PDF_VARIAN
     if (!selectedFiles || selectedFiles.length === 0 || busy) return;
 
     const incomingFiles = Array.from(selectedFiles);
-    const validation = validateImageFiles(incomingFiles);
+    const candidates = selectImageQueueCandidates({
+      files: incomingFiles,
+      source: variant.source,
+      currentCount: images.length,
+    });
+    const validation = validateImageFiles([...candidates.accepted]);
     const preparedImages = validation.accepted.map((file) => ({
       id: createQueueId(),
       file,
@@ -513,6 +524,16 @@ export default function ImagesToPdfPage({ variant = DEFAULT_IMAGES_TO_PDF_VARIAN
 
     const rejectedSummary = getImageToPdfRejectedSummary(validation.rejected);
     if (rejectedSummary) messageParts.push(rejectedSummary);
+    if (candidates.wrongFormatCount > 0) {
+      messageParts.push(
+        `${candidates.wrongFormatCount} file${candidates.wrongFormatCount === 1 ? "" : "s"} rejected: this route accepts ${variant.source === "mixed" ? "JPG, PNG, or WebP" : variant.source.toUpperCase()} only.`,
+      );
+    }
+    if (candidates.queueLimitCount > 0) {
+      messageParts.push(
+        `${candidates.queueLimitCount} image${candidates.queueLimitCount === 1 ? "" : "s"} rejected: the queue accepts at most 80 images.`,
+      );
+    }
 
     setStatus(messageParts.join(" ") || "No supported images were selected.");
   }

@@ -11,6 +11,7 @@ export default function PngToPdfPage() {
         initialStatus: "Upload PNG images to convert into PDF.",
         accept: "image/png",
         outputSlug: "png-to-pdf",
+        source: "png",
       }}
     />
   );

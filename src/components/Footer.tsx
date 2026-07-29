@@ -38,7 +38,7 @@ const footerGroups = [
       { label: "Images to PDF", href: "/tools/images-to-pdf" },
       { label: "PDF to Images", href: "/tools/pdf-to-images" },
       { label: "Page Numbers", href: "/tools/page-numbers" },
-      { label: "Organize PDF", href: "/tools/organize" },
+      { label: "Organize PDF", href: "/tools/reorder" },
     ],
   },
 ] as const;
