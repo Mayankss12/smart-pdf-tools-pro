@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, Globe2, Linkedin, Sparkles } from "lucide-react";
+import { ArrowUpRight, Globe2, Sparkles } from "lucide-react";
 import { BrandMark } from "@/components/BrandMark";
 
 const footerGroups = [
@@ -46,7 +46,7 @@ const footerGroups = [
 export function Footer() {
   return (
     <footer className="border-t border-white/10 bg-[#252631] text-white">
-      <div className="mx-auto max-w-[1480px] px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
+      <div className="mx-auto max-w-[1320px] px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
         <div className="grid gap-10 lg:grid-cols-[1.18fr_repeat(4,0.82fr)]">
           <div className="max-w-sm">
             <Link href="/" className="inline-flex items-center gap-3">
@@ -62,7 +62,9 @@ export function Footer() {
             </Link>
 
             <p className="mt-5 text-sm font-normal leading-7 text-white/68">
-              A cleaner way to edit, organize, convert, and secure PDFs through focused document workflows.
+              Browser-based PDF tools and clearly labelled secure-provider
+              workflows for editing, organizing, converting, and preparing
+              documents.
             </p>
 
             <Link
@@ -99,16 +101,13 @@ export function Footer() {
           <div className="flex flex-wrap items-center gap-3 text-sm font-medium text-white/64">
             <span>© 2026 PDFMantra</span>
             <span className="hidden h-1 w-1 rounded-full bg-white/30 sm:inline-block" />
-            <span>Built for focused PDF work</span>
+            <span>Processing mode shown before you start</span>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <span className="inline-flex items-center gap-2 rounded-full border border-white/14 bg-white/8 px-3.5 py-2 text-sm font-semibold text-white/78">
               <Globe2 size={15} />
               English
-            </span>
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/14 bg-white/8 text-white/78">
-              <Linkedin size={16} />
             </span>
           </div>
         </div>
