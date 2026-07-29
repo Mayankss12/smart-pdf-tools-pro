@@ -1,4 +1,7 @@
 import { getBackendEnvironment } from "@/lib/backend/env";
+import { isWithinProviderUploadLimit } from "./limits";
+import type { ConversionDefinition } from "./registry";
+import type { WebpageSecurityPolicy } from "./webpage-security.server";
 
 export type ConversionJobStatus =
   | "queued"
@@ -26,6 +29,7 @@ export interface ConversionProvider {
     readonly conversionId: string;
     readonly file?: File;
     readonly sourceUrl?: string;
+    readonly webpageSecurityPolicy?: WebpageSecurityPolicy;
   }): Promise<ConversionJob>;
   getJob(ownerId: string, jobId: string): Promise<ConversionJob>;
   cancelJob(ownerId: string, jobId: string): Promise<ConversionJob>;
@@ -40,6 +44,16 @@ export interface ConversionProvider {
 }
 
 const JOB_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_-]{7,127}$/;
+const MAX_PROVIDER_OUTPUT_BYTES = 250 * 1024 * 1024;
+
+export class ConversionJobIdError extends Error {
+  readonly code = "INVALID_JOB_ID";
+
+  constructor() {
+    super("Invalid conversion job identifier.");
+    this.name = "ConversionJobIdError";
+  }
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -137,11 +151,21 @@ class HttpConversionProvider implements ConversionProvider {
     readonly conversionId: string;
     readonly file?: File;
     readonly sourceUrl?: string;
+    readonly webpageSecurityPolicy?: WebpageSecurityPolicy;
   }) {
     const form = new FormData();
     form.set("conversionId", input.conversionId);
     if (input.file) form.set("file", input.file, input.file.name);
     if (input.sourceUrl) form.set("sourceUrl", input.sourceUrl);
+    if (input.webpageSecurityPolicy) {
+      form.set(
+        "webpageSecurityPolicy",
+        JSON.stringify(input.webpageSecurityPolicy),
+      );
+    }
+    if (input.file && !isWithinProviderUploadLimit(input.file.size)) {
+      throw new Error("FILE_TOO_LARGE: Conversion source exceeds the provider upload limit.");
+    }
     const response = await this.request("conversions/jobs", {
       method: "POST",
       headers: {
@@ -202,8 +226,75 @@ class HttpConversionProvider implements ConversionProvider {
 
 export function assertSafeJobId(jobId: string) {
   if (!JOB_ID_PATTERN.test(jobId)) {
-    throw new Error("Invalid conversion job identifier.");
+    throw new ConversionJobIdError();
   }
+}
+
+function outputExtension(fileName: string) {
+  const dotIndex = fileName.lastIndexOf(".");
+  return dotIndex >= 0 ? fileName.slice(dotIndex).toLowerCase() : "";
+}
+
+function hasMagic(bytes: Uint8Array, magic: readonly number[]) {
+  return magic.every((value, index) => bytes[index] === value);
+}
+
+function expectedExtensions(format: ConversionDefinition["destinationFormat"]) {
+  if (format === "jpg") return [".jpg", ".jpeg"] as const;
+  if (format === "markdown") return [".md", ".markdown"] as const;
+  return [`.${format}`] as const;
+}
+
+export function validateProviderOutput(
+  conversion: ConversionDefinition,
+  output: {
+    readonly body: ArrayBuffer;
+    readonly mimeType: string;
+    readonly fileName: string;
+  },
+) {
+  if (
+    output.body.byteLength <= 0 ||
+    output.body.byteLength > MAX_PROVIDER_OUTPUT_BYTES
+  ) {
+    throw new Error("INVALID_PROVIDER_OUTPUT: Provider output size is invalid.");
+  }
+  const mimeType = output.mimeType.split(";")[0]?.trim().toLowerCase();
+  const expectedMime = conversion.expectedOutputMime
+    .split(";")[0]
+    ?.trim()
+    .toLowerCase();
+  if (
+    mimeType !== expectedMime &&
+    mimeType !== "application/octet-stream"
+  ) {
+    throw new Error("INVALID_PROVIDER_OUTPUT: Provider output content type is invalid.");
+  }
+  const extension = outputExtension(output.fileName);
+  if (
+    !expectedExtensions(conversion.destinationFormat).some(
+      (expected) => expected === extension,
+    )
+  ) {
+    throw new Error("INVALID_PROVIDER_OUTPUT: Provider output filename is invalid.");
+  }
+
+  const header = new Uint8Array(output.body, 0, Math.min(8, output.body.byteLength));
+  if (
+    conversion.destinationFormat === "pdf" &&
+    !hasMagic(header, [0x25, 0x50, 0x44, 0x46, 0x2d])
+  ) {
+    throw new Error("INVALID_PROVIDER_OUTPUT: Provider output is not a PDF.");
+  }
+  if (
+    (conversion.destinationFormat === "docx" ||
+      conversion.destinationFormat === "xlsx" ||
+      conversion.destinationFormat === "pptx") &&
+    !hasMagic(header, [0x50, 0x4b, 0x03, 0x04])
+  ) {
+    throw new Error("INVALID_PROVIDER_OUTPUT: Provider output is not an Open XML container.");
+  }
+  return output;
 }
 
 export function getConversionProvider(): ConversionProvider | null {

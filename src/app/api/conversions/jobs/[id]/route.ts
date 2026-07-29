@@ -8,6 +8,7 @@ import {
 } from "@/lib/conversions/api";
 import {
   assertSafeJobId,
+  ConversionJobIdError,
   getConversionProvider,
 } from "@/lib/conversions/jobs";
 
@@ -45,6 +46,14 @@ export async function GET(
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
+    if (error instanceof ConversionJobIdError) {
+      return conversionApiError(
+        request,
+        400,
+        error.code,
+        error.message,
+      );
+    }
     if (error instanceof ConversionIdentityError) {
       return conversionApiError(
         request,

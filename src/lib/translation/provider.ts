@@ -27,6 +27,24 @@ export function isTranslationProviderConfigured() {
   return Boolean(getTranslationProviderConfig());
 }
 
+export function isTranslationProviderCapabilityConfigured() {
+  return (
+    isTranslationProviderConfigured() &&
+    Boolean(
+      (
+        process.env.TRANSLATION_RATE_LIMIT_URL ??
+        process.env.UPSTASH_REDIS_REST_URL
+      )?.trim(),
+    ) &&
+    Boolean(
+      (
+        process.env.TRANSLATION_RATE_LIMIT_TOKEN ??
+        process.env.UPSTASH_REDIS_REST_TOKEN
+      )?.trim(),
+    )
+  );
+}
+
 function readTranslatedText(payload: unknown) {
   if (!payload || typeof payload !== "object") return null;
 

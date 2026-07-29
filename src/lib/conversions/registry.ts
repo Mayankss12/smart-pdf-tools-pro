@@ -122,7 +122,7 @@ function backendConversion(
 const pdfInput = {
   acceptedMimeTypes: ["application/pdf"],
   acceptedExtensions: [".pdf"],
-  maxFileSize: 80 * MB,
+  maxFileSize: PROVIDER_UPLOAD_FILE_LIMIT_BYTES,
   maxFileCount: 1,
   maxPageCount: 500,
   batchLimit: 1,
@@ -144,7 +144,8 @@ export const CONVERSION_REGISTRY = [
     sourceFormat: "pdf",
     destinationFormat: "docx",
     title: "PDF to Word",
-    description: "Convert PDF content into a valid editable DOCX document.",
+    description:
+      "Create DOCX output only through a configured document-processing provider.",
     route: "/tools/pdf-to-word",
     capabilityKey: "document-conversion-worker",
     disabledReason:
@@ -152,7 +153,7 @@ export const CONVERSION_REGISTRY = [
     supportsBatch: false,
     supportsProgress: true,
     supportsCancellation: true,
-    preservesText: "yes",
+    preservesText: "partial",
     preservesLayout: "partial",
     preservesImages: "partial",
     preservesTables: "partial",
@@ -162,7 +163,7 @@ export const CONVERSION_REGISTRY = [
     entitlementToolKey: "pdf-to-word",
     analyticsEvent: "conversion_pdf_to_word",
     qualityNotice:
-      "Editable reconstruction requires a real DOCX renderer; complex PDF layout may differ.",
+      "OCR, editable Word output, and layout preservation are provider-dependent and are not available or claimed without a verified provider.",
   }),
   backendConversion({
     ...pdfInput,
@@ -590,3 +591,4 @@ export function isConversionAvailable(
   }
   return true;
 }
+import { PROVIDER_UPLOAD_FILE_LIMIT_BYTES } from "./limits";

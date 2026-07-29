@@ -1,82 +1,71 @@
 import { NextResponse } from "next/server";
 
+import { isSameSiteStateChangingRequest } from "@/lib/api-security";
 import {
-  isTranslationProviderConfigured,
+  ConversionIdentityError,
+  getConversionApiIdentity,
+} from "@/lib/conversions/api";
+import { canUseToolByTier } from "@/lib/entitlements";
+import {
+  isTranslationProviderCapabilityConfigured,
   translateWithConfiguredProvider,
 } from "@/lib/translation/provider";
+import { consumeTranslationRateLimit } from "@/lib/translation/rate-limit";
 
 const MAX_TEXT_LENGTH = 20_000;
-const RATE_LIMIT_WINDOW_MS = 60_000;
-const RATE_LIMIT_REQUESTS = 12;
 const PROVIDER_TIMEOUT_MS = 20_000;
-
-type RateLimitEntry = {
-  count: number;
-  resetAt: number;
-};
-
-const rateLimits = new Map<string, RateLimitEntry>();
 
 function readString(payload: object, key: string) {
   const value = Reflect.get(payload, key);
   return typeof value === "string" ? value.trim() : "";
 }
 
-function isSameOriginRequest(request: Request) {
-  const origin = request.headers.get("origin");
-  if (!origin) return true;
-
-  try {
-    return new URL(origin).origin === new URL(request.url).origin;
-  } catch {
-    return false;
-  }
-}
-
-function getClientKey(request: Request) {
-  return (
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip")?.trim() ||
-    "local"
-  );
-}
-
-function isRateLimited(request: Request) {
-  const now = Date.now();
-  const key = getClientKey(request);
-  const current = rateLimits.get(key);
-
-  if (!current || current.resetAt <= now) {
-    rateLimits.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    return false;
-  }
-
-  current.count += 1;
-  return current.count > RATE_LIMIT_REQUESTS;
-}
-
 export async function POST(request: Request) {
-  if (!isSameOriginRequest(request)) {
+  if (!isSameSiteStateChangingRequest(request)) {
     return NextResponse.json({ error: "Cross-origin requests are not allowed." }, { status: 403 });
   }
 
-  if (isRateLimited(request)) {
+  let identity;
+  try {
+    identity = await getConversionApiIdentity();
+  } catch (error) {
+    if (error instanceof ConversionIdentityError) {
+      return NextResponse.json(
+        { error: "Translation access is temporarily unavailable." },
+        { status: 503 },
+      );
+    }
+    throw error;
+  }
+  if (!identity) {
+    return NextResponse.json(
+      { error: "Sign in to use translation." },
+      { status: 401 },
+    );
+  }
+  if (!canUseToolByTier({ tier: identity.tier, toolKey: "translate" })) {
+    return NextResponse.json(
+      { error: "Translation requires an eligible Pro or Admin plan." },
+      { status: 403 },
+    );
+  }
+  if (!isTranslationProviderCapabilityConfigured()) {
+    return NextResponse.json(
+      { error: "Translation is not configured." },
+      { status: 503 },
+    );
+  }
+  const rateLimit = await consumeTranslationRateLimit(identity.ownerId);
+  if (rateLimit.unavailable) {
+    return NextResponse.json(
+      { error: "Translation access is temporarily unavailable." },
+      { status: 503 },
+    );
+  }
+  if (!rateLimit.allowed) {
     return NextResponse.json(
       { error: "Too many translation requests. Please retry in a minute." },
       { status: 429 },
-    );
-  }
-
-  if (!isTranslationProviderConfigured()) {
-    return NextResponse.json(
-      {
-        error: "Translation backend configuration required.",
-        requiredEnvironment: [
-          "TRANSLATION_API_URL",
-          "TRANSLATION_API_KEY",
-        ],
-      },
-      { status: 503 },
     );
   }
 
@@ -131,9 +120,7 @@ export async function POST(request: Request) {
         error:
           timedOut
             ? "Translation provider timed out."
-            : error instanceof Error
-            ? error.message
-            : "Translation provider failed.",
+            : "Translation provider failed safely.",
       },
       { status: 502 },
     );

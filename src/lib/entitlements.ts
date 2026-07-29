@@ -142,6 +142,7 @@ export const BACKEND_TOOL_KEYS = [
   "pptx-to-pdf",
   "heic-to-pdf",
   "webpage-to-pdf",
+  "translate",
 ] as const;
 
 export type CoreToolKey = (typeof CORE_TOOL_KEYS)[number];

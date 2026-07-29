@@ -7,8 +7,11 @@ import {
 } from "@/lib/conversions/api";
 import {
   assertSafeJobId,
+  ConversionJobIdError,
   getConversionProvider,
+  validateProviderOutput,
 } from "@/lib/conversions/jobs";
+import { getConversionById } from "@/lib/conversions/registry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,7 +49,20 @@ export async function GET(
     }
     const { id } = await context.params;
     assertSafeJobId(id);
-    const output = await provider.downloadJob(ownerId, id);
+    const job = await provider.getJob(ownerId, id);
+    const conversion = getConversionById(job.conversionId);
+    if (!conversion || job.status !== "completed" || !job.outputAvailable) {
+      return conversionApiError(
+        request,
+        409,
+        "OUTPUT_NOT_READY",
+        "The conversion output is not ready.",
+      );
+    }
+    const output = validateProviderOutput(
+      conversion,
+      await provider.downloadJob(ownerId, id),
+    );
     return new Response(output.body, {
       headers: {
         "Cache-Control": "no-store, private",
@@ -56,6 +72,14 @@ export async function GET(
       },
     });
   } catch (error) {
+    if (error instanceof ConversionJobIdError) {
+      return conversionApiError(
+        request,
+        400,
+        error.code,
+        error.message,
+      );
+    }
     if (error instanceof ConversionIdentityError) {
       return conversionApiError(
         request,

@@ -8,7 +8,7 @@ const PRO_TOOLS = [
   ["Protect PDF", "Password protection workflow prepared for secure backend encryption and private delivery.", "/tools/protect", ShieldCheck],
   ["Unlock PDF", "Authorized unlock workflow for PDFs you own or are allowed to access with a known password.", "/tools/unlock", ShieldOff],
   ["OCR PDF", "Backend OCR workflow for scanned PDFs that need searchable and selectable text layers.", "/tools/ocr", Brain],
-  ["PDF to Word", "Backend document workflow prepared for editable Word-style output and layout reconstruction.", "/tools/pdf-to-word", Wand2],
+  ["PDF to Word", "Backend-required DOCX workflow. OCR, editability, and layout quality depend on a configured document-processing provider.", "/tools/pdf-to-word", Wand2],
   ["Redact PDF", "Privacy workflow prepared for true permanent redaction instead of visual-only hiding.", "/tools/redact", Eye],
 ] as const;
 

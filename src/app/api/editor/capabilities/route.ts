@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 
 import { getEditorFeatureControlFromEnvironment } from "@/lib/editor/editor-feature-control";
-import { isTranslationProviderConfigured } from "@/lib/translation/provider";
+import { isTranslationProviderCapabilityConfigured } from "@/lib/translation/provider";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET() {
-  const translation = isTranslationProviderConfigured();
+  const translation = isTranslationProviderCapabilityConfigured();
 
   return NextResponse.json(
     {

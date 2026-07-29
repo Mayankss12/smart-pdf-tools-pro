@@ -13,6 +13,10 @@ import {
 } from "lucide-react";
 
 import { formatFileSize } from "@/lib/pdf-engine";
+import {
+  getConversionPollDelay,
+  isTransientPollStatus,
+} from "@/lib/conversions/polling";
 
 type BackendJobStatus =
   | "queued"
@@ -116,6 +120,9 @@ export function BackendConversionClient({
   const [sourceUrl, setSourceUrl] = useState("");
   const [job, setJob] = useState<BackendJob | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pollFailureCount, setPollFailureCount] = useState(0);
+  const [pollingStopped, setPollingStopped] = useState(false);
+  const [pollNonce, setPollNonce] = useState(0);
   const [status, setStatus] = useState(
     enabled
       ? `Choose a ${sourceFormat.toUpperCase()} source to begin.`
@@ -123,7 +130,7 @@ export function BackendConversionClient({
   );
 
   useEffect(() => {
-    if (!enabled || !isActiveJob(job)) return;
+    if (!enabled || !isActiveJob(job) || pollingStopped) return;
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       try {
@@ -138,15 +145,26 @@ export function BackendConversionClient({
         const payload: unknown = await response.json();
         const nextJob = getPayloadJob(payload);
         if (!response.ok || !nextJob) {
+          if (isTransientPollStatus(response.status)) {
+            setPollFailureCount((count) => count + 1);
+            setStatus(
+              "Temporary status error. Retrying the conversion service automatically...",
+            );
+            return;
+          }
           setBusy(false);
+          setPollingStopped(true);
           setStatus(
-            getPayloadMessage(
-              payload,
-              "Unable to read the conversion job status.",
-            ),
+            response.status === 401 || response.status === 403
+              ? "Your conversion session is no longer authorized. Sign in and retry."
+              : getPayloadMessage(
+                  payload,
+                  "Unable to read the conversion job status.",
+                ),
           );
           return;
         }
+        setPollFailureCount(0);
         setJob(nextJob);
         if (nextJob.status === "completed") {
           setBusy(false);
@@ -171,15 +189,17 @@ export function BackendConversionClient({
         }
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") return;
-        setBusy(false);
-        setStatus("Unable to contact the conversion service.");
+        setPollFailureCount((count) => count + 1);
+        setStatus(
+          "Temporary network error. Retrying the conversion service automatically...",
+        );
       }
-    }, 1500);
+    }, getConversionPollDelay(pollFailureCount));
     return () => {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [enabled, job]);
+  }, [enabled, job, pollFailureCount, pollingStopped, pollNonce]);
 
   function selectFile(selected: File | undefined) {
     if (!selected) return;
@@ -202,6 +222,8 @@ export function BackendConversionClient({
     }
     setFile(selected);
     setJob(null);
+    setPollFailureCount(0);
+    setPollingStopped(false);
     setStatus(
       `${selected.name} is ready (${formatFileSize(selected.size)}).`,
     );
@@ -219,6 +241,8 @@ export function BackendConversionClient({
     }
     setBusy(true);
     setJob(null);
+    setPollFailureCount(0);
+    setPollingStopped(false);
     setStatus("Validating source and starting a private conversion job...");
     try {
       const form = new FormData();
@@ -294,6 +318,8 @@ export function BackendConversionClient({
     setSourceUrl("");
     setJob(null);
     setBusy(false);
+    setPollFailureCount(0);
+    setPollingStopped(false);
     setStatus(
       enabled
         ? `Choose a ${sourceFormat.toUpperCase()} source to begin.`
@@ -459,6 +485,22 @@ export function BackendConversionClient({
           <RefreshCcw size={16} />
           Convert another
         </button>
+        {job && (pollFailureCount > 0 || pollingStopped) ? (
+          <button
+            type="button"
+            onClick={() => {
+              setPollingStopped(false);
+              setPollFailureCount(0);
+              setBusy(true);
+              setPollNonce((value) => value + 1);
+              setStatus("Retrying conversion status now...");
+            }}
+            className="inline-flex h-11 items-center gap-2 rounded-2xl border border-violet-200 bg-violet-50 px-5 text-sm font-bold text-violet-700 hover:bg-violet-100"
+          >
+            <RefreshCcw size={16} />
+            Retry status
+          </button>
+        ) : null}
       </div>
     </div>
   );

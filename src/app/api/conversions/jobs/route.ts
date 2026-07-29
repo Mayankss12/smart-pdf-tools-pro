@@ -9,18 +9,20 @@ import {
 } from "@/lib/conversions/api";
 import { getPublicConversionCapability } from "@/lib/conversions/capabilities";
 import { getConversionProvider } from "@/lib/conversions/jobs";
+import { PROVIDER_REQUEST_LIMIT_BYTES } from "@/lib/conversions/limits";
 import { getConversionById } from "@/lib/conversions/registry";
 import {
   ConversionValidationError,
   validateConversionFiles,
-  validatePublicWebpageUrl,
 } from "@/lib/conversions/security";
+import {
+  validateAndResolvePublicWebpageUrl,
+  type WebpageSecurityPolicy,
+} from "@/lib/conversions/webpage-security.server";
 import { canUseToolByTier } from "@/lib/entitlements";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const MAX_REQUEST_BYTES = 55 * 1024 * 1024;
 
 export async function POST(request: Request) {
   if (!isSameSiteStateChangingRequest(request)) {
@@ -32,7 +34,7 @@ export async function POST(request: Request) {
     );
   }
   const contentLength = Number(request.headers.get("content-length") ?? 0);
-  if (contentLength > MAX_REQUEST_BYTES) {
+  if (contentLength > PROVIDER_REQUEST_LIMIT_BYTES) {
     return conversionApiError(
       request,
       413,
@@ -107,6 +109,7 @@ export async function POST(request: Request) {
         ? sourceUrlValue.trim()
         : undefined;
 
+    let webpageSecurityPolicy: WebpageSecurityPolicy | undefined;
     if (conversion.sourceFormat === "url") {
       if (!sourceUrl) {
         return conversionApiError(
@@ -116,8 +119,9 @@ export async function POST(request: Request) {
           "A public webpage URL is required.",
         );
       }
-      const validation = validatePublicWebpageUrl(sourceUrl);
-      if (!validation.allowed) {
+      const validation =
+        await validateAndResolvePublicWebpageUrl(sourceUrl);
+      if (validation.allowed === false) {
         return conversionApiError(
           request,
           400,
@@ -125,6 +129,7 @@ export async function POST(request: Request) {
           validation.reason,
         );
       }
+      webpageSecurityPolicy = validation.policy;
     } else {
       await validateConversionFiles(conversion, file ? [file] : []);
     }
@@ -134,6 +139,7 @@ export async function POST(request: Request) {
       conversionId,
       file,
       sourceUrl,
+      webpageSecurityPolicy,
     });
     return NextResponse.json(
       { ok: true, job },

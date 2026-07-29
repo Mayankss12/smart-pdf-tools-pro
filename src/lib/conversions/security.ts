@@ -186,22 +186,151 @@ export function validatePublicWebpageUrl(value: string) {
     } as const;
   }
 
-  const hostname = url.hostname.toLowerCase().replace(/\.$/, "");
+  const hostname = canonicalizeNetworkHostname(url.hostname);
   const forbidden =
-    hostname === "localhost" ||
-    hostname === "0.0.0.0" ||
-    hostname === "::1" ||
-    hostname.endsWith(".local") ||
-    hostname.endsWith(".internal") ||
-    /^(127|10)\./.test(hostname) ||
-    /^169\.254\./.test(hostname) ||
-    /^192\.168\./.test(hostname) ||
-    /^172\.(1[6-9]|2\d|3[01])\./.test(hostname);
+    isLocalHostname(hostname) || isNonPublicIpAddress(hostname);
 
-  return forbidden
-    ? {
-        allowed: false,
-        reason: "Local, private, link-local, and internal network URLs are blocked.",
-      }
-    : { allowed: true, reason: null };
+  if (forbidden) {
+    return {
+      allowed: false,
+      reason: "Local, private, link-local, and internal network URLs are blocked.",
+    } as const;
+  }
+  return { allowed: true, reason: null } as const;
+}
+
+export function canonicalizeNetworkHostname(value: string) {
+  const trimmed = value.trim().toLowerCase().replace(/\.$/, "");
+  return trimmed.startsWith("[") && trimmed.endsWith("]")
+    ? trimmed.slice(1, -1)
+    : trimmed;
+}
+
+export function isLocalHostname(hostname: string) {
+  const canonical = canonicalizeNetworkHostname(hostname);
+  return (
+    canonical === "localhost" ||
+    canonical.endsWith(".localhost") ||
+    canonical.endsWith(".local") ||
+    canonical.endsWith(".internal") ||
+    canonical.endsWith(".home") ||
+    canonical.endsWith(".lan")
+  );
+}
+
+function parseIpv4(value: string) {
+  const parts = value.split(".");
+  if (parts.length !== 4) return null;
+  const octets = parts.map((part) =>
+    /^\d{1,3}$/.test(part) ? Number(part) : Number.NaN,
+  );
+  return octets.every(
+    (octet) => Number.isInteger(octet) && octet >= 0 && octet <= 255,
+  )
+    ? octets
+    : null;
+}
+
+function parseIpv6(value: string) {
+  let source = canonicalizeNetworkHostname(value);
+  const zoneIndex = source.indexOf("%");
+  if (zoneIndex >= 0) source = source.slice(0, zoneIndex);
+
+  const embeddedIpv4Match = source.match(/^(.*:)(\d+\.\d+\.\d+\.\d+)$/);
+  if (embeddedIpv4Match) {
+    const ipv4 = parseIpv4(embeddedIpv4Match[2]);
+    if (!ipv4) return null;
+    source = `${embeddedIpv4Match[1]}${((ipv4[0] << 8) | ipv4[1]).toString(16)}:${((ipv4[2] << 8) | ipv4[3]).toString(16)}`;
+  }
+
+  if (!source.includes(":") || source.split("::").length > 2) return null;
+  const [leftSource, rightSource = ""] = source.split("::");
+  const left = leftSource ? leftSource.split(":") : [];
+  const right = rightSource ? rightSource.split(":") : [];
+  if (
+    [...left, ...right].some((part) => !/^[0-9a-f]{1,4}$/i.test(part))
+  ) {
+    return null;
+  }
+  const missing = 8 - left.length - right.length;
+  if (
+    (source.includes("::") && missing < 1) ||
+    (!source.includes("::") && missing !== 0)
+  ) {
+    return null;
+  }
+  return [
+    ...left.map((part) => Number.parseInt(part, 16)),
+    ...Array.from({ length: missing }, () => 0),
+    ...right.map((part) => Number.parseInt(part, 16)),
+  ];
+}
+
+function isNonPublicIpv4(octets: readonly number[]) {
+  const [a, b, c] = octets;
+  return (
+    a === 0 ||
+    a === 10 ||
+    a === 127 ||
+    (a === 100 && b >= 64 && b <= 127) ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 0 && c === 0) ||
+    (a === 192 && b === 0 && c === 2) ||
+    (a === 192 && b === 168) ||
+    (a === 198 && (b === 18 || b === 19)) ||
+    (a === 198 && b === 51 && c === 100) ||
+    (a === 203 && b === 0 && c === 113) ||
+    a >= 224
+  );
+}
+
+export function isNonPublicIpAddress(value: string) {
+  const canonical = canonicalizeNetworkHostname(value);
+  const ipv4 = parseIpv4(canonical);
+  if (ipv4) return isNonPublicIpv4(ipv4);
+
+  const ipv6 = parseIpv6(canonical);
+  if (!ipv6) return false;
+  const [first, second, third, fourth, fifth, sixth, seventh, eighth] = ipv6;
+  const isUnspecified = ipv6.every((part) => part === 0);
+  const isLoopback =
+    first === 0 &&
+    second === 0 &&
+    third === 0 &&
+    fourth === 0 &&
+    fifth === 0 &&
+    sixth === 0 &&
+    seventh === 0 &&
+    eighth === 1;
+  const isIpv4Mapped =
+    first === 0 &&
+    second === 0 &&
+    third === 0 &&
+    fourth === 0 &&
+    fifth === 0 &&
+    sixth === 0xffff;
+  if (isIpv4Mapped) {
+    return isNonPublicIpv4([
+      seventh >> 8,
+      seventh & 0xff,
+      eighth >> 8,
+      eighth & 0xff,
+    ]);
+  }
+
+  const isUniqueLocal = (first & 0xfe00) === 0xfc00;
+  const isLinkLocal = (first & 0xffc0) === 0xfe80;
+  const isMulticast = (first & 0xff00) === 0xff00;
+  const isDocumentation = first === 0x2001 && second === 0x0db8;
+  const isGlobalUnicast = (first & 0xe000) === 0x2000;
+  return (
+    isUnspecified ||
+    isLoopback ||
+    isUniqueLocal ||
+    isLinkLocal ||
+    isMulticast ||
+    isDocumentation ||
+    !isGlobalUnicast
+  );
 }
