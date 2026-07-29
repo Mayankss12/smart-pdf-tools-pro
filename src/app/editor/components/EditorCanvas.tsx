@@ -305,10 +305,9 @@ function PdfPageRenderer({
     let cancelled = false;
     let renderTask: PdfRenderTask | null = null;
     let renderedPage: PDFPageProxy | null = null;
+    const canvas = canvasRef.current;
 
     async function renderPage() {
-      const canvas = canvasRef.current;
-
       if (!canvas || !editor.pdfDocument) return;
 
       try {
@@ -359,7 +358,6 @@ function PdfPageRenderer({
         // Ignore cancelled render task.
       }
       renderedPage?.cleanup();
-      const canvas = canvasRef.current;
       if (canvas) {
         canvas.width = 0;
         canvas.height = 0;

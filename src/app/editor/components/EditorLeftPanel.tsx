@@ -37,8 +37,8 @@ function PageThumbnail({ documentProxy, pageNumber, active, onSelect }: Thumbnai
   }, [active]);
 
   useEffect(() => {
+    const canvas = canvasRef.current;
     if (!shouldRender) {
-      const canvas = canvasRef.current;
       if (canvas) {
         canvas.width = 0;
         canvas.height = 0;
@@ -50,7 +50,6 @@ function PageThumbnail({ documentProxy, pageNumber, active, onSelect }: Thumbnai
     let renderTask: { cancel: () => void; promise: Promise<void> } | null = null;
 
     async function renderThumbnail() {
-      const canvas = canvasRef.current;
       if (!canvas) return;
 
       try {
@@ -90,7 +89,6 @@ function PageThumbnail({ documentProxy, pageNumber, active, onSelect }: Thumbnai
       } catch {
         // Ignore cancelled render task.
       }
-      const canvas = canvasRef.current;
       if (canvas) {
         canvas.width = 0;
         canvas.height = 0;
