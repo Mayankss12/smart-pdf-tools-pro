@@ -9,6 +9,8 @@ import {
 } from "../src/lib/home/file-action-suggestions.ts";
 import {
   assertHomepageCuratedIds,
+  getHomepageConversionsFromPdf,
+  getHomepageConversionsToPdf,
   getHomepageExplorerTools,
   getHomepageFaqStructuredData,
   getHomepagePopularTools,
@@ -17,65 +19,64 @@ import {
   HOMEPAGE_POPULAR_TOOL_IDS,
   HOMEPAGE_TO_PDF_IDS,
 } from "../src/lib/home/homepage-tools.ts";
-import { getHomepageProductMetrics } from "../src/lib/home/homepage-metrics.ts";
-import { EDITOR_TOOL_DEFINITIONS } from "../src/lib/editor/editor-tool-registry.ts";
-import { getToolById, tools } from "../src/lib/tools.ts";
+import {
+  getPublicLaunchReadyTools,
+  isToolPubliclyLaunchReady,
+} from "../src/lib/public-launch.ts";
+import { getPublicLaunchCapabilitySnapshot } from "../src/lib/public-launch-snapshot.ts";
+import { getToolById } from "../src/lib/tools.ts";
 
 assert.doesNotThrow(() => assertHomepageCuratedIds());
 
-const popularTools = getHomepagePopularTools();
-assert.equal(popularTools.length, HOMEPAGE_POPULAR_TOOL_IDS.length);
+const snapshot = getPublicLaunchCapabilitySnapshot();
+const unavailableIds = new Set([
+  "pdf-to-word",
+  "pdf-to-excel",
+  "pdf-to-powerpoint",
+  "docx-to-pdf",
+  "xlsx-to-pdf",
+  "pptx-to-pdf",
+  "heic-to-pdf",
+  "webpage-to-pdf",
+  "protect-pdf",
+  "unlock-pdf",
+  "watermark-remover",
+  "redact-pdf",
+]);
+
+const popularTools = getHomepagePopularTools(snapshot);
 assert.deepEqual(
   popularTools.map((tool) => tool.id),
   [...HOMEPAGE_POPULAR_TOOL_IDS],
 );
-for (const tool of popularTools) {
-  assert.equal(tool.href, getToolById(tool.id)?.href);
-  assert.ok(
-    tool.status === "working" || tool.status === "beta",
-    `Popular tool ${tool.id} must be usable`,
-  );
-}
+assert.ok(
+  popularTools.every((tool) => isToolPubliclyLaunchReady(tool, snapshot)),
+);
 
-const explorerTools = getHomepageExplorerTools();
+const explorerTools = getHomepageExplorerTools(snapshot);
 assert.equal(
   new Set(explorerTools.map((tool) => tool.id)).size,
   explorerTools.length,
+);
+assert.deepEqual(
+  explorerTools.filter((tool) => unavailableIds.has(tool.id)),
+  [],
+);
+
+const conversionTools = [
+  ...getHomepageConversionsFromPdf(snapshot),
+  ...getHomepageConversionsToPdf(snapshot),
+];
+assert.deepEqual(
+  conversionTools.filter((conversion) => unavailableIds.has(conversion.id)),
+  [],
 );
 
 for (const conversion of CONVERSION_REGISTRY) {
   const tool = getToolById(conversion.id);
   assert.ok(tool, `Missing canonical tool for ${conversion.id}`);
   assert.equal(tool.href, conversion.route);
-  assert.equal(
-    tool.capabilities.processingMode,
-    conversion.processingMode === "client" ? "browser" : "backend",
-  );
-  if (conversion.processingMode === "provider") {
-    assert.notEqual(conversion.status, "available");
-    assert.ok(conversion.disabledReason);
-  }
 }
-
-const metrics = getHomepageProductMetrics();
-assert.equal(
-  metrics.browserTools,
-  tools.filter(
-    (tool) =>
-      tool.status === "working" &&
-      tool.capabilities.processingMode === "browser",
-  ).length,
-);
-assert.equal(metrics.conversionWorkflows, CONVERSION_REGISTRY.length);
-assert.equal(
-  metrics.editorCapabilities,
-  EDITOR_TOOL_DEFINITIONS.filter(
-    (definition) =>
-      definition.visible &&
-      definition.group !== "actions" &&
-      definition.id !== "select",
-  ).length,
-);
 
 const faqStructuredData = getHomepageFaqStructuredData();
 assert.deepEqual(
@@ -95,10 +96,16 @@ const pdfRecognition = recognizeHomepageFile({
 });
 assert.ok(pdfRecognition);
 assert.ok(
-  getFileActionSuggestions(pdfRecognition).some(
+  getFileActionSuggestions(pdfRecognition, snapshot).some(
     (tool) => tool.id === "pdf-editor",
   ),
 );
+const officeRecognition = recognizeHomepageFile({
+  name: "document.docx",
+  size: 1024,
+});
+assert.ok(officeRecognition);
+assert.deepEqual(getFileActionSuggestions(officeRecognition, snapshot), []);
 assert.equal(
   recognizeHomepageFile({ name: "too-large.pdf", size: 56 * 1024 * 1024 }),
   null,
@@ -108,63 +115,99 @@ assert.equal(
   null,
 );
 
-const sourceFiles = await Promise.all(
+const sources = await Promise.all(
   [
     "../src/app/page.tsx",
-    "../src/components/Header.tsx",
+    "../src/components/HeaderClient.tsx",
     "../src/components/Footer.tsx",
+    "../src/components/ToolsDirectoryClient.tsx",
     "../src/components/home/ToolCard.tsx",
     "../src/components/home/ToolExplorer.tsx",
     "../src/components/home/ConversionHub.tsx",
     "../src/components/home/HomeFaq.tsx",
-    "../src/components/home/ProductProof.tsx",
+    "../src/app/sitemap.ts",
   ].map((path) => readFile(new URL(path, import.meta.url), "utf8")),
 );
 const [
   pageSource,
   headerSource,
   footerSource,
+  directorySource,
   toolCardSource,
   explorerSource,
   conversionSource,
   faqSource,
-  proofSource,
-] = sourceFiles;
+  sitemapSource,
+] = sources;
+const homepageSource = [
+  pageSource,
+  toolCardSource,
+  explorerSource,
+  conversionSource,
+  faqSource,
+].join("\n");
 
 assert.doesNotMatch(pageSource.trimStart(), /^["']use client["']/);
 assert.doesNotMatch(pageSource, /useRouter|pdfjs-dist|tesseract/i);
 assert.doesNotMatch(
-  `${pageSource}\n${headerSource}\n${footerSource}`,
-  /\/tools\/organize/,
+  pageSource,
+  /HomepageTrustStrip|ProductProof|WorkflowStories/,
 );
+assert.doesNotMatch(homepageSource, /Coming soon|Backend required/i);
+assert.doesNotMatch(
+  homepageSource,
+  /browser tools|conversion workflows|editor capabilities/i,
+);
+assert.doesNotMatch(conversionSource, /Advanced conversions/i);
 assert.match(pageSource, /getHomepageCapabilitySnapshot/);
-assert.match(headerSource, /getHomepagePopularTools/);
+assert.match(headerSource, /launchReadyToolIds/);
 assert.match(headerSource, /xl:flex/);
 assert.match(headerSource, /aria-expanded=\{toolsOpen\}/);
 assert.match(headerSource, /event\.key === "Escape"/);
-assert.doesNotMatch(pageSource, /HomeFinalCta/);
+assert.match(directorySource, /launchReadyToolIds/);
+assert.match(footerSource, /getPublicFooterTools/);
+assert.match(sitemapSource, /getPublicSitemapTools/);
+assert.doesNotMatch(
+  `${pageSource}\n${headerSource}\n${footerSource}`,
+  /\/tools\/organize/,
+);
 assert.doesNotMatch(toolCardSource, />\s*Browser\s*</);
-assert.doesNotMatch(toolCardSource, /Backend required/);
-assert.match(explorerSource, /RESULT_LIMIT = 12/);
-assert.match(explorerSource, /tool\.search\.keywords/);
-assert.doesNotMatch(explorerSource, />\s*Browser\s*</);
-assert.doesNotMatch(explorerSource, /Backend required/);
-assert.doesNotMatch(conversionSource, />\s*Browser\s*</);
-assert.doesNotMatch(conversionSource, /Backend required/);
-assert.match(conversionSource, /Coming soon/);
+assert.doesNotMatch(explorerSource, /Coming soon|Backend required/i);
+assert.doesNotMatch(conversionSource, /Coming soon|Backend required/i);
 assert.match(faqSource, /getHomepageFaqStructuredData/);
-assert.match(proofSource, /homepage-metrics/);
 
+for (const removedPath of [
+  "../src/components/home/HomepageTrustStrip.tsx",
+  "../src/components/home/ProductProof.tsx",
+  "../src/components/home/WorkflowStories.tsx",
+  "../src/lib/home/homepage-metrics.ts",
+]) {
+  await assert.rejects(
+    access(fileURLToPath(new URL(removedPath, import.meta.url))),
+    `${removedPath} should be deleted`,
+  );
+}
+
+await assert.doesNotReject(
+  access(
+    fileURLToPath(
+      new URL("../src/app/tools/reorder/page.tsx", import.meta.url),
+    ),
+  ),
+);
 await assert.rejects(
   access(
     fileURLToPath(
-      new URL(
-        "../src/components/home/HomeFinalCta.tsx",
-        import.meta.url,
-      ),
+      new URL("../src/app/tools/organize/page.tsx", import.meta.url),
     ),
   ),
-  "HomeFinalCta should be deleted",
+);
+
+const publicTools = getPublicLaunchReadyTools(snapshot);
+assert.ok(publicTools.length > 0);
+assert.deepEqual(
+  publicTools.filter((tool) => unavailableIds.has(tool.id)),
+  [],
 );
 
 const curatedRouteIds = new Set([
@@ -188,15 +231,13 @@ for (const id of curatedRouteIds) {
 
 console.log(
   JSON.stringify({
-    curatedIds: "passed",
-    popularTools: popularTools.length,
-    canonicalRoutes: "passed",
-    capabilityBadges: "passed",
-    providerGating: "passed",
+    homepageComposition: "passed",
+    publicPopularTools: popularTools.length,
+    publicExplorerTools: explorerTools.length,
+    publicConversions: conversionTools.length,
+    publicVisibility: "passed",
     faqJsonLdParity: "passed",
-    internalLinks: "passed",
-    uniqueExplorerTools: explorerTools.length,
-    registryDerivedMetrics: metrics,
+    routeIntegrity: "passed",
     serverPage: "passed",
     fileRecommendations: "passed",
   }),

@@ -138,15 +138,32 @@ assert.equal(
   resolveEditorTool(getEditorToolDefinition("text"), baseToolContext).disabledReason,
   "Open a PDF with an active page to use this tool.",
 );
-assert.equal(
-  resolveEditorTool(getEditorToolDefinition("translate"), {
+const unavailableTranslate = resolveEditorTool(
+  getEditorToolDefinition("translate"),
+  {
     ...baseToolContext,
     hasDocument: true,
     hasPage: true,
     pageCount: 1,
-  }).disabledReason,
-  "Backend configuration required.",
+  },
 );
+assert.equal(unavailableTranslate.visible, false);
+assert.equal(unavailableTranslate.enabled, false);
+assert.equal(unavailableTranslate.disabledReason, "Backend configuration required.");
+
+const availableTranslate = resolveEditorTool(
+  getEditorToolDefinition("translate"),
+  {
+    ...baseToolContext,
+    hasDocument: true,
+    hasPage: true,
+    pageCount: 1,
+    backendCapabilities: { translation: true },
+    canUseBackendTools: true,
+  },
+);
+assert.equal(availableTranslate.visible, true);
+assert.equal(availableTranslate.enabled, true);
 assert.equal(
   resolveEditorTool(getEditorToolDefinition("delete"), {
     ...baseToolContext,

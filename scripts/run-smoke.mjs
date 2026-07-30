@@ -7,6 +7,7 @@ const suites = [
   "fill-sign-smoke.mjs",
   "homepage-smoke.mjs",
   "images-to-pdf-smoke.mjs",
+  "launch-readiness.mjs",
   "pdf-rebuild-safety-smoke.mjs",
   "pdf-to-images-smoke.mjs",
   "standalone-overlay-smoke.mjs",
