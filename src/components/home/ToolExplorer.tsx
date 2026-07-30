@@ -112,6 +112,37 @@ export function ToolExplorer({
                 aria-selected={selected}
                 aria-controls="homepage-tool-results"
                 onClick={() => setCategory(item.id)}
+                onKeyDown={(event) => {
+                  const currentIndex = HOMEPAGE_EXPLORER_CATEGORIES.findIndex(
+                    (categoryItem) => categoryItem.id === item.id,
+                  );
+                  let nextIndex = currentIndex;
+                  if (event.key === "ArrowRight") {
+                    nextIndex =
+                      (currentIndex + 1) %
+                      HOMEPAGE_EXPLORER_CATEGORIES.length;
+                  } else if (event.key === "ArrowLeft") {
+                    nextIndex =
+                      (currentIndex -
+                        1 +
+                        HOMEPAGE_EXPLORER_CATEGORIES.length) %
+                      HOMEPAGE_EXPLORER_CATEGORIES.length;
+                  } else if (event.key === "Home") {
+                    nextIndex = 0;
+                  } else if (event.key === "End") {
+                    nextIndex =
+                      HOMEPAGE_EXPLORER_CATEGORIES.length - 1;
+                  } else {
+                    return;
+                  }
+                  event.preventDefault();
+                  const nextCategory =
+                    HOMEPAGE_EXPLORER_CATEGORIES[nextIndex];
+                  setCategory(nextCategory.id);
+                  document
+                    .getElementById(`homepage-tool-tab-${nextCategory.id}`)
+                    ?.focus();
+                }}
                 className={`min-h-11 shrink-0 rounded-full border px-4 py-2 text-sm font-bold outline-none transition focus-visible:ring-4 focus-visible:ring-violet-300/30 ${
                   selected
                     ? "border-violet-400 bg-violet-500 text-white"
@@ -227,4 +258,3 @@ export function ToolExplorer({
     </section>
   );
 }
-

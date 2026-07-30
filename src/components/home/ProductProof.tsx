@@ -1,6 +1,6 @@
 import { MonitorSmartphone } from "lucide-react";
 
-import { getHomepageProductMetrics } from "@/lib/home/homepage-tools";
+import { getHomepageProductMetrics } from "@/lib/home/homepage-metrics";
 
 export function ProductProof() {
   const metrics = getHomepageProductMetrics();
@@ -42,4 +42,3 @@ export function ProductProof() {
     </section>
   );
 }
-

@@ -12,12 +12,12 @@ import {
   getHomepageExplorerTools,
   getHomepageFaqStructuredData,
   getHomepagePopularTools,
-  getHomepageProductMetrics,
   HOMEPAGE_FAQS,
   HOMEPAGE_FROM_PDF_IDS,
   HOMEPAGE_POPULAR_TOOL_IDS,
   HOMEPAGE_TO_PDF_IDS,
 } from "../src/lib/home/homepage-tools.ts";
+import { getHomepageProductMetrics } from "../src/lib/home/homepage-metrics.ts";
 import { EDITOR_TOOL_DEFINITIONS } from "../src/lib/editor/editor-tool-registry.ts";
 import { getToolById, tools } from "../src/lib/tools.ts";
 
@@ -141,7 +141,7 @@ assert.match(toolCardSource, /Backend required/);
 assert.match(explorerSource, /RESULT_LIMIT = 12/);
 assert.match(explorerSource, /tool\.search\.keywords/);
 assert.match(faqSource, /getHomepageFaqStructuredData/);
-assert.match(proofSource, /getHomepageProductMetrics/);
+assert.match(proofSource, /homepage-metrics/);
 
 const curatedRouteIds = new Set([
   ...HOMEPAGE_POPULAR_TOOL_IDS,
@@ -177,4 +177,3 @@ console.log(
     fileRecommendations: "passed",
   }),
 );
-

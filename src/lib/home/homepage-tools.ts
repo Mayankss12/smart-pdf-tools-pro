@@ -3,7 +3,6 @@ import {
   getConversionById,
   type ConversionDefinition,
 } from "@/lib/conversions/registry";
-import { EDITOR_TOOL_DEFINITIONS } from "@/lib/editor/editor-tool-registry";
 import {
   getToolById,
   tools,
@@ -253,9 +252,7 @@ export function isToolInHomepageCategory(
   category: HomepageExplorerCategoryId,
 ) {
   if (category === "popular") {
-    return HOMEPAGE_POPULAR_TOOL_IDS.includes(
-      tool.id as (typeof HOMEPAGE_POPULAR_TOOL_IDS)[number],
-    );
+    return HOMEPAGE_POPULAR_TOOL_IDS.some((id) => id === tool.id);
   }
   if (category === "edit-sign") return tool.category === "edit";
   if (category === "organize") return tool.category === "organize";
@@ -275,23 +272,6 @@ export function isToolInHomepageCategory(
     tool.id === "pdf-to-html" ||
     tool.id === "pdf-editor"
   );
-}
-
-export function getHomepageProductMetrics() {
-  return {
-    browserTools: tools.filter(
-      (tool) =>
-        tool.status === "working" &&
-        tool.capabilities.processingMode === "browser",
-    ).length,
-    conversionWorkflows: CONVERSION_REGISTRY.length,
-    editorCapabilities: EDITOR_TOOL_DEFINITIONS.filter(
-      (definition) =>
-        definition.visible &&
-        definition.group !== "actions" &&
-        definition.id !== "select",
-    ).length,
-  };
 }
 
 export function assertHomepageCuratedIds() {
