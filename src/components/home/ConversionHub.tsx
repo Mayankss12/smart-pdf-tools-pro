@@ -1,10 +1,5 @@
 import Link from "next/link";
-import {
-  ArrowRight,
-  ArrowUpRight,
-  CloudCog,
-  Laptop,
-} from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 import {
   getHomepageToolCapability,
@@ -14,8 +9,53 @@ import {
   getHomepageConversionsFromPdf,
   getHomepageConversionsToPdf,
 } from "@/lib/home/homepage-tools";
-import { getToolById } from "@/lib/tools";
 import type { ConversionDefinition } from "@/lib/conversions/registry";
+import { getToolById } from "@/lib/tools";
+
+type ConversionItem = {
+  readonly conversion: ConversionDefinition;
+  readonly available: boolean;
+};
+
+function ConversionLink({ item }: { readonly item: ConversionItem }) {
+  const tool = getToolById(item.conversion.id);
+  if (!tool) {
+    throw new Error(
+      `[homepage] Conversion "${item.conversion.id}" has no canonical tool.`,
+    );
+  }
+  const Icon = tool.icon;
+
+  return (
+    <Link
+      href={item.conversion.route}
+      className={`group grid min-h-14 grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-3 rounded-xl px-3 py-2 outline-none transition hover:bg-violet-50 focus-visible:ring-4 focus-visible:ring-violet-100 ${
+        item.available ? "text-slate-900" : "text-slate-500"
+      }`}
+      aria-label={`${item.conversion.title}. ${
+        item.available ? "Open conversion." : "Coming soon."
+      }`}
+    >
+      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-50 text-violet-700">
+        <Icon size={16} />
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate text-sm font-bold">
+          {item.conversion.title}
+        </span>
+        {!item.available ? (
+          <span className="mt-0.5 block text-[10px] font-bold uppercase tracking-[0.07em] text-slate-400">
+            Coming soon
+          </span>
+        ) : null}
+      </span>
+      <ArrowRight
+        size={14}
+        className="text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-violet-600"
+      />
+    </Link>
+  );
+}
 
 function ConversionGroup({
   eyebrow,
@@ -28,77 +68,49 @@ function ConversionGroup({
   readonly conversions: readonly ConversionDefinition[];
   readonly capabilities: HomepageCapabilitySnapshot;
 }) {
+  const items = conversions.map((conversion) => {
+    const tool = getToolById(conversion.id);
+    if (!tool) {
+      throw new Error(
+        `[homepage] Conversion "${conversion.id}" has no canonical tool.`,
+      );
+    }
+    return {
+      conversion,
+      available: getHomepageToolCapability(tool, capabilities).enabled,
+    };
+  });
+  const availableItems = items.filter((item) => item.available);
+  const advancedItems = items.filter((item) => !item.available);
+
   return (
-    <div className="overflow-hidden rounded-[1.35rem] border border-slate-200 bg-white">
-      <div className="border-b border-slate-200 bg-[#f8f7fd] px-5 py-5 sm:px-6">
-        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-violet-700">
-          {eyebrow}
-        </p>
-        <h3 className="mt-1 text-2xl font-bold tracking-[-0.035em] text-slate-950">
-          {title}
-        </h3>
+    <article>
+      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-violet-700">
+        {eyebrow}
+      </p>
+      <h3 className="mt-1 text-2xl font-bold tracking-[-0.035em] text-slate-950">
+        {title}
+      </h3>
+
+      <div className="mt-5 grid gap-1 sm:grid-cols-2">
+        {availableItems.map((item) => (
+          <ConversionLink key={item.conversion.id} item={item} />
+        ))}
       </div>
 
-      <div className="divide-y divide-slate-100">
-        {conversions.map((conversion) => {
-          const tool = getToolById(conversion.id);
-          if (!tool) {
-            throw new Error(
-              `[homepage] Conversion "${conversion.id}" has no canonical tool.`,
-            );
-          }
-          const Icon = tool.icon;
-          const capability = getHomepageToolCapability(tool, capabilities);
-          const unavailable =
-            capability.processingMode === "provider" && !capability.enabled;
-
-          return (
-            <Link
-              key={conversion.id}
-              href={conversion.route}
-              className="group grid min-h-[82px] grid-cols-[40px_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 outline-none transition hover:bg-violet-50/55 focus-visible:bg-violet-50 focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-violet-100 sm:px-6"
-              aria-label={`${conversion.title}. ${capability.label}. ${
-                unavailable ? "Currently unavailable." : "Open conversion."
-              }`}
-            >
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
-                <Icon size={18} />
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-bold text-slate-900">
-                  {conversion.title}
-                </span>
-                <span className="mt-1 flex flex-wrap items-center gap-2">
-                  <span
-                    className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.07em] ${
-                      capability.processingMode === "browser"
-                        ? "text-emerald-700"
-                        : "text-blue-700"
-                    }`}
-                  >
-                    {capability.processingMode === "browser" ? (
-                      <Laptop size={11} />
-                    ) : (
-                      <CloudCog size={11} />
-                    )}
-                    {capability.label}
-                  </span>
-                  {unavailable ? (
-                    <span className="text-[10px] font-bold uppercase tracking-[0.07em] text-amber-800">
-                      Backend required
-                    </span>
-                  ) : null}
-                </span>
-              </span>
-              <ArrowUpRight
-                size={16}
-                className="text-slate-300 transition group-hover:text-violet-700"
-              />
-            </Link>
-          );
-        })}
-      </div>
-    </div>
+      {advancedItems.length ? (
+        <div className="mt-5 border-t border-[var(--home-border)] pt-4">
+          <p className="px-3 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
+            Advanced conversions
+          </p>
+          <div className="mt-2 grid gap-1 sm:grid-cols-2">
+            {advancedItems.map((item) => (
+              <ConversionLink key={item.conversion.id} item={item} />
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </article>
   );
 }
 
@@ -108,20 +120,19 @@ export function ConversionHub({
   readonly capabilities: HomepageCapabilitySnapshot;
 }) {
   return (
-    <section className="bg-[#fbfaf7] py-16 sm:py-20">
+    <section className="home-section py-16 sm:py-20">
       <div className="mx-auto max-w-[1320px] px-4 sm:px-6 lg:px-8">
         <div className="max-w-3xl">
           <p className="section-eyebrow">Conversion hub</p>
           <h2 className="mt-3 text-3xl font-bold tracking-[-0.045em] text-slate-950 sm:text-4xl">
-            Convert in either direction—with the processing mode visible.
+            Convert PDFs in either direction.
           </h2>
           <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
-            Browser conversions start locally. Secure-provider workflows remain
-            visible but never pretend to work when their backend is unavailable.
+            Choose a format and go directly to the conversion workspace.
           </p>
         </div>
 
-        <div className="mt-9 grid gap-6 lg:grid-cols-2">
+        <div className="mt-9 grid gap-10 border-y border-[var(--home-border)] py-8 lg:grid-cols-2 lg:gap-14">
           <ConversionGroup
             eyebrow="Export useful formats"
             title="Convert from PDF"
@@ -136,10 +147,11 @@ export function ConversionHub({
           />
         </div>
 
-        <Link
-          href="/tools?category=convert"
-          className="btn-secondary mt-8"
-        >
+        <p className="mt-5 max-w-2xl text-xs leading-6 text-slate-500">
+          Some advanced Office conversions require configured secure
+          processing.
+        </p>
+        <Link href="/tools?category=convert" className="btn-secondary mt-6">
           View all conversions
           <ArrowRight size={16} />
         </Link>
@@ -147,4 +159,3 @@ export function ConversionHub({
     </section>
   );
 }
-

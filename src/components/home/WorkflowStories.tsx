@@ -6,15 +6,9 @@ import {
   HOMEPAGE_WORKFLOWS,
 } from "@/lib/home/homepage-tools";
 
-const WORKFLOW_STYLES = [
-  "border-violet-200 bg-violet-50/70 text-violet-800",
-  "border-blue-200 bg-blue-50/70 text-blue-800",
-  "border-amber-200 bg-amber-50/70 text-amber-900",
-] as const;
-
 export function WorkflowStories() {
   return (
-    <section className="border-y border-slate-200 bg-white py-16 sm:py-20">
+    <section className="home-section-alt border-y border-[var(--home-border)] py-16 sm:py-20">
       <div className="mx-auto max-w-[1320px] px-4 sm:px-6 lg:px-8">
         <div className="max-w-3xl">
           <p className="section-eyebrow">Connected work, not isolated tools</p>
@@ -23,16 +17,16 @@ export function WorkflowStories() {
           </h2>
         </div>
 
-        <div className="mt-9 space-y-4">
+        <div className="mt-9 divide-y divide-[var(--home-border)] border-y border-[var(--home-border)]">
           {HOMEPAGE_WORKFLOWS.map((workflow, workflowIndex) => {
             const workflowTools = getHomepageWorkflowTools(workflow.toolIds);
             return (
               <article
                 key={workflow.id}
-                className="grid gap-5 rounded-[1.25rem] border border-slate-200 bg-[#fbfaf7] p-5 md:grid-cols-[260px_minmax(0,1fr)] md:items-center lg:p-6"
+                className="grid gap-6 py-7 md:grid-cols-[250px_minmax(0,1fr)] md:items-center"
               >
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-violet-700">
                     Workflow {workflowIndex + 1}
                   </p>
                   <h3 className="mt-2 text-xl font-bold text-slate-950">
@@ -47,15 +41,14 @@ export function WorkflowStories() {
                   {workflowTools.map((tool, index) => {
                     const Icon = tool.icon;
                     return (
-                      <div
-                        key={tool.id}
-                        className="contents"
-                      >
+                      <div key={tool.id} className="contents">
                         <Link
                           href={tool.href}
-                          className={`group flex min-h-16 min-w-0 flex-1 items-center gap-3 rounded-xl border px-3.5 py-3 outline-none transition hover:-translate-y-0.5 focus-visible:ring-4 focus-visible:ring-violet-100 ${WORKFLOW_STYLES[workflowIndex]}`}
+                          className="group flex min-h-14 min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2 text-slate-800 outline-none transition hover:bg-white hover:text-violet-700 focus-visible:ring-4 focus-visible:ring-violet-100"
                         >
-                          <Icon size={18} className="shrink-0" />
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-violet-700 ring-1 ring-[var(--home-border)]">
+                            <Icon size={17} />
+                          </span>
                           <span className="min-w-0 text-sm font-bold">
                             {tool.shortTitle ?? tool.title}
                           </span>
@@ -63,7 +56,7 @@ export function WorkflowStories() {
                         {index < workflowTools.length - 1 ? (
                           <ArrowRight
                             size={16}
-                            className="mx-auto shrink-0 rotate-90 text-slate-300 sm:rotate-0"
+                            className="mx-auto shrink-0 rotate-90 text-violet-400 sm:rotate-0"
                             aria-hidden="true"
                           />
                         ) : null}
@@ -79,4 +72,3 @@ export function WorkflowStories() {
     </section>
   );
 }
-
