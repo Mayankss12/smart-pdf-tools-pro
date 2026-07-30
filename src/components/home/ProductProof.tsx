@@ -20,10 +20,10 @@ export function ProductProof() {
   ] as const;
 
   return (
-    <section className="border-y border-violet-100 bg-white py-12">
+    <section className="home-section-alt border-y border-[var(--home-border)] py-12">
       <div className="mx-auto grid max-w-[1320px] gap-6 px-4 sm:grid-cols-2 sm:px-6 lg:grid-cols-4 lg:px-8">
         {proof.map((item) => (
-          <div key={item.label} className="border-l-2 border-violet-200 pl-5">
+          <div key={item.label} className="border-l border-[var(--home-border)] pl-5">
             <div className="text-4xl font-bold tracking-[-0.055em] text-slate-950">
               {item.value}
             </div>
@@ -32,7 +32,7 @@ export function ProductProof() {
             </p>
           </div>
         ))}
-        <div className="border-l-2 border-violet-200 pl-5">
+        <div className="border-l border-[var(--home-border)] pl-5">
           <MonitorSmartphone size={31} className="text-violet-700" />
           <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
             Responsive workspace for desktop and mobile
