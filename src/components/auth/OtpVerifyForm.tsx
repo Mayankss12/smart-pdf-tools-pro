@@ -11,9 +11,8 @@ import {
 import {
   CheckCircle2,
   Loader2,
-  MailCheck,
+  Mail,
   RefreshCw,
-  ShieldCheck,
 } from "lucide-react";
 
 import { resendOtpAction, type ActionResult } from "@/app/actions/auth";
@@ -33,6 +32,19 @@ type VerifyOtpApiResponse = {
 
 function normalizeOtp(value: string) {
   return value.replace(/\D/g, "").slice(0, OTP_LENGTH);
+}
+
+function maskEmail(email: string) {
+  const [localPart = "", domain = ""] = email.split("@");
+
+  if (!domain) return email;
+
+  const visibleCharacters = Math.min(2, localPart.length);
+  const maskedCharacters = Math.max(3, localPart.length - visibleCharacters);
+
+  return `${localPart.slice(0, visibleCharacters)}${"•".repeat(
+    maskedCharacters,
+  )}@${domain}`;
 }
 
 function getSafeRedirectPath(value: string | undefined): string {
@@ -185,37 +197,42 @@ export function OtpVerifyForm({ email, redirectTo }: OtpVerifyFormProps) {
   }
 
   const isComplete = otp.length === OTP_LENGTH;
+  const maskedEmail = maskEmail(email);
 
   return (
-    <div className="space-y-5">
-      <div className="rounded-[1.35rem] border border-violet-100 bg-violet-50/70 p-4">
-        <div className="flex gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-violet-700 shadow-sm">
-            <MailCheck size={22} />
-          </div>
-
-          <div className="min-w-0">
-            <div className="text-sm font-bold text-slate-950">
-              Verification code sent
-            </div>
-            <p className="mt-1 break-words text-sm leading-6 text-slate-600">
-              Enter the 6-digit code sent to{" "}
-              <span className="font-semibold text-slate-950">{email}</span>.
-            </p>
-          </div>
+    <div className="space-y-4">
+      <div
+        role="status"
+        className="flex items-start gap-3 rounded-[14px] border border-emerald-200 bg-emerald-50 px-3.5 py-3"
+      >
+        <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+          <Mail aria-hidden="true" size={15} strokeWidth={2.2} />
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-emerald-900">
+            Verification code sent to your email
+          </p>
+          <p className="mt-0.5 break-words text-xs leading-5 text-emerald-800">
+            {maskedEmail}
+          </p>
         </div>
       </div>
 
-      <form onSubmit={handleVerifySubmit} className="space-y-5">
+      <form onSubmit={handleVerifySubmit} className="space-y-4">
         <div>
-          <label className="mb-3 flex items-center justify-between gap-3 text-sm font-semibold text-[var(--text-primary)]">
-            <span>6-digit code</span>
-            <span className="rounded-full border border-violet-100 bg-white px-3 py-1 text-xs font-semibold text-slate-500">
-              {otp.length}/{OTP_LENGTH}
-            </span>
+          <label
+            id="otp-label"
+            className="mb-2 block text-[0.72rem] font-bold uppercase tracking-[0.08em] text-slate-700"
+          >
+            6-digit verification code
           </label>
 
-          <div className="grid grid-cols-6 gap-2 sm:gap-3">
+          <div
+            role="group"
+            aria-labelledby="otp-label"
+            aria-describedby="otp-helper"
+            className="grid grid-cols-6 gap-1.5 sm:gap-2"
+          >
             {Array.from({ length: OTP_LENGTH }).map((_, index) => (
               <input
                 key={index}
@@ -231,19 +248,25 @@ export function OtpVerifyForm({ email, redirectTo }: OtpVerifyFormProps) {
                 onKeyDown={(event) => handleKeyDown(index, event)}
                 onPaste={handlePaste}
                 disabled={isVerifying}
-                className="h-13 min-h-13 w-full rounded-2xl border border-[var(--border-light)] bg-white text-center text-2xl font-black tracking-[-0.04em] text-[var(--text-primary)] outline-none transition focus:border-[var(--violet-600)] focus:ring-4 focus:ring-[rgba(101,80,232,0.16)] disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 sm:h-14 sm:min-h-14"
-                aria-label={`Digit ${index + 1}`}
+                aria-invalid={verifyError ? "true" : undefined}
+                aria-label={`Verification code digit ${index + 1}`}
+                className={`h-[50px] min-w-0 w-full rounded-[13px] border bg-white text-center text-xl font-bold tracking-[-0.04em] text-slate-950 outline-none transition focus:border-violet-600 focus:ring-4 focus:ring-violet-200/60 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 motion-reduce:transition-none ${
+                  verifyError ? "border-red-400" : "border-slate-200"
+                }`}
               />
             ))}
           </div>
 
-          <p className="mt-3 text-xs leading-5 text-[var(--text-muted)]">
+          <p id="otp-helper" className="mt-2 text-xs leading-5 text-slate-500">
             You can paste the full code from your email. Only numbers are accepted.
           </p>
         </div>
 
         {verifyError ? (
-          <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium leading-6 text-red-700">
+          <div
+            role="alert"
+            className="rounded-[14px] border border-red-200 bg-red-50 px-3.5 py-3 text-sm font-medium leading-6 text-red-700"
+          >
             {verifyError}
           </div>
         ) : null}
@@ -251,50 +274,64 @@ export function OtpVerifyForm({ email, redirectTo }: OtpVerifyFormProps) {
         <button
           type="submit"
           disabled={!isComplete || isVerifying}
-          className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-[var(--violet-600)] px-5 py-3 text-sm font-semibold text-white shadow-[0_16px_34px_rgba(101,80,232,0.18)] transition hover:bg-[var(--violet-500)] disabled:cursor-not-allowed disabled:opacity-60"
+          aria-busy={isVerifying}
+          className="inline-flex min-h-[50px] w-full items-center justify-center gap-2 rounded-[14px] bg-[#5f4bc6] px-5 py-3 text-sm font-bold text-white shadow-[0_12px_28px_rgba(74,55,168,0.2)] outline-none transition hover:-translate-y-0.5 hover:bg-[#503db5] focus-visible:ring-4 focus-visible:ring-violet-200 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 motion-reduce:transform-none motion-reduce:transition-none"
         >
           {isVerifying ? (
             <>
-              <Loader2 className="animate-spin" size={18} />
+              <Loader2
+                aria-hidden="true"
+                className="animate-spin motion-reduce:animate-none"
+                size={18}
+              />
               Verifying code
             </>
           ) : (
-            <>
-              <ShieldCheck size={18} />
-              Verify & Sign In
-            </>
+            "Verify & sign in"
           )}
         </button>
       </form>
 
-      <div className="rounded-[1.35rem] border border-[var(--border-light)] bg-slate-50 p-4">
+      <div className="border-t border-slate-100 pt-4">
         {resendState?.success ? (
-          <div className="mb-3 flex items-start gap-2 rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-2.5 text-sm font-medium leading-6 text-emerald-800">
+          <div
+            role="status"
+            className="mb-3 flex items-start gap-2 rounded-[14px] border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm font-medium leading-6 text-emerald-800"
+          >
             <CheckCircle2 className="mt-0.5 shrink-0" size={16} />
             <span>{resendState.message}</span>
           </div>
         ) : null}
 
         {resendState?.success === false ? (
-          <p className="mb-3 rounded-2xl border border-red-100 bg-red-50 px-3 py-2.5 text-sm font-medium text-red-700">
+          <p
+            role="alert"
+            className="mb-3 rounded-[14px] border border-red-200 bg-red-50 px-3 py-2.5 text-sm font-medium text-red-700"
+          >
             {resendState.error}
           </p>
         ) : null}
 
         <form
           action={resendAction}
-          className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+          className="flex items-center justify-center gap-2 text-sm"
         >
           <input type="hidden" name="email" value={email} />
-          <p className="text-sm text-[var(--text-muted)]">
-            Didn&apos;t receive the code?
-          </p>
+          <span className="text-slate-500">Didn&apos;t receive it?</span>
           <button
             type="submit"
             disabled={isResending || isVerifying}
-            className="inline-flex items-center justify-center gap-2 rounded-full border border-violet-100 bg-white px-4 py-2 text-sm font-semibold text-[var(--violet-600)] transition hover:border-violet-200 hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl px-2 font-bold text-violet-700 outline-none transition hover:bg-violet-50 focus-visible:ring-4 focus-visible:ring-violet-200 disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none"
           >
-            <RefreshCw className={isResending ? "animate-spin" : ""} size={15} />
+            <RefreshCw
+              aria-hidden="true"
+              className={
+                isResending
+                  ? "animate-spin motion-reduce:animate-none"
+                  : undefined
+              }
+              size={14}
+            />
             {isResending ? "Sending" : "Resend code"}
           </button>
         </form>

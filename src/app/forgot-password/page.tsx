@@ -12,7 +12,7 @@ export default function ForgotPasswordPage() {
   return (
     <AuthPageShell
       title="Reset your password"
-      subtitle="Enter your account email and we will send a reset link if an account exists."
+      subtitle="Enter your email and we’ll send you a secure reset link."
     >
       <ForgotPasswordForm />
       <p className="mt-6 text-center text-sm text-[var(--text-muted)]">

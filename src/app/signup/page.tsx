@@ -12,7 +12,8 @@ export default function SignupPage() {
   return (
     <AuthPageShell
       title="Create your account"
-      subtitle="Start using PDFMantra for free. No credit card required."
+      subtitle="Start using PDFMantra for free."
+      size="wide"
     >
       <SignupForm />
       <p className="mt-6 text-center text-sm text-[var(--text-muted)]">

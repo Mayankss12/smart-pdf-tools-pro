@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect } from "react";
-import { AlertCircle, ShieldCheck } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 
 import { signupAction, type ActionResult } from "@/app/actions/auth";
 import { AuthButton } from "./AuthButton";
@@ -20,28 +20,20 @@ export function SignupForm() {
   useEffect(() => {
     if (state?.success) {
       router.push("/login?message=account-created");
+      return;
+    }
+
+    if (state?.success === false) {
+      window.requestAnimationFrame(() => {
+        document
+          .querySelector<HTMLElement>("[aria-invalid='true'], [role='alert']")
+          ?.focus();
+      });
     }
   }, [state, router]);
 
   return (
-    <form action={action} className="space-y-4">
-      <div className="rounded-[1.35rem] border border-violet-100 bg-violet-50/70 p-4">
-        <div className="flex gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-violet-700 shadow-sm">
-            <ShieldCheck size={20} />
-          </div>
-
-          <div>
-            <div className="text-sm font-bold text-slate-950">
-              Create your PDFMantra account
-            </div>
-            <p className="mt-1 text-sm leading-6 text-slate-600">
-              Enter your details to continue.
-            </p>
-          </div>
-        </div>
-      </div>
-
+    <form action={action} className="space-y-3.5">
       <AuthInput
         name="fullName"
         label="Full name"
@@ -95,19 +87,19 @@ export function SignupForm() {
         }
       />
 
-      <div className="rounded-2xl border border-[var(--border-light)] bg-slate-50 p-4">
+      <div className="pt-0.5">
         <div className="flex items-start gap-3">
           <input
             id="acceptTerms"
             name="acceptTerms"
             type="checkbox"
             required
-            className="mt-1 h-4 w-4 cursor-pointer rounded border-[var(--border-light)] accent-[var(--violet-600)]"
+            className="mt-0.5 h-[18px] w-[18px] shrink-0 cursor-pointer rounded border-slate-300 accent-[var(--violet-600)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-200"
           />
 
           <label
             htmlFor="acceptTerms"
-            className="text-sm leading-6 text-[var(--text-secondary)]"
+            className="text-xs leading-5 text-slate-600"
           >
             I agree to the{" "}
             <Link
@@ -131,7 +123,11 @@ export function SignupForm() {
       </div>
 
       {state?.success === false && !state.field ? (
-        <div className="flex gap-3 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium leading-6 text-red-700">
+        <div
+          role="alert"
+          tabIndex={-1}
+          className="flex gap-3 rounded-[14px] border border-red-200 bg-red-50 px-3.5 py-3 text-sm font-medium leading-6 text-red-700 outline-none focus:ring-4 focus:ring-red-100"
+        >
           <AlertCircle className="mt-0.5 shrink-0" size={17} />
           <span>{state.error}</span>
         </div>

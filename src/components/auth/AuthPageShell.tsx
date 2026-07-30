@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { ArrowLeft } from "lucide-react";
 
 import { BrandMark } from "@/components/BrandMark";
 
@@ -7,86 +8,56 @@ interface AuthPageShellProps {
   readonly title: string;
   readonly subtitle: string;
   readonly children: ReactNode;
+  readonly size?: "default" | "wide";
 }
 
-const TRUST_POINTS = [
-  "Password-first login",
-  "Email code verification",
-  "Private document workspace",
-] as const;
-
-export function AuthPageShell({ title, subtitle, children }: AuthPageShellProps) {
+export function AuthPageShell({
+  title,
+  subtitle,
+  children,
+  size = "default",
+}: AuthPageShellProps) {
   return (
-    <div className="relative flex min-h-screen flex-col overflow-hidden bg-[var(--bg-base)] text-[var(--text-primary)]">
-      <div className="pointer-events-none absolute left-[-12rem] top-[-14rem] h-[28rem] w-[28rem] rounded-full bg-violet-200/35 blur-3xl" />
-      <div className="pointer-events-none absolute bottom-[-16rem] right-[-12rem] h-[30rem] w-[30rem] rounded-full bg-indigo-200/30 blur-3xl" />
+    <div className="relative min-h-screen overflow-x-hidden bg-[#f6f4f8] text-[var(--text-primary)]">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_-15%,rgba(118,92,206,0.09),transparent_34rem)]" />
+      <div className="pointer-events-none absolute left-1/2 top-1/2 opacity-[0.018] [transform:translate(-50%,-50%)_scale(7)]">
+        <BrandMark className="h-24 w-24" title="" />
+      </div>
 
-      <header className="relative z-10 border-b border-violet-100 bg-white/82 px-5 py-4 backdrop-blur-xl sm:px-6">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
-          <Link href="/" className="group flex min-w-0 items-center gap-3">
-            <BrandMark className="h-9 w-9 shrink-0 transition group-hover:-translate-y-0.5" />
-            <div className="min-w-0">
-              <div className="display-font truncate text-xl font-semibold tracking-[-0.035em] text-slate-950 transition group-hover:text-violet-700">
-                PDFMantra
-              </div>
-              <div className="hidden text-[9px] font-semibold uppercase tracking-[0.22em] text-slate-500 sm:block">
-                Secure workspace
-              </div>
-            </div>
-          </Link>
-
+      <main className="relative z-10 flex min-h-screen items-center justify-center px-4 py-7 sm:px-6 sm:py-10">
+        <div
+          className={`w-full ${
+            size === "wide" ? "max-w-[470px]" : "max-w-[440px]"
+          }`}
+        >
           <Link
             href="/"
-            className="rounded-full border border-violet-100 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-[0_1px_3px_rgba(24,21,46,0.05)] transition hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700"
+            className="mb-4 inline-flex min-h-10 items-center gap-2 rounded-xl px-1 text-sm font-semibold text-slate-600 outline-none transition hover:text-violet-700 focus-visible:ring-4 focus-visible:ring-violet-200 motion-reduce:transition-none"
           >
+            <ArrowLeft aria-hidden="true" size={17} strokeWidth={2.2} />
             Back to site
           </Link>
-        </div>
-      </header>
 
-      <main className="relative z-10 flex flex-1 items-center justify-center px-4 py-10 sm:px-6 sm:py-14">
-        <div className="grid w-full max-w-6xl items-center gap-8 lg:grid-cols-[1fr_440px]">
-          <section className="hidden lg:block">
-            <p className="section-eyebrow">PDFMantra account</p>
-            <h1 className="display-font mt-5 max-w-2xl text-5xl font-bold tracking-[-0.05em] text-slate-950">
-              Secure access for your smart PDF workspace.
-            </h1>
-            <p className="mt-5 max-w-xl text-base leading-8 text-slate-600">
-              Sign in to manage your dashboard, future saved documents, signatures, and premium PDF workflows as PDFMantra grows.
-            </p>
-
-            <div className="mt-8 grid max-w-xl gap-3">
-              {TRUST_POINTS.map((item) => (
-                <div
-                  key={item}
-                  className="flex items-center gap-3 rounded-2xl border border-violet-100 bg-white/72 px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_8px_24px_rgba(101,80,232,0.06)] backdrop-blur"
-                >
-                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-violet-100 text-xs font-black text-violet-700">
-                    ✓
-                  </span>
-                  {item}
-                </div>
-              ))}
+          <section className="rounded-[26px] border border-white/80 bg-white p-5 shadow-[0_24px_75px_rgba(49,38,74,0.11),0_2px_12px_rgba(49,38,74,0.05)] sm:p-7">
+            <div className="mb-6 text-center">
+              <Link
+                href="/"
+                aria-label="PDFMantra home"
+                className="group mx-auto inline-flex items-center justify-center gap-2.5 rounded-xl outline-none focus-visible:ring-4 focus-visible:ring-violet-200"
+              >
+                <BrandMark className="h-10 w-10 shrink-0 transition-transform group-hover:-translate-y-0.5 motion-reduce:transition-none" />
+                <span className="display-font text-xl font-bold tracking-[-0.045em] text-slate-950">
+                  PDFMantra
+                </span>
+              </Link>
+              <h1 className="display-font mt-5 text-[1.65rem] font-bold leading-tight tracking-[-0.045em] text-slate-950 sm:text-[1.8rem]">
+                {title}
+              </h1>
+              <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-slate-600">
+                {subtitle}
+              </p>
             </div>
-          </section>
-
-          <section className="w-full">
-            <div className="rounded-[2rem] border border-violet-100 bg-white/92 p-6 shadow-[0_24px_70px_rgba(76,47,209,0.12)] backdrop-blur sm:p-8">
-              <div className="mb-6">
-                <p className="section-eyebrow">Secure account</p>
-                <h2 className="display-font mt-3 text-2xl font-bold tracking-[-0.03em] text-slate-950 sm:text-3xl">
-                  {title}
-                </h2>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                  {subtitle}
-                </p>
-              </div>
-              {children}
-            </div>
-
-            <p className="mx-auto mt-5 max-w-sm text-center text-xs leading-5 text-slate-500">
-              Protected by PDFMantra auth. Use your own account only and keep verification codes private.
-            </p>
+            {children}
           </section>
         </div>
       </main>

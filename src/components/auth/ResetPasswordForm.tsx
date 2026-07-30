@@ -29,7 +29,10 @@ export function ResetPasswordForm() {
   if (state?.success) {
     return (
       <div className="space-y-3 text-center">
-        <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2.5 text-sm font-medium leading-6 text-emerald-800">
+        <div
+          role="status"
+          className="rounded-[14px] border border-emerald-200 bg-emerald-50 px-3.5 py-3 text-sm font-medium leading-6 text-emerald-800"
+        >
           {state.message}
         </div>
         <p className="text-xs text-[var(--text-muted)]">Redirecting to login...</p>
@@ -58,11 +61,18 @@ export function ResetPasswordForm() {
         error={state?.success === false && state.field === "confirmPassword" ? state.error : undefined}
       />
       {state?.success === false && !state.field ? (
-        <div className="rounded-xl border border-red-100 bg-red-50 px-3 py-2.5 text-sm font-medium leading-6 text-red-700">
+        <div
+          role="alert"
+          className="rounded-[14px] border border-red-200 bg-red-50 px-3.5 py-3 text-sm font-medium leading-6 text-red-700"
+        >
           {state.error}
         </div>
       ) : null}
-      <AuthButton isPending={isPending} label="Set new password" pendingLabel="Updating..." />
+      <AuthButton
+        isPending={isPending}
+        label="Set new password"
+        pendingLabel="Updating password"
+      />
     </form>
   );
 }

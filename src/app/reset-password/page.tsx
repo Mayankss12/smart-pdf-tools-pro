@@ -11,7 +11,7 @@ export default function ResetPasswordPage() {
   return (
     <AuthPageShell
       title="Set your new password"
-      subtitle="Choose a strong password with at least 8 characters."
+      subtitle="Choose a strong password with at least eight characters."
     >
       <ResetPasswordForm />
     </AuthPageShell>

@@ -52,20 +52,35 @@ export function LoginForm() {
       });
 
       router.push(`/login/verify-otp?${params.toString()}`);
+      return;
+    }
+
+    if (state?.success === false) {
+      window.requestAnimationFrame(() => {
+        document
+          .querySelector<HTMLElement>("[aria-invalid='true'], [role='alert']")
+          ?.focus();
+      });
     }
   }, [state, router, redirectTo]);
 
   return (
     <form action={action} className="space-y-4">
       {accountCreated ? (
-        <div className="flex gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-medium leading-6 text-emerald-800">
+        <div
+          role="status"
+          className="flex gap-3 rounded-[14px] border border-emerald-200 bg-emerald-50 px-3.5 py-3 text-sm font-medium leading-6 text-emerald-800"
+        >
           <CheckCircle2 className="mt-0.5 shrink-0" size={17} />
           <span>Account created successfully. Sign in below to continue.</span>
         </div>
       ) : null}
 
       {passwordReset ? (
-        <div className="flex gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-medium leading-6 text-emerald-800">
+        <div
+          role="status"
+          className="flex gap-3 rounded-[14px] border border-emerald-200 bg-emerald-50 px-3.5 py-3 text-sm font-medium leading-6 text-emerald-800"
+        >
           <CheckCircle2 className="mt-0.5 shrink-0" size={17} />
           <span>Password updated successfully. Sign in with your new password.</span>
         </div>
@@ -101,7 +116,11 @@ export function LoginForm() {
       </div>
 
       {state?.success === false && !state.field ? (
-        <div className="flex gap-3 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium leading-6 text-red-700">
+        <div
+          role="alert"
+          tabIndex={-1}
+          className="flex gap-3 rounded-[14px] border border-red-200 bg-red-50 px-3.5 py-3 text-sm font-medium leading-6 text-red-700 outline-none focus:ring-4 focus:ring-red-100"
+        >
           <AlertCircle className="mt-0.5 shrink-0" size={17} />
           <div>
             <p>{state.error}</p>
@@ -117,7 +136,7 @@ export function LoginForm() {
 
       <AuthButton
         isPending={isPending}
-        label="Continue"
+        label="Send verification code"
         pendingLabel="Checking password"
       />
     </form>

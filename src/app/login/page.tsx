@@ -12,8 +12,8 @@ export const metadata: Metadata = {
 export default function LoginPage() {
   return (
     <AuthPageShell
-      title="Sign in to PDFMantra"
-      subtitle="Enter your email and password. We will then send a verification code to your email."
+      title="Welcome back"
+      subtitle="Sign in to your account to continue."
     >
       <Suspense fallback={null}>
         <LoginForm />

@@ -11,9 +11,16 @@ export function AuthButton({ isPending, label, pendingLabel = "Please wait..." }
     <button
       type="submit"
       disabled={isPending}
-      className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-[var(--violet-600)] px-5 py-3 text-sm font-semibold text-white shadow-[0_16px_34px_rgba(101,80,232,0.18)] transition hover:bg-[var(--violet-500)] focus:outline-none focus:ring-4 focus:ring-[rgba(101,80,232,0.16)] disabled:cursor-not-allowed disabled:opacity-60"
+      aria-busy={isPending}
+      className="inline-flex min-h-[50px] w-full items-center justify-center gap-2 rounded-[14px] bg-[#5f4bc6] px-5 py-3 text-sm font-bold text-white shadow-[0_12px_28px_rgba(74,55,168,0.2)] outline-none transition hover:-translate-y-0.5 hover:bg-[#503db5] hover:shadow-[0_16px_32px_rgba(74,55,168,0.24)] focus-visible:ring-4 focus-visible:ring-violet-200 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 motion-reduce:transform-none motion-reduce:transition-none"
     >
-      {isPending ? <Loader2 className="animate-spin" size={18} /> : null}
+      {isPending ? (
+        <Loader2
+          aria-hidden="true"
+          className="animate-spin motion-reduce:animate-none"
+          size={18}
+        />
+      ) : null}
       <span>{isPending ? pendingLabel : label}</span>
     </button>
   );

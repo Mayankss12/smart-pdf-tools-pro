@@ -43,8 +43,11 @@ export default async function VerifyOtpPage({ searchParams }: VerifyOtpPageProps
         title="Verification error"
         subtitle="Please start the login process from the beginning."
       >
-        <Link href="/login" className="btn-primary w-full">
-          Back to Login
+        <Link
+          href="/login"
+          className="inline-flex min-h-[50px] w-full items-center justify-center rounded-[14px] bg-[#5f4bc6] px-5 py-3 text-sm font-bold text-white shadow-[0_12px_28px_rgba(74,55,168,0.2)] outline-none transition hover:bg-[#503db5] focus-visible:ring-4 focus-visible:ring-violet-200 motion-reduce:transition-none"
+        >
+          Back to login
         </Link>
       </AuthPageShell>
     );
@@ -52,8 +55,8 @@ export default async function VerifyOtpPage({ searchParams }: VerifyOtpPageProps
 
   return (
     <AuthPageShell
-      title="Check your email"
-      subtitle={`We sent a 6-digit verification code to ${email}. Enter it below to sign in.`}
+      title="Verify your sign-in"
+      subtitle="Enter the six-digit code to continue."
     >
       <OtpVerifyForm email={email} redirectTo={redirectTo} />
     </AuthPageShell>
