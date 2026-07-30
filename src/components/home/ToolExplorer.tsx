@@ -34,7 +34,10 @@ export function ToolExplorer({
   const [query, setQuery] = useState("");
   const [category, setCategory] =
     useState<HomepageExplorerCategoryId>("popular");
-  const explorerTools = useMemo(() => getHomepageExplorerTools(), []);
+  const explorerTools = useMemo(
+    () => getHomepageExplorerTools(capabilities),
+    [capabilities],
+  );
 
   const matches = useMemo(() => {
     const normalizedQuery = normalize(query);
@@ -73,7 +76,7 @@ export function ToolExplorer({
               What do you need to do?
             </h2>
             <p className="mt-3 max-w-xl text-sm leading-7 text-slate-600 sm:text-base">
-              Search the complete PDFMantra toolset, then go straight to the
+              Search the available PDFMantra tools, then go straight to the
               workflow you need.
             </p>
           </div>
@@ -176,21 +179,12 @@ export function ToolExplorer({
             <div className="grid gap-px overflow-hidden rounded-2xl border border-[var(--home-border)] bg-white sm:grid-cols-2 lg:grid-cols-3">
               {matches.slice(0, RESULT_LIMIT).map((tool) => {
                 const Icon = tool.icon;
-                const capability = capabilities[tool.id];
-                const available =
-                  capability?.enabled ??
-                  (tool.status === "working" || tool.status === "beta");
-
                 return (
                   <Link
                     key={tool.id}
                     href={tool.href}
-                    className={`group grid min-h-[118px] grid-cols-[40px_minmax(0,1fr)_auto] items-start gap-3 bg-white p-4 outline-none transition hover:bg-[var(--home-subtle)] focus-visible:z-10 focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-violet-100 ${
-                      !available ? "opacity-70" : ""
-                    }`}
-                    aria-label={`${tool.title}. ${
-                      available ? "Open tool." : "Coming soon."
-                    }`}
+                    className="group grid min-h-[118px] grid-cols-[40px_minmax(0,1fr)_auto] items-start gap-3 bg-white p-4 outline-none transition hover:bg-[var(--home-subtle)] focus-visible:z-10 focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-violet-100"
+                    aria-label={`${tool.title}. Open tool.`}
                   >
                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-700">
                       <Icon size={18} />
@@ -202,11 +196,6 @@ export function ToolExplorer({
                       <span className="mt-1 block line-clamp-2 text-xs leading-5 text-slate-500">
                         {tool.description}
                       </span>
-                      {!available ? (
-                        <span className="mt-2 inline-flex text-[10px] font-bold uppercase tracking-[0.08em] text-slate-500">
-                          Coming soon
-                        </span>
-                      ) : null}
                     </span>
                     <ArrowRight
                       size={15}

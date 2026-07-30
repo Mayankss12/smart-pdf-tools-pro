@@ -1,25 +1,16 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
-import {
-  getHomepageToolCapability,
-  type HomepageCapabilitySnapshot,
-} from "@/lib/home/homepage-capabilities";
 import type { Tool } from "@/lib/tools";
 
 export function ToolCard({
   tool,
-  capabilities,
   compact = false,
 }: {
   readonly tool: Tool;
-  readonly capabilities: HomepageCapabilitySnapshot;
   readonly compact?: boolean;
 }) {
   const Icon = tool.icon;
-  const capability = getHomepageToolCapability(tool, capabilities);
-  const providerUnavailable =
-    capability.processingMode === "provider" && !capability.enabled;
 
   return (
     <Link
@@ -27,9 +18,7 @@ export function ToolCard({
       className={`group relative grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3 bg-white outline-none transition hover:bg-[var(--home-subtle)] focus-visible:z-10 focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-violet-100 ${
         compact ? "min-h-[112px] p-4" : "min-h-[132px] p-5 sm:p-6"
       }`}
-      aria-label={`${tool.title}. ${
-        providerUnavailable ? "Coming soon." : "Open tool."
-      }`}
+      aria-label={`${tool.title}. Open tool.`}
     >
       <span
         className={`flex shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-700 ${
@@ -54,11 +43,6 @@ export function ToolCard({
         >
           {tool.description}
         </span>
-        {providerUnavailable ? (
-          <span className="mt-2 inline-flex text-[10px] font-bold uppercase tracking-[0.08em] text-slate-500">
-            Coming soon
-          </span>
-        ) : null}
       </span>
 
       <ArrowRight

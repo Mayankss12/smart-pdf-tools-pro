@@ -1,10 +1,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
-import {
-  getHomepageToolCapability,
-  type HomepageCapabilitySnapshot,
-} from "@/lib/home/homepage-capabilities";
+import type { HomepageCapabilitySnapshot } from "@/lib/home/homepage-capabilities";
 import {
   getHomepageConversionsFromPdf,
   getHomepageConversionsToPdf,
@@ -14,7 +11,6 @@ import { getToolById } from "@/lib/tools";
 
 type ConversionItem = {
   readonly conversion: ConversionDefinition;
-  readonly available: boolean;
 };
 
 function ConversionLink({ item }: { readonly item: ConversionItem }) {
@@ -29,12 +25,8 @@ function ConversionLink({ item }: { readonly item: ConversionItem }) {
   return (
     <Link
       href={item.conversion.route}
-      className={`group grid min-h-14 grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-3 rounded-xl px-3 py-2 outline-none transition hover:bg-violet-50 focus-visible:ring-4 focus-visible:ring-violet-100 ${
-        item.available ? "text-slate-900" : "text-slate-500"
-      }`}
-      aria-label={`${item.conversion.title}. ${
-        item.available ? "Open conversion." : "Coming soon."
-      }`}
+      className="group grid min-h-14 grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-3 rounded-xl px-3 py-2 text-slate-900 outline-none transition hover:bg-violet-50 focus-visible:ring-4 focus-visible:ring-violet-100"
+      aria-label={`${item.conversion.title}. Open conversion.`}
     >
       <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-50 text-violet-700">
         <Icon size={16} />
@@ -43,11 +35,6 @@ function ConversionLink({ item }: { readonly item: ConversionItem }) {
         <span className="block truncate text-sm font-bold">
           {item.conversion.title}
         </span>
-        {!item.available ? (
-          <span className="mt-0.5 block text-[10px] font-bold uppercase tracking-[0.07em] text-slate-400">
-            Coming soon
-          </span>
-        ) : null}
       </span>
       <ArrowRight
         size={14}
@@ -61,12 +48,10 @@ function ConversionGroup({
   eyebrow,
   title,
   conversions,
-  capabilities,
 }: {
   readonly eyebrow: string;
   readonly title: string;
   readonly conversions: readonly ConversionDefinition[];
-  readonly capabilities: HomepageCapabilitySnapshot;
 }) {
   const items = conversions.map((conversion) => {
     const tool = getToolById(conversion.id);
@@ -75,13 +60,8 @@ function ConversionGroup({
         `[homepage] Conversion "${conversion.id}" has no canonical tool.`,
       );
     }
-    return {
-      conversion,
-      available: getHomepageToolCapability(tool, capabilities).enabled,
-    };
+    return { conversion };
   });
-  const availableItems = items.filter((item) => item.available);
-  const advancedItems = items.filter((item) => !item.available);
 
   return (
     <article>
@@ -93,23 +73,10 @@ function ConversionGroup({
       </h3>
 
       <div className="mt-5 grid gap-1 sm:grid-cols-2">
-        {availableItems.map((item) => (
+        {items.map((item) => (
           <ConversionLink key={item.conversion.id} item={item} />
         ))}
       </div>
-
-      {advancedItems.length ? (
-        <div className="mt-5 border-t border-[var(--home-border)] pt-4">
-          <p className="px-3 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
-            Advanced conversions
-          </p>
-          <div className="mt-2 grid gap-1 sm:grid-cols-2">
-            {advancedItems.map((item) => (
-              <ConversionLink key={item.conversion.id} item={item} />
-            ))}
-          </div>
-        </div>
-      ) : null}
     </article>
   );
 }
@@ -136,21 +103,15 @@ export function ConversionHub({
           <ConversionGroup
             eyebrow="Export useful formats"
             title="Convert from PDF"
-            conversions={getHomepageConversionsFromPdf()}
-            capabilities={capabilities}
+            conversions={getHomepageConversionsFromPdf(capabilities)}
           />
           <ConversionGroup
             eyebrow="Build a new PDF"
             title="Convert to PDF"
-            conversions={getHomepageConversionsToPdf()}
-            capabilities={capabilities}
+            conversions={getHomepageConversionsToPdf(capabilities)}
           />
         </div>
 
-        <p className="mt-5 max-w-2xl text-xs leading-6 text-slate-500">
-          Some advanced Office conversions require configured secure
-          processing.
-        </p>
         <Link href="/tools?category=convert" className="btn-secondary mt-6">
           View all conversions
           <ArrowRight size={16} />

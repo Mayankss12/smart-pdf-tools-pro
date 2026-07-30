@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { ArrowUpRight, Globe2, Sparkles } from "lucide-react";
 import { BrandMark } from "@/components/BrandMark";
+import { getPublicFooterTools } from "@/lib/public-launch-collections";
+import { getPublicLaunchCapabilitySnapshot } from "@/lib/public-launch-snapshot";
 
 const footerGroups = [
   {
@@ -28,7 +30,6 @@ const footerGroups = [
     links: [
       { label: "Security", href: "/security" },
       { label: "About us", href: "/about" },
-      { label: "Desktop", href: "/desktop" },
     ],
   },
   {
@@ -44,6 +45,21 @@ const footerGroups = [
 ] as const;
 
 export function Footer() {
+  const publicToolHrefs = new Set(
+    getPublicFooterTools(getPublicLaunchCapabilitySnapshot()).map(
+      (tool) => tool.href,
+    ),
+  );
+  const publicFooterGroups = footerGroups
+    .map((group) => ({
+      ...group,
+      links:
+        group.title === "PDF tools" || group.title === "Workspace"
+          ? group.links.filter((link) => publicToolHrefs.has(link.href))
+          : group.links,
+    }))
+    .filter((group) => group.links.length > 0);
+
   return (
     <footer className="border-t border-white/10 bg-[#252631] text-white">
       <div className="mx-auto max-w-[1320px] px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
@@ -62,9 +78,8 @@ export function Footer() {
             </Link>
 
             <p className="mt-5 text-sm font-normal leading-7 text-white/68">
-              Browser-based PDF tools and clearly labelled secure-provider
-              workflows for editing, organizing, converting, and preparing
-              documents.
+              Focused PDF tools for editing, organizing, converting, signing,
+              and preparing documents.
             </p>
 
             <Link
@@ -77,7 +92,7 @@ export function Footer() {
             </Link>
           </div>
 
-          {footerGroups.map((group) => (
+          {publicFooterGroups.map((group) => (
             <div key={group.title}>
               <h3 className="text-sm font-bold uppercase tracking-[0.05em] text-white">
                 {group.title}
@@ -101,7 +116,7 @@ export function Footer() {
           <div className="flex flex-wrap items-center gap-3 text-sm font-medium text-white/64">
             <span>© 2026 PDFMantra</span>
             <span className="hidden h-1 w-1 rounded-full bg-white/30 sm:inline-block" />
-            <span>Processing mode shown before you start</span>
+            <span>Simple tools for everyday PDF work</span>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">

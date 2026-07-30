@@ -1,4 +1,8 @@
 import { getToolById, type Tool } from "@/lib/tools";
+import {
+  isToolPubliclyLaunchReady,
+  type PublicLaunchCapabilitySnapshot,
+} from "@/lib/public-launch";
 
 export type RecognizedHomepageFileKind =
   | "pdf"
@@ -120,6 +124,7 @@ export function recognizeHomepageFile(
 
 export function getFileActionSuggestions(
   recognition: HomepageFileRecognition,
+  capabilitySnapshot: PublicLaunchCapabilitySnapshot,
 ): Tool[] {
   return recognition.toolIds.map((id) => {
     const tool = getToolById(id);
@@ -129,6 +134,8 @@ export function getFileActionSuggestions(
       );
     }
     return tool;
-  });
+  }).filter((tool) =>
+    isToolPubliclyLaunchReady(tool, capabilitySnapshot),
+  );
 }
 

@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 
-import { tools } from "@/lib/tools";
+import { getPublicSitemapTools } from "@/lib/public-launch";
+import { getPublicLaunchCapabilitySnapshot } from "@/lib/public-launch-snapshot";
 
 const SITE_URL = "https://smart-pdf-tools-pro.vercel.app";
 
@@ -14,7 +15,6 @@ const KEY_PAGES = [
   "/security",
   "/privacy",
   "/terms",
-  "/desktop",
 ] as const;
 
 function absoluteUrl(path: string) {
@@ -27,9 +27,9 @@ function uniquePaths(paths: readonly string[]) {
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
-  const toolPaths = tools
-    .filter((tool) => tool.visibility.searchable && tool.status !== "coming-soon")
-    .map((tool) => tool.href);
+  const toolPaths = getPublicSitemapTools(
+    getPublicLaunchCapabilitySnapshot(),
+  ).map((tool) => tool.href);
 
   return uniquePaths([...KEY_PAGES, ...toolPaths]).map((path) => ({
     url: absoluteUrl(path),

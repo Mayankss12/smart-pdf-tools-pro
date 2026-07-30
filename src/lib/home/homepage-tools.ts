@@ -8,6 +8,10 @@ import {
   tools,
   type Tool,
 } from "@/lib/tools";
+import {
+  isToolPubliclyLaunchReady,
+  type PublicLaunchCapabilitySnapshot,
+} from "@/lib/public-launch";
 
 export const HOMEPAGE_POPULAR_TOOL_IDS = [
   "pdf-editor",
@@ -58,27 +62,6 @@ export const HOMEPAGE_QUICK_ACTION_IDS = [
   "pdf-to-images",
 ] as const;
 
-export const HOMEPAGE_WORKFLOWS = [
-  {
-    id: "prepare",
-    title: "Prepare a document",
-    description: "Build a polished, share-ready PDF.",
-    toolIds: ["merge-pdf", "reorder-pages", "page-numbers", "compress-pdf"],
-  },
-  {
-    id: "review",
-    title: "Review and approve",
-    description: "Make changes, mark decisions, and collect a signature.",
-    toolIds: ["pdf-editor", "highlight-pdf", "fill-sign"],
-  },
-  {
-    id: "digitize",
-    title: "Digitize and convert",
-    description: "Turn scanned pages into useful, searchable content.",
-    toolIds: ["pdf-to-searchable-pdf", "pdf-editor", "pdf-to-text", "pdf-to-images"],
-  },
-] as const;
-
 export type HomepageExplorerCategoryId =
   | "popular"
   | "edit-sign"
@@ -86,8 +69,7 @@ export type HomepageExplorerCategoryId =
   | "convert-from"
   | "convert-to"
   | "optimize"
-  | "smart"
-  | "security";
+  | "smart";
 
 export const HOMEPAGE_EXPLORER_CATEGORIES: readonly {
   readonly id: HomepageExplorerCategoryId;
@@ -100,39 +82,38 @@ export const HOMEPAGE_EXPLORER_CATEGORIES: readonly {
   { id: "convert-to", label: "Convert to PDF" },
   { id: "optimize", label: "Optimize" },
   { id: "smart", label: "OCR & Smart Tools" },
-  { id: "security", label: "Security" },
 ];
 
 export const HOMEPAGE_FAQS = [
   {
-    question: "Is PDFMantra free?",
+    question: "Can I edit a PDF online?",
     answer:
-      "PDFMantra includes browser-based tools you can start without a paid provider. Some advanced or provider-processed workflows can require an account, an eligible plan, and configured backend capacity.",
+      "Yes. Open the PDF Editor to add text, images, highlights, notes, whiteout, and visual signatures, then export your updated PDF.",
   },
   {
-    question: "Are files uploaded to a server?",
+    question: "Is PDFMantra free to use?",
     answer:
-      "Browser-labelled tools process supported work locally in your browser. Tools labelled Secure Provider send files only after you choose that workflow and may require authentication. PDFMantra does not claim that every tool is browser-only.",
+      "The PDF tools shown on this site can be opened and used without installing software. If a usage limit applies, it is shown before you export.",
   },
   {
-    question: "Which tools work in the browser?",
+    question: "Are my PDF files private?",
     answer:
-      "The PDF Editor, page organization, compression, supported image conversion, structured text conversion, and client OCR workflows are browser-based where their tool card shows the Browser badge.",
+      "Supported tools process documents locally in your browser. Your files remain on your device while you use those tools.",
   },
   {
-    question: "Can scanned PDFs be searched?",
+    question: "Can I fill and sign PDF forms?",
     answer:
-      "Yes. The searchable PDF workflow can run OCR in the browser and add a search layer while preserving the original page appearance. Accuracy depends on scan quality and language selection.",
+      "You can add text and place a typed, drawn, or uploaded visual signature on a PDF. This is a visual document workflow, not a cryptographic digital signature.",
   },
   {
-    question: "Does PDF to Word currently support OCR?",
+    question: "Can scanned PDFs be made searchable?",
     answer:
-      "Not without a verified document-processing provider. PDF to Word stays visibly disabled when that provider is unavailable, and PDFMantra does not claim verified OCR, editability, or layout preservation in that state.",
+      "Yes. The OCR tool can add a searchable text layer while preserving the original page image. Accuracy depends on scan quality, language, and handwriting clarity.",
   },
   {
-    question: "What happens when a tool requires backend processing?",
+    question: "Does PDFMantra work on mobile devices?",
     answer:
-      "The tool is clearly labelled Secure Provider or Backend required. It remains disabled when its configured provider capability is unavailable, and authenticated access or plan limits can apply when it is enabled.",
+      "Yes. The site and its focused tools are designed for phones and tablets, although complex document editing is usually more comfortable on a larger screen.",
   },
 ] as const;
 
@@ -206,44 +187,70 @@ export function resolveHomepageConversions(
   });
 }
 
-export function getHomepagePopularTools() {
+export function getHomepagePopularTools(
+  capabilitySnapshot: PublicLaunchCapabilitySnapshot,
+) {
   return resolveHomepageTools(
     HOMEPAGE_POPULAR_TOOL_IDS,
     "HOMEPAGE_POPULAR_TOOL_IDS",
+  ).filter((tool) =>
+    isToolPubliclyLaunchReady(tool, capabilitySnapshot),
   );
 }
 
-export function getHomepageQuickActions() {
+export function getHomepageQuickActions(
+  capabilitySnapshot: PublicLaunchCapabilitySnapshot,
+) {
   return resolveHomepageTools(
     HOMEPAGE_QUICK_ACTION_IDS,
     "HOMEPAGE_QUICK_ACTION_IDS",
+  ).filter((tool) =>
+    isToolPubliclyLaunchReady(tool, capabilitySnapshot),
   );
 }
 
-export function getHomepageExplorerTools() {
+export function getHomepageExplorerTools(
+  capabilitySnapshot: PublicLaunchCapabilitySnapshot,
+) {
   const seen = new Set<string>();
   return tools.filter((tool) => {
-    if (!tool.visibility.searchable || seen.has(tool.id)) return false;
+    if (
+      !tool.visibility.searchable ||
+      seen.has(tool.id) ||
+      !isToolPubliclyLaunchReady(tool, capabilitySnapshot)
+    ) {
+      return false;
+    }
     seen.add(tool.id);
     return true;
   });
 }
 
-export function getHomepageWorkflowTools(toolIds: readonly string[]) {
-  return resolveHomepageTools(toolIds, "HOMEPAGE_WORKFLOWS");
-}
-
-export function getHomepageConversionsFromPdf() {
+export function getHomepageConversionsFromPdf(
+  capabilitySnapshot: PublicLaunchCapabilitySnapshot,
+) {
   return resolveHomepageConversions(
     HOMEPAGE_FROM_PDF_IDS,
     "HOMEPAGE_FROM_PDF_IDS",
+  ).filter((conversion) =>
+    isToolPubliclyLaunchReady(
+      requireTool(conversion.id, "HOMEPAGE_FROM_PDF_IDS"),
+      capabilitySnapshot,
+    ),
   );
 }
 
-export function getHomepageConversionsToPdf() {
+export function getHomepageConversionsToPdf(
+  capabilitySnapshot: PublicLaunchCapabilitySnapshot,
+) {
   return resolveHomepageConversions(
     HOMEPAGE_TO_PDF_IDS,
     "HOMEPAGE_TO_PDF_IDS",
+  ).filter((conversion) =>
+    isToolPubliclyLaunchReady(
+      requireTool(conversion.id, "HOMEPAGE_TO_PDF_IDS"),
+      capabilitySnapshot,
+    ),
   );
 }
 
@@ -257,8 +264,6 @@ export function isToolInHomepageCategory(
   if (category === "edit-sign") return tool.category === "edit";
   if (category === "organize") return tool.category === "organize";
   if (category === "optimize") return tool.category === "optimize";
-  if (category === "security") return tool.category === "security";
-
   const conversion = getConversionById(tool.id);
   if (category === "convert-from") {
     return conversion?.sourceFormat === "pdf";
@@ -275,11 +280,20 @@ export function isToolInHomepageCategory(
 }
 
 export function assertHomepageCuratedIds() {
-  getHomepagePopularTools();
-  getHomepageQuickActions();
-  getHomepageConversionsFromPdf();
-  getHomepageConversionsToPdf();
-  for (const workflow of HOMEPAGE_WORKFLOWS) {
-    getHomepageWorkflowTools(workflow.toolIds);
-  }
+  resolveHomepageTools(
+    HOMEPAGE_POPULAR_TOOL_IDS,
+    "HOMEPAGE_POPULAR_TOOL_IDS",
+  );
+  resolveHomepageTools(
+    HOMEPAGE_QUICK_ACTION_IDS,
+    "HOMEPAGE_QUICK_ACTION_IDS",
+  );
+  resolveHomepageConversions(
+    HOMEPAGE_FROM_PDF_IDS,
+    "HOMEPAGE_FROM_PDF_IDS",
+  );
+  resolveHomepageConversions(
+    HOMEPAGE_TO_PDF_IDS,
+    "HOMEPAGE_TO_PDF_IDS",
+  );
 }

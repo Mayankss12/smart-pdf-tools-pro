@@ -54,7 +54,13 @@ export function SmartFileEntry({
     const recognition = recognizeHomepageFile(file);
     if (!recognition) {
       setError(
-        "That file type is not recognized. Try PDF, image, text, Office, HEIC, CSV, Markdown, or HTML.",
+        "That file type is not recognized. Try PDF, JPG, PNG, WebP, text, CSV, Markdown, or HTML.",
+      );
+      return;
+    }
+    if (getFileActionSuggestions(recognition, capabilities).length === 0) {
+      setError(
+        "Choose a PDF, JPG, PNG, WebP, text, CSV, Markdown, or HTML file.",
       );
       return;
     }
@@ -67,7 +73,7 @@ export function SmartFileEntry({
   }
 
   const suggestions = selected
-    ? getFileActionSuggestions(selected.recognition)
+    ? getFileActionSuggestions(selected.recognition, capabilities)
     : [];
 
   return (
@@ -134,7 +140,7 @@ export function SmartFileEntry({
           Choose a file
         </span>
         <span className="mt-3 text-xs font-medium text-slate-400">
-          PDF, images, text, Office, HEIC · up to 55 MB
+          PDF, images and text files · up to 55 MB
         </span>
       </label>
 
@@ -175,26 +181,15 @@ export function SmartFileEntry({
             </p>
             <div className="mt-2 grid gap-2 sm:grid-cols-2">
               {suggestions.slice(0, 6).map((tool) => {
-                const capability = capabilities[tool.id];
-                const enabled = capability
-                  ? capability.enabled
-                  : tool.status === "working" || tool.status === "beta";
                 return (
                   <Link
                     key={tool.id}
                     href={tool.href}
                     className="group flex min-h-12 items-center justify-between rounded-xl bg-[#f8f7fd] px-3.5 py-2.5 text-sm font-bold text-slate-800 transition hover:bg-violet-50 hover:text-violet-700 focus:outline-none focus:ring-4 focus:ring-violet-100"
-                    aria-label={`${tool.title}. ${
-                      enabled ? "Available" : "Backend unavailable"
-                    }. The destination tool will ask you to choose the file again.`}
+                    aria-label={`${tool.title}. The destination tool will ask you to choose the file again.`}
                   >
                     <span className="min-w-0 truncate">{tool.title}</span>
                     <span className="ml-2 flex shrink-0 items-center gap-1.5">
-                      {!enabled ? (
-                        <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-600">
-                          Coming soon
-                        </span>
-                      ) : null}
                       <ArrowRight
                         size={14}
                         className="transition group-hover:translate-x-0.5"

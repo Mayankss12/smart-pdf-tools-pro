@@ -10,7 +10,7 @@ export function HomeHero({
 }: {
   readonly capabilities: HomepageCapabilitySnapshot;
 }) {
-  const quickActions = getHomepageQuickActions();
+  const quickActions = getHomepageQuickActions(capabilities);
 
   return (
     <section className="home-hero relative overflow-hidden border-b border-[var(--home-border)] bg-[var(--home-surface)]">

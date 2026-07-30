@@ -10,7 +10,7 @@ export function PopularTools({
 }: {
   readonly capabilities: HomepageCapabilitySnapshot;
 }) {
-  const popularTools = getHomepagePopularTools();
+  const popularTools = getHomepagePopularTools(capabilities);
 
   return (
     <section className="home-section py-16 sm:py-20">
@@ -22,7 +22,7 @@ export function PopularTools({
               Popular PDF tools
             </h2>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 sm:text-base">
-              Eight reliable routes into the PDF work people do most.
+              Reliable routes into the PDF work people do most.
             </p>
           </div>
           <Link
@@ -36,11 +36,7 @@ export function PopularTools({
 
         <div className="mt-8 grid overflow-hidden rounded-2xl border border-[var(--home-border)] bg-[var(--home-border)] gap-px sm:grid-cols-2 lg:grid-cols-4">
           {popularTools.map((tool) => (
-            <ToolCard
-              key={tool.id}
-              tool={tool}
-              capabilities={capabilities}
-            />
+            <ToolCard key={tool.id} tool={tool} />
           ))}
         </div>
       </div>
