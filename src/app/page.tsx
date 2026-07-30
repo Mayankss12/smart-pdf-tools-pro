@@ -5,7 +5,6 @@ import { Header } from "@/components/Header";
 import { ConversionHub } from "@/components/home/ConversionHub";
 import { EditorShowcase } from "@/components/home/EditorShowcase";
 import { HomeFaq } from "@/components/home/HomeFaq";
-import { HomeFinalCta } from "@/components/home/HomeFinalCta";
 import { HomeHero } from "@/components/home/HomeHero";
 import { HomepageTrustStrip } from "@/components/home/HomepageTrustStrip";
 import { PopularTools } from "@/components/home/PopularTools";
@@ -38,7 +37,7 @@ export default function HomePage() {
   return (
     <>
       <Header />
-      <main className="home-shell min-h-screen bg-[#fbfaf7] text-slate-950">
+      <main className="home-shell min-h-screen text-slate-950">
         <HomeHero capabilities={capabilities} />
         <HomepageTrustStrip />
         <PopularTools capabilities={capabilities} />
@@ -46,10 +45,9 @@ export default function HomePage() {
         <EditorShowcase />
         <ConversionHub capabilities={capabilities} />
         <WorkflowStories />
-        <ProcessingPrivacy capabilities={capabilities} />
+        <ProcessingPrivacy />
         <ProductProof />
         <HomeFaq />
-        <HomeFinalCta />
       </main>
       <Footer />
     </>

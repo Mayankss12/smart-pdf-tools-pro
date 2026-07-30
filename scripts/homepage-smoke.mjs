@@ -31,6 +31,10 @@ assert.deepEqual(
 );
 for (const tool of popularTools) {
   assert.equal(tool.href, getToolById(tool.id)?.href);
+  assert.ok(
+    tool.status === "working" || tool.status === "beta",
+    `Popular tool ${tool.id} must be usable`,
+  );
 }
 
 const explorerTools = getHomepageExplorerTools();
@@ -111,6 +115,7 @@ const sourceFiles = await Promise.all(
     "../src/components/Footer.tsx",
     "../src/components/home/ToolCard.tsx",
     "../src/components/home/ToolExplorer.tsx",
+    "../src/components/home/ConversionHub.tsx",
     "../src/components/home/HomeFaq.tsx",
     "../src/components/home/ProductProof.tsx",
   ].map((path) => readFile(new URL(path, import.meta.url), "utf8")),
@@ -121,6 +126,7 @@ const [
   footerSource,
   toolCardSource,
   explorerSource,
+  conversionSource,
   faqSource,
   proofSource,
 ] = sourceFiles;
@@ -136,12 +142,30 @@ assert.match(headerSource, /getHomepagePopularTools/);
 assert.match(headerSource, /xl:flex/);
 assert.match(headerSource, /aria-expanded=\{toolsOpen\}/);
 assert.match(headerSource, /event\.key === "Escape"/);
-assert.match(toolCardSource, /capability\.processingMode === "browser"/);
-assert.match(toolCardSource, /Backend required/);
+assert.doesNotMatch(pageSource, /HomeFinalCta/);
+assert.doesNotMatch(toolCardSource, />\s*Browser\s*</);
+assert.doesNotMatch(toolCardSource, /Backend required/);
 assert.match(explorerSource, /RESULT_LIMIT = 12/);
 assert.match(explorerSource, /tool\.search\.keywords/);
+assert.doesNotMatch(explorerSource, />\s*Browser\s*</);
+assert.doesNotMatch(explorerSource, /Backend required/);
+assert.doesNotMatch(conversionSource, />\s*Browser\s*</);
+assert.doesNotMatch(conversionSource, /Backend required/);
+assert.match(conversionSource, /Coming soon/);
 assert.match(faqSource, /getHomepageFaqStructuredData/);
 assert.match(proofSource, /homepage-metrics/);
+
+await assert.rejects(
+  access(
+    fileURLToPath(
+      new URL(
+        "../src/components/home/HomeFinalCta.tsx",
+        import.meta.url,
+      ),
+    ),
+  ),
+  "HomeFinalCta should be deleted",
+);
 
 const curatedRouteIds = new Set([
   ...HOMEPAGE_POPULAR_TOOL_IDS,
