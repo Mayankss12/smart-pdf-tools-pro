@@ -173,7 +173,7 @@ export function ToolExplorer({
           className="mt-5"
         >
           {matches.length ? (
-            <div className="grid gap-px overflow-hidden rounded-2xl border border-[var(--home-border)] bg-[var(--home-border)] sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-px overflow-hidden rounded-2xl border border-[var(--home-border)] bg-white sm:grid-cols-2 lg:grid-cols-3">
               {matches.slice(0, RESULT_LIMIT).map((tool) => {
                 const Icon = tool.icon;
                 const capability = capabilities[tool.id];
