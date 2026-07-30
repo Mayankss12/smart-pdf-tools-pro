@@ -13,11 +13,11 @@ export function HomeHero({
   const quickActions = getHomepageQuickActions();
 
   return (
-    <section className="home-hero relative overflow-hidden border-b border-violet-100 bg-[#f4f1e9]">
-      <div className="home-grid-pattern absolute inset-0 opacity-60" aria-hidden="true" />
+    <section className="home-hero relative overflow-hidden border-b border-[var(--home-border)] bg-[var(--home-surface)]">
+      <div className="home-hero-glow absolute inset-0" aria-hidden="true" />
       <div className="relative mx-auto grid max-w-[1320px] gap-10 px-4 py-12 sm:px-6 sm:py-16 lg:grid-cols-[minmax(0,7fr)_minmax(390px,5fr)] lg:items-center lg:px-8 lg:py-20">
         <div className="max-w-[760px]">
-          <div className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-white/80 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-violet-700">
+          <div className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-violet-700">
             <ShieldCheck size={14} />
             Private, fast & built for real PDF work
           </div>

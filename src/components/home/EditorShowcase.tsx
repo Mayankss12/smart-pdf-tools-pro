@@ -39,7 +39,7 @@ const RIBBON_TOOLS = [
 function EditorProductMock() {
   return (
     <div
-      className="home-editor-mock overflow-hidden rounded-[1.5rem] border border-slate-700 bg-[#181922] shadow-[0_32px_90px_rgba(16,17,24,0.28)]"
+      className="home-editor-mock overflow-hidden rounded-[1.35rem] border border-slate-700 bg-[#181922] shadow-[0_24px_64px_rgba(16,17,24,0.20)]"
       aria-label="Presentational preview of the PDFMantra Editor"
       role="img"
     >
@@ -146,7 +146,7 @@ function EditorProductMock() {
 
 export function EditorShowcase() {
   return (
-    <section className="overflow-hidden bg-[#ede8dd] py-16 sm:py-24">
+    <section className="home-section-alt overflow-hidden border-y border-[var(--home-border)] py-16 sm:py-24">
       <div className="mx-auto grid max-w-[1320px] gap-10 px-4 sm:px-6 lg:grid-cols-[0.72fr_1.28fr] lg:items-center lg:px-8">
         <div>
           <p className="section-eyebrow">More than a collection of tools</p>

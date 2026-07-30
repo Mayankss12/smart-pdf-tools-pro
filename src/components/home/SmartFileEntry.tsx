@@ -73,13 +73,13 @@ export function SmartFileEntry({
   return (
     <div
       id="start-with-file"
-      className="home-file-entry rounded-[1.6rem] border border-violet-200 bg-white p-3 shadow-[0_24px_80px_rgba(42,28,100,0.16)] sm:p-4"
+      className="home-file-entry rounded-[1.25rem] border border-[var(--home-border)] bg-white p-3 shadow-[0_18px_50px_rgba(37,29,76,0.09)] sm:p-4"
     >
       <label
         className={`group flex min-h-[250px] cursor-pointer flex-col justify-center rounded-[1.25rem] border border-dashed px-5 py-7 text-center outline-none transition sm:min-h-[280px] sm:px-7 ${
           dragActive
-            ? "border-violet-500 bg-violet-50 shadow-[inset_0_0_0_2px_rgba(101,80,232,0.12)]"
-            : "border-violet-200 bg-[#faf9ff] hover:border-violet-400 hover:bg-white"
+            ? "border-violet-500 bg-white shadow-[inset_0_0_0_2px_rgba(101,80,232,0.10)]"
+            : "border-[var(--home-border)] bg-[var(--home-subtle)] hover:border-violet-400 hover:bg-white"
         }`}
         tabIndex={0}
         role="button"
@@ -120,7 +120,7 @@ export function SmartFileEntry({
           }}
         />
 
-        <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-600 text-white shadow-[0_15px_35px_rgba(101,80,232,0.28)] transition group-hover:-translate-y-0.5">
+        <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-600 text-white shadow-[0_10px_24px_rgba(101,80,232,0.20)] transition group-hover:-translate-y-0.5">
           <UploadCloud size={25} />
         </span>
         <span className="mt-5 block text-lg font-bold text-slate-950">
@@ -149,7 +149,7 @@ export function SmartFileEntry({
         {selected ? (
           <div className="mt-3 rounded-[1.2rem] border border-violet-100 bg-white p-4 text-left">
             <div className="flex items-start gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-700">
                 <FileCheck2 size={19} />
               </span>
               <div className="min-w-0 flex-1">
@@ -191,8 +191,8 @@ export function SmartFileEntry({
                     <span className="min-w-0 truncate">{tool.title}</span>
                     <span className="ml-2 flex shrink-0 items-center gap-1.5">
                       {!enabled ? (
-                        <span className="rounded-full bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-800">
-                          Backend
+                        <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-600">
+                          Coming soon
                         </span>
                       ) : null}
                       <ArrowRight

@@ -225,7 +225,7 @@ export function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-50 border-b border-violet-100 bg-white/96 backdrop-blur-xl">
+    <header className="sticky top-0 z-50 border-b border-[var(--border-light)] bg-white/96 backdrop-blur-xl">
       <div className="mx-auto max-w-[1320px] px-4 sm:px-6 lg:px-8">
         <div className="flex min-h-[68px] items-center justify-between gap-3">
           <Link
@@ -311,7 +311,7 @@ export function Header() {
           ref={toolsMenuRef}
           role="menu"
           aria-label="All PDF tools"
-          className="absolute inset-x-0 top-full hidden border-y border-violet-100 bg-white shadow-[0_28px_70px_rgba(36,25,86,0.15)] xl:block"
+          className="absolute inset-x-0 top-full hidden border-y border-[var(--border-light)] bg-white shadow-[0_20px_52px_rgba(36,25,86,0.11)] xl:block"
         >
           <div className="mx-auto grid max-h-[calc(100vh-90px)] max-w-[1320px] grid-cols-4 gap-x-6 gap-y-7 overflow-y-auto px-8 py-7">
             {toolGroups.map((group) => (
@@ -342,7 +342,7 @@ export function Header() {
           aria-modal="true"
           aria-label="PDFMantra navigation"
           onKeyDown={handleMobileKeyDown}
-          className="fixed inset-x-0 top-[69px] z-40 h-[calc(100dvh-69px)] overflow-y-auto border-t border-violet-100 bg-[#f8f7fd] px-4 py-5 xl:hidden"
+          className="fixed inset-x-0 top-[69px] z-40 h-[calc(100dvh-69px)] overflow-y-auto border-t border-[var(--border-light)] bg-[#f8f7fb] px-4 py-5 xl:hidden"
         >
           <div className="mx-auto max-w-3xl pb-8">
             <div className="overflow-hidden rounded-2xl border border-violet-100 bg-white">

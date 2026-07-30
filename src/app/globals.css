@@ -339,12 +339,26 @@ a {
   color: transparent;
 }
 
-.home-grid-pattern {
-  background-image:
-    linear-gradient(rgba(55, 38, 118, 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(55, 38, 118, 0.045) 1px, transparent 1px);
-  background-size: 38px 38px;
-  mask-image: linear-gradient(to bottom, black 0%, transparent 92%);
+.home-shell {
+  --home-surface: #ffffff;
+  --home-subtle: #fbfaff;
+  --home-section-alt: #f7f6fa;
+  --home-border: #e8e5ef;
+  background: var(--home-surface);
+}
+
+.home-section {
+  background: var(--home-surface);
+}
+
+.home-section-alt {
+  background: var(--home-section-alt);
+}
+
+.home-hero-glow {
+  background:
+    radial-gradient(circle at 78% 18%, rgba(101, 80, 232, 0.07), transparent 25rem),
+    linear-gradient(180deg, #ffffff 0%, #fbfaff 100%);
 }
 
 .home-file-entry,
