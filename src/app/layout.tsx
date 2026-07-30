@@ -26,7 +26,7 @@ export const metadata: Metadata = {
     template: "%s | PDFMantra",
   },
   description:
-    "PDFMantra is a modern PDF workspace for editing, signing, highlighting, organizing, and preparing documents with browser-side tools and backend-ready premium workflows.",
+    "PDFMantra is a modern PDF workspace for editing, signing, highlighting, organizing, converting, and preparing documents online.",
   keywords: [
     "PDF editor",
     "edit PDF",

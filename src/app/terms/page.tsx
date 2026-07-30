@@ -63,8 +63,8 @@ export default function TermsPage() {
             </h2>
             <p className="mt-3">
               PDFMantra may update, improve, limit, or discontinue features as
-              the product develops. Some features may be browser-side, while
-              others may require backend processing or paid plans in the future.
+              the product develops. Material changes will be reflected in the
+              product or these terms.
             </p>
           </section>
 

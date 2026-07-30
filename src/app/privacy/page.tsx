@@ -40,10 +40,9 @@ export default function PrivacyPage() {
               2. Documents and files
             </h2>
             <p className="mt-3">
-              Some PDFMantra tools may process files directly in your browser.
-              Future backend-assisted features may store or process files only
-              when required for saved documents, annotation projects, signatures,
-              or processing jobs.
+              Supported PDFMantra tools process documents locally in your
+              browser. Your files remain on your device while you use those
+              tools.
             </p>
           </section>
 
@@ -53,8 +52,8 @@ export default function PrivacyPage() {
             </h2>
             <p className="mt-3">
               We use information to provide account access, maintain sessions,
-              improve document workflows, protect the platform, and support
-              future workspace features.
+              improve document workflows, protect the platform, and provide
+              account features you choose to use.
             </p>
           </section>
 

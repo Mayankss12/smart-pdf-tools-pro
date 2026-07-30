@@ -6,10 +6,8 @@ import {
   Combine,
   FileCog,
   FileSearch,
-  FileText,
   Highlighter,
   Layers,
-  Lock,
   Sparkles,
   Wand2,
 } from "lucide-react";
@@ -31,7 +29,7 @@ const featureGroups = [
     title: "Convert and optimize",
     description: "Move documents into the right format while keeping the workflow clear and direct.",
     icon: Wand2,
-    items: ["PDF to Word", "Images to PDF", "PDF to images", "Compression-ready flow"],
+    items: ["PDF to text", "Images to PDF", "PDF to images", "Compress PDF"],
   },
 ] as const;
 
@@ -56,8 +54,8 @@ const workflowSteps = [
 const capabilityRows = [
   ["Document editing", "Text, images, signatures, highlights"],
   ["Page control", "Merge, split, rotate, extract"],
-  ["Conversion", "PDF-to-file and file-to-PDF workflows"],
-  ["Security", "Protect, unlock, redact direction"],
+  ["Conversion", "Text, image, and structured file conversions"],
+  ["Signing", "Form filling and visual signatures"],
   ["Discovery", "Category-led tools and streamlined navigation"],
 ] as const;
 

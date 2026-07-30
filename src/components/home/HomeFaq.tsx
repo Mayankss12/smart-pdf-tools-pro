@@ -17,8 +17,8 @@ export function HomeFaq() {
             Before you open a file.
           </h2>
           <p className="mt-4 text-sm leading-7 text-slate-600">
-            Processing, availability and provider requirements explained
-            without blanket promises.
+            Practical details about editing, privacy, signing, scanned files,
+            and mobile use.
           </p>
         </div>
 
