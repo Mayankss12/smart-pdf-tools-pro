@@ -45,6 +45,30 @@ assert.match(sources.shell, /rounded-\[26px\]/);
 assert.match(sources.shell, /overflow-x-hidden/);
 assert.match(sources.shell, /PDFMantra home/);
 assert.match(sources.shell, /Back to site/);
+assert.doesNotMatch(sources.shell, /\boverflow-hidden\b/);
+
+// Signup and login must stay on the same visual primitives. Signup may only
+// request the wider card variant needed for its longer, naturally scrolling form.
+assert.match(sources.signupPage, /<AuthPageShell/);
+assert.match(sources.loginPage, /<AuthPageShell/);
+assert.match(sources.signupForm, /import \{ AuthInput \} from "\.\/AuthInput"/);
+assert.match(sources.loginForm, /import \{ AuthInput \} from "\.\/AuthInput"/);
+assert.match(sources.signupForm, /import \{ AuthButton \} from "\.\/AuthButton"/);
+assert.match(sources.loginForm, /import \{ AuthButton \} from "\.\/AuthButton"/);
+assert.equal(
+  [...sources.signupForm.matchAll(/<AuthInput/g)].length,
+  5,
+  "Signup must retain five fields on the shared input system",
+);
+assert.equal(
+  [...sources.signupForm.matchAll(/<AuthButton/g)].length,
+  1,
+  "Signup must retain one shared full-width primary action",
+);
+assert.doesNotMatch(
+  `${sources.signupPage}\n${sources.signupForm}`,
+  /TRUST_POINTS|lg:grid-cols|marketing|introduction box|ShieldCheck/i,
+);
 
 assert.match(sources.signupPage, /title="Create your account"/);
 assert.match(sources.signupPage, /subtitle="Start using PDFMantra for free\."/);
@@ -63,6 +87,8 @@ assert.match(sources.signupForm, /signupAction/);
 assert.match(sources.signupForm, /Create account/);
 assert.match(sources.signupForm, /\/terms/);
 assert.match(sources.signupForm, /\/privacy/);
+assert.match(sources.signupPage, /Already have an account\?/);
+assert.match(sources.signupPage, />\s*Sign in\s*</);
 assert.doesNotMatch(sources.signupForm, /Create your PDFMantra account|ShieldCheck/);
 
 assert.match(sources.loginPage, /title="Welcome back"/);
@@ -144,6 +170,7 @@ assert.ok(
 console.log(
   JSON.stringify({
     authShell: "passed",
+    signupVisualParity: "passed",
     authRoutes: 6,
     authActions: 5,
     otpSecurity: "passed",
