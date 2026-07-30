@@ -3,8 +3,6 @@
 import Link from "next/link";
 import {
   ArrowRight,
-  CloudCog,
-  Laptop,
   Search,
   SearchX,
 } from "lucide-react";
@@ -63,34 +61,34 @@ export function ToolExplorer({
   return (
     <section
       id="tool-explorer"
-      className="border-y border-slate-800 bg-[#20212b] py-16 text-white sm:py-20"
+      className="home-section-alt border-y border-[var(--home-border)] py-16 sm:py-20"
     >
       <div className="mx-auto max-w-[1320px] px-4 sm:px-6 lg:px-8">
         <div className="grid gap-7 lg:grid-cols-[0.7fr_1.3fr] lg:items-end">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-violet-300">
-              Tool command center
+            <p className="section-eyebrow">
+              Tool directory
             </p>
-            <h2 className="mt-3 text-3xl font-bold tracking-[-0.045em] !text-white sm:text-4xl">
+            <h2 className="mt-3 text-3xl font-bold tracking-[-0.045em] text-slate-950 sm:text-4xl">
               What do you need to do?
             </h2>
-            <p className="mt-3 max-w-xl text-sm leading-7 !text-white/65 sm:text-base">
-              Search real tools and see where each task runs before you open
-              your document.
+            <p className="mt-3 max-w-xl text-sm leading-7 text-slate-600 sm:text-base">
+              Search the complete PDFMantra toolset, then go straight to the
+              workflow you need.
             </p>
           </div>
 
           <div className="relative">
             <Search
               size={20}
-              className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-violet-300"
+              className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-violet-600"
             />
             <input
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search PDF tools — convert, sign, remove pages…"
-              className="min-h-14 w-full rounded-2xl border border-white/15 bg-white/10 pl-12 pr-4 text-base font-semibold text-white outline-none transition placeholder:text-white/42 focus:border-violet-300 focus:bg-white/14 focus:ring-4 focus:ring-violet-400/15"
+              className="min-h-14 w-full rounded-2xl border border-[var(--home-border)] bg-white pl-12 pr-4 text-base font-semibold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
               aria-label="Search PDF tools"
             />
           </div>
@@ -143,10 +141,10 @@ export function ToolExplorer({
                     .getElementById(`homepage-tool-tab-${nextCategory.id}`)
                     ?.focus();
                 }}
-                className={`min-h-11 shrink-0 rounded-full border px-4 py-2 text-sm font-bold outline-none transition focus-visible:ring-4 focus-visible:ring-violet-300/30 ${
+                className={`min-h-11 shrink-0 rounded-full border px-4 py-2 text-sm font-bold outline-none transition focus-visible:ring-4 focus-visible:ring-violet-100 ${
                   selected
-                    ? "border-violet-400 bg-violet-500 text-white"
-                    : "border-white/14 bg-white/5 text-white/70 hover:border-white/30 hover:text-white"
+                    ? "border-violet-600 bg-violet-600 text-white"
+                    : "border-[var(--home-border)] bg-white text-slate-600 hover:border-violet-300 hover:text-violet-700"
                 }`}
               >
                 {item.label}
@@ -156,12 +154,12 @@ export function ToolExplorer({
         </div>
 
         <div className="mt-5 flex items-center justify-between gap-4">
-          <p className="text-sm font-semibold !text-white/60" aria-live="polite">
+          <p className="text-sm font-semibold text-slate-500" aria-live="polite">
             {matches.length} {matches.length === 1 ? "tool" : "tools"} found
           </p>
           <Link
             href="/tools"
-            className="inline-flex min-h-11 items-center gap-2 text-sm font-bold text-violet-300 transition hover:text-white"
+            className="inline-flex min-h-11 items-center gap-2 text-sm font-bold text-violet-700 transition hover:text-violet-900"
           >
             View all tools
             <ArrowRight size={15} />
@@ -175,15 +173,10 @@ export function ToolExplorer({
           className="mt-5"
         >
           {matches.length ? (
-            <div className="grid gap-px overflow-hidden rounded-[1.35rem] border border-white/10 bg-white/10 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-px overflow-hidden rounded-2xl border border-[var(--home-border)] bg-[var(--home-border)] sm:grid-cols-2 lg:grid-cols-3">
               {matches.slice(0, RESULT_LIMIT).map((tool) => {
                 const Icon = tool.icon;
                 const capability = capabilities[tool.id];
-                const processingMode =
-                  capability?.processingMode ??
-                  (tool.capabilities.processingMode === "browser"
-                    ? "browser"
-                    : "provider");
                 const available =
                   capability?.enabled ??
                   (tool.status === "working" || tool.status === "beta");
@@ -192,62 +185,44 @@ export function ToolExplorer({
                   <Link
                     key={tool.id}
                     href={tool.href}
-                    className="group flex min-h-[148px] flex-col bg-[#262732] p-5 outline-none transition hover:bg-[#2f3040] focus-visible:bg-[#2f3040] focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-violet-400/40"
+                    className={`group grid min-h-[118px] grid-cols-[40px_minmax(0,1fr)_auto] items-start gap-3 bg-white p-4 outline-none transition hover:bg-[var(--home-subtle)] focus-visible:z-10 focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-violet-100 ${
+                      !available ? "opacity-70" : ""
+                    }`}
                     aria-label={`${tool.title}. ${
-                      processingMode === "browser"
-                        ? "Browser processing"
-                        : available
-                          ? "Secure provider processing"
-                          : "Backend required and currently unavailable"
-                    }.`}
+                      available ? "Open tool." : "Coming soon."
+                    }`}
                   >
-                    <div className="flex items-start gap-3">
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/8 text-violet-300">
-                        <Icon size={18} />
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-700">
+                      <Icon size={18} />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-[15px] font-bold text-slate-950">
+                        {tool.title}
                       </span>
-                      <div className="min-w-0 flex-1">
-                        <h3 className="text-base font-bold !text-white">
-                          {tool.title}
-                        </h3>
-                        <p className="mt-1 line-clamp-2 text-xs leading-5 !text-white/55">
-                          {tool.description}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="mt-auto flex flex-wrap items-center gap-2 pt-4">
-                      <span
-                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] ${
-                          processingMode === "browser"
-                            ? "bg-emerald-400/12 text-emerald-300"
-                            : "bg-blue-400/12 text-blue-300"
-                        }`}
-                      >
-                        {processingMode === "browser" ? (
-                          <Laptop size={12} />
-                        ) : (
-                          <CloudCog size={12} />
-                        )}
-                        {processingMode === "browser"
-                          ? "Browser"
-                          : "Secure provider"}
+                      <span className="mt-1 block line-clamp-2 text-xs leading-5 text-slate-500">
+                        {tool.description}
                       </span>
                       {!available ? (
-                        <span className="rounded-full bg-amber-400/12 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-amber-300">
-                          Unavailable
+                        <span className="mt-2 inline-flex text-[10px] font-bold uppercase tracking-[0.08em] text-slate-500">
+                          Coming soon
                         </span>
                       ) : null}
-                    </div>
+                    </span>
+                    <ArrowRight
+                      size={15}
+                      className="mt-1 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-violet-600"
+                    />
                   </Link>
                 );
               })}
             </div>
           ) : (
-            <div className="flex min-h-48 flex-col items-center justify-center rounded-[1.35rem] border border-dashed border-white/15 bg-white/5 px-6 text-center">
-              <SearchX size={28} className="text-violet-300" />
-              <h3 className="mt-4 text-lg font-bold !text-white">
+            <div className="flex min-h-48 flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--home-border)] bg-white px-6 text-center">
+              <SearchX size={28} className="text-violet-600" />
+              <h3 className="mt-4 text-lg font-bold text-slate-950">
                 No matching tool yet
               </h3>
-              <p className="mt-2 max-w-md text-sm leading-6 !text-white/55">
+              <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">
                 Try a broader term such as “sign”, “image”, “pages”, or
                 “compress”, or browse the complete directory.
               </p>

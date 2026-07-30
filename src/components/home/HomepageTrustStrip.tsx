@@ -13,17 +13,17 @@ const POINTS = [
   },
   { icon: Download, text: "No software installation" },
   { icon: MonitorSmartphone, text: "Works on desktop and mobile" },
-  { icon: CloudCog, text: "Backend tools are clearly labelled" },
-  { icon: UserCheck, text: "Provider workflows require authentication" },
+  { icon: CloudCog, text: "Advanced workflows are clearly gated" },
+  { icon: UserCheck, text: "Account access shown before processing" },
 ] as const;
 
 export function HomepageTrustStrip() {
   return (
     <section
       aria-label="Processing and access overview"
-      className="border-b border-violet-100 bg-white"
+      className="border-b border-[var(--home-border)] bg-white"
     >
-      <div className="mx-auto grid max-w-[1320px] gap-px bg-violet-100 px-4 sm:grid-cols-2 sm:px-6 lg:grid-cols-5 lg:px-8">
+      <div className="mx-auto grid max-w-[1320px] gap-px bg-[var(--home-border)] px-4 sm:grid-cols-2 sm:px-6 lg:grid-cols-5 lg:px-8">
         {POINTS.map(({ icon: Icon, text }) => (
           <div
             key={text}

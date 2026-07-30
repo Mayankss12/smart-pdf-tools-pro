@@ -17,7 +17,7 @@ export const HOMEPAGE_POPULAR_TOOL_IDS = [
   "pdf-to-searchable-pdf",
   "jpg-to-pdf",
   "pdf-to-images",
-  "pdf-to-word",
+  "split-pdf",
 ] as const;
 
 export const HOMEPAGE_FROM_PDF_IDS = [

@@ -13,7 +13,7 @@ export function PopularTools({
   const popularTools = getHomepagePopularTools();
 
   return (
-    <section className="bg-[#fbfaf7] py-16 sm:py-20">
+    <section className="home-section py-16 sm:py-20">
       <div className="mx-auto max-w-[1320px] px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -22,8 +22,7 @@ export function PopularTools({
               Popular PDF tools
             </h2>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 sm:text-base">
-              Eight direct routes into the work people do most, including
-              browser tools and honestly gated provider workflows.
+              Eight reliable routes into the PDF work people do most.
             </p>
           </div>
           <Link
@@ -35,7 +34,7 @@ export function PopularTools({
           </Link>
         </div>
 
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-8 grid overflow-hidden rounded-2xl border border-[var(--home-border)] bg-[var(--home-border)] gap-px sm:grid-cols-2 lg:grid-cols-4">
           {popularTools.map((tool) => (
             <ToolCard
               key={tool.id}
