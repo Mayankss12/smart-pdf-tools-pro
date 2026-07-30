@@ -1,8 +1,10 @@
 import { ShieldOff } from "lucide-react";
 
 import { BackendToolShell } from "@/components/BackendToolShell";
+import { requirePublicLaunchReadyTool } from "@/lib/public-launch-guard";
 
 export default function UnlockPdfPage() {
+  requirePublicLaunchReadyTool("unlock-pdf");
   return (
     <BackendToolShell
       icon={ShieldOff}

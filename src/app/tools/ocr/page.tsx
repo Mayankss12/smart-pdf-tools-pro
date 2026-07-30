@@ -344,6 +344,11 @@ export default function OcrPdfPage() {
                 <ShieldCheck className="mb-2" size={18} />
                 Your file stays in your browser. Existing page visuals are preserved.
               </div>
+              <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs font-semibold leading-6 text-amber-900">
+                OCR accuracy depends on scan quality and the selected language.
+                Handwriting recognition can vary and is not guaranteed to be
+                perfect.
+              </div>
 
               {busy ? (
                 <button

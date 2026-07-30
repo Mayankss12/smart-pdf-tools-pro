@@ -453,6 +453,11 @@ export function PdfTextConversionPage({
                 <ShieldCheck className="mb-2" size={18} />
                 Your files stay in your browser. Generated HTML contains no scripts or external resources.
               </div>
+              <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs font-semibold leading-6 text-amber-900">
+                {outputFormat === "txt"
+                  ? "Plain text output does not reproduce visual page layout. Images and tables are not reconstructed. OCR accuracy depends on scan quality and language."
+                  : "HTML output is a sanitized text flow. Complex columns and typography may differ, and images and tables are not fully reconstructed. OCR accuracy depends on scan quality and language."}
+              </div>
 
               {state === "processing" || state === "cancelling" ? (
                 <button

@@ -76,8 +76,18 @@ export function useEntitlement() {
   });
 
   const anonymousId = useMemo(() => getAnonymousId(), []);
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
   const refresh = useCallback(async () => {
+    if (!supabase) {
+      setState({
+        status: DEFAULT_STATUS,
+        loading: false,
+        error: null,
+      });
+      return DEFAULT_STATUS;
+    }
+
     setState((current) => ({
       ...current,
       loading: true,
@@ -118,7 +128,7 @@ export function useEntitlement() {
 
       return null;
     }
-  }, [anonymousId]);
+  }, [anonymousId, supabase]);
 
   const recordExport = useCallback(
     async ({
@@ -128,6 +138,20 @@ export function useEntitlement() {
       toolKey: string;
       exportKind?: ExportKind;
     }): Promise<RecordExportResult> => {
+      if (!supabase) {
+        const payload: RecordExportResult = {
+          ...state.status,
+          allowed: true,
+          exportKind,
+        };
+        setState((current) => ({
+          ...current,
+          loading: false,
+          error: null,
+        }));
+        return payload;
+      }
+
       try {
         const response = await fetch("/api/entitlements/record-export", {
           method: "POST",
@@ -184,7 +208,7 @@ export function useEntitlement() {
         };
       }
     },
-    [anonymousId, state.status],
+    [anonymousId, state.status, supabase],
   );
 
   useEffect(() => {
@@ -192,8 +216,6 @@ export function useEntitlement() {
   }, [refresh]);
 
   useEffect(() => {
-    const supabase = createSupabaseBrowserClient();
-
     const {
       data: { subscription },
     } =
@@ -219,7 +241,7 @@ export function useEntitlement() {
       window.removeEventListener("focus", handleFocus);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [refresh]);
+  }, [refresh, supabase]);
 
   return {
     ...state.status,

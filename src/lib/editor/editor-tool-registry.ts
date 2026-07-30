@@ -534,7 +534,14 @@ export function resolveEditorTool(
   const availability: EditorToolAvailability = configuredDefinition.availability;
   const flagEnabled =
     context.featureControl.flags[configuredDefinition.adminFeatureFlag] ?? true;
-  const visible = configuredDefinition.visible;
+  const backendCapabilityAvailable =
+    availability !== "requires-backend" ||
+    Boolean(
+      configuredDefinition.backendCapability &&
+        context.backendCapabilities[configuredDefinition.backendCapability],
+    );
+  const visible =
+    configuredDefinition.visible && backendCapabilityAvailable;
   let disabledReason: string | null = null;
 
   if (!context.featureControl.globalEditorEnabled) {

@@ -16,6 +16,7 @@ import {
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type HeaderAuthState = {
+  isAvailable: boolean;
   isLoaded: boolean;
   isSignedIn: boolean;
   email: string | null;
@@ -87,8 +88,10 @@ function getDisplayNameFromMetadata(
 
 function useHeaderAuthState(): HeaderAuthState {
   const pathname = usePathname();
+  const supabase = createSupabaseBrowserClient();
 
   const [authState, setAuthState] = useState<HeaderAuthState>({
+    isAvailable: Boolean(supabase),
     isLoaded: false,
     isSignedIn: false,
     email: null,
@@ -96,24 +99,32 @@ function useHeaderAuthState(): HeaderAuthState {
   });
 
   const refreshAuthState = useCallback(async () => {
+    if (!supabase) {
+      setAuthState({
+        isAvailable: false,
+        isLoaded: true,
+        isSignedIn: false,
+        email: null,
+        displayName: null,
+      });
+      return;
+    }
+
     try {
-      const supabase = createSupabaseBrowserClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-      if (supabase) {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+      if (user) {
+        setAuthState({
+          isAvailable: true,
+          isLoaded: true,
+          isSignedIn: true,
+          email: user.email ?? null,
+          displayName: getDisplayNameFromMetadata(user.user_metadata),
+        });
 
-        if (user) {
-          setAuthState({
-            isLoaded: true,
-            isSignedIn: true,
-            email: user.email ?? null,
-            displayName: getDisplayNameFromMetadata(user.user_metadata),
-          });
-
-          return;
-        }
+        return;
       }
 
       const response = await fetch("/api/auth/session", {
@@ -128,6 +139,7 @@ function useHeaderAuthState(): HeaderAuthState {
       const data = (await response.json()) as SessionResponse;
 
       setAuthState({
+        isAvailable: true,
         isLoaded: true,
         isSignedIn: Boolean(data.isSignedIn),
         email: data.email ?? null,
@@ -135,21 +147,20 @@ function useHeaderAuthState(): HeaderAuthState {
       });
     } catch {
       setAuthState({
+        isAvailable: true,
         isLoaded: true,
         isSignedIn: false,
         email: null,
         displayName: null,
       });
     }
-  }, []);
+  }, [supabase]);
 
   useEffect(() => {
     void refreshAuthState();
   }, [pathname, refreshAuthState]);
 
   useEffect(() => {
-    const supabase = createSupabaseBrowserClient();
-
     const {
       data: { subscription },
     } =
@@ -318,7 +329,15 @@ function AccountAvatarMenu({
 }
 
 export function HeaderAuthLinks() {
-  const { isLoaded, isSignedIn, email, displayName } = useHeaderAuthState();
+  const {
+    isAvailable,
+    isLoaded,
+    isSignedIn,
+    email,
+    displayName,
+  } = useHeaderAuthState();
+
+  if (!isAvailable) return null;
 
   if (!isLoaded) {
     return (
@@ -348,7 +367,9 @@ export function HeaderAuthLinks() {
 }
 
 export function MobileHeaderAuthLink() {
-  const { isLoaded, isSignedIn } = useHeaderAuthState();
+  const { isAvailable, isLoaded, isSignedIn } = useHeaderAuthState();
+
+  if (!isAvailable) return null;
 
   if (!isLoaded) {
     return (

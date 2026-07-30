@@ -1,8 +1,10 @@
 import { Eye } from "lucide-react";
 
 import { BackendToolShell } from "@/components/BackendToolShell";
+import { requirePublicLaunchReadyTool } from "@/lib/public-launch-guard";
 
 export default function RedactPdfPage() {
+  requirePublicLaunchReadyTool("redact-pdf");
   return (
     <BackendToolShell
       icon={Eye}

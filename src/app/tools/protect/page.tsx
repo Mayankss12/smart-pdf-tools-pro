@@ -1,8 +1,10 @@
 import { ShieldCheck } from "lucide-react";
 
 import { BackendToolShell } from "@/components/BackendToolShell";
+import { requirePublicLaunchReadyTool } from "@/lib/public-launch-guard";
 
 export default function ProtectPdfPage() {
+  requirePublicLaunchReadyTool("protect-pdf");
   return (
     <BackendToolShell
       icon={ShieldCheck}

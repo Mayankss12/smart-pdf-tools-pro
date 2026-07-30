@@ -508,7 +508,11 @@ export default function CompressPage() {
 
               {openPanel === "help" ? (
                 <div className="absolute right-3 top-full z-50 mt-2 w-80 rounded-2xl border border-slate-200 bg-white p-3 text-xs font-semibold leading-5 text-slate-600 shadow-xl">
-                  Preserve Text keeps document structure. Scan Compression is intended for scanned PDFs and deliberately flattens text, links, forms, and vectors. Auto inspects the document before choosing.
+                  Preserve Text keeps document structure and may produce only a
+                  modest reduction. Scan Compression is intended for scanned
+                  PDFs and deliberately flattens text, links, forms, and
+                  vectors. Results vary by document, and no size reduction is
+                  guaranteed. Auto inspects the document before choosing.
                 </div>
               ) : null}
             </div>
