@@ -186,7 +186,7 @@ function useHeaderAuthState(): HeaderAuthState {
       window.removeEventListener("focus", handleFocus);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [refreshAuthState]);
+  }, [refreshAuthState, supabase]);
 
   return authState;
 }
