@@ -5,11 +5,7 @@ import { CONVERSION_REGISTRY } from "../src/lib/conversions/registry.ts";
 import { getPublicConversionCapabilities } from "../src/lib/conversions/capabilities.ts";
 import { EDITOR_TOOL_DEFINITIONS } from "../src/lib/editor/editor-tool-registry.ts";
 import {
-  getHomepageConversionsFromPdf,
-  getHomepageConversionsToPdf,
-  getHomepageExplorerTools,
-  getHomepagePopularTools,
-  getHomepageQuickActions,
+  getHomepageToolGridTools,
 } from "../src/lib/home/homepage-tools.ts";
 import {
   getPublicFooterTools,
@@ -51,17 +47,7 @@ const groups = {
 };
 
 const publicSurfaces = {
-  homepagePopular: getHomepagePopularTools(snapshot),
-  homepageExplorer: getHomepageExplorerTools(snapshot),
-  homepageQuickActions: getHomepageQuickActions(snapshot),
-  homepageConversions: [
-    ...getHomepageConversionsFromPdf(snapshot),
-    ...getHomepageConversionsToPdf(snapshot),
-  ].map((conversion) => {
-    const tool = tools.find((candidate) => candidate.id === conversion.id);
-    assert.ok(tool, `Missing canonical tool for ${conversion.id}`);
-    return tool;
-  }),
+  homepageGrid: getHomepageToolGridTools(snapshot),
   header: getPublicLaunchReadyTools(snapshot),
   toolsDirectory: getPublicToolsDirectory(snapshot),
   search: searchPublicLaunchTools("", snapshot).map((result) => result.tool),

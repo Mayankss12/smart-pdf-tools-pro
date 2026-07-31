@@ -4,20 +4,14 @@ import { fileURLToPath } from "node:url";
 
 import { CONVERSION_REGISTRY } from "../src/lib/conversions/registry.ts";
 import {
-  getFileActionSuggestions,
-  recognizeHomepageFile,
-} from "../src/lib/home/file-action-suggestions.ts";
-import {
   assertHomepageCuratedIds,
-  getHomepageConversionsFromPdf,
-  getHomepageConversionsToPdf,
-  getHomepageExplorerTools,
   getHomepageFaqStructuredData,
-  getHomepagePopularTools,
+  getHomepageToolGridCategories,
+  getHomepageToolGridTools,
   HOMEPAGE_FAQS,
-  HOMEPAGE_FROM_PDF_IDS,
-  HOMEPAGE_POPULAR_TOOL_IDS,
-  HOMEPAGE_TO_PDF_IDS,
+  HOMEPAGE_TOOL_GRID_ORDER_IDS,
+  isToolInHomepageGridCategory,
+  matchesHomepageToolQuery,
 } from "../src/lib/home/homepage-tools.ts";
 import {
   getPublicLaunchReadyTools,
@@ -44,33 +38,46 @@ const unavailableIds = new Set([
   "redact-pdf",
 ]);
 
-const popularTools = getHomepagePopularTools(snapshot);
+const gridTools = getHomepageToolGridTools(snapshot);
+const publicTools = getPublicLaunchReadyTools(snapshot).filter(
+  (tool) => tool.visibility.searchable,
+);
+
+assert.ok(gridTools.length > 0);
+assert.equal(new Set(gridTools.map((tool) => tool.id)).size, gridTools.length);
 assert.deepEqual(
-  popularTools.map((tool) => tool.id),
-  [...HOMEPAGE_POPULAR_TOOL_IDS],
+  new Set(gridTools.map((tool) => tool.id)),
+  new Set(publicTools.map((tool) => tool.id)),
+  "The homepage grid must cover every searchable launch-ready tool exactly once",
 );
 assert.ok(
-  popularTools.every((tool) => isToolPubliclyLaunchReady(tool, snapshot)),
-);
-
-const explorerTools = getHomepageExplorerTools(snapshot);
-assert.equal(
-  new Set(explorerTools.map((tool) => tool.id)).size,
-  explorerTools.length,
+  gridTools.every((tool) => isToolPubliclyLaunchReady(tool, snapshot)),
 );
 assert.deepEqual(
-  explorerTools.filter((tool) => unavailableIds.has(tool.id)),
+  gridTools.filter((tool) => unavailableIds.has(tool.id)),
   [],
 );
 
-const conversionTools = [
-  ...getHomepageConversionsFromPdf(snapshot),
-  ...getHomepageConversionsToPdf(snapshot),
-];
-assert.deepEqual(
-  conversionTools.filter((conversion) => unavailableIds.has(conversion.id)),
-  [],
-);
+const curatedGridIds = new Set(HOMEPAGE_TOOL_GRID_ORDER_IDS);
+assert.equal(curatedGridIds.size, HOMEPAGE_TOOL_GRID_ORDER_IDS.length);
+for (const id of HOMEPAGE_TOOL_GRID_ORDER_IDS) {
+  assert.ok(getToolById(id), `Unknown curated homepage grid ID: ${id}`);
+}
+
+const categories = getHomepageToolGridCategories(gridTools);
+assert.equal(categories[0]?.id, "all");
+assert.equal(categories.some((category) => category.id === "popular"), false);
+for (const tool of gridTools) {
+  assert.ok(
+    categories
+      .filter((category) => category.id !== "all")
+      .some((category) => isToolInHomepageGridCategory(tool, category.id)),
+    `No specific homepage category covers ${tool.id}`,
+  );
+}
+assert.equal(matchesHomepageToolQuery(getToolById("merge-pdf"), "combine"), true);
+assert.equal(matchesHomepageToolQuery(getToolById("fill-sign"), "signature"), true);
+assert.equal(matchesHomepageToolQuery(getToolById("merge-pdf"), "translate"), false);
 
 for (const conversion of CONVERSION_REGISTRY) {
   const tool = getToolById(conversion.id);
@@ -90,97 +97,82 @@ assert.deepEqual(
   })),
 );
 
-const pdfRecognition = recognizeHomepageFile({
-  name: "document.pdf",
-  size: 1024,
-});
-assert.ok(pdfRecognition);
-assert.ok(
-  getFileActionSuggestions(pdfRecognition, snapshot).some(
-    (tool) => tool.id === "pdf-editor",
-  ),
-);
-const officeRecognition = recognizeHomepageFile({
-  name: "document.docx",
-  size: 1024,
-});
-assert.ok(officeRecognition);
-assert.deepEqual(getFileActionSuggestions(officeRecognition, snapshot), []);
-assert.equal(
-  recognizeHomepageFile({ name: "too-large.pdf", size: 56 * 1024 * 1024 }),
-  null,
-);
-assert.equal(
-  recognizeHomepageFile({ name: "script.exe", size: 1024 }),
-  null,
-);
-
 const sources = await Promise.all(
   [
     "../src/app/page.tsx",
+    "../src/components/home/HomeHero.tsx",
+    "../src/components/home/HomeToolsGrid.tsx",
+    "../src/components/home/EditorShowcase.tsx",
+    "../src/components/home/ProcessingPrivacy.tsx",
+    "../src/components/home/HomeFaq.tsx",
     "../src/components/HeaderClient.tsx",
     "../src/components/Footer.tsx",
-    "../src/components/ToolsDirectoryClient.tsx",
-    "../src/components/home/ToolCard.tsx",
-    "../src/components/home/ToolExplorer.tsx",
-    "../src/components/home/ConversionHub.tsx",
-    "../src/components/home/HomeFaq.tsx",
     "../src/app/sitemap.ts",
   ].map((path) => readFile(new URL(path, import.meta.url), "utf8")),
 );
 const [
   pageSource,
+  heroSource,
+  gridSource,
+  editorSource,
+  privacySource,
+  faqSource,
   headerSource,
   footerSource,
-  directorySource,
-  toolCardSource,
-  explorerSource,
-  conversionSource,
-  faqSource,
   sitemapSource,
 ] = sources;
 const homepageSource = [
   pageSource,
-  toolCardSource,
-  explorerSource,
-  conversionSource,
+  heroSource,
+  gridSource,
+  editorSource,
+  privacySource,
   faqSource,
 ].join("\n");
 
 assert.doesNotMatch(pageSource.trimStart(), /^["']use client["']/);
-assert.doesNotMatch(pageSource, /useRouter|pdfjs-dist|tesseract/i);
-assert.doesNotMatch(
-  pageSource,
-  /HomepageTrustStrip|ProductProof|WorkflowStories/,
-);
+assert.match(pageSource, /getHomepageCapabilitySnapshot/);
+assert.match(pageSource, /<HomeToolsGrid capabilities=\{capabilities\}/);
+assert.doesNotMatch(pageSource, /PopularTools|ToolExplorer|ConversionHub/);
+assert.doesNotMatch(heroSource, /SmartFileEntry|Jump straight to|quickActions/);
+assert.match(heroSource, /Every PDF tool you need/);
+assert.match(gridSource, /^"use client";/);
+assert.doesNotMatch(gridSource, /Choose what you want to do/);
+assert.doesNotMatch(gridSource, /<ArrowRight|,\s*ArrowRight/);
+assert.doesNotMatch(gridSource, /\{tool\.description\}/);
+assert.doesNotMatch(gridSource, /\{tool\.menuDescription\}/);
+assert.match(gridSource, /grid-cols-2/);
+assert.match(gridSource, /xl:grid-cols-6/);
+assert.match(gridSource, /role="tablist"/);
+assert.match(gridSource, /role="tabpanel"/);
+assert.match(gridSource, /ArrowRight|ArrowLeft/);
+assert.match(gridSource, /aria-label="Clear tool search"/);
+assert.doesNotMatch(homepageSource, /pdfjs-dist|tesseract/i);
 assert.doesNotMatch(homepageSource, /Coming soon|Backend required/i);
 assert.doesNotMatch(
   homepageSource,
   /browser tools|conversion workflows|editor capabilities/i,
 );
-assert.doesNotMatch(conversionSource, /Advanced conversions/i);
-assert.match(pageSource, /getHomepageCapabilitySnapshot/);
 assert.match(headerSource, /launchReadyToolIds/);
+assert.match(headerSource, /\/#pdf-tools/);
+assert.doesNotMatch(headerSource, /#tool-explorer/);
 assert.match(headerSource, /xl:flex/);
 assert.match(headerSource, /aria-expanded=\{toolsOpen\}/);
 assert.match(headerSource, /event\.key === "Escape"/);
-assert.match(directorySource, /launchReadyToolIds/);
 assert.match(footerSource, /getPublicFooterTools/);
 assert.match(sitemapSource, /getPublicSitemapTools/);
+assert.match(faqSource, /getHomepageFaqStructuredData/);
 assert.doesNotMatch(
   `${pageSource}\n${headerSource}\n${footerSource}`,
   /\/tools\/organize/,
 );
-assert.doesNotMatch(toolCardSource, />\s*Browser\s*</);
-assert.doesNotMatch(explorerSource, /Coming soon|Backend required/i);
-assert.doesNotMatch(conversionSource, /Coming soon|Backend required/i);
-assert.match(faqSource, /getHomepageFaqStructuredData/);
 
 for (const removedPath of [
-  "../src/components/home/HomepageTrustStrip.tsx",
-  "../src/components/home/ProductProof.tsx",
-  "../src/components/home/WorkflowStories.tsx",
-  "../src/lib/home/homepage-metrics.ts",
+  "../src/components/home/PopularTools.tsx",
+  "../src/components/home/ToolExplorer.tsx",
+  "../src/components/home/ConversionHub.tsx",
+  "../src/components/home/ToolCard.tsx",
+  "../src/components/home/SmartFileEntry.tsx",
 ]) {
   await assert.rejects(
     access(fileURLToPath(new URL(removedPath, import.meta.url))),
@@ -203,21 +195,7 @@ await assert.rejects(
   ),
 );
 
-const publicTools = getPublicLaunchReadyTools(snapshot);
-assert.ok(publicTools.length > 0);
-assert.deepEqual(
-  publicTools.filter((tool) => unavailableIds.has(tool.id)),
-  [],
-);
-
-const curatedRouteIds = new Set([
-  ...HOMEPAGE_POPULAR_TOOL_IDS,
-  ...HOMEPAGE_FROM_PDF_IDS,
-  ...HOMEPAGE_TO_PDF_IDS,
-]);
-for (const id of curatedRouteIds) {
-  const tool = getToolById(id);
-  assert.ok(tool);
+for (const tool of gridTools) {
   const route = tool.href.split(/[?#]/)[0];
   const pagePath =
     route === "/"
@@ -232,13 +210,13 @@ for (const id of curatedRouteIds) {
 console.log(
   JSON.stringify({
     homepageComposition: "passed",
-    publicPopularTools: popularTools.length,
-    publicExplorerTools: explorerTools.length,
-    publicConversions: conversionTools.length,
+    unifiedGridTools: gridTools.length,
+    categoryCoverage: "passed",
+    explicitSearch: "passed",
+    tilePresentation: "passed",
     publicVisibility: "passed",
     faqJsonLdParity: "passed",
     routeIntegrity: "passed",
     serverPage: "passed",
-    fileRecommendations: "passed",
   }),
 );
