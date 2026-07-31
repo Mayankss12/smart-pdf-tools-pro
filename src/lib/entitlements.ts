@@ -122,6 +122,12 @@ export const CORE_TOOL_KEYS = [
   "markdown-to-pdf",
   "html-to-pdf",
   "csv-to-pdf",
+  "pdf-to-word",
+  "pdf-to-excel",
+  "pdf-to-powerpoint",
+  "docx-to-pdf",
+  "xlsx-to-pdf",
+  "pptx-to-pdf",
 ] as const;
 
 export const ADVANCED_TOOL_KEYS = [
@@ -134,12 +140,6 @@ export const ADVANCED_TOOL_KEYS = [
 
 export const BACKEND_TOOL_KEYS = [
   "ocr",
-  "pdf-to-word",
-  "pdf-to-excel",
-  "pdf-to-powerpoint",
-  "docx-to-pdf",
-  "xlsx-to-pdf",
-  "pptx-to-pdf",
   "heic-to-pdf",
   "webpage-to-pdf",
   "translate",
@@ -170,7 +170,11 @@ export function getEntitlementPlan(tier: string | null | undefined) {
 export function isUnlimitedPlan(tier: string | null | undefined) {
   const normalizedTier = normalizeTier(tier);
 
-  return normalizedTier === "plus" || normalizedTier === "pro" || normalizedTier === "admin";
+  return (
+    normalizedTier === "plus" ||
+    normalizedTier === "pro" ||
+    normalizedTier === "admin"
+  );
 }
 
 export function getDailyCleanExportLimit(tier: string | null | undefined) {
