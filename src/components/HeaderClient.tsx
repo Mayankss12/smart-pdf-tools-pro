@@ -2,13 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  ArrowRight,
-  ChevronDown,
-  Menu,
-  Search,
-  X,
-} from "lucide-react";
+import { ChevronDown, Menu, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { BrandMark } from "@/components/BrandMark";
@@ -16,133 +10,192 @@ import {
   HeaderAuthLinks,
   MobileHeaderAuthLink,
 } from "@/components/auth/HeaderAuthLinks";
+import { HeaderToolSearch } from "@/components/header/HeaderToolSearch";
 import {
-  HOMEPAGE_FROM_PDF_IDS,
-  HOMEPAGE_POPULAR_TOOL_IDS,
-  HOMEPAGE_TO_PDF_IDS,
-  resolveHomepageTools,
+  getHeaderToolSearchItems,
+  getToolDiscoveryGroups,
+  type ToolDiscoveryGroup,
+  type ToolDiscoveryGroupId,
+  type ToolDiscoveryItem,
 } from "@/lib/home/homepage-tools";
-import { getToolById, tools, type Tool } from "@/lib/tools";
+import type { PublicLaunchCapabilitySnapshot } from "@/lib/public-launch";
 
-const PRIMARY_NAV = [
-  { label: "Edit PDF", href: "/editor" },
-  { label: "Organize", href: "/tools/reorder" },
-  { label: "Convert", href: "/#pdf-tools" },
-  { label: "Sign", href: "/tools/fill-sign" },
-  { label: "Compress", href: "/tools/compress" },
-] as const;
-
-type HeaderToolGroup = {
-  readonly label: string;
-  readonly tools: readonly Tool[];
-};
-
-function conversionTools(
-  ids: readonly string[],
-  label: string,
-  launchReadyIds: ReadonlySet<string>,
-) {
-  return ids.filter((id) => launchReadyIds.has(id)).map((id) => {
-    const tool = getToolById(id);
-    if (!tool) {
-      throw new Error(`[header] Missing canonical tool "${id}" in ${label}.`);
-    }
-    return tool;
-  });
-}
-
-function HeaderToolLink({
-  tool,
-  onClick,
+function DiscoveryTool({
+  item,
+  onNavigate,
 }: {
-  readonly tool: Tool;
-  readonly onClick?: () => void;
+  readonly item: ToolDiscoveryItem;
+  readonly onNavigate?: () => void;
 }) {
-  const Icon = tool.icon;
+  const Icon = item.tool.icon;
+  const content = (
+    <>
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-700">
+        <Icon size={17} strokeWidth={2} aria-hidden="true" />
+      </span>
+      <span className="min-w-0 flex-1 truncate text-sm font-bold">
+        {item.tool.title}
+      </span>
+      {item.availability === "coming-soon" ? (
+        <span className="shrink-0 text-[9px] font-bold uppercase tracking-[0.08em] text-slate-500">
+          Coming soon
+        </span>
+      ) : null}
+    </>
+  );
+
+  if (item.availability === "coming-soon") {
+    return (
+      <div
+        role="link"
+        aria-disabled="true"
+        className="flex min-h-12 cursor-not-allowed items-center gap-2.5 rounded-xl border border-slate-100 bg-slate-50/70 px-2.5 py-2 text-slate-500"
+      >
+        {content}
+      </div>
+    );
+  }
+
   return (
     <Link
-      href={tool.href}
-      role="menuitem"
-      onClick={onClick}
-      className="group flex min-h-11 items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-semibold text-slate-700 outline-none transition hover:bg-violet-50 hover:text-violet-700 focus-visible:bg-violet-50 focus-visible:ring-4 focus-visible:ring-violet-100"
+      href={item.tool.href}
+      onClick={onNavigate}
+      className="flex min-h-12 items-center gap-2.5 rounded-xl border border-transparent px-2.5 py-2 text-slate-800 outline-none transition hover:border-violet-100 hover:bg-violet-50 hover:text-violet-800 focus-visible:ring-4 focus-visible:ring-violet-100"
     >
-      <Icon size={15} className="shrink-0 text-violet-600" />
-      <span className="min-w-0 flex-1 truncate">
-        {tool.shortTitle ?? tool.title}
-      </span>
+      {content}
     </Link>
   );
 }
 
-export function HeaderClient({
-  launchReadyToolIds,
+function CategoryTabs({
+  groups,
+  selectedId,
+  orientation,
+  idPrefix,
+  tabRefs,
+  onSelect,
 }: {
-  readonly launchReadyToolIds: readonly string[];
+  readonly groups: readonly ToolDiscoveryGroup[];
+  readonly selectedId: ToolDiscoveryGroupId;
+  readonly orientation: "horizontal" | "vertical";
+  readonly idPrefix: string;
+  readonly tabRefs?: React.MutableRefObject<
+    Map<ToolDiscoveryGroupId, HTMLButtonElement>
+  >;
+  readonly onSelect: (id: ToolDiscoveryGroupId) => void;
+}) {
+  const vertical = orientation === "vertical";
+
+  return (
+    <div
+      role="tablist"
+      aria-label="PDF tool categories"
+      aria-orientation={orientation}
+      className={
+        vertical
+          ? "space-y-1"
+          : "flex gap-2 overflow-x-auto pb-2 [scrollbar-width:none]"
+      }
+    >
+      {groups.map((group, index) => {
+        const selected = group.id === selectedId;
+        return (
+          <button
+            key={group.id}
+            ref={(node) => {
+              if (!tabRefs) return;
+              if (node) tabRefs.current.set(group.id, node);
+              else tabRefs.current.delete(group.id);
+            }}
+            id={`${idPrefix}-tab-${group.id}`}
+            type="button"
+            role="tab"
+            aria-selected={selected}
+            aria-controls={`${idPrefix}-panel-${group.id}`}
+            tabIndex={selected ? 0 : -1}
+            onClick={() => onSelect(group.id)}
+            onKeyDown={(event) => {
+              const previousKey = vertical ? "ArrowUp" : "ArrowLeft";
+              const nextKey = vertical ? "ArrowDown" : "ArrowRight";
+              let nextIndex = index;
+
+              if (event.key === previousKey) {
+                nextIndex = (index - 1 + groups.length) % groups.length;
+              } else if (event.key === nextKey) {
+                nextIndex = (index + 1) % groups.length;
+              } else if (event.key === "Home") {
+                nextIndex = 0;
+              } else if (event.key === "End") {
+                nextIndex = groups.length - 1;
+              } else {
+                return;
+              }
+
+              event.preventDefault();
+              const nextGroup = groups[nextIndex];
+              onSelect(nextGroup.id);
+              requestAnimationFrame(() => {
+                document
+                  .getElementById(`${idPrefix}-tab-${nextGroup.id}`)
+                  ?.focus();
+              });
+            }}
+            className={
+              vertical
+                ? `flex min-h-11 w-full items-center justify-between rounded-xl px-3 text-left text-sm font-bold outline-none transition focus-visible:ring-4 focus-visible:ring-violet-100 ${
+                    selected
+                      ? "bg-violet-600 text-white"
+                      : "text-slate-700 hover:bg-violet-50 hover:text-violet-800"
+                  }`
+                : `min-h-11 shrink-0 rounded-full border px-4 py-2 text-sm font-bold outline-none transition focus-visible:ring-4 focus-visible:ring-violet-100 ${
+                    selected
+                      ? "border-violet-600 bg-violet-600 text-white"
+                      : "border-violet-100 bg-white text-slate-700 hover:border-violet-300 hover:text-violet-800"
+                  }`
+            }
+          >
+            {group.label}
+            {vertical ? (
+              <span className={selected ? "text-violet-100" : "text-slate-400"}>
+                {group.items.length}
+              </span>
+            ) : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+export function HeaderClient({
+  capabilities,
+}: {
+  readonly capabilities: PublicLaunchCapabilitySnapshot;
 }) {
   const pathname = usePathname();
+  const groups = useMemo(
+    () => getToolDiscoveryGroups(capabilities),
+    [capabilities],
+  );
+  const searchItems = useMemo(
+    () => getHeaderToolSearchItems(capabilities),
+    [capabilities],
+  );
+  const firstGroupId = groups[0]?.id ?? "edit-sign";
+  const [selectedGroupId, setSelectedGroupId] =
+    useState<ToolDiscoveryGroupId>(firstGroupId);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const toolsTriggerRef = useRef<HTMLButtonElement | null>(null);
   const toolsMenuRef = useRef<HTMLDivElement | null>(null);
+  const desktopTabRefs = useRef(
+    new Map<ToolDiscoveryGroupId, HTMLButtonElement>(),
+  );
   const mobileTriggerRef = useRef<HTMLButtonElement | null>(null);
   const mobilePanelRef = useRef<HTMLDivElement | null>(null);
 
-  const toolGroups = useMemo<readonly HeaderToolGroup[]>(() => {
-    const launchReadyIds = new Set(launchReadyToolIds);
-    const readyTools = tools.filter((tool) => launchReadyIds.has(tool.id));
-    return [
-      {
-        label: "Popular",
-        tools: resolveHomepageTools(
-          HOMEPAGE_POPULAR_TOOL_IDS,
-          "Header Popular",
-        )
-          .filter((tool) => launchReadyIds.has(tool.id))
-          .slice(0, 6),
-      },
-      {
-        label: "Edit & Sign",
-        tools: readyTools
-          .filter((tool) => tool.category === "edit")
-          .slice(0, 6),
-      },
-      {
-        label: "Organize",
-        tools: readyTools
-          .filter((tool) => tool.category === "organize")
-          .slice(0, 6),
-      },
-      {
-        label: "Convert from PDF",
-        tools: conversionTools(
-          HOMEPAGE_FROM_PDF_IDS,
-          "Convert from PDF",
-          launchReadyIds,
-        ),
-      },
-      {
-        label: "Convert to PDF",
-        tools: conversionTools(
-          HOMEPAGE_TO_PDF_IDS,
-          "Convert to PDF",
-          launchReadyIds,
-        ),
-      },
-      {
-        label: "Optimize",
-        tools: readyTools
-          .filter((tool) => tool.category === "optimize")
-          .slice(0, 6),
-      },
-      {
-        label: "OCR & Smart Tools",
-        tools: resolveHomepageTools(
-          ["pdf-to-searchable-pdf", "pdf-to-text", "pdf-to-html", "pdf-editor"],
-          "Header OCR & Smart Tools",
-        ).filter((tool) => launchReadyIds.has(tool.id)),
-      },
-    ].filter((group) => group.tools.length > 0);
-  }, [launchReadyToolIds]);
+  const selectedGroup =
+    groups.find((group) => group.id === selectedGroupId) ?? groups[0];
 
   useEffect(() => {
     setToolsOpen(false);
@@ -158,11 +211,10 @@ export function HeaderClient({
     }
 
     function handlePointerDown(event: MouseEvent) {
-      const target = event.target;
-      if (!(target instanceof Node)) return;
       if (
-        !toolsMenuRef.current?.contains(target) &&
-        !toolsTriggerRef.current?.contains(target)
+        event.target instanceof Node &&
+        !toolsMenuRef.current?.contains(event.target) &&
+        !toolsTriggerRef.current?.contains(event.target)
       ) {
         closeAndRestoreFocus();
       }
@@ -188,7 +240,7 @@ export function HeaderClient({
     if (mobileOpen) {
       requestAnimationFrame(() => {
         mobilePanelRef.current
-          ?.querySelector<HTMLElement>("a, button")
+          ?.querySelector<HTMLElement>("input, button, a[href]")
           ?.focus();
       });
     }
@@ -196,6 +248,18 @@ export function HeaderClient({
       document.body.style.overflow = "";
     };
   }, [mobileOpen]);
+
+  function openToolsMenu() {
+    setSelectedGroupId(firstGroupId);
+    setToolsOpen(true);
+    requestAnimationFrame(() => {
+      desktopTabRefs.current.get(firstGroupId)?.focus();
+    });
+  }
+
+  function closeToolsMenu() {
+    setToolsOpen(false);
+  }
 
   function handleMobileKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
     if (event.key === "Escape") {
@@ -208,7 +272,7 @@ export function HeaderClient({
 
     const focusable = Array.from(
       event.currentTarget.querySelectorAll<HTMLElement>(
-        'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        'a[href], input:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])',
       ),
     );
     const first = focusable[0];
@@ -226,7 +290,7 @@ export function HeaderClient({
   return (
     <header className="sticky top-0 z-50 border-b border-[var(--border-light)] bg-white/96 backdrop-blur-xl">
       <div className="mx-auto max-w-[1320px] px-4 sm:px-6 lg:px-8">
-        <div className="flex min-h-[68px] items-center justify-between gap-3">
+        <div className="flex min-h-[68px] items-center gap-3">
           <Link
             href="/"
             className="group flex min-w-0 shrink-0 items-center gap-2"
@@ -243,97 +307,106 @@ export function HeaderClient({
             </div>
           </Link>
 
-          <nav
-            className="hidden min-w-0 flex-1 items-center justify-center gap-1 xl:flex"
-            aria-label="Primary navigation"
+          <button
+            ref={toolsTriggerRef}
+            type="button"
+            onClick={() => {
+              if (toolsOpen) closeToolsMenu();
+              else openToolsMenu();
+            }}
+            className="ml-3 hidden min-h-11 shrink-0 items-center gap-1.5 rounded-full px-3 text-[13px] font-bold text-slate-700 outline-none transition hover:bg-violet-50 hover:text-violet-700 focus-visible:ring-4 focus-visible:ring-violet-100 lg:inline-flex"
+            aria-expanded={toolsOpen}
+            aria-haspopup="dialog"
+            aria-controls="header-tools-menu"
           >
-            {PRIMARY_NAV.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="inline-flex min-h-11 items-center rounded-full px-3 text-[13px] font-bold text-slate-700 transition hover:bg-violet-50 hover:text-violet-700"
-              >
-                {item.label}
-              </Link>
-            ))}
+            All PDF Tools
+            <ChevronDown
+              size={14}
+              className={`transition ${toolsOpen ? "rotate-180" : ""}`}
+              aria-hidden="true"
+            />
+          </button>
 
-            <div className="relative">
-              <button
-                ref={toolsTriggerRef}
-                type="button"
-                onClick={() => setToolsOpen((current) => !current)}
-                className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-[13px] font-bold text-slate-700 transition hover:bg-violet-50 hover:text-violet-700"
-                aria-expanded={toolsOpen}
-                aria-haspopup="menu"
-                aria-controls="header-tools-menu"
-              >
-                All PDF Tools
-                <ChevronDown
-                  size={14}
-                  className={`transition ${toolsOpen ? "rotate-180" : ""}`}
-                />
-              </button>
-            </div>
-          </nav>
+          <div className="hidden min-w-4 flex-1 lg:block" />
 
-          <div className="hidden shrink-0 items-center gap-2 xl:flex">
-            <Link
-          href="/#pdf-tools"
-              className="inline-flex h-11 w-11 items-center justify-center rounded-full text-slate-600 transition hover:bg-violet-50 hover:text-violet-700"
-              aria-label="Search PDF tools"
-            >
-              <Search size={18} />
-            </Link>
+          <div className="hidden shrink-0 items-center gap-3 lg:flex">
+            <HeaderToolSearch
+              idPrefix="desktop-header-tool-search"
+              items={searchItems}
+              enableShortcut
+            />
             <HeaderAuthLinks />
-            <Link href="/editor" className="header-cta min-h-11 px-4 text-xs">
-              Open Editor
-            </Link>
           </div>
 
           <button
             ref={mobileTriggerRef}
             type="button"
             onClick={() => setMobileOpen((current) => !current)}
-            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-violet-100 bg-white text-slate-950 transition hover:border-violet-300 hover:text-violet-700 xl:hidden"
+            className="ml-auto inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-violet-100 bg-white text-slate-950 outline-none transition hover:border-violet-300 hover:text-violet-700 focus-visible:ring-4 focus-visible:ring-violet-100 lg:hidden"
             aria-label={mobileOpen ? "Close navigation menu" : "Open navigation menu"}
             aria-expanded={mobileOpen}
             aria-controls="mobile-navigation"
           >
-            {mobileOpen ? <X size={20} /> : <Menu size={21} />}
+            {mobileOpen ? (
+              <X size={20} aria-hidden="true" />
+            ) : (
+              <Menu size={21} aria-hidden="true" />
+            )}
           </button>
         </div>
       </div>
 
-      {toolsOpen ? (
+      {toolsOpen && selectedGroup ? (
         <div
           id="header-tools-menu"
           ref={toolsMenuRef}
-          role="menu"
+          role="dialog"
           aria-label="All PDF tools"
-          className="absolute inset-x-0 top-full hidden border-y border-[var(--border-light)] bg-white shadow-[0_20px_52px_rgba(36,25,86,0.11)] xl:block"
+          className="absolute inset-x-0 top-full hidden border-y border-[var(--border-light)] bg-white shadow-[0_20px_52px_rgba(36,25,86,0.11)] lg:block"
         >
-          <div className="mx-auto grid max-h-[calc(100vh-90px)] max-w-[1320px] grid-cols-4 gap-x-6 gap-y-7 overflow-y-auto px-8 py-7">
-            {toolGroups.map((group) => (
-              <div key={group.label}>
-                <p className="px-2.5 pb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
-                  {group.label}
-                </p>
-                <div className="space-y-0.5">
-                  {group.tools.map((tool) => (
-                    <HeaderToolLink
-                      key={tool.id}
-                      tool={tool}
-                      onClick={() => setToolsOpen(false)}
-                    />
-                  ))}
-                </div>
+          <div className="mx-auto grid max-h-[calc(100vh-90px)] max-w-[1320px] grid-cols-[220px_minmax(0,1fr)] gap-7 overflow-y-auto px-8 py-6">
+            <CategoryTabs
+              groups={groups}
+              selectedId={selectedGroupId}
+              orientation="vertical"
+              idPrefix="desktop-tool-group"
+              tabRefs={desktopTabRefs}
+              onSelect={setSelectedGroupId}
+            />
+
+            <div
+              id={`desktop-tool-group-panel-${selectedGroup.id}`}
+              role="tabpanel"
+              aria-labelledby={`desktop-tool-group-tab-${selectedGroup.id}`}
+              className="min-w-0"
+            >
+              <div className="mb-3 flex items-center justify-between gap-4">
+                <h2 className="text-base font-black text-slate-950">
+                  {selectedGroup.label}
+                </h2>
+                <Link
+                  href="/#pdf-tools"
+                  onClick={closeToolsMenu}
+                  className="text-xs font-bold text-violet-700 outline-none hover:text-violet-900 focus-visible:ring-4 focus-visible:ring-violet-100"
+                >
+                  View on homepage
+                </Link>
               </div>
-            ))}
+              <div className="grid grid-cols-2 gap-1.5 xl:grid-cols-3">
+                {selectedGroup.items.map((item) => (
+                  <DiscoveryTool
+                    key={item.tool.id}
+                    item={item}
+                    onNavigate={closeToolsMenu}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       ) : null}
 
-      {mobileOpen ? (
+      {mobileOpen && selectedGroup ? (
         <div
           id="mobile-navigation"
           ref={mobilePanelRef}
@@ -341,59 +414,46 @@ export function HeaderClient({
           aria-modal="true"
           aria-label="PDFMantra navigation"
           onKeyDown={handleMobileKeyDown}
-          className="fixed inset-x-0 top-[69px] z-40 h-[calc(100dvh-69px)] overflow-y-auto border-t border-[var(--border-light)] bg-[#f8f7fb] px-4 py-5 xl:hidden"
+          className="fixed inset-x-0 top-[69px] z-40 h-[calc(100dvh-69px)] overflow-y-auto border-t border-[var(--border-light)] bg-[#f8f7fb] px-4 py-5 lg:hidden"
         >
           <div className="mx-auto max-w-3xl pb-8">
-            <div className="overflow-hidden rounded-2xl border border-violet-100 bg-white">
-              {PRIMARY_NAV.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="flex min-h-14 items-center justify-between border-b border-violet-100 px-4 text-base font-bold text-slate-900 transition hover:bg-violet-50 hover:text-violet-700"
-                >
-                  {item.label}
-                  <ArrowRight size={16} />
-                </Link>
-              ))}
-              <Link
-                href="/tools"
-                className="flex min-h-14 items-center justify-between px-4 text-base font-bold text-slate-900 transition hover:bg-violet-50 hover:text-violet-700"
-              >
-                All PDF Tools
-                <ArrowRight size={16} />
-              </Link>
+            <HeaderToolSearch
+              idPrefix="mobile-header-tool-search"
+              items={searchItems}
+              mobile
+              onNavigate={() => setMobileOpen(false)}
+            />
+
+            <div className="mt-5">
+              <CategoryTabs
+                groups={groups}
+                selectedId={selectedGroupId}
+                orientation="horizontal"
+                idPrefix="mobile-tool-group"
+                onSelect={setSelectedGroupId}
+              />
             </div>
 
-            <Link
-            href="/#pdf-tools"
-              className="mt-4 flex min-h-12 items-center gap-3 rounded-xl border border-violet-100 bg-white px-4 text-sm font-bold text-violet-700"
+            <div
+              id={`mobile-tool-group-panel-${selectedGroup.id}`}
+              role="tabpanel"
+              aria-labelledby={`mobile-tool-group-tab-${selectedGroup.id}`}
+              className="mt-3 rounded-2xl border border-violet-100 bg-white p-2"
             >
-              <Search size={17} />
-              Search PDF tools
-            </Link>
-
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              {toolGroups.map((group) => (
-                <div
-                  key={group.label}
-                  className="rounded-2xl border border-violet-100 bg-white p-3"
-                >
-                  <p className="px-2.5 pb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
-                    {group.label}
-                  </p>
-                  {group.tools.slice(0, 5).map((tool) => (
-                    <HeaderToolLink key={tool.id} tool={tool} />
-                  ))}
-                </div>
-              ))}
+              <div className="grid gap-1 sm:grid-cols-2">
+                {selectedGroup.items.map((item) => (
+                  <DiscoveryTool
+                    key={item.tool.id}
+                    item={item}
+                    onNavigate={() => setMobileOpen(false)}
+                  />
+                ))}
+              </div>
             </div>
 
             <div className="mt-5 overflow-hidden rounded-2xl border border-violet-100 bg-white">
               <MobileHeaderAuthLink />
             </div>
-            <Link href="/editor" className="header-cta mt-4 min-h-14 w-full">
-              Open PDF Editor
-            </Link>
           </div>
         </div>
       ) : null}
