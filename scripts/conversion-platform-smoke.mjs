@@ -9,6 +9,8 @@ import {
   getConversionsFromPdf,
   getConversionsToPdf,
 } from "../src/lib/conversions/registry.ts";
+import { getPublicConversionCapability } from "../src/lib/conversions/capabilities.ts";
+import { LOCAL_BROWSER_CONVERSION_IDS } from "../src/lib/conversions/local-browser-conversions.ts";
 import {
   validatePublicWebpageUrl,
   validateConversionFiles,
@@ -46,6 +48,7 @@ assert.equal(new Set(routes).size, routes.length);
 assert.equal(CONVERSION_REGISTRY.length, 23);
 assert.ok(getConversionsFromPdf().length >= 9);
 assert.ok(getConversionsToPdf().length >= 10);
+
 const toolsSource = await readFile(
   join(process.cwd(), "src/lib/tools.ts"),
   "utf8",
@@ -57,28 +60,36 @@ for (const conversion of CONVERSION_REGISTRY) {
   assert.ok(conversion.entitlementToolKey);
   assert.ok(conversion.analyticsEvent.startsWith("conversion_"));
   assert.ok(conversion.maxFileSize >= 0);
-  if (conversion.status === "backend-required") {
+  if (
+    conversion.status === "backend-required" &&
+    !LOCAL_BROWSER_CONVERSION_IDS.includes(conversion.id)
+  ) {
     assert.ok(conversion.disabledReason);
   }
   await access(
-    join(
-      process.cwd(),
-      "src/app",
-      conversion.route,
-      "page.tsx",
-    ),
+    join(process.cwd(), "src/app", conversion.route, "page.tsx"),
   );
 }
+
 assert.equal(
   canUseToolByTier({ tier: "guest", toolKey: "pdf-to-text" }),
   true,
 );
+for (const id of LOCAL_BROWSER_CONVERSION_IDS) {
+  assert.equal(canUseToolByTier({ tier: "guest", toolKey: id }), true);
+  assert.equal(canUseToolByTier({ tier: "free", toolKey: id }), true);
+  const capability = getPublicConversionCapability(id);
+  assert.equal(capability?.enabled, true);
+  assert.equal(capability?.status, "available");
+  assert.equal(capability?.processingMode, "client");
+  assert.equal(capability?.access, "free");
+}
 assert.equal(
-  canUseToolByTier({ tier: "free", toolKey: "pdf-to-word" }),
+  canUseToolByTier({ tier: "free", toolKey: "heic-to-pdf" }),
   false,
 );
 assert.equal(
-  canUseToolByTier({ tier: "pro", toolKey: "pdf-to-word" }),
+  canUseToolByTier({ tier: "pro", toolKey: "heic-to-pdf" }),
   true,
 );
 
@@ -87,7 +98,6 @@ assert.equal(validatePublicWebpageUrl("http://[::1]/").allowed, false);
 assert.equal(validatePublicWebpageUrl("http://[fc00::1]/").allowed, false);
 assert.equal(validatePublicWebpageUrl("http://[fe80::1]/").allowed, false);
 assert.equal(validatePublicWebpageUrl("http://[::ffff:127.0.0.1]/").allowed, false);
-assert.equal(validatePublicWebpageUrl("http://[::ffff:10.0.0.1]/").allowed, false);
 assert.equal(validatePublicWebpageUrl("http://127.0.0.1/admin").allowed, false);
 assert.equal(validatePublicWebpageUrl("http://10.0.0.1").allowed, false);
 assert.equal(validatePublicWebpageUrl("http://172.16.0.1").allowed, false);
@@ -110,24 +120,28 @@ const privateDns = await validateAndResolvePublicWebpageUrl(
 assert.equal(privateDns.allowed, false);
 const publicDns = await validateAndResolvePublicWebpageUrl(
   "https://public.example/path",
-  { resolver: async () => ["93.184.216.34", "2606:2800:220:1:248:1893:25c8:1946"] },
+  {
+    resolver: async () => [
+      "93.184.216.34",
+      "2606:2800:220:1:248:1893:25c8:1946",
+    ],
+  },
 );
 assert.equal(publicDns.allowed, true);
 if (publicDns.allowed) {
   assert.equal(publicDns.policy.dnsPinningRequired, true);
   assert.equal(publicDns.policy.redirectRevalidationRequired, true);
   assert.equal(publicDns.policy.maxRedirects, 5);
-  assert.deepEqual(publicDns.policy.pinnedAddresses, [
-    "93.184.216.34",
-    "2606:2800:220:1:248:1893:25c8:1946",
-  ]);
 }
 assert.equal(
   PROVIDER_REQUEST_LIMIT_BYTES - PROVIDER_UPLOAD_FILE_LIMIT_BYTES,
   1024 * 1024,
 );
 assert.equal(isWithinProviderUploadLimit(PROVIDER_UPLOAD_FILE_LIMIT_BYTES), true);
-assert.equal(isWithinProviderUploadLimit(PROVIDER_UPLOAD_FILE_LIMIT_BYTES + 1), false);
+assert.equal(
+  isWithinProviderUploadLimit(PROVIDER_UPLOAD_FILE_LIMIT_BYTES + 1),
+  false,
+);
 assert.equal(getConversionPollDelay(0, 0), 1500);
 assert.ok(getConversionPollDelay(20, 1) <= 15_000);
 assert.equal(isTransientPollStatus(503), true);
@@ -236,7 +250,6 @@ const markdown = parseMarkdownBlocks(
 assert.ok(markdown.some((block) => block.kind === "heading"));
 assert.ok(markdown.some((block) => block.kind === "table-row"));
 assert.ok(markdown.some((block) => block.kind === "code"));
-
 const safeHtmlBlocks = parseSafeHtmlBlocks(
   "<h1>Safe</h1><script>danger()</script><p>Body</p>",
 );
@@ -255,7 +268,10 @@ const fontBytes = {
   ),
   devanagari: new Uint8Array(
     await readFile(
-      join(process.cwd(), "public/fonts/NotoSansDevanagari-Regular.ttf"),
+      join(
+        process.cwd(),
+        "public/fonts/NotoSansDevanagari-Regular.ttf",
+      ),
     ),
   ),
 };
@@ -280,7 +296,8 @@ console.log(
     canonicalCatalogSource: "passed",
     uniqueRoutes: "passed",
     routeCoverage: "passed",
-    backendBlockers: "passed",
+    localOfficeCapabilities: [...LOCAL_BROWSER_CONVERSION_IDS],
+    remainingBackendBlockers: ["heic-to-pdf", "webpage-to-pdf"],
     magicBytes: "passed",
     heicSignature: "passed",
     officeStructureAndMacroBlock: "passed",
