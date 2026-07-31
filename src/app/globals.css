@@ -357,7 +357,7 @@ a {
 
 .home-hero-glow {
   background:
-    radial-gradient(circle at 78% 18%, rgba(101, 80, 232, 0.07), transparent 25rem),
+    radial-gradient(circle at 50% 0%, rgba(101, 80, 232, 0.1), transparent 28rem),
     linear-gradient(180deg, #ffffff 0%, #fbfaff 100%);
 }
 

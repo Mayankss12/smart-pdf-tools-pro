@@ -16,12 +16,10 @@ import {
 const EDITOR_FEATURES = [
   "Add and edit text",
   "Images and signatures",
-  "Highlight, draw, whiteout, shapes and notes",
-  "Add, reorder and rotate pages",
-  "Page numbering",
-  "OCR and Find",
-  "Atomic Undo and Redo",
-  "Export in one workspace",
+  "Highlight, draw and annotate",
+  "Reorder and rotate pages",
+  "OCR and document search",
+  "Undo, redo and export",
 ] as const;
 
 const RIBBON_TOOLS = [
@@ -146,16 +144,16 @@ function EditorProductMock() {
 
 export function EditorShowcase() {
   return (
-    <section className="home-section-alt overflow-hidden border-y border-[var(--home-border)] py-16 sm:py-24">
+    <section className="home-section-alt overflow-hidden border-b border-[var(--home-border)] py-14 sm:py-16 lg:py-20">
       <div className="mx-auto grid max-w-[1320px] gap-10 px-4 sm:px-6 lg:grid-cols-[0.72fr_1.28fr] lg:items-center lg:px-8">
         <div>
-          <p className="section-eyebrow">More than a collection of tools</p>
-          <h2 className="mt-3 text-3xl font-bold tracking-[-0.05em] text-slate-950 sm:text-5xl">
+          <p className="section-eyebrow">PDFMantra Editor</p>
+          <h2 className="mt-3 text-3xl font-bold tracking-[-0.05em] text-slate-950 sm:text-4xl lg:text-5xl">
             One editor for the whole document.
           </h2>
           <p className="mt-5 max-w-xl text-base leading-8 text-slate-600">
-            Work across content, pages, OCR and review without bouncing between
-            disconnected screens.
+            Add content, manage pages, search scans and export without leaving
+            the workspace.
           </p>
 
           <div className="mt-7 grid gap-x-6 gap-y-3 sm:grid-cols-2">

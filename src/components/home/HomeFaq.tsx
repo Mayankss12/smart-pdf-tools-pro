@@ -9,7 +9,7 @@ export function HomeFaq() {
   const faqStructuredData = getHomepageFaqStructuredData();
 
   return (
-    <section className="home-section py-16 sm:py-20">
+    <section className="home-section border-t border-[var(--home-border)] py-14 sm:py-16">
       <div className="mx-auto grid max-w-[1120px] gap-10 px-4 sm:px-6 lg:grid-cols-[0.6fr_1.4fr] lg:px-8">
         <div>
           <p className="section-eyebrow">Clear answers</p>
