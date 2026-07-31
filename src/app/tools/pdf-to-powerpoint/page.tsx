@@ -1,7 +1,5 @@
-import { ConversionCapabilityShell } from "@/components/ConversionCapabilityShell";
-import { requirePublicLaunchReadyTool } from "@/lib/public-launch-guard";
+import { PdfOfficeConversionPage } from "@/components/PdfOfficeConversionPage";
 
 export default function PdfToPowerPointPage() {
-  requirePublicLaunchReadyTool("pdf-to-powerpoint");
-  return <ConversionCapabilityShell conversionId="pdf-to-powerpoint" />;
+  return <PdfOfficeConversionPage format="pptx" />;
 }
