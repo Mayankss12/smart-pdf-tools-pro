@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { Layers, Search, X } from "lucide-react";
 
 import { ToolGlyph, type ToolGlyphTone } from "@/components/ToolGlyph";
+import { getLocalBrowserConversionDescription } from "@/lib/conversions/local-browser-conversions";
 import {
   tools,
   type Tool,
@@ -60,7 +61,10 @@ function getVisibleTools(launchReadyToolIds: readonly string[]) {
 }
 
 function getShortDescription(tool: Tool) {
-  const text = tool.menuDescription || tool.description;
+  const text =
+    getLocalBrowserConversionDescription(tool.id) ??
+    tool.menuDescription ||
+    tool.description;
 
   if (text.length <= 66) return text;
 
@@ -170,6 +174,7 @@ export function ToolsDirectoryClient({
         [
           tool.title,
           tool.shortTitle,
+          getLocalBrowserConversionDescription(tool.id),
           tool.description,
           tool.menuDescription,
           tool.category,
@@ -192,73 +197,73 @@ export function ToolsDirectoryClient({
   }
 
   return (
-      <main
-        className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)]"
-        style={{
-          paddingLeft: "max(1rem, env(safe-area-inset-left))",
-          paddingRight: "max(1rem, env(safe-area-inset-right))",
-        }}
-      >
-        <section className="mx-auto max-w-[1600px] px-4 pb-14 pt-10 sm:px-6 lg:px-8 lg:pb-16 lg:pt-12">
-          <div className="mb-6 text-center">
-            <div className="mx-auto mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--violet-50)] text-[var(--violet-600)] shadow-[var(--shadow-soft)]">
-              <Layers size={22} />
-            </div>
-
-            <h1 className="display-font text-3xl font-bold tracking-tight text-[var(--text-primary)] sm:text-4xl">
-              All PDF Tools
-            </h1>
-
-            <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-[var(--text-secondary)]">
-              Choose a focused tool and get straight to the task.
-            </p>
+    <main
+      className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)]"
+      style={{
+        paddingLeft: "max(1rem, env(safe-area-inset-left))",
+        paddingRight: "max(1rem, env(safe-area-inset-right))",
+      }}
+    >
+      <section className="mx-auto max-w-[1600px] px-4 pb-14 pt-10 sm:px-6 lg:px-8 lg:pb-16 lg:pt-12">
+        <div className="mb-6 text-center">
+          <div className="mx-auto mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--violet-50)] text-[var(--violet-600)] shadow-[var(--shadow-soft)]">
+            <Layers size={22} />
           </div>
 
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-2.5">
-            {categoryOptions.map((category) => (
-              <CategoryPill
-                key={category.id}
-                active={activeCategory === category.id}
-                label={category.label}
-                onClick={() => setActiveCategory(category.id)}
-              />
+          <h1 className="display-font text-3xl font-bold tracking-tight text-[var(--text-primary)] sm:text-4xl">
+            All PDF Tools
+          </h1>
+
+          <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-[var(--text-secondary)]">
+            Choose a focused tool and get straight to the task.
+          </p>
+        </div>
+
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-2.5">
+          {categoryOptions.map((category) => (
+            <CategoryPill
+              key={category.id}
+              active={activeCategory === category.id}
+              label={category.label}
+              onClick={() => setActiveCategory(category.id)}
+            />
+          ))}
+        </div>
+
+        <div className="mt-3 flex justify-center">
+          <label className="inline-flex min-h-10 w-full max-w-md items-center gap-2 rounded-full border border-[var(--border-light)] bg-[var(--bg-card)] px-4 shadow-[var(--shadow-soft)] transition focus-within:border-[var(--border-focus)] focus-within:bg-white">
+            <Search size={15} className="shrink-0 text-[var(--text-muted)]" />
+
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search tools..."
+              className="w-full bg-transparent text-sm font-medium text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
+            />
+
+            {query ? (
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[var(--text-muted)] transition hover:bg-[var(--violet-50)] hover:text-[var(--violet-600)]"
+                aria-label="Clear search"
+              >
+                <X size={14} />
+              </button>
+            ) : null}
+          </label>
+        </div>
+
+        {filteredTools.length === 0 ? (
+          <EmptyState onReset={resetView} />
+        ) : (
+          <div className="mx-auto mt-8 grid max-w-[1320px] grid-cols-2 place-items-center justify-items-center gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
+            {filteredTools.map((tool) => (
+              <ToolCard key={tool.id} tool={tool} />
             ))}
           </div>
-
-          <div className="mt-3 flex justify-center">
-            <label className="inline-flex min-h-10 w-full max-w-md items-center gap-2 rounded-full border border-[var(--border-light)] bg-[var(--bg-card)] px-4 shadow-[var(--shadow-soft)] transition focus-within:border-[var(--border-focus)] focus-within:bg-white">
-              <Search size={15} className="shrink-0 text-[var(--text-muted)]" />
-
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search tools..."
-                className="w-full bg-transparent text-sm font-medium text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
-              />
-
-              {query ? (
-                <button
-                  type="button"
-                  onClick={() => setQuery("")}
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[var(--text-muted)] transition hover:bg-[var(--violet-50)] hover:text-[var(--violet-600)]"
-                  aria-label="Clear search"
-                >
-                  <X size={14} />
-                </button>
-              ) : null}
-            </label>
-          </div>
-
-          {filteredTools.length === 0 ? (
-            <EmptyState onReset={resetView} />
-          ) : (
-            <div className="mx-auto mt-8 grid max-w-[1320px] grid-cols-2 place-items-center justify-items-center gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
-              {filteredTools.map((tool) => (
-                <ToolCard key={tool.id} tool={tool} />
-              ))}
-            </div>
-          )}
-        </section>
-      </main>
+        )}
+      </section>
+    </main>
   );
 }
