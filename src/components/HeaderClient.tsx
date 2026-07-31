@@ -47,7 +47,6 @@ function DiscoveryTool({
   if (item.availability === "coming-soon") {
     return (
       <div
-        role="link"
         aria-disabled="true"
         className="flex min-h-12 cursor-not-allowed items-center gap-2.5 rounded-xl border border-slate-100 bg-slate-50/70 px-2.5 py-2 text-slate-500"
       >
@@ -67,99 +66,19 @@ function DiscoveryTool({
   );
 }
 
-function CategoryTabs({
-  groups,
-  selectedId,
-  orientation,
-  idPrefix,
-  tabRefs,
-  onSelect,
-}: {
-  readonly groups: readonly ToolDiscoveryGroup[];
-  readonly selectedId: ToolDiscoveryGroupId;
-  readonly orientation: "horizontal" | "vertical";
-  readonly idPrefix: string;
-  readonly tabRefs?: React.MutableRefObject<
-    Map<ToolDiscoveryGroupId, HTMLButtonElement>
-  >;
-  readonly onSelect: (id: ToolDiscoveryGroupId) => void;
-}) {
-  const vertical = orientation === "vertical";
+function desktopPanelClasses(groupId: ToolDiscoveryGroupId) {
+  if (groupId === "edit-sign") return "left-0 w-[520px]";
+  if (groupId === "organize") return "left-0 w-[500px]";
+  if (groupId === "convert-from") {
+    return "left-1/2 w-[620px] -translate-x-1/2";
+  }
+  if (groupId === "convert-to") return "right-0 w-[660px]";
+  return "right-0 w-[380px]";
+}
 
-  return (
-    <div
-      role="tablist"
-      aria-label="PDF tool categories"
-      aria-orientation={orientation}
-      className={
-        vertical
-          ? "space-y-1"
-          : "flex gap-2 overflow-x-auto pb-2 [scrollbar-width:none]"
-      }
-    >
-      {groups.map((group, index) => {
-        const selected = group.id === selectedId;
-        return (
-          <button
-            key={group.id}
-            ref={(node) => {
-              if (!tabRefs) return;
-              if (node) tabRefs.current.set(group.id, node);
-              else tabRefs.current.delete(group.id);
-            }}
-            id={`${idPrefix}-tab-${group.id}`}
-            type="button"
-            role="tab"
-            aria-selected={selected}
-            aria-controls={`${idPrefix}-panel-${group.id}`}
-            tabIndex={selected ? 0 : -1}
-            onClick={() => onSelect(group.id)}
-            onKeyDown={(event) => {
-              const previousKey = vertical ? "ArrowUp" : "ArrowLeft";
-              const nextKey = vertical ? "ArrowDown" : "ArrowRight";
-              let nextIndex = index;
-
-              if (event.key === previousKey) {
-                nextIndex = (index - 1 + groups.length) % groups.length;
-              } else if (event.key === nextKey) {
-                nextIndex = (index + 1) % groups.length;
-              } else if (event.key === "Home") {
-                nextIndex = 0;
-              } else if (event.key === "End") {
-                nextIndex = groups.length - 1;
-              } else {
-                return;
-              }
-
-              event.preventDefault();
-              const nextGroup = groups[nextIndex];
-              onSelect(nextGroup.id);
-              requestAnimationFrame(() => {
-                document
-                  .getElementById(`${idPrefix}-tab-${nextGroup.id}`)
-                  ?.focus();
-              });
-            }}
-            className={
-              vertical
-                ? `flex min-h-11 w-full items-center justify-between rounded-xl px-3 text-left text-sm font-bold outline-none transition focus-visible:ring-4 focus-visible:ring-violet-100 ${
-                    selected
-                      ? "bg-violet-600 text-white"
-                      : "text-slate-700 hover:bg-violet-50 hover:text-violet-800"
-                  }`
-                : `min-h-11 shrink-0 rounded-full border px-4 py-2 text-sm font-bold outline-none transition focus-visible:ring-4 focus-visible:ring-violet-100 ${
-                    selected
-                      ? "border-violet-600 bg-violet-600 text-white"
-                      : "border-violet-100 bg-white text-slate-700 hover:border-violet-300 hover:text-violet-800"
-                  }`
-            }
-          >
-            {group.label}
-          </button>
-        );
-      })}
-    </div>
-  );
+function desktopGridClasses(groupId: ToolDiscoveryGroupId) {
+  if (groupId === "optimize-ocr") return "grid-cols-1";
+  return "grid-cols-2";
 }
 
 export function HeaderClient({
@@ -177,41 +96,38 @@ export function HeaderClient({
     [capabilities],
   );
   const firstGroupId = groups[0]?.id ?? "edit-sign";
-  const [selectedGroupId, setSelectedGroupId] =
+  const [openGroupId, setOpenGroupId] =
+    useState<ToolDiscoveryGroupId | null>(null);
+  const [mobileGroupId, setMobileGroupId] =
     useState<ToolDiscoveryGroupId>(firstGroupId);
-  const [toolsOpen, setToolsOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const toolsTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const toolsMenuRef = useRef<HTMLDivElement | null>(null);
-  const desktopTabRefs = useRef(
+  const desktopNavRef = useRef<HTMLElement | null>(null);
+  const desktopTriggerRefs = useRef(
     new Map<ToolDiscoveryGroupId, HTMLButtonElement>(),
   );
   const mobileTriggerRef = useRef<HTMLButtonElement | null>(null);
   const mobilePanelRef = useRef<HTMLDivElement | null>(null);
 
-  const selectedGroup =
-    groups.find((group) => group.id === selectedGroupId) ?? groups[0];
-
   useEffect(() => {
-    setToolsOpen(false);
+    setOpenGroupId(null);
     setMobileOpen(false);
   }, [pathname]);
 
   useEffect(() => {
-    if (!toolsOpen) return;
+    if (!openGroupId) return;
 
     function closeAndRestoreFocus() {
-      setToolsOpen(false);
-      toolsTriggerRef.current?.focus();
+      const currentGroupId = openGroupId;
+      setOpenGroupId(null);
+      desktopTriggerRefs.current.get(currentGroupId)?.focus();
     }
 
     function handlePointerDown(event: MouseEvent) {
       if (
         event.target instanceof Node &&
-        !toolsMenuRef.current?.contains(event.target) &&
-        !toolsTriggerRef.current?.contains(event.target)
+        !desktopNavRef.current?.contains(event.target)
       ) {
-        closeAndRestoreFocus();
+        setOpenGroupId(null);
       }
     }
 
@@ -228,7 +144,7 @@ export function HeaderClient({
       document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [toolsOpen]);
+  }, [openGroupId]);
 
   useEffect(() => {
     document.body.style.overflow = mobileOpen ? "hidden" : "";
@@ -244,16 +160,91 @@ export function HeaderClient({
     };
   }, [mobileOpen]);
 
-  function openToolsMenu() {
-    setSelectedGroupId(firstGroupId);
-    setToolsOpen(true);
-    requestAnimationFrame(() => {
-      desktopTabRefs.current.get(firstGroupId)?.focus();
-    });
+  function focusDesktopTrigger(index: number) {
+    const group = groups[index];
+    if (!group) return;
+    desktopTriggerRefs.current.get(group.id)?.focus();
   }
 
-  function closeToolsMenu() {
-    setToolsOpen(false);
+  function openDesktopGroup(groupId: ToolDiscoveryGroupId, focusFirst = false) {
+    setOpenGroupId(groupId);
+    if (focusFirst) {
+      requestAnimationFrame(() => {
+        document
+          .getElementById(`header-tool-menu-${groupId}`)
+          ?.querySelector<HTMLElement>('a[href]')
+          ?.focus();
+      });
+    }
+  }
+
+  function handleDesktopTriggerKeyDown(
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    group: ToolDiscoveryGroup,
+    index: number,
+  ) {
+    if (event.key === "ArrowRight") {
+      event.preventDefault();
+      focusDesktopTrigger((index + 1) % groups.length);
+      return;
+    }
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      focusDesktopTrigger((index - 1 + groups.length) % groups.length);
+      return;
+    }
+    if (event.key === "Home") {
+      event.preventDefault();
+      focusDesktopTrigger(0);
+      return;
+    }
+    if (event.key === "End") {
+      event.preventDefault();
+      focusDesktopTrigger(groups.length - 1);
+      return;
+    }
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      openDesktopGroup(group.id, true);
+    }
+  }
+
+  function handleDesktopPanelKeyDown(
+    event: React.KeyboardEvent<HTMLDivElement>,
+    groupId: ToolDiscoveryGroupId,
+  ) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setOpenGroupId(null);
+      desktopTriggerRefs.current.get(groupId)?.focus();
+      return;
+    }
+
+    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+      return;
+    }
+
+    const links = Array.from(
+      event.currentTarget.querySelectorAll<HTMLElement>('a[href]'),
+    );
+    if (!links.length) return;
+
+    const currentIndex = links.indexOf(document.activeElement as HTMLElement);
+    let nextIndex = currentIndex;
+    if (event.key === "ArrowDown") {
+      nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % links.length;
+    } else if (event.key === "ArrowUp") {
+      nextIndex = currentIndex < 0
+        ? links.length - 1
+        : (currentIndex - 1 + links.length) % links.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = links.length - 1;
+    }
+
+    event.preventDefault();
+    links[nextIndex]?.focus();
   }
 
   function handleMobileKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
@@ -285,7 +276,7 @@ export function HeaderClient({
   return (
     <header className="sticky top-0 z-50 border-b border-[var(--border-light)] bg-white/96 backdrop-blur-xl">
       <div className="mx-auto max-w-[1320px] px-4 sm:px-6 lg:px-8">
-        <div className="flex min-h-[68px] items-center gap-3">
+        <div className="flex min-h-[68px] items-center gap-2">
           <Link
             href="/"
             className="group flex min-w-0 shrink-0 items-center gap-2"
@@ -302,29 +293,70 @@ export function HeaderClient({
             </div>
           </Link>
 
-          <button
-            ref={toolsTriggerRef}
-            type="button"
-            onClick={() => {
-              if (toolsOpen) closeToolsMenu();
-              else openToolsMenu();
-            }}
-            className="ml-3 hidden min-h-11 shrink-0 items-center gap-1.5 rounded-full px-3 text-[13px] font-bold text-slate-700 outline-none transition hover:bg-violet-50 hover:text-violet-700 focus-visible:ring-4 focus-visible:ring-violet-100 lg:inline-flex"
-            aria-expanded={toolsOpen}
-            aria-haspopup="dialog"
-            aria-controls="header-tools-menu"
+          <nav
+            ref={desktopNavRef}
+            aria-label="PDF tool categories"
+            className="ml-3 hidden min-w-0 shrink-0 items-center gap-0.5 xl:flex"
           >
-            All PDF Tools
-            <ChevronDown
-              size={14}
-              className={`transition ${toolsOpen ? "rotate-180" : ""}`}
-              aria-hidden="true"
-            />
-          </button>
+            {groups.map((group, index) => {
+              const open = openGroupId === group.id;
+              return (
+                <div key={group.id} className="relative">
+                  <button
+                    ref={(node) => {
+                      if (node) desktopTriggerRefs.current.set(group.id, node);
+                      else desktopTriggerRefs.current.delete(group.id);
+                    }}
+                    type="button"
+                    onClick={() => {
+                      setOpenGroupId((current) =>
+                        current === group.id ? null : group.id,
+                      );
+                    }}
+                    onKeyDown={(event) =>
+                      handleDesktopTriggerKeyDown(event, group, index)
+                    }
+                    className="inline-flex min-h-11 items-center gap-1 rounded-full px-2.5 text-[12px] font-bold text-slate-700 outline-none transition hover:bg-violet-50 hover:text-violet-700 focus-visible:ring-4 focus-visible:ring-violet-100"
+                    aria-expanded={open}
+                    aria-controls={`header-tool-menu-${group.id}`}
+                  >
+                    {group.label}
+                    <ChevronDown
+                      size={13}
+                      className={`transition ${open ? "rotate-180" : ""}`}
+                      aria-hidden="true"
+                    />
+                  </button>
 
-          <div className="hidden min-w-4 flex-1 lg:block" />
+                  {open ? (
+                    <div
+                      id={`header-tool-menu-${group.id}`}
+                      role="region"
+                      aria-label={`${group.label} tools`}
+                      onKeyDown={(event) =>
+                        handleDesktopPanelKeyDown(event, group.id)
+                      }
+                      className={`absolute top-[calc(100%+12px)] z-50 rounded-2xl border border-violet-100 bg-white p-3 shadow-[0_20px_52px_rgba(36,25,86,0.13)] ${desktopPanelClasses(group.id)}`}
+                    >
+                      <div className={`grid gap-1.5 ${desktopGridClasses(group.id)}`}>
+                        {group.items.map((item) => (
+                          <DiscoveryTool
+                            key={item.tool.id}
+                            item={item}
+                            onNavigate={() => setOpenGroupId(null)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </nav>
 
-          <div className="hidden shrink-0 items-center gap-3 lg:flex">
+          <div className="hidden min-w-3 flex-1 xl:block" />
+
+          <div className="hidden shrink-0 items-center gap-2 xl:flex">
             <HeaderToolSearch
               idPrefix="desktop-header-tool-search"
               items={searchItems}
@@ -336,8 +368,14 @@ export function HeaderClient({
           <button
             ref={mobileTriggerRef}
             type="button"
-            onClick={() => setMobileOpen((current) => !current)}
-            className="ml-auto inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-violet-100 bg-white text-slate-950 outline-none transition hover:border-violet-300 hover:text-violet-700 focus-visible:ring-4 focus-visible:ring-violet-100 lg:hidden"
+            onClick={() => {
+              setMobileOpen((current) => {
+                const next = !current;
+                if (next) setMobileGroupId(firstGroupId);
+                return next;
+              });
+            }}
+            className="ml-auto inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-violet-100 bg-white text-slate-950 outline-none transition hover:border-violet-300 hover:text-violet-700 focus-visible:ring-4 focus-visible:ring-violet-100 xl:hidden"
             aria-label={mobileOpen ? "Close navigation menu" : "Open navigation menu"}
             aria-expanded={mobileOpen}
             aria-controls="mobile-navigation"
@@ -351,45 +389,7 @@ export function HeaderClient({
         </div>
       </div>
 
-      {toolsOpen && selectedGroup ? (
-        <div
-          id="header-tools-menu"
-          ref={toolsMenuRef}
-          role="dialog"
-          aria-label="All PDF tools"
-          className="absolute inset-x-0 top-full hidden border-y border-[var(--border-light)] bg-white shadow-[0_20px_52px_rgba(36,25,86,0.11)] lg:block"
-        >
-          <div className="mx-auto grid max-h-[calc(100vh-90px)] max-w-[1320px] grid-cols-[220px_minmax(0,1fr)] gap-7 overflow-y-auto px-8 py-6">
-            <CategoryTabs
-              groups={groups}
-              selectedId={selectedGroupId}
-              orientation="vertical"
-              idPrefix="desktop-tool-group"
-              tabRefs={desktopTabRefs}
-              onSelect={setSelectedGroupId}
-            />
-
-            <div
-              id={`desktop-tool-group-panel-${selectedGroup.id}`}
-              role="tabpanel"
-              aria-labelledby={`desktop-tool-group-tab-${selectedGroup.id}`}
-              className="min-w-0"
-            >
-              <div className="grid grid-cols-2 gap-1.5 xl:grid-cols-3">
-                {selectedGroup.items.map((item) => (
-                  <DiscoveryTool
-                    key={item.tool.id}
-                    item={item}
-                    onNavigate={closeToolsMenu}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {mobileOpen && selectedGroup ? (
+      {mobileOpen ? (
         <div
           id="mobile-navigation"
           ref={mobilePanelRef}
@@ -397,7 +397,7 @@ export function HeaderClient({
           aria-modal="true"
           aria-label="PDFMantra navigation"
           onKeyDown={handleMobileKeyDown}
-          className="fixed inset-x-0 top-[69px] z-40 h-[calc(100dvh-69px)] overflow-y-auto border-t border-[var(--border-light)] bg-[#f8f7fb] px-4 py-5 lg:hidden"
+          className="fixed inset-x-0 top-[69px] z-40 h-[calc(100dvh-69px)] overflow-y-auto border-t border-[var(--border-light)] bg-[#f8f7fb] px-4 py-5 xl:hidden"
         >
           <div className="mx-auto max-w-3xl pb-8">
             <HeaderToolSearch
@@ -407,31 +407,48 @@ export function HeaderClient({
               onNavigate={() => setMobileOpen(false)}
             />
 
-            <div className="mt-5">
-              <CategoryTabs
-                groups={groups}
-                selectedId={selectedGroupId}
-                orientation="horizontal"
-                idPrefix="mobile-tool-group"
-                onSelect={setSelectedGroupId}
-              />
-            </div>
+            <div className="mt-5 space-y-2">
+              {groups.map((group) => {
+                const expanded = mobileGroupId === group.id;
+                return (
+                  <section
+                    key={group.id}
+                    className="overflow-hidden rounded-2xl border border-violet-100 bg-white"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setMobileGroupId(group.id)}
+                      className="flex min-h-14 w-full items-center justify-between px-4 text-left text-sm font-bold text-slate-900 outline-none transition hover:bg-violet-50 hover:text-violet-800 focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-violet-100"
+                      aria-expanded={expanded}
+                      aria-controls={`mobile-tool-group-${group.id}`}
+                    >
+                      {group.label}
+                      <ChevronDown
+                        size={16}
+                        className={`transition ${expanded ? "rotate-180" : ""}`}
+                        aria-hidden="true"
+                      />
+                    </button>
 
-            <div
-              id={`mobile-tool-group-panel-${selectedGroup.id}`}
-              role="tabpanel"
-              aria-labelledby={`mobile-tool-group-tab-${selectedGroup.id}`}
-              className="mt-3 rounded-2xl border border-violet-100 bg-white p-2"
-            >
-              <div className="grid gap-1 sm:grid-cols-2">
-                {selectedGroup.items.map((item) => (
-                  <DiscoveryTool
-                    key={item.tool.id}
-                    item={item}
-                    onNavigate={() => setMobileOpen(false)}
-                  />
-                ))}
-              </div>
+                    {expanded ? (
+                      <div
+                        id={`mobile-tool-group-${group.id}`}
+                        className="border-t border-violet-100 p-2"
+                      >
+                        <div className="grid gap-1 sm:grid-cols-2">
+                          {group.items.map((item) => (
+                            <DiscoveryTool
+                              key={item.tool.id}
+                              item={item}
+                              onNavigate={() => setMobileOpen(false)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </section>
+                );
+              })}
             </div>
 
             <div className="mt-5 overflow-hidden rounded-2xl border border-violet-100 bg-white">
