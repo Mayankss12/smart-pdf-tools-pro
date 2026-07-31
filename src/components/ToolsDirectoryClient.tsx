@@ -63,8 +63,7 @@ function getVisibleTools(launchReadyToolIds: readonly string[]) {
 function getShortDescription(tool: Tool) {
   const text =
     getLocalBrowserConversionDescription(tool.id) ??
-    tool.menuDescription ||
-    tool.description;
+    (tool.menuDescription || tool.description);
 
   if (text.length <= 66) return text;
 
