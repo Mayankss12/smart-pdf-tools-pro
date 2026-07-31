@@ -39,8 +39,9 @@ for (const value of [
 for (const value of [
   "export async function extractOfficeText",
   "word/document.xml",
-  "xl/worksheets/sheet",
-  "ppt/slides/slide",
+  "worksheets",
+  "sheetPaths",
+  "slidePaths",
   "vbaProject",
   "DecompressionStream",
   "deflate-raw",
