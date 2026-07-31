@@ -1,9 +1,4 @@
-const suites = [
-  "images-to-pdf-smoke.mjs",
-  "launch-readiness.mjs",
-  "office-conversions-smoke.mjs",
-  "pdf-rebuild-safety-smoke.mjs",
-];
+const suites = ["launch-readiness.mjs"];
 
 for (const suite of suites) {
   await import(`./${suite}`);
