@@ -1,5 +1,4 @@
 import {
-  CONVERSION_REGISTRY,
   getConversionById,
   type ConversionDefinition,
 } from "@/lib/conversions/registry";
@@ -53,35 +52,58 @@ export const HOMEPAGE_TO_PDF_IDS = [
   "webpage-to-pdf",
 ] as const;
 
-export const HOMEPAGE_QUICK_ACTION_IDS = [
+export const HOMEPAGE_TOOL_GRID_ORDER_IDS = [
+  "pdf-editor",
   "merge-pdf",
+  "split-pdf",
   "compress-pdf",
   "fill-sign",
+  "pdf-to-images",
+  "images-to-pdf",
   "pdf-to-searchable-pdf",
   "reorder-pages",
-  "pdf-to-images",
+  "rotate-pdf",
+  "delete-pages",
+  "extract-pages",
+  "page-numbers",
+  "watermark-pdf",
+  "sign-pdf",
+  "annotate-pdf",
+  "highlight-pdf",
+  "pdf-to-text",
+  "pdf-to-html",
+  "pdf-to-jpg",
+  "pdf-to-png",
+  "pdf-to-webp",
+  "jpg-to-pdf",
+  "png-to-pdf",
+  "webp-to-pdf",
+  "txt-to-pdf",
+  "markdown-to-pdf",
+  "html-to-pdf",
+  "csv-to-pdf",
 ] as const;
 
-export type HomepageExplorerCategoryId =
-  | "popular"
+export type HomepageToolGridCategoryId =
+  | "all"
   | "edit-sign"
   | "organize"
   | "convert-from"
   | "convert-to"
-  | "optimize"
-  | "smart";
+  | "optimize-ocr"
+  | "security";
 
-export const HOMEPAGE_EXPLORER_CATEGORIES: readonly {
-  readonly id: HomepageExplorerCategoryId;
+const HOMEPAGE_TOOL_GRID_CATEGORIES: readonly {
+  readonly id: HomepageToolGridCategoryId;
   readonly label: string;
 }[] = [
-  { id: "popular", label: "Popular" },
+  { id: "all", label: "All tools" },
   { id: "edit-sign", label: "Edit & Sign" },
   { id: "organize", label: "Organize" },
   { id: "convert-from", label: "Convert from PDF" },
   { id: "convert-to", label: "Convert to PDF" },
-  { id: "optimize", label: "Optimize" },
-  { id: "smart", label: "OCR & Smart Tools" },
+  { id: "optimize-ocr", label: "Optimize & OCR" },
+  { id: "security", label: "Security" },
 ];
 
 export const HOMEPAGE_FAQS = [
@@ -187,33 +209,11 @@ export function resolveHomepageConversions(
   });
 }
 
-export function getHomepagePopularTools(
-  capabilitySnapshot: PublicLaunchCapabilitySnapshot,
-) {
-  return resolveHomepageTools(
-    HOMEPAGE_POPULAR_TOOL_IDS,
-    "HOMEPAGE_POPULAR_TOOL_IDS",
-  ).filter((tool) =>
-    isToolPubliclyLaunchReady(tool, capabilitySnapshot),
-  );
-}
-
-export function getHomepageQuickActions(
-  capabilitySnapshot: PublicLaunchCapabilitySnapshot,
-) {
-  return resolveHomepageTools(
-    HOMEPAGE_QUICK_ACTION_IDS,
-    "HOMEPAGE_QUICK_ACTION_IDS",
-  ).filter((tool) =>
-    isToolPubliclyLaunchReady(tool, capabilitySnapshot),
-  );
-}
-
-export function getHomepageExplorerTools(
+export function getHomepageToolGridTools(
   capabilitySnapshot: PublicLaunchCapabilitySnapshot,
 ) {
   const seen = new Set<string>();
-  return tools.filter((tool) => {
+  const launchReadyTools = tools.filter((tool) => {
     if (
       !tool.visibility.searchable ||
       seen.has(tool.id) ||
@@ -224,46 +224,72 @@ export function getHomepageExplorerTools(
     seen.add(tool.id);
     return true;
   });
+  const launchReadyById = new Map(
+    launchReadyTools.map((tool) => [tool.id, tool]),
+  );
+  const orderedTools = resolveHomepageTools(
+    HOMEPAGE_TOOL_GRID_ORDER_IDS,
+    "HOMEPAGE_TOOL_GRID_ORDER_IDS",
+  ).flatMap((tool) => {
+    const launchReadyTool = launchReadyById.get(tool.id);
+    return launchReadyTool ? [launchReadyTool] : [];
+  });
+  const orderedIds = new Set(orderedTools.map((tool) => tool.id));
+
+  return [
+    ...orderedTools,
+    ...launchReadyTools.filter((tool) => !orderedIds.has(tool.id)),
+  ];
 }
 
-export function getHomepageConversionsFromPdf(
-  capabilitySnapshot: PublicLaunchCapabilitySnapshot,
-) {
-  return resolveHomepageConversions(
-    HOMEPAGE_FROM_PDF_IDS,
-    "HOMEPAGE_FROM_PDF_IDS",
-  ).filter((conversion) =>
-    isToolPubliclyLaunchReady(
-      requireTool(conversion.id, "HOMEPAGE_FROM_PDF_IDS"),
-      capabilitySnapshot,
-    ),
+export function getHomepageToolGridCategories(toolsInGrid: readonly Tool[]) {
+  const hasPublicSecurityTool = toolsInGrid.some(
+    (tool) => tool.category === "security",
+  );
+
+  return HOMEPAGE_TOOL_GRID_CATEGORIES.filter(
+    (category) => category.id !== "security" || hasPublicSecurityTool,
   );
 }
 
-export function getHomepageConversionsToPdf(
-  capabilitySnapshot: PublicLaunchCapabilitySnapshot,
-) {
-  return resolveHomepageConversions(
-    HOMEPAGE_TO_PDF_IDS,
-    "HOMEPAGE_TO_PDF_IDS",
-  ).filter((conversion) =>
-    isToolPubliclyLaunchReady(
-      requireTool(conversion.id, "HOMEPAGE_TO_PDF_IDS"),
-      capabilitySnapshot,
-    ),
-  );
+export function matchesHomepageToolQuery(tool: Tool, query: string) {
+  const normalize = (value: string) =>
+    value
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+  const normalizedQuery = normalize(query);
+  if (!normalizedQuery) return true;
+
+  const corpus = [
+    tool.title,
+    tool.shortTitle,
+    tool.description,
+    tool.menuDescription,
+    ...tool.search.aliases,
+    ...tool.search.keywords,
+    ...tool.search.useCases,
+  ]
+    .filter(Boolean)
+    .map((value) => normalize(String(value)))
+    .join(" ");
+
+  return normalizedQuery
+    .split(/\s+/)
+    .filter(Boolean)
+    .every((token) => corpus.includes(token));
 }
 
-export function isToolInHomepageCategory(
+export function isToolInHomepageGridCategory(
   tool: Tool,
-  category: HomepageExplorerCategoryId,
+  category: HomepageToolGridCategoryId,
 ) {
-  if (category === "popular") {
-    return HOMEPAGE_POPULAR_TOOL_IDS.some((id) => id === tool.id);
-  }
+  if (category === "all") return true;
   if (category === "edit-sign") return tool.category === "edit";
   if (category === "organize") return tool.category === "organize";
-  if (category === "optimize") return tool.category === "optimize";
+  if (category === "optimize-ocr") return tool.category === "optimize";
+  if (category === "security") return tool.category === "security";
   const conversion = getConversionById(tool.id);
   if (category === "convert-from") {
     return conversion?.sourceFormat === "pdf";
@@ -271,12 +297,7 @@ export function isToolInHomepageCategory(
   if (category === "convert-to") {
     return conversion?.destinationFormat === "pdf";
   }
-  return (
-    tool.id === "pdf-to-searchable-pdf" ||
-    tool.id === "pdf-to-text" ||
-    tool.id === "pdf-to-html" ||
-    tool.id === "pdf-editor"
-  );
+  return false;
 }
 
 export function assertHomepageCuratedIds() {
@@ -285,8 +306,8 @@ export function assertHomepageCuratedIds() {
     "HOMEPAGE_POPULAR_TOOL_IDS",
   );
   resolveHomepageTools(
-    HOMEPAGE_QUICK_ACTION_IDS,
-    "HOMEPAGE_QUICK_ACTION_IDS",
+    HOMEPAGE_TOOL_GRID_ORDER_IDS,
+    "HOMEPAGE_TOOL_GRID_ORDER_IDS",
   );
   resolveHomepageConversions(
     HOMEPAGE_FROM_PDF_IDS,

@@ -1,77 +1,35 @@
 import Link from "next/link";
-import { ArrowRight, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowDown, ArrowRight, Sparkles } from "lucide-react";
 
-import { SmartFileEntry } from "@/components/home/SmartFileEntry";
-import type { HomepageCapabilitySnapshot } from "@/lib/home/homepage-capabilities";
-import { getHomepageQuickActions } from "@/lib/home/homepage-tools";
-
-export function HomeHero({
-  capabilities,
-}: {
-  readonly capabilities: HomepageCapabilitySnapshot;
-}) {
-  const quickActions = getHomepageQuickActions(capabilities);
-
+export function HomeHero() {
   return (
     <section className="home-hero relative overflow-hidden border-b border-[var(--home-border)] bg-[var(--home-surface)]">
       <div className="home-hero-glow absolute inset-0" aria-hidden="true" />
-      <div className="relative mx-auto grid max-w-[1320px] gap-10 px-4 py-12 sm:px-6 sm:py-16 lg:grid-cols-[minmax(0,7fr)_minmax(390px,5fr)] lg:items-center lg:px-8 lg:py-20">
-        <div className="max-w-[760px]">
-          <div className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-violet-700">
-            <ShieldCheck size={14} />
-            Private, fast & built for real PDF work
-          </div>
-
-          <h1 className="mt-6 max-w-[720px] text-[2.65rem] font-bold leading-[1.02] tracking-[-0.055em] text-slate-950 sm:text-[3.8rem] lg:text-[4.45rem]">
-            Every PDF tool you need.
-            <span className="mt-1 block text-violet-700">
-              One powerful workspace.
-            </span>
-          </h1>
-
-          <p className="mt-6 max-w-2xl text-base leading-8 text-slate-600 sm:text-lg">
-            Edit, organize, compress, sign, OCR and convert documents without
-            installing complicated software. Start with a file or choose a
-            focused tool.
-          </p>
-
-          <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-            <a href="#start-with-file" className="btn-primary">
-              Choose a file
-              <ArrowRight size={16} />
-            </a>
-            <Link href="/editor" className="btn-secondary">
-              <Sparkles size={16} />
-              Open PDF Editor
-            </Link>
-            <Link href="/tools" className="btn-light">
-              Browse all tools
-            </Link>
-          </div>
-
-          <div className="mt-8 border-t border-slate-900/10 pt-5">
-            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
-              Jump straight to
-            </p>
-            <div className="mt-3 flex flex-wrap gap-x-5 gap-y-3">
-              {quickActions.map((tool) => (
-                <Link
-                  key={tool.id}
-                  href={tool.href}
-                  className="group inline-flex min-h-11 items-center gap-1.5 text-sm font-bold text-slate-700 transition hover:text-violet-700"
-                >
-                  {tool.shortTitle ?? tool.title}
-                  <ArrowRight
-                    size={13}
-                    className="transition group-hover:translate-x-0.5"
-                  />
-                </Link>
-              ))}
-            </div>
-          </div>
+      <div className="relative mx-auto flex min-h-[280px] max-w-[950px] flex-col items-center justify-center px-4 py-10 text-center sm:px-6 sm:py-12 lg:px-8">
+        <div className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-violet-700">
+          <Sparkles size={14} aria-hidden="true" />
+          PDF tools, made simple
         </div>
 
-        <SmartFileEntry capabilities={capabilities} />
+        <h1 className="mt-4 text-[2.2rem] font-bold leading-[1.04] tracking-[-0.055em] text-slate-950 sm:text-[3.15rem] lg:text-[3.5rem]">
+          Every PDF tool you need,
+          <span className="text-violet-700"> in one place.</span>
+        </h1>
+
+        <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600 sm:text-lg">
+          Edit, organize, convert, compress, sign and OCR PDFs online.
+        </p>
+
+        <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <Link href="/editor" className="btn-primary">
+            Open PDF Editor
+            <ArrowRight size={16} aria-hidden="true" />
+          </Link>
+          <a href="#pdf-tools" className="btn-light">
+            Browse PDF tools
+            <ArrowDown size={16} aria-hidden="true" />
+          </a>
+        </div>
       </div>
     </section>
   );

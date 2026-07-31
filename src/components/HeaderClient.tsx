@@ -27,7 +27,7 @@ import { getToolById, tools, type Tool } from "@/lib/tools";
 const PRIMARY_NAV = [
   { label: "Edit PDF", href: "/editor" },
   { label: "Organize", href: "/tools/reorder" },
-  { label: "Convert", href: "/#tool-explorer" },
+  { label: "Convert", href: "/#pdf-tools" },
   { label: "Sign", href: "/tools/fill-sign" },
   { label: "Compress", href: "/tools/compress" },
 ] as const;
@@ -278,7 +278,7 @@ export function HeaderClient({
 
           <div className="hidden shrink-0 items-center gap-2 xl:flex">
             <Link
-              href="/#tool-explorer"
+          href="/#pdf-tools"
               className="inline-flex h-11 w-11 items-center justify-center rounded-full text-slate-600 transition hover:bg-violet-50 hover:text-violet-700"
               aria-label="Search PDF tools"
             >
@@ -365,7 +365,7 @@ export function HeaderClient({
             </div>
 
             <Link
-              href="/#tool-explorer"
+            href="/#pdf-tools"
               className="mt-4 flex min-h-12 items-center gap-3 rounded-xl border border-violet-100 bg-white px-4 text-sm font-bold text-violet-700"
             >
               <Search size={17} />
