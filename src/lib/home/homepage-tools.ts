@@ -83,8 +83,7 @@ export const HOMEPAGE_TOOL_GRID_ORDER_IDS = [
   "csv-to-pdf",
 ] as const;
 
-export type HomepageToolGridCategoryId =
-  | "all"
+export type ToolDiscoveryGroupId =
   | "edit-sign"
   | "organize"
   | "convert-from"
@@ -97,11 +96,6 @@ export type ToolDiscoveryItem = {
   readonly tool: Tool;
   readonly availability: ToolDiscoveryAvailability;
 };
-
-export type ToolDiscoveryGroupId = Exclude<
-  HomepageToolGridCategoryId,
-  "all"
->;
 
 export type ToolDiscoveryGroup = {
   readonly id: ToolDiscoveryGroupId;
@@ -175,18 +169,6 @@ const TOOL_DISCOVERY_GROUPS: readonly {
     toolIds: HOMEPAGE_OPTIMIZE_OCR_IDS,
   },
 ] as const;
-
-const HOMEPAGE_TOOL_GRID_CATEGORIES: readonly {
-  readonly id: HomepageToolGridCategoryId;
-  readonly label: string;
-}[] = [
-  { id: "all", label: "All tools" },
-  { id: "edit-sign", label: "Edit & Sign" },
-  { id: "organize", label: "Organize" },
-  { id: "convert-from", label: "Convert from PDF" },
-  { id: "convert-to", label: "Convert to PDF" },
-  { id: "optimize-ocr", label: "Optimize & OCR" },
-];
 
 export const HOMEPAGE_FAQS = [
   {
@@ -324,11 +306,6 @@ export function getHomepageToolGridTools(
   ];
 }
 
-export function getHomepageToolGridCategories(toolsInGrid: readonly Tool[]) {
-  void toolsInGrid;
-  return HOMEPAGE_TOOL_GRID_CATEGORIES;
-}
-
 export function matchesHomepageToolQuery(tool: Tool, query: string) {
   const normalize = (value: string) =>
     value
@@ -356,15 +333,6 @@ export function matchesHomepageToolQuery(tool: Tool, query: string) {
     .split(/\s+/)
     .filter(Boolean)
     .every((token) => corpus.includes(token));
-}
-
-export function isToolInHomepageGridCategory(
-  tool: Tool,
-  category: HomepageToolGridCategoryId,
-) {
-  if (category === "all") return true;
-  const group = TOOL_DISCOVERY_GROUPS.find((item) => item.id === category);
-  return group?.toolIds.includes(tool.id) ?? false;
 }
 
 function isPendingConversion(tool: Tool) {
@@ -427,34 +395,6 @@ export function getHeaderToolSearchItems(
     seen.add(item.tool.id);
     return true;
   });
-}
-
-export function getHomepageDiscoveryItems(
-  category: HomepageToolGridCategoryId,
-  capabilitySnapshot: PublicLaunchCapabilitySnapshot,
-): readonly ToolDiscoveryItem[] {
-  if (category === "all") {
-    return getHomepageToolGridTools(capabilitySnapshot).map((tool) => ({
-      tool,
-      availability: "ready" as const,
-    }));
-  }
-
-  return (
-    getToolDiscoveryGroups(capabilitySnapshot).find(
-      (group) => group.id === category,
-    )?.items ?? []
-  );
-}
-
-export function parseHomepageToolCategory(
-  value: string | null | undefined,
-): HomepageToolGridCategoryId {
-  return HOMEPAGE_TOOL_GRID_CATEGORIES.some(
-    (category) => category.id === value,
-  )
-    ? (value as HomepageToolGridCategoryId)
-    : "all";
 }
 
 export function assertToolDiscoveryModel(

@@ -155,11 +155,6 @@ function CategoryTabs({
             }
           >
             {group.label}
-            {vertical ? (
-              <span className={selected ? "text-violet-100" : "text-slate-400"}>
-                {group.items.length}
-              </span>
-            ) : null}
           </button>
         );
       })}
@@ -380,18 +375,6 @@ export function HeaderClient({
               aria-labelledby={`desktop-tool-group-tab-${selectedGroup.id}`}
               className="min-w-0"
             >
-              <div className="mb-3 flex items-center justify-between gap-4">
-                <h2 className="text-base font-black text-slate-950">
-                  {selectedGroup.label}
-                </h2>
-                <Link
-                  href="/#pdf-tools"
-                  onClick={closeToolsMenu}
-                  className="text-xs font-bold text-violet-700 outline-none hover:text-violet-900 focus-visible:ring-4 focus-visible:ring-violet-100"
-                >
-                  View on homepage
-                </Link>
-              </div>
               <div className="grid grid-cols-2 gap-1.5 xl:grid-cols-3">
                 {selectedGroup.items.map((item) => (
                   <DiscoveryTool
