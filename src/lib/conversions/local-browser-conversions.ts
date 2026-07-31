@@ -2,6 +2,9 @@ export const LOCAL_BROWSER_CONVERSION_IDS = [
   "pdf-to-word",
   "pdf-to-excel",
   "pdf-to-powerpoint",
+  "docx-to-pdf",
+  "xlsx-to-pdf",
+  "pptx-to-pdf",
 ] as const;
 
 export type LocalBrowserConversionId =
