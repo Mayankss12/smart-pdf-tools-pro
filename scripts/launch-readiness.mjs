@@ -76,27 +76,19 @@ for (const id of LOCAL_BROWSER_CONVERSION_IDS) {
   assert.equal(capability?.processingMode, "client");
 }
 
-const backendMinimum = [
-  "docx-to-pdf",
-  "xlsx-to-pdf",
-  "pptx-to-pdf",
-  "heic-to-pdf",
-  "webpage-to-pdf",
-];
-for (const id of backendMinimum) {
+for (const id of ["heic-to-pdf", "webpage-to-pdf"]) {
   assert.ok(
     groups.backendRequired.some((tool) => tool.id === id),
     `Backend-required launch group is missing ${id}`,
   );
 }
 
-const comingSoonMinimum = [
+for (const id of [
   "protect-pdf",
   "unlock-pdf",
   "watermark-remover",
   "redact-pdf",
-];
-for (const id of comingSoonMinimum) {
+]) {
   assert.ok(
     groups.comingSoon.some((tool) => tool.id === id),
     `Coming-soon launch group is missing ${id}`,
@@ -124,9 +116,6 @@ for (const [surface, surfaceTools] of Object.entries(publicSurfaces)) {
 }
 
 const guardedRoutes = [
-  "word-to-pdf",
-  "excel-to-pdf",
-  "powerpoint-to-pdf",
   "heic-to-pdf",
   "webpage-to-pdf",
   "protect",
@@ -146,7 +135,7 @@ for (const source of guardedRouteSources) {
   assert.match(source, /requirePublicLaunchReadyTool\(/);
 }
 
-const localRouteSources = await Promise.all(
+const pdfOfficeRouteSources = await Promise.all(
   ["pdf-to-word", "pdf-to-excel", "pdf-to-powerpoint"].map((route) =>
     readFile(
       new URL(`../src/app/tools/${route}/page.tsx`, import.meta.url),
@@ -154,8 +143,21 @@ const localRouteSources = await Promise.all(
     ),
   ),
 );
-for (const source of localRouteSources) {
+for (const source of pdfOfficeRouteSources) {
   assert.match(source, /PdfOfficeConversionPage/);
+  assert.doesNotMatch(source, /ConversionCapabilityShell|requirePublicLaunchReadyTool/);
+}
+
+const officePdfRouteSources = await Promise.all(
+  ["word-to-pdf", "excel-to-pdf", "powerpoint-to-pdf"].map((route) =>
+    readFile(
+      new URL(`../src/app/tools/${route}/page.tsx`, import.meta.url),
+      "utf8",
+    ),
+  ),
+);
+for (const source of officePdfRouteSources) {
+  assert.match(source, /OfficeToPdfConversionPage/);
   assert.doesNotMatch(source, /ConversionCapabilityShell|requirePublicLaunchReadyTool/);
 }
 
