@@ -1,7 +1,5 @@
-import { ConversionCapabilityShell } from "@/components/ConversionCapabilityShell";
-import { requirePublicLaunchReadyTool } from "@/lib/public-launch-guard";
+import { OfficeToPdfConversionPage } from "@/components/OfficeToPdfConversionPage";
 
 export default function WordToPdfPage() {
-  requirePublicLaunchReadyTool("docx-to-pdf");
-  return <ConversionCapabilityShell conversionId="docx-to-pdf" />;
+  return <OfficeToPdfConversionPage format="docx" />;
 }
