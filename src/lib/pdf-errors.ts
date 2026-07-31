@@ -1,5 +1,6 @@
 export type PdfEngineErrorCode =
   | "NO_FILE"
+  | "INVALID_FILE"
   | "INVALID_FILE_TYPE"
   | "FILE_TOO_LARGE"
   | "EMPTY_FILE"
