@@ -231,18 +231,23 @@ assert.doesNotMatch(
 assert.match(headerServerSource, /capabilities=\{capabilitySnapshot\}/);
 assert.doesNotMatch(headerSource, /\/#pdf-tools/);
 assert.doesNotMatch(headerSource, /#tool-explorer/);
-assert.match(headerSource, /lg:inline-flex/);
-assert.match(headerSource, /aria-expanded=\{toolsOpen\}/);
+assert.match(headerSource, /xl:flex/);
+assert.match(headerSource, /aria-expanded=\{open\}/);
 assert.match(headerSource, /event\.key === "Escape"/);
 assert.doesNotMatch(headerSource, /PRIMARY_NAV/);
+assert.doesNotMatch(headerSource, /All PDF Tools/);
+assert.doesNotMatch(headerSource, /CategoryTabs|toolsOpen|selectedGroupId/);
 assert.doesNotMatch(
   headerSource,
-  />\s*(Edit PDF|Organize|Convert|Sign|Compress)\s*</,
+  />\s*(Edit PDF|Convert|Sign|Compress)\s*</,
 );
 assert.doesNotMatch(headerSource, /Open Editor|Open PDF Editor/);
 assert.doesNotMatch(headerSource, /OCR & Smart Tools|Popular/);
 assert.match(headerSource, /HeaderToolSearch/);
 assert.match(headerSource, /getToolDiscoveryGroups/);
+assert.match(headerSource, /groups\.map/);
+assert.match(headerSource, /header-tool-menu-\$\{group\.id\}/);
+assert.match(headerSource, /mobileGroupId === group\.id/);
 assert.match(headerSource, /aria-disabled="true"/);
 assert.doesNotMatch(headerSource, /View on homepage/);
 assert.doesNotMatch(headerSource, /group\.items\.length/);
