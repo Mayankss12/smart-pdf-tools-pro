@@ -5,13 +5,21 @@ import { fileURLToPath } from "node:url";
 import { CONVERSION_REGISTRY } from "../src/lib/conversions/registry.ts";
 import {
   assertHomepageCuratedIds,
+  assertToolDiscoveryModel,
+  getHeaderToolSearchItems,
+  getHomepageDiscoveryItems,
   getHomepageFaqStructuredData,
   getHomepageToolGridCategories,
   getHomepageToolGridTools,
+  getToolDiscoveryGroups,
   HOMEPAGE_FAQS,
+  HOMEPAGE_FROM_PDF_IDS,
+  HOMEPAGE_PENDING_CONVERSION_IDS,
   HOMEPAGE_TOOL_GRID_ORDER_IDS,
+  HOMEPAGE_TO_PDF_IDS,
   isToolInHomepageGridCategory,
   matchesHomepageToolQuery,
+  parseHomepageToolCategory,
 } from "../src/lib/home/homepage-tools.ts";
 import {
   getPublicLaunchReadyTools,
@@ -20,9 +28,9 @@ import {
 import { getPublicLaunchCapabilitySnapshot } from "../src/lib/public-launch-snapshot.ts";
 import { getToolById } from "../src/lib/tools.ts";
 
-assert.doesNotThrow(() => assertHomepageCuratedIds());
-
 const snapshot = getPublicLaunchCapabilitySnapshot();
+assert.doesNotThrow(() => assertHomepageCuratedIds(snapshot));
+assert.doesNotThrow(() => assertToolDiscoveryModel(snapshot));
 const unavailableIds = new Set([
   "pdf-to-word",
   "pdf-to-excel",
@@ -67,6 +75,17 @@ for (const id of HOMEPAGE_TOOL_GRID_ORDER_IDS) {
 const categories = getHomepageToolGridCategories(gridTools);
 assert.equal(categories[0]?.id, "all");
 assert.equal(categories.some((category) => category.id === "popular"), false);
+assert.deepEqual(
+  categories.map((category) => category.id),
+  [
+    "all",
+    "edit-sign",
+    "organize",
+    "convert-from",
+    "convert-to",
+    "optimize-ocr",
+  ],
+);
 for (const tool of gridTools) {
   assert.ok(
     categories
@@ -78,6 +97,89 @@ for (const tool of gridTools) {
 assert.equal(matchesHomepageToolQuery(getToolById("merge-pdf"), "combine"), true);
 assert.equal(matchesHomepageToolQuery(getToolById("fill-sign"), "signature"), true);
 assert.equal(matchesHomepageToolQuery(getToolById("merge-pdf"), "translate"), false);
+assert.equal(parseHomepageToolCategory("convert-from"), "convert-from");
+assert.equal(parseHomepageToolCategory("invalid-category"), "all");
+assert.equal(parseHomepageToolCategory(null), "all");
+
+const discoveryGroups = getToolDiscoveryGroups(snapshot);
+assert.deepEqual(
+  discoveryGroups.map((group) => group.label),
+  [
+    "Edit & Sign",
+    "Organize",
+    "Convert from PDF",
+    "Convert to PDF",
+    "Optimize & OCR",
+  ],
+);
+const discoveryItems = discoveryGroups.flatMap((group) => group.items);
+assert.equal(
+  new Set(discoveryItems.map((item) => item.tool.id)).size,
+  discoveryItems.length,
+  "Every discovery tool must have exactly one category owner",
+);
+assert.deepEqual(
+  discoveryGroups
+    .filter((group) =>
+      group.items.some((item) => item.tool.id === "pdf-to-searchable-pdf"),
+    )
+    .map((group) => group.id),
+  ["optimize-ocr"],
+);
+
+const pendingItems = discoveryItems.filter(
+  (item) => item.availability === "coming-soon",
+);
+assert.deepEqual(
+  new Set(pendingItems.map((item) => item.tool.id)),
+  new Set(HOMEPAGE_PENDING_CONVERSION_IDS),
+);
+assert.ok(
+  pendingItems.every((item) => unavailableIds.has(item.tool.id)),
+  "Only canonical unavailable conversions may appear as previews",
+);
+
+const allHomepageItems = getHomepageDiscoveryItems("all", snapshot);
+assert.ok(
+  allHomepageItems.every((item) => item.availability === "ready"),
+  "The All category must contain only launch-ready tools",
+);
+assert.deepEqual(
+  new Set(allHomepageItems.map((item) => item.tool.id)),
+  new Set(gridTools.map((tool) => tool.id)),
+);
+
+const fromPdfItems = getHomepageDiscoveryItems("convert-from", snapshot);
+assert.deepEqual(
+  new Set(fromPdfItems.map((item) => item.tool.id)),
+  new Set(HOMEPAGE_FROM_PDF_IDS),
+);
+const toPdfItems = getHomepageDiscoveryItems("convert-to", snapshot);
+assert.deepEqual(
+  new Set(toPdfItems.map((item) => item.tool.id)),
+  new Set(HOMEPAGE_TO_PDF_IDS),
+);
+
+const headerSearchItems = getHeaderToolSearchItems(snapshot);
+assert.equal(
+  new Set(headerSearchItems.map((item) => item.tool.id)).size,
+  headerSearchItems.length,
+);
+assert.deepEqual(
+  new Set(
+    headerSearchItems
+      .filter((item) => item.availability === "coming-soon")
+      .map((item) => item.tool.id),
+  ),
+  new Set(HOMEPAGE_PENDING_CONVERSION_IDS),
+);
+assert.ok(
+  headerSearchItems.some(
+    (item) =>
+      item.tool.id === "pdf-to-word" &&
+      matchesHomepageToolQuery(item.tool, "word"),
+  ),
+);
 
 for (const conversion of CONVERSION_REGISTRY) {
   const tool = getToolById(conversion.id);
@@ -105,7 +207,9 @@ const sources = await Promise.all(
     "../src/components/home/EditorShowcase.tsx",
     "../src/components/home/ProcessingPrivacy.tsx",
     "../src/components/home/HomeFaq.tsx",
+    "../src/components/Header.tsx",
     "../src/components/HeaderClient.tsx",
+    "../src/components/header/HeaderToolSearch.tsx",
     "../src/components/Footer.tsx",
     "../src/app/sitemap.ts",
   ].map((path) => readFile(new URL(path, import.meta.url), "utf8")),
@@ -117,7 +221,9 @@ const [
   editorSource,
   privacySource,
   faqSource,
+  headerServerSource,
   headerSource,
+  headerSearchSource,
   footerSource,
   sitemapSource,
 ] = sources;
@@ -133,12 +239,16 @@ const homepageSource = [
 assert.doesNotMatch(pageSource.trimStart(), /^["']use client["']/);
 assert.match(pageSource, /getHomepageCapabilitySnapshot/);
 assert.match(pageSource, /<HomeToolsGrid capabilities=\{capabilities\}/);
+assert.match(pageSource, /assertHomepageCuratedIds\(capabilities\)/);
 assert.doesNotMatch(pageSource, /PopularTools|ToolExplorer|ConversionHub/);
 assert.doesNotMatch(heroSource, /SmartFileEntry|Jump straight to|quickActions/);
 assert.match(heroSource, /Every PDF tool you need/);
+assert.doesNotMatch(heroSource, /Browse PDF tools|ArrowDown/);
 assert.match(gridSource, /^"use client";/);
 assert.doesNotMatch(gridSource, /Choose what you want to do/);
 assert.doesNotMatch(gridSource, /<ArrowRight|,\s*ArrowRight/);
+assert.doesNotMatch(gridSource, /home-tool-search|Search tools|Full directory/);
+assert.doesNotMatch(gridSource, /matches\.length|matching/);
 assert.doesNotMatch(gridSource, /\{tool\.description\}/);
 assert.doesNotMatch(gridSource, /\{tool\.menuDescription\}/);
 assert.match(gridSource, /grid-cols-2/);
@@ -146,19 +256,43 @@ assert.match(gridSource, /xl:grid-cols-6/);
 assert.match(gridSource, /role="tablist"/);
 assert.match(gridSource, /role="tabpanel"/);
 assert.match(gridSource, /ArrowRight|ArrowLeft/);
-assert.match(gridSource, /aria-label="Clear tool search"/);
+assert.match(gridSource, /toolCategory/);
+assert.match(gridSource, /window\.history\.pushState/);
+assert.match(gridSource, /popstate/);
+assert.match(gridSource, /aria-disabled="true"/);
+assert.match(gridSource, /Coming soon/);
 assert.doesNotMatch(homepageSource, /pdfjs-dist|tesseract/i);
-assert.doesNotMatch(homepageSource, /Coming soon|Backend required/i);
+assert.doesNotMatch(homepageSource, /Backend required/i);
 assert.doesNotMatch(
   homepageSource,
   /browser tools|conversion workflows|editor capabilities/i,
 );
-assert.match(headerSource, /launchReadyToolIds/);
+assert.match(headerServerSource, /capabilities=\{capabilitySnapshot\}/);
 assert.match(headerSource, /\/#pdf-tools/);
 assert.doesNotMatch(headerSource, /#tool-explorer/);
-assert.match(headerSource, /xl:flex/);
+assert.match(headerSource, /lg:inline-flex/);
 assert.match(headerSource, /aria-expanded=\{toolsOpen\}/);
 assert.match(headerSource, /event\.key === "Escape"/);
+assert.doesNotMatch(headerSource, /PRIMARY_NAV/);
+assert.doesNotMatch(
+  headerSource,
+  />\s*(Edit PDF|Organize|Convert|Sign|Compress)\s*</,
+);
+assert.doesNotMatch(headerSource, /Open Editor|Open PDF Editor/);
+assert.doesNotMatch(headerSource, /OCR & Smart Tools|Popular/);
+assert.match(headerSource, /HeaderToolSearch/);
+assert.match(headerSource, /getToolDiscoveryGroups/);
+assert.match(headerSource, /aria-disabled="true"/);
+assert.match(headerSearchSource, /MAX_RESULTS = 10/);
+assert.match(headerSearchSource, /event\.ctrlKey \|\| event\.metaKey/);
+assert.match(headerSearchSource, /event\.key === "ArrowDown"/);
+assert.match(headerSearchSource, /event\.key === "ArrowUp"/);
+assert.match(headerSearchSource, /event\.key === "Enter"/);
+assert.match(headerSearchSource, /event\.key === "Escape"/);
+assert.match(headerSearchSource, /aria-autocomplete="list"/);
+assert.match(headerSearchSource, /aria-disabled="true"/);
+assert.match(headerSearchSource, /Coming soon/);
+assert.doesNotMatch(headerSearchSource, /Backend required|provider/i);
 assert.match(footerSource, /getPublicFooterTools/);
 assert.match(sitemapSource, /getPublicSitemapTools/);
 assert.match(faqSource, /getHomepageFaqStructuredData/);

@@ -26,8 +26,8 @@ export const metadata: Metadata = {
 };
 
 export default function HomePage() {
-  assertHomepageCuratedIds();
   const capabilities = getHomepageCapabilitySnapshot();
+  assertHomepageCuratedIds(capabilities);
 
   return (
     <>

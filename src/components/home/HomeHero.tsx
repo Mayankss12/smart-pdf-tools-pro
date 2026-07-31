@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowDown, ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight, Sparkles } from "lucide-react";
 
 export function HomeHero() {
   return (
@@ -20,15 +20,11 @@ export function HomeHero() {
           Edit, organize, convert, compress, sign and OCR PDFs online.
         </p>
 
-        <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
+        <div className="mt-6">
           <Link href="/editor" className="btn-primary">
             Open PDF Editor
             <ArrowRight size={16} aria-hidden="true" />
           </Link>
-          <a href="#pdf-tools" className="btn-light">
-            Browse PDF tools
-            <ArrowDown size={16} aria-hidden="true" />
-          </a>
         </div>
       </div>
     </section>
