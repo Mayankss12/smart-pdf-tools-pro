@@ -9,6 +9,7 @@ const suites = [
   "homepage-smoke.mjs",
   "images-to-pdf-smoke.mjs",
   "launch-readiness.mjs",
+  "office-conversions-smoke.mjs",
   "pdf-rebuild-safety-smoke.mjs",
   "pdf-to-images-smoke.mjs",
   "standalone-overlay-smoke.mjs",
