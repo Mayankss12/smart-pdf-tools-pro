@@ -8,6 +8,7 @@ import {
   type ConversionCapabilityKey,
   type ConversionDefinition,
 } from "./registry";
+import { isLocalBrowserConversionId } from "./local-browser-conversions";
 
 const CLIENT_CAPABILITIES = new Set<ConversionCapabilityKey>([
   "browser-pdf-render",
@@ -68,29 +69,41 @@ export function getPublicConversionCapabilities(): readonly PublicConversionCapa
 
   return CONVERSION_REGISTRY.map((conversion) => {
     const control = controls.get(conversion.id);
+    const locallyImplemented = isLocalBrowserConversionId(conversion.id);
     const capabilityEnabled = enabledCapabilities.has(
       conversion.capabilityKey,
     );
-    const enabled = Boolean(control?.enabled && capabilityEnabled);
+    const administrativelyBlocked =
+      control?.hidden === true ||
+      control?.status === "maintenance" ||
+      control?.status === "disabled";
+    const enabled = locallyImplemented
+      ? !administrativelyBlocked
+      : Boolean(control?.enabled && capabilityEnabled);
+    const status = locallyImplemented && !administrativelyBlocked
+      ? "available"
+      : (control?.status ?? conversion.status);
 
     return {
       id: conversion.id,
       route: conversion.route,
-      status: control?.status ?? conversion.status,
+      status,
       enabled,
       hidden: control?.hidden ?? false,
-      beta: control?.beta ?? false,
-      processingMode: conversion.processingMode,
+      beta: locallyImplemented ? false : (control?.beta ?? false),
+      processingMode: locallyImplemented ? "client" : conversion.processingMode,
       capabilityKey: conversion.capabilityKey,
       disabledReason: enabled
         ? null
         : (control?.disabledReason ?? conversion.disabledReason),
-      access: control?.access ?? conversion.access,
+      access: locallyImplemented ? "free" : (control?.access ?? conversion.access),
       limits: {
         maxFileSize: control?.maxFileSize ?? conversion.maxFileSize,
         maxPageCount: control?.maxPageCount ?? conversion.maxPageCount,
         batchLimit: control?.batchLimit ?? conversion.batchLimit,
-        dailyLimit: control?.dailyLimit ?? conversion.dailyLimit,
+        dailyLimit: locallyImplemented
+          ? null
+          : (control?.dailyLimit ?? conversion.dailyLimit),
       },
     };
   });
