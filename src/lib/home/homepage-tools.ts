@@ -30,7 +30,6 @@ export const HOMEPAGE_FROM_PDF_IDS = [
   "pdf-to-png",
   "pdf-to-webp",
   "pdf-to-images",
-  "pdf-to-searchable-pdf",
   "pdf-to-word",
   "pdf-to-excel",
   "pdf-to-powerpoint",
@@ -90,8 +89,92 @@ export type HomepageToolGridCategoryId =
   | "organize"
   | "convert-from"
   | "convert-to"
-  | "optimize-ocr"
-  | "security";
+  | "optimize-ocr";
+
+export type ToolDiscoveryAvailability = "ready" | "coming-soon";
+
+export type ToolDiscoveryItem = {
+  readonly tool: Tool;
+  readonly availability: ToolDiscoveryAvailability;
+};
+
+export type ToolDiscoveryGroupId = Exclude<
+  HomepageToolGridCategoryId,
+  "all"
+>;
+
+export type ToolDiscoveryGroup = {
+  readonly id: ToolDiscoveryGroupId;
+  readonly label: string;
+  readonly items: readonly ToolDiscoveryItem[];
+};
+
+const HOMEPAGE_EDIT_SIGN_IDS = [
+  "pdf-editor",
+  "sign-pdf",
+  "fill-sign",
+  "highlight-pdf",
+  "watermark-pdf",
+  "annotate-pdf",
+  "page-numbers",
+] as const;
+
+const HOMEPAGE_ORGANIZE_IDS = [
+  "merge-pdf",
+  "split-pdf",
+  "reorder-pages",
+  "extract-pages",
+  "rotate-pdf",
+  "delete-pages",
+] as const;
+
+const HOMEPAGE_OPTIMIZE_OCR_IDS = [
+  "compress-pdf",
+  "pdf-to-searchable-pdf",
+] as const;
+
+export const HOMEPAGE_PENDING_CONVERSION_IDS = [
+  "pdf-to-word",
+  "pdf-to-excel",
+  "pdf-to-powerpoint",
+  "docx-to-pdf",
+  "xlsx-to-pdf",
+  "pptx-to-pdf",
+  "heic-to-pdf",
+  "webpage-to-pdf",
+] as const;
+
+const TOOL_DISCOVERY_GROUPS: readonly {
+  readonly id: ToolDiscoveryGroupId;
+  readonly label: string;
+  readonly toolIds: readonly string[];
+}[] = [
+  {
+    id: "edit-sign",
+    label: "Edit & Sign",
+    toolIds: HOMEPAGE_EDIT_SIGN_IDS,
+  },
+  {
+    id: "organize",
+    label: "Organize",
+    toolIds: HOMEPAGE_ORGANIZE_IDS,
+  },
+  {
+    id: "convert-from",
+    label: "Convert from PDF",
+    toolIds: HOMEPAGE_FROM_PDF_IDS,
+  },
+  {
+    id: "convert-to",
+    label: "Convert to PDF",
+    toolIds: HOMEPAGE_TO_PDF_IDS,
+  },
+  {
+    id: "optimize-ocr",
+    label: "Optimize & OCR",
+    toolIds: HOMEPAGE_OPTIMIZE_OCR_IDS,
+  },
+] as const;
 
 const HOMEPAGE_TOOL_GRID_CATEGORIES: readonly {
   readonly id: HomepageToolGridCategoryId;
@@ -103,7 +186,6 @@ const HOMEPAGE_TOOL_GRID_CATEGORIES: readonly {
   { id: "convert-from", label: "Convert from PDF" },
   { id: "convert-to", label: "Convert to PDF" },
   { id: "optimize-ocr", label: "Optimize & OCR" },
-  { id: "security", label: "Security" },
 ];
 
 export const HOMEPAGE_FAQS = [
@@ -243,13 +325,8 @@ export function getHomepageToolGridTools(
 }
 
 export function getHomepageToolGridCategories(toolsInGrid: readonly Tool[]) {
-  const hasPublicSecurityTool = toolsInGrid.some(
-    (tool) => tool.category === "security",
-  );
-
-  return HOMEPAGE_TOOL_GRID_CATEGORIES.filter(
-    (category) => category.id !== "security" || hasPublicSecurityTool,
-  );
+  void toolsInGrid;
+  return HOMEPAGE_TOOL_GRID_CATEGORIES;
 }
 
 export function matchesHomepageToolQuery(tool: Tool, query: string) {
@@ -286,21 +363,166 @@ export function isToolInHomepageGridCategory(
   category: HomepageToolGridCategoryId,
 ) {
   if (category === "all") return true;
-  if (category === "edit-sign") return tool.category === "edit";
-  if (category === "organize") return tool.category === "organize";
-  if (category === "optimize-ocr") return tool.category === "optimize";
-  if (category === "security") return tool.category === "security";
-  const conversion = getConversionById(tool.id);
-  if (category === "convert-from") {
-    return conversion?.sourceFormat === "pdf";
-  }
-  if (category === "convert-to") {
-    return conversion?.destinationFormat === "pdf";
-  }
-  return false;
+  const group = TOOL_DISCOVERY_GROUPS.find((item) => item.id === category);
+  return group?.toolIds.includes(tool.id) ?? false;
 }
 
-export function assertHomepageCuratedIds() {
+function isPendingConversion(tool: Tool) {
+  if (
+    !HOMEPAGE_PENDING_CONVERSION_IDS.includes(
+      tool.id as (typeof HOMEPAGE_PENDING_CONVERSION_IDS)[number],
+    )
+  ) {
+    return false;
+  }
+
+  const conversion = getConversionById(tool.id);
+  return (
+    conversion?.status === "backend-required" ||
+    conversion?.status === "coming-soon"
+  );
+}
+
+function resolveDiscoveryItem(
+  tool: Tool,
+  capabilitySnapshot: PublicLaunchCapabilitySnapshot,
+): ToolDiscoveryItem | null {
+  if (isToolPubliclyLaunchReady(tool, capabilitySnapshot)) {
+    return { tool, availability: "ready" };
+  }
+
+  if (isPendingConversion(tool)) {
+    return { tool, availability: "coming-soon" };
+  }
+
+  return null;
+}
+
+export function getToolDiscoveryGroups(
+  capabilitySnapshot: PublicLaunchCapabilitySnapshot,
+): readonly ToolDiscoveryGroup[] {
+  return TOOL_DISCOVERY_GROUPS.map((group) => ({
+    id: group.id,
+    label: group.label,
+    items: resolveHomepageTools(
+      group.toolIds,
+      `TOOL_DISCOVERY_GROUPS.${group.id}`,
+    ).flatMap((tool) => {
+      const item = resolveDiscoveryItem(tool, capabilitySnapshot);
+      return item ? [item] : [];
+    }),
+  }));
+}
+
+export function getHeaderToolSearchItems(
+  capabilitySnapshot: PublicLaunchCapabilitySnapshot,
+): readonly ToolDiscoveryItem[] {
+  const items = getToolDiscoveryGroups(capabilitySnapshot).flatMap(
+    (group) => group.items,
+  );
+  const seen = new Set<string>();
+
+  return items.filter((item) => {
+    if (seen.has(item.tool.id)) return false;
+    seen.add(item.tool.id);
+    return true;
+  });
+}
+
+export function getHomepageDiscoveryItems(
+  category: HomepageToolGridCategoryId,
+  capabilitySnapshot: PublicLaunchCapabilitySnapshot,
+): readonly ToolDiscoveryItem[] {
+  if (category === "all") {
+    return getHomepageToolGridTools(capabilitySnapshot).map((tool) => ({
+      tool,
+      availability: "ready" as const,
+    }));
+  }
+
+  return (
+    getToolDiscoveryGroups(capabilitySnapshot).find(
+      (group) => group.id === category,
+    )?.items ?? []
+  );
+}
+
+export function parseHomepageToolCategory(
+  value: string | null | undefined,
+): HomepageToolGridCategoryId {
+  return HOMEPAGE_TOOL_GRID_CATEGORIES.some(
+    (category) => category.id === value,
+  )
+    ? (value as HomepageToolGridCategoryId)
+    : "all";
+}
+
+export function assertToolDiscoveryModel(
+  capabilitySnapshot?: PublicLaunchCapabilitySnapshot,
+) {
+  const ownerByToolId = new Map<string, ToolDiscoveryGroupId>();
+  for (const group of TOOL_DISCOVERY_GROUPS) {
+    for (const id of group.toolIds) {
+      const existingOwner = ownerByToolId.get(id);
+      if (existingOwner) {
+        throw new Error(
+          `[homepage] Tool "${id}" is duplicated across discovery groups "${existingOwner}" and "${group.id}".`,
+        );
+      }
+      ownerByToolId.set(id, group.id);
+      requireTool(id, `TOOL_DISCOVERY_GROUPS.${group.id}`);
+    }
+  }
+
+  if (ownerByToolId.get("pdf-to-searchable-pdf") !== "optimize-ocr") {
+    throw new Error(
+      '[homepage] "pdf-to-searchable-pdf" must belong only to Optimize & OCR.',
+    );
+  }
+
+  for (const id of HOMEPAGE_PENDING_CONVERSION_IDS) {
+    const conversion = requireConversion(
+      id,
+      "HOMEPAGE_PENDING_CONVERSION_IDS",
+    );
+    if (
+      conversion.status !== "backend-required" &&
+      conversion.status !== "coming-soon"
+    ) {
+      throw new Error(
+        `[homepage] Pending discovery tool "${id}" is unexpectedly "${conversion.status}".`,
+      );
+    }
+  }
+
+  if (capabilitySnapshot) {
+    const gridIds = getHomepageToolGridTools(capabilitySnapshot).map(
+      (tool) => tool.id,
+    );
+    for (const id of gridIds) {
+      if (!ownerByToolId.has(id)) {
+        throw new Error(
+          `[homepage] Launch-ready tool "${id}" has no discovery group owner.`,
+        );
+      }
+    }
+
+    for (const item of getHeaderToolSearchItems(capabilitySnapshot)) {
+      if (
+        item.availability === "coming-soon" &&
+        !isPendingConversion(item.tool)
+      ) {
+        throw new Error(
+          `[homepage] Non-pending tool "${item.tool.id}" was exposed as coming soon.`,
+        );
+      }
+    }
+  }
+}
+
+export function assertHomepageCuratedIds(
+  capabilitySnapshot?: PublicLaunchCapabilitySnapshot,
+) {
   resolveHomepageTools(
     HOMEPAGE_POPULAR_TOOL_IDS,
     "HOMEPAGE_POPULAR_TOOL_IDS",
@@ -317,4 +539,9 @@ export function assertHomepageCuratedIds() {
     HOMEPAGE_TO_PDF_IDS,
     "HOMEPAGE_TO_PDF_IDS",
   );
+  resolveHomepageConversions(
+    HOMEPAGE_PENDING_CONVERSION_IDS,
+    "HOMEPAGE_PENDING_CONVERSION_IDS",
+  );
+  assertToolDiscoveryModel(capabilitySnapshot);
 }
