@@ -3,13 +3,10 @@ import { readFile } from "node:fs/promises";
 
 import { CONVERSION_REGISTRY } from "../src/lib/conversions/registry.ts";
 import { getPublicConversionCapabilities } from "../src/lib/conversions/capabilities.ts";
+import { LOCAL_BROWSER_CONVERSION_IDS } from "../src/lib/conversions/local-browser-conversions.ts";
 import { EDITOR_TOOL_DEFINITIONS } from "../src/lib/editor/editor-tool-registry.ts";
-import {
-  getHomepageToolGridTools,
-} from "../src/lib/home/homepage-tools.ts";
-import {
-  getPublicFooterTools,
-} from "../src/lib/public-launch-collections.ts";
+import { getHomepageToolGridTools } from "../src/lib/home/homepage-tools.ts";
+import { getPublicFooterTools } from "../src/lib/public-launch-collections.ts";
 import {
   getPublicLaunchReadyTools,
   getPublicSitemapTools,
@@ -21,6 +18,7 @@ import { getPublicLaunchCapabilitySnapshot } from "../src/lib/public-launch-snap
 import { tools } from "../src/lib/tools.ts";
 
 const snapshot = getPublicLaunchCapabilitySnapshot();
+const localIds = new Set(LOCAL_BROWSER_CONVERSION_IDS);
 const capabilityById = new Map(
   getPublicConversionCapabilities().map((capability) => [
     capability.id,
@@ -30,7 +28,9 @@ const capabilityById = new Map(
 
 const groups = {
   publicWorking: getPublicLaunchReadyTools(snapshot),
-  backendRequired: tools.filter((tool) => tool.status === "backend-required"),
+  backendRequired: tools.filter(
+    (tool) => tool.status === "backend-required" && !localIds.has(tool.id),
+  ),
   comingSoon: tools.filter((tool) => tool.status === "coming-soon"),
   maintenanceOrDisabled: CONVERSION_REGISTRY.filter((conversion) => {
     const capability = capabilityById.get(conversion.id);
@@ -65,10 +65,18 @@ for (const [surface, surfaceTools] of Object.entries(publicSurfaces)) {
   }
 }
 
+for (const id of LOCAL_BROWSER_CONVERSION_IDS) {
+  assert.ok(
+    groups.publicWorking.some((tool) => tool.id === id),
+    `Locally implemented conversion is not publicly launch ready: ${id}`,
+  );
+  const capability = capabilityById.get(id);
+  assert.equal(capability?.enabled, true);
+  assert.equal(capability?.status, "available");
+  assert.equal(capability?.processingMode, "client");
+}
+
 const backendMinimum = [
-  "pdf-to-word",
-  "pdf-to-excel",
-  "pdf-to-powerpoint",
   "docx-to-pdf",
   "xlsx-to-pdf",
   "pptx-to-pdf",
@@ -115,21 +123,19 @@ for (const [surface, surfaceTools] of Object.entries(publicSurfaces)) {
   );
 }
 
+const guardedRoutes = [
+  "word-to-pdf",
+  "excel-to-pdf",
+  "powerpoint-to-pdf",
+  "heic-to-pdf",
+  "webpage-to-pdf",
+  "protect",
+  "unlock",
+  "watermark-remover",
+  "redact",
+];
 const guardedRouteSources = await Promise.all(
-  [
-    "pdf-to-word",
-    "pdf-to-excel",
-    "pdf-to-powerpoint",
-    "word-to-pdf",
-    "excel-to-pdf",
-    "powerpoint-to-pdf",
-    "heic-to-pdf",
-    "webpage-to-pdf",
-    "protect",
-    "unlock",
-    "watermark-remover",
-    "redact",
-  ].map((route) =>
+  guardedRoutes.map((route) =>
     readFile(
       new URL(`../src/app/tools/${route}/page.tsx`, import.meta.url),
       "utf8",
@@ -138,6 +144,19 @@ const guardedRouteSources = await Promise.all(
 );
 for (const source of guardedRouteSources) {
   assert.match(source, /requirePublicLaunchReadyTool\(/);
+}
+
+const localRouteSources = await Promise.all(
+  ["pdf-to-word", "pdf-to-excel", "pdf-to-powerpoint"].map((route) =>
+    readFile(
+      new URL(`../src/app/tools/${route}/page.tsx`, import.meta.url),
+      "utf8",
+    ),
+  ),
+);
+for (const source of localRouteSources) {
+  assert.match(source, /PdfOfficeConversionPage/);
+  assert.doesNotMatch(source, /ConversionCapabilityShell|requirePublicLaunchReadyTool/);
 }
 
 const homepageSource = await readFile(
@@ -164,6 +183,7 @@ console.log(
         maintenanceOrDisabled: labels(groups.maintenanceOrDisabled),
         editorBackendFeatures: labels(groups.editorBackendFeatures),
       },
+      localBrowserConversions: [...LOCAL_BROWSER_CONVERSION_IDS],
       checkedSurfaces: Object.keys(publicSurfaces),
       guardedUnavailableRoutes: guardedRouteSources.length,
     },
