@@ -1,4 +1,5 @@
 import { getConversionById } from "@/lib/conversions/registry";
+import { isLocalBrowserConversionId } from "@/lib/conversions/local-browser-conversions";
 import {
   searchTools,
   sortToolsForDiscovery,
@@ -23,7 +24,8 @@ export function isToolPubliclyLaunchReady(
   tool: Tool,
   capabilitySnapshot: PublicLaunchCapabilitySnapshot,
 ): boolean {
-  if (tool.status !== "working") return false;
+  const locallyImplemented = isLocalBrowserConversionId(tool.id);
+  if (tool.status !== "working" && !locallyImplemented) return false;
 
   const conversion = getConversionById(tool.id);
   if (!conversion) {
