@@ -1,7 +1,5 @@
-import { ConversionCapabilityShell } from "@/components/ConversionCapabilityShell";
-import { requirePublicLaunchReadyTool } from "@/lib/public-launch-guard";
+import { OfficeToPdfConversionPage } from "@/components/OfficeToPdfConversionPage";
 
 export default function PowerPointToPdfPage() {
-  requirePublicLaunchReadyTool("pptx-to-pdf");
-  return <ConversionCapabilityShell conversionId="pptx-to-pdf" />;
+  return <OfficeToPdfConversionPage format="pptx" />;
 }
