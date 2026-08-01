@@ -4,6 +4,7 @@ const suites = [
   "conversion-platform-smoke.mjs",
   "editor-administration-smoke.mjs",
   "editor-export-smoke.mjs",
+  "editor-interaction-smoke.mjs",
   "export-entitlement-smoke.mjs",
   "fill-sign-smoke.mjs",
   "homepage-smoke.mjs",
