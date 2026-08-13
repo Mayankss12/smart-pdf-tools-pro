@@ -43,6 +43,12 @@ import {
   type FillSignTextStyle,
 } from "@/lib/fill-sign-engine";
 import {
+  isProportionalFillSignMarkKind,
+  normalizeProportionalMarkBox,
+  resizeProportionalMarkBox,
+  scaleProportionalMarkBox,
+} from "@/lib/fill-sign-layout";
+import {
   inspectPdfCompatibility,
   readValidatedPdfBytes,
 } from "@/lib/pdf-document-safety";
@@ -525,6 +531,22 @@ export default function FillSignPage() {
 
           const start = dragState.startBox;
           const minBox = getMinBox(object.kind);
+
+          if (isProportionalFillSignMarkKind(object.kind)) {
+            return {
+              ...object,
+              box: resizeProportionalMarkBox({
+                box: start,
+                handle: dragState.handle,
+                deltaXPercent: dxPercent,
+                deltaYPercent: dyPercent,
+                page: { width: rect.width, height: rect.height },
+                minWidthPercent: minBox.width,
+                minHeightPercent: minBox.height,
+              }),
+            };
+          }
+
           let nextX = start.xPercent;
           let nextY = start.yPercent;
           let nextWidth = start.widthPercent;
@@ -951,7 +973,21 @@ export default function FillSignPage() {
       image = objectImage;
     }
 
-    const defaultBox = getDefaultBox(kind, image);
+    let defaultBox = getDefaultBox(kind, image);
+    const pageRect = activePageRef.current?.getBoundingClientRect();
+
+    if (
+      isProportionalFillSignMarkKind(kind) &&
+      pageRect &&
+      pageRect.width > 0 &&
+      pageRect.height > 0
+    ) {
+      defaultBox = normalizeProportionalMarkBox(defaultBox, {
+        width: pageRect.width,
+        height: pageRect.height,
+      });
+    }
+
     const box = {
       ...defaultBox,
       xPercent:
@@ -1173,11 +1209,27 @@ export default function FillSignPage() {
 
     const delta = direction === "bigger" ? 3 : -3;
     const minBox = getMinBox(selectedObject.kind);
+    const pageRect = activePageRef.current?.getBoundingClientRect();
 
     updateObjects(
       (current) =>
         current.map((object) => {
           if (object.id !== selectedObject.id) return object;
+
+          if (
+            isProportionalFillSignMarkKind(object.kind) &&
+            pageRect &&
+            pageRect.width > 0 &&
+            pageRect.height > 0
+          ) {
+            return {
+              ...object,
+              box: scaleProportionalMarkBox(object.box, delta, {
+                width: pageRect.width,
+                height: pageRect.height,
+              }),
+            };
+          }
 
           return {
             ...object,
@@ -1444,65 +1496,80 @@ export default function FillSignPage() {
           ].join(" ")}
           title="Drag to move"
         >
-          {isSelected && (
-            <div className="absolute left-2 top-1 z-30 flex h-5 items-center gap-1 rounded-full bg-indigo-600/95 px-2 text-[10px] font-bold text-white">
-              <Grip size={11} />
-              Drag
-            </div>
-          )}
-
           <div className="flex h-full w-full items-center justify-center overflow-hidden p-1">
             {renderObjectContent(object)}
           </div>
 
-          <div className="absolute -right-2 -top-2 z-40 hidden gap-1 group-hover:flex">
-            <button
-              type="button"
-              onMouseDown={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                setSelectedObjectId(object.id);
-                duplicateSelectedObject();
-              }}
-              className="flex h-6 w-6 items-center justify-center rounded-full border border-indigo-100 bg-white text-indigo-700 shadow-sm"
-              title="Duplicate"
+          {isSelected && (
+            <div
+              data-fill-selection-controls
+              className={[
+                "absolute left-1/2 z-50 flex -translate-x-1/2 items-center gap-1 rounded-full border border-slate-200 bg-white p-1 shadow-[0_10px_28px_rgba(15,23,42,0.16)]",
+                object.box.yPercent < 9
+                  ? "top-full mt-3"
+                  : "bottom-full mb-3",
+              ].join(" ")}
             >
-              <Copy size={12} />
-            </button>
-            <button
-              type="button"
-              onMouseDown={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                setSelectedObjectId(object.id);
-                deleteSelectedObject();
-              }}
-              className="flex h-6 w-6 items-center justify-center rounded-full border border-red-100 bg-white text-red-600 shadow-sm"
-              title="Delete"
-            >
-              <Trash2 size={12} />
-            </button>
-          </div>
+              <div
+                onMouseDown={(event) => startMove(event, object)}
+                className="flex h-6 cursor-move items-center gap-1 rounded-full bg-indigo-50 px-2 text-[10px] font-bold text-indigo-700"
+                title="Drag to move"
+              >
+                <Grip size={11} />
+                Move
+              </div>
+              <button
+                type="button"
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  duplicateSelectedObject();
+                }}
+                className="flex h-6 w-6 items-center justify-center rounded-full text-indigo-700 hover:bg-indigo-50"
+                title="Duplicate"
+                aria-label="Duplicate selected field"
+              >
+                <Copy size={12} />
+              </button>
+              <button
+                type="button"
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  deleteSelectedObject();
+                }}
+                className="flex h-6 w-6 items-center justify-center rounded-full text-red-600 hover:bg-red-50"
+                title="Delete"
+                aria-label="Delete selected field"
+              >
+                <Trash2 size={12} />
+              </button>
+            </div>
+          )}
 
           {isSelected && (
             <>
               {(["nw", "ne", "sw", "se"] as const).map((handle) => {
                 const positionClass =
                   handle === "nw"
-                    ? "-left-2 -top-2"
+                    ? "-left-3 -top-3"
                     : handle === "ne"
-                      ? "-right-2 -top-2"
+                      ? "-right-3 -top-3"
                       : handle === "sw"
-                        ? "-bottom-2 -left-2"
-                        : "-bottom-2 -right-2";
+                        ? "-bottom-3 -left-3"
+                        : "-bottom-3 -right-3";
 
                 return (
                   <button
                     key={handle}
                     type="button"
                     onMouseDown={(event) => startResize(event, object, handle)}
-                    className={`absolute ${positionClass} h-4 w-4 rounded-full border-2 border-white bg-indigo-600 shadow-md`}
-                    title="Resize"
+                    className={`absolute ${positionClass} h-3.5 w-3.5 rounded-full border-2 border-white bg-indigo-600 shadow-md`}
+                    title={
+                      isProportionalFillSignMarkKind(object.kind)
+                        ? "Resize proportionally"
+                        : "Resize"
+                    }
                   />
                 );
               })}
@@ -1513,7 +1580,7 @@ export default function FillSignPage() {
     );
   }
 
-    function renderToolbarButton(item: (typeof TOOLBAR_ITEMS)[number]) {
+  function renderToolbarButton(item: (typeof TOOLBAR_ITEMS)[number]) {
     const Icon = item.icon;
     const isActive = activeTool === item.mode;
 
