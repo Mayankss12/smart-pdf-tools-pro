@@ -3,6 +3,10 @@ import Link from "next/link";
 
 import { AuthPageShell } from "@/components/auth/AuthPageShell";
 import { OtpVerifyForm } from "@/components/auth/OtpVerifyForm";
+import {
+  getSafeAuthRedirectPath,
+  normalizeAuthEmail,
+} from "@/lib/auth/otp-flow";
 
 export const metadata: Metadata = {
   title: "Verify Login — PDFMantra",
@@ -16,26 +20,10 @@ interface VerifyOtpPageProps {
   }>;
 }
 
-function getSafeRedirectPath(value: string | undefined): string {
-  const rawValue = value?.trim() ?? "";
-
-  if (!rawValue || !rawValue.startsWith("/") || rawValue.startsWith("//")) {
-    return "/dashboard";
-  }
-
-  const blockedPrefixes = ["/login", "/signup", "/logout", "/auth"];
-
-  if (blockedPrefixes.some((prefix) => rawValue === prefix || rawValue.startsWith(`${prefix}/`))) {
-    return "/dashboard";
-  }
-
-  return rawValue;
-}
-
 export default async function VerifyOtpPage({ searchParams }: VerifyOtpPageProps) {
   const params = await searchParams;
-  const email = params.email || "";
-  const redirectTo = getSafeRedirectPath(params.redirectTo ?? params.next);
+  const email = normalizeAuthEmail(params.email || "");
+  const redirectTo = getSafeAuthRedirectPath(params.redirectTo ?? params.next);
 
   if (!email) {
     return (
