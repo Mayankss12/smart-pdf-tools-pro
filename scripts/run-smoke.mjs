@@ -1,5 +1,6 @@
 const suites = [
   "auth-ui-smoke.mjs",
+  "auth-otp-smoke.mjs",
   "compression-smoke.mjs",
   "conversion-platform-smoke.mjs",
   "editor-administration-smoke.mjs",
