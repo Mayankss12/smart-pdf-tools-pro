@@ -4,6 +4,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
+import {
+  getSafeAuthRedirectPath,
+  normalizeAuthEmail,
+  normalizeOtpToken,
+} from "@/lib/auth/otp-flow";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export type ActionResult =
@@ -65,22 +70,6 @@ function getSiteUrl(): string {
   return process.env.NEXT_PUBLIC_SITE_URL?.trim() || "http://localhost:3000";
 }
 
-function getSafeRedirectPath(value: FormDataEntryValue | string | null | undefined): string {
-  const rawValue = typeof value === "string" ? value.trim() : "";
-
-  if (!rawValue || !rawValue.startsWith("/") || rawValue.startsWith("//")) {
-    return "/dashboard";
-  }
-
-  const blockedPrefixes = ["/login", "/signup", "/logout", "/auth"];
-
-  if (blockedPrefixes.some((prefix) => rawValue === prefix || rawValue.startsWith(`${prefix}/`))) {
-    return "/dashboard";
-  }
-
-  return rawValue;
-}
-
 async function getConfiguredServerClient(): Promise<Awaited<ReturnType<typeof createServerSupabaseClient>>> {
   const supabase = await createServerSupabaseClient();
 
@@ -111,7 +100,8 @@ export async function signupAction(
     return { success: false, error: firstError.message, field: firstError.field };
   }
 
-  const { fullName, email, phone, password } = parsed.data;
+  const { fullName, phone, password } = parsed.data;
+  const email = normalizeAuthEmail(parsed.data.email);
 
   try {
     const supabase = await getConfiguredServerClient();
@@ -163,7 +153,8 @@ export async function loginVerifyPasswordAction(
     return { success: false, error: firstError.message, field: firstError.field };
   }
 
-  const { email, password } = parsed.data;
+  const email = normalizeAuthEmail(parsed.data.email);
+  const { password } = parsed.data;
 
   try {
     const supabase = await getConfiguredServerClient();
@@ -207,9 +198,13 @@ export async function verifyOtpAction(
   _prevState: ActionResult | null,
   formData: FormData,
 ): Promise<ActionResult> {
+  const emailValue = formData.get("email");
+  const tokenValue = formData.get("token");
   const raw = {
-    email: formData.get("email"),
-    token: formData.get("token"),
+    email:
+      typeof emailValue === "string" ? normalizeAuthEmail(emailValue) : emailValue,
+    token:
+      typeof tokenValue === "string" ? normalizeOtpToken(tokenValue) : tokenValue,
     redirectTo: formData.get("redirectTo") || undefined,
   };
 
@@ -221,12 +216,12 @@ export async function verifyOtpAction(
   }
 
   const { email, token, redirectTo } = parsed.data;
-  const safeRedirectTo = getSafeRedirectPath(redirectTo);
+  const safeRedirectTo = getSafeAuthRedirectPath(redirectTo);
 
   try {
     const supabase = await getConfiguredServerClient();
 
-    const { error } = await supabase.auth.verifyOtp({
+    const { data, error } = await supabase.auth.verifyOtp({
       email,
       token,
       type: "email",
@@ -235,13 +230,24 @@ export async function verifyOtpAction(
     if (error) {
       const lowerMessage = error.message.toLowerCase();
 
-      if (lowerMessage.includes("expired") || lowerMessage.includes("invalid")) {
+      if (error.code === "otp_expired") {
         return {
           success: false,
-          error: "Code is incorrect or has expired. Request a new code and try again.",
+          error: "This verification code has expired. Request a new code and try again.",
         };
       }
 
+      if (lowerMessage.includes("invalid") || lowerMessage.includes("incorrect")) {
+        return {
+          success: false,
+          error: "The verification code is incorrect. Please check the code and try again.",
+        };
+      }
+
+      return { success: false, error: "Verification failed. Please try again." };
+    }
+
+    if (!data.session || !data.user || normalizeAuthEmail(data.user.email ?? "") !== email) {
       return { success: false, error: "Verification failed. Please try again." };
     }
 
@@ -257,7 +263,7 @@ export async function resendOtpAction(
   _prevState: ActionResult | null,
   formData: FormData,
 ): Promise<ActionResult> {
-  const email = formData.get("email")?.toString() ?? "";
+  const email = normalizeAuthEmail(formData.get("email")?.toString() ?? "");
 
   if (!z.string().email().safeParse(email).success) {
     return { success: false, error: "Invalid email address." };
@@ -289,7 +295,7 @@ export async function forgotPasswordAction(
   _prevState: ActionResult | null,
   formData: FormData,
 ): Promise<ActionResult> {
-  const email = formData.get("email")?.toString() ?? "";
+  const email = normalizeAuthEmail(formData.get("email")?.toString() ?? "");
 
   if (!z.string().email().safeParse(email).success) {
     return { success: false, error: "Please enter a valid email address.", field: "email" };
