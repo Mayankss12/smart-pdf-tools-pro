@@ -1,4 +1,6 @@
 import {
+  PDFArray,
+  PDFDict,
   PDFDocument,
   PDFName,
   PDFSignature,
@@ -38,6 +40,41 @@ export type PdfCompatibilityReport = {
 const PDF_MAGIC = [0x25, 0x50, 0x44, 0x46, 0x2d] as const;
 const RAW_SIGNATURE_MARKERS = ["/ByteRange", "/Type/Sig", "/Type /Sig"];
 
+const SAFE_ANNOTATION_SUBTYPES = new Set([
+  "Text",
+  "Link",
+  "FreeText",
+  "Line",
+  "Square",
+  "Circle",
+  "Polygon",
+  "PolyLine",
+  "Highlight",
+  "Underline",
+  "Squiggly",
+  "StrikeOut",
+  "Stamp",
+  "Caret",
+  "Ink",
+  "Popup",
+  "Redact",
+  "Watermark",
+]);
+
+const SAFE_ANNOTATION_ACTIONS = new Set(["URI", "GoTo"]);
+const ADDITIONAL_ACTION_KEYS = [
+  "E",
+  "X",
+  "D",
+  "U",
+  "Fo",
+  "Bl",
+  "PO",
+  "PC",
+  "PV",
+  "PI",
+] as const;
+
 function bytesStartWithPdfMagic(bytes: Uint8Array) {
   return PDF_MAGIC.every((value, index) => bytes[index] === value);
 }
@@ -52,10 +89,58 @@ function rawPdfContains(bytes: Uint8Array, markers: readonly string[]) {
   return markers.some((marker) => source.includes(marker));
 }
 
-function getPageAnnotationPresence(pdf: PdfLibDocument) {
+function pdfNameValue(value: PDFName | undefined) {
+  return value?.toString().replace(/^\//, "") ?? null;
+}
+
+function getActionType(action: PDFDict) {
+  return pdfNameValue(action.lookupMaybe(PDFName.of("S"), PDFName));
+}
+
+function hasUnsafeAction(action: PDFDict | undefined) {
+  if (!action) return false;
+  const actionType = getActionType(action);
+  return !actionType || !SAFE_ANNOTATION_ACTIONS.has(actionType);
+}
+
+function hasUnsafeAdditionalActions(annotation: PDFDict) {
+  const additionalActions = annotation.lookupMaybe(PDFName.of("AA"), PDFDict);
+  if (!additionalActions) return false;
+
+  return ADDITIONAL_ACTION_KEYS.some((key) => {
+    const action = additionalActions.lookupMaybe(PDFName.of(key), PDFDict);
+    return hasUnsafeAction(action);
+  });
+}
+
+function isRiskyAnnotation(annotation: PDFDict) {
+  const subtype = pdfNameValue(annotation.lookupMaybe(PDFName.of("Subtype"), PDFName));
+
+  if (!subtype || !SAFE_ANNOTATION_SUBTYPES.has(subtype)) {
+    return true;
+  }
+
+  const primaryAction = annotation.lookupMaybe(PDFName.of("A"), PDFDict);
+  if (hasUnsafeAction(primaryAction)) {
+    return true;
+  }
+
+  return hasUnsafeAdditionalActions(annotation);
+}
+
+function getRiskyPageAnnotationPresence(pdf: PdfLibDocument) {
   return pdf.getPages().some((page) => {
-    const annotations = page.node.get(PDFName.of("Annots"));
-    return Boolean(annotations);
+    const annotations = page.node.lookupMaybe(PDFName.of("Annots"), PDFArray);
+    if (!annotations) return false;
+
+    for (let index = 0; index < annotations.size(); index += 1) {
+      const annotation = annotations.lookupMaybe(index, PDFDict);
+      if (!annotation || isRiskyAnnotation(annotation)) {
+        return true;
+      }
+    }
+
+    return false;
   });
 }
 
@@ -131,7 +216,7 @@ export async function inspectPdfCompatibility(
   const hasXmpMetadata =
     rawPdfContains(bytes, ["/Type/Metadata", "/Type /Metadata"]) ||
     Boolean(pdf.catalog.get(PDFName.of("Metadata")));
-  const hasInteractiveAnnotations = getPageAnnotationPresence(pdf);
+  const hasInteractiveAnnotations = getRiskyPageAnnotationPresence(pdf);
   const issues: PdfCompatibilityIssue[] = [];
 
   if (hasDigitalSignature) {
@@ -184,7 +269,7 @@ export async function inspectPdfCompatibility(
       feature: "interactive-annotations",
       severity: "warning",
       message:
-        "Ordinary page annotations are copied with their pages, but unsupported interactive actions may not survive.",
+        "This PDF contains interactive annotation types or actions that may not survive page-copy rebuilding.",
     });
   }
 
