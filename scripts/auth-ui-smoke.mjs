@@ -18,6 +18,7 @@ const sourcePaths = {
   errorPage: "../src/app/auth/error/page.tsx",
   actions: "../src/app/actions/auth.ts",
   verifyRoute: "../src/app/api/auth/verify-otp/route.ts",
+  otpFlow: "../src/lib/auth/otp-flow.ts",
   serverClient: "../src/lib/supabase/server.ts",
 };
 
@@ -29,7 +30,10 @@ const entries = await Promise.all(
 );
 const sources = Object.fromEntries(entries);
 const authUiSource = Object.entries(sources)
-  .filter(([key]) => !["actions", "verifyRoute", "serverClient"].includes(key))
+  .filter(
+    ([key]) =>
+      !["actions", "verifyRoute", "otpFlow", "serverClient"].includes(key),
+  )
   .map(([, source]) => source)
   .join("\n");
 
@@ -150,14 +154,18 @@ for (const action of [
 }
 assert.match(sources.actions, /signInWithPassword/);
 assert.match(sources.actions, /shouldCreateUser:\s*false/);
-assert.match(sources.actions, /getSafeRedirectPath/);
-assert.match(sources.actions, /rawValue\.startsWith\("\/\/"\)/);
+assert.match(sources.actions, /getSafeAuthRedirectPath/);
+assert.match(sources.actions, /normalizeAuthEmail/);
+assert.match(sources.otpFlow, /rawValue\.startsWith\("\/\/"\)/);
+assert.match(sources.otpFlow, /normalizeOtpToken/);
+assert.match(sources.otpFlow, /\^\\d\{6\}\$/);
 assert.match(sources.verifyRoute, /MAX_FAILED_ATTEMPTS = 5/);
 assert.match(sources.verifyRoute, /isSameSiteStateChangingRequest/);
-assert.match(sources.verifyRoute, /getSafeRedirectPath/);
+assert.match(sources.verifyRoute, /getSafeAuthRedirectPath/);
+assert.match(sources.verifyRoute, /verifyOtpSessionFlow/);
 assert.match(sources.verifyRoute, /Cache-Control": "no-store"/);
 assert.ok(
-  sources.verifyRoute.indexOf("if (!config || !attemptHashSecret)") <
+  sources.verifyRoute.indexOf("if (!config)") <
     sources.verifyRoute.indexOf("createServerClient(config.url"),
   "OTP route must reject unconfigured auth before making a provider request",
 );
