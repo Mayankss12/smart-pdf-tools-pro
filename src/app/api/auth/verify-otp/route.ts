@@ -4,16 +4,23 @@ import { createServerClient } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
 
 import { isSameSiteStateChangingRequest } from "@/lib/api-security";
+import {
+  GENERIC_VERIFICATION_ERROR,
+  getSafeAuthRedirectPath,
+  isValidOtpToken,
+  normalizeAuthEmail,
+  normalizeOtpToken,
+  verifyOtpSessionFlow,
+  type OtpAttemptGuard,
+} from "@/lib/auth/otp-flow";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCK_SECONDS = 10 * 60;
-const GENERIC_VERIFICATION_ERROR = "Verification failed. Please try again.";
-const LOCKED_ERROR = "Too many attempts. Please wait a few minutes before trying again.";
 
- type AttemptScope = "identifier" | "ip";
+type AttemptScope = "identifier" | "ip";
 
 type AttemptKey = {
   scope: AttemptScope;
@@ -48,26 +55,6 @@ function getAttemptHashSecret() {
   );
 }
 
-function getSafeRedirectPath(value: unknown): string {
-  const rawValue = typeof value === "string" ? value.trim() : "";
-
-  if (!rawValue || !rawValue.startsWith("/") || rawValue.startsWith("//")) {
-    return "/dashboard";
-  }
-
-  const blockedPrefixes = ["/login", "/signup", "/logout", "/auth"];
-
-  if (
-    blockedPrefixes.some(
-      (prefix) => rawValue === prefix || rawValue.startsWith(`${prefix}/`),
-    )
-  ) {
-    return "/dashboard";
-  }
-
-  return rawValue;
-}
-
 function jsonError(message: string, status: number) {
   return NextResponse.json(
     {
@@ -97,7 +84,7 @@ function hashAttemptKey(secret: string, value: string) {
 }
 
 function buildAttemptKeys(secret: string, email: string, request: NextRequest): AttemptKey[] {
-  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedEmail = normalizeAuthEmail(email);
   const clientIp = getClientIp(request);
 
   return [
@@ -166,15 +153,35 @@ async function clearAttempts(admin: ReturnType<typeof createAdminClient>, keys: 
   }
 }
 
+function createAttemptGuard(request: NextRequest, email: string): OtpAttemptGuard | null {
+  const attemptHashSecret = getAttemptHashSecret();
+
+  if (!attemptHashSecret) {
+    return null;
+  }
+
+  try {
+    const admin = createAdminClient();
+    const keys = buildAttemptKeys(attemptHashSecret, email, request);
+
+    return {
+      hasActiveLock: () => hasActiveLock(admin, keys),
+      recordFailure: () => recordFailedAttempts(admin, keys),
+      clear: () => clearAttempts(admin, keys),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(request: NextRequest) {
   if (!isSameSiteStateChangingRequest(request)) {
     return jsonError("Request origin is not allowed.", 403);
   }
 
   const config = getSupabaseConfig();
-  const attemptHashSecret = getAttemptHashSecret();
 
-  if (!config || !attemptHashSecret) {
+  if (!config) {
     return jsonError("Authentication service is not configured yet.", 500);
   }
 
@@ -190,30 +197,14 @@ export async function POST(request: NextRequest) {
     return jsonError(GENERIC_VERIFICATION_ERROR, 400);
   }
 
-  const email = typeof body.email === "string" ? body.email.trim() : "";
-  const token = typeof body.token === "string" ? body.token.trim() : "";
-  const redirectTo = getSafeRedirectPath(body.redirectTo);
+  const email =
+    typeof body.email === "string" ? normalizeAuthEmail(body.email) : "";
+  const token =
+    typeof body.token === "string" ? normalizeOtpToken(body.token) : "";
+  const redirectTo = getSafeAuthRedirectPath(body.redirectTo);
 
-  if (!email || !email.includes("@") || !/^\d{6}$/.test(token)) {
+  if (!email || !email.includes("@") || !isValidOtpToken(token)) {
     return jsonError(GENERIC_VERIFICATION_ERROR, 400);
-  }
-
-  const attemptKeys = buildAttemptKeys(attemptHashSecret, email, request);
-
-  let admin: ReturnType<typeof createAdminClient>;
-
-  try {
-    admin = createAdminClient();
-  } catch {
-    return jsonError("Authentication service is not configured yet.", 500);
-  }
-
-  try {
-    if (await hasActiveLock(admin, attemptKeys)) {
-      return jsonError(LOCKED_ERROR, 429);
-    }
-  } catch {
-    return jsonError(GENERIC_VERIFICATION_ERROR, 500);
   }
 
   const response = NextResponse.json(
@@ -245,36 +236,31 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  try {
-    const { data, error } = await supabase.auth.verifyOtp({
-      email,
-      token,
-      type: "email",
-    });
+  const result = await verifyOtpSessionFlow(
+    { email, token },
+    {
+      attemptGuard: createAttemptGuard(request, email),
+      provider: {
+        async verify({ email: normalizedEmail, token: normalizedToken }) {
+          const { data, error } = await supabase.auth.verifyOtp({
+            email: normalizedEmail,
+            token: normalizedToken,
+            type: "email",
+          });
 
-    if (error) {
-      const locked = await recordFailedAttempts(admin, attemptKeys);
-      return jsonError(locked ? LOCKED_ERROR : GENERIC_VERIFICATION_ERROR, locked ? 429 : 400);
-    }
+          return {
+            session: data.session,
+            user: data.user,
+            error,
+          };
+        },
+      },
+    },
+  );
 
-    if (!data.session || !data.user) {
-      const locked = await recordFailedAttempts(admin, attemptKeys);
-      return jsonError(locked ? LOCKED_ERROR : GENERIC_VERIFICATION_ERROR, locked ? 429 : 400);
-    }
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      const locked = await recordFailedAttempts(admin, attemptKeys);
-      return jsonError(locked ? LOCKED_ERROR : GENERIC_VERIFICATION_ERROR, locked ? 429 : 400);
-    }
-
-    await clearAttempts(admin, attemptKeys);
-
-    return response;
-  } catch {
-    return jsonError(GENERIC_VERIFICATION_ERROR, 500);
+  if (!result.ok) {
+    return jsonError(result.error, result.status);
   }
+
+  return response;
 }
