@@ -8,6 +8,7 @@ const suites = [
   "editor-interaction-smoke.mjs",
   "export-entitlement-smoke.mjs",
   "fill-sign-smoke.mjs",
+  "fill-sign-selection-smoke.mjs",
   "homepage-smoke.mjs",
   "images-to-pdf-smoke.mjs",
   "launch-readiness.mjs",
