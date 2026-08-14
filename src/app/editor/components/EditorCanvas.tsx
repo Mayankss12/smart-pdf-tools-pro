@@ -1037,12 +1037,58 @@ function PdfPageRenderer({
         </span>
       </div>
 
-      {editor.selectedObject ? (
-        <div className="mb-3 flex min-h-[48px] items-center justify-center">
-          <div
-            id="editor-object-toolbar-host"
-            className="flex max-w-full items-center justify-center overflow-x-auto px-1"
-          />
+      {editor.selectedObject || (editor.activeTool === "object" && objectPopover) ? (
+        <div className="mb-3 flex min-h-[48px] items-center justify-center gap-2">
+          {editor.selectedObject ? (
+            <div
+              id="editor-object-toolbar-host"
+              className="flex max-w-full items-center justify-center overflow-x-auto px-1"
+            />
+          ) : null}
+
+          {editor.activeTool === "object" && objectPopover ? (
+            <div
+              data-detected-image-actions
+              onPointerDown={(event) => event.stopPropagation()}
+              className="flex max-w-full items-center gap-1 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-[0_12px_34px_rgba(15,23,42,0.12)]"
+              role="toolbar"
+              aria-label="Selected PDF image actions"
+            >
+              <button
+                type="button"
+                onClick={() => void copyDetectedImage(objectPopover)}
+                className="flex h-8 items-center gap-1.5 rounded-xl px-2.5 text-xs font-black text-slate-700 transition hover:bg-violet-50 hover:text-violet-700"
+                title="Copy / download this image"
+              >
+                <Copy size={14} />
+                Copy
+              </button>
+
+              <span className="h-5 w-px bg-slate-200" />
+
+              <button
+                type="button"
+                onClick={() => duplicateDetectedImage(objectPopover)}
+                className="flex h-8 items-center gap-1.5 rounded-xl px-2.5 text-xs font-black text-slate-700 transition hover:bg-violet-50 hover:text-violet-700"
+                title="Duplicate as a movable object"
+              >
+                <CopyPlus size={14} />
+                Duplicate
+              </button>
+
+              <span className="h-5 w-px bg-slate-200" />
+
+              <button
+                type="button"
+                onClick={() => coverDetectedImage(objectPopover)}
+                className="flex h-8 items-center gap-1.5 rounded-xl px-2.5 text-xs font-black text-slate-700 transition hover:bg-red-50 hover:text-red-600"
+                title="Cover (hide) this image with white"
+              >
+                <EyeOff size={14} />
+                Cover
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -1266,51 +1312,6 @@ function PdfPageRenderer({
             })
           : null}
 
-        {editor.activeTool === "object" && objectPopover ? (
-          <div
-            onPointerDown={(event) => event.stopPropagation()}
-            className="absolute z-50 flex items-center gap-1 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-[0_18px_45px_rgba(15,23,42,0.18)]"
-            style={{
-              left: clamp(objectPopover.x * editor.zoom, 0, Math.max(0, pageSize.width - 150)),
-              top: Math.max(0, objectPopover.y * editor.zoom - 48),
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => void copyDetectedImage(objectPopover)}
-              className="flex h-8 items-center gap-1.5 rounded-xl px-2.5 text-xs font-black text-slate-700 transition hover:bg-violet-50 hover:text-violet-700"
-              title="Copy / download this image"
-            >
-              <Copy size={14} />
-              Copy
-            </button>
-
-            <span className="h-5 w-px bg-slate-200" />
-
-            <button
-              type="button"
-              onClick={() => duplicateDetectedImage(objectPopover)}
-              className="flex h-8 items-center gap-1.5 rounded-xl px-2.5 text-xs font-black text-slate-700 transition hover:bg-violet-50 hover:text-violet-700"
-              title="Duplicate as a movable object"
-            >
-              <CopyPlus size={14} />
-              Duplicate
-            </button>
-
-            <span className="h-5 w-px bg-slate-200" />
-
-            <button
-              type="button"
-              onClick={() => coverDetectedImage(objectPopover)}
-              className="flex h-8 items-center gap-1.5 rounded-xl px-2.5 text-xs font-black text-slate-700 transition hover:bg-red-50 hover:text-red-600"
-              title="Cover (hide) this image with white"
-            >
-              <EyeOff size={14} />
-              Cover
-            </button>
-          </div>
-        ) : null}
-
         {editor.activeTool === "object" && !isRendering && detectedImages.length === 0 ? (
           <div className="pointer-events-none absolute inset-x-0 top-4 z-30 flex justify-center">
             <span className="rounded-full bg-slate-900/80 px-4 py-1.5 text-xs font-black text-white">
@@ -1346,7 +1347,7 @@ function PdfPageRenderer({
           <svg
             viewBox={`0 0 ${drawStroke.box.width} ${drawStroke.box.height}`}
             className="pointer-events-none absolute z-40 overflow-visible"
-            preserveAspectRatio="none"
+            preserveAspectRatio="xMidYMid meet"
             style={{
               left: drawStroke.box.x * editor.zoom,
               top: drawStroke.box.y * editor.zoom,
