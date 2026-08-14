@@ -53,6 +53,7 @@ const DEFAULT_STROKE_COLOR = "#111827";
 const DEFAULT_FILL_COLOR = "#ede9fe";
 const DEFAULT_STROKE_WIDTH = 2;
 const MIN_SCALE_DIMENSION = 0.01;
+const MIN_CIRCLE_SIZE = 24;
 
 function clampStrokeWidth(value: number) {
   if (!Number.isFinite(value)) return DEFAULT_STROKE_WIDTH;
@@ -134,6 +135,19 @@ function getArrowMarkerId(objectId: string) {
   return `pdfmantra-arrow-${objectId.replace(/[^a-zA-Z0-9_-]/g, "")}`;
 }
 
+function getSquareBox(box: EditorObjectBox): EditorObjectBox {
+  const centerX = box.x + box.width / 2;
+  const centerY = box.y + box.height / 2;
+  const size = Math.max(MIN_CIRCLE_SIZE, Math.min(box.width, box.height));
+
+  return {
+    x: centerX - size / 2,
+    y: centerY - size / 2,
+    width: size,
+    height: size,
+  };
+}
+
 function ShapePreview({
   object,
   data,
@@ -189,11 +203,10 @@ function ShapePreview({
       ) : null}
 
       {shapeType === "circle" ? (
-        <ellipse
+        <circle
           cx={width / 2}
           cy={height / 2}
-          rx={Math.max(1, width / 2 - linePadding)}
-          ry={Math.max(1, height / 2 - linePadding)}
+          r={Math.max(1, Math.min(width, height) / 2 - linePadding)}
           fill={fillColor}
           stroke={strokeColor}
           strokeWidth={strokeWidth}
@@ -260,6 +273,10 @@ export function ShapeTool({
 
   function setShapeType(event: MouseEvent<HTMLButtonElement>, nextShapeType: ShapeType) {
     handleToolbarMouseDown(event);
+
+    if (nextShapeType === "circle" && shapeType !== "circle") {
+      onUpdateBox(object.id, getSquareBox(object.box));
+    }
 
     updateShapeData({
       shapeType: nextShapeType,
@@ -480,6 +497,7 @@ export function ShapeTool({
       minHeight={24}
       toolbarLabel="Shape"
       toolbarContent={toolbarContent}
+      preserveAspectRatioOnCornerResize={shapeType === "circle"}
       onSelect={onSelect}
       onUpdateBox={updateShapeBox}
       onDelete={onDelete}
