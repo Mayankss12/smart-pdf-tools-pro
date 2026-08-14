@@ -1,11 +1,16 @@
 "use client";
 
-import type { EditorController, EditorObject } from "../hooks/useEditor";
+import type { EditorController, EditorObject, EditorObjectData } from "../hooks/useEditor";
+import { EditorFormControls } from "./EditorFormControls";
 import { EditorLinkControls } from "./EditorLinkControls";
 import { ExistingTextEditPortal } from "./ExistingTextEditPortal";
 
 type EditorLayerControlsProps = {
   readonly editor: EditorController;
+};
+
+type FormCapableData = EditorObjectData & {
+  readonly formField?: unknown;
 };
 
 function LayerButton({
@@ -39,6 +44,10 @@ function LayerButton({
   );
 }
 
+function hasFormField(data: EditorObjectData) {
+  return Boolean((data as FormCapableData).formField);
+}
+
 function getObjectLabel(object: EditorObject) {
   if (object.type === "image" && object.data.note === "Copied area") {
     return "Copied area";
@@ -54,6 +63,7 @@ function getObjectLabel(object: EditorObject) {
   if (object.type === "note") return "Note";
   if (object.type === "draw") return "Drawing";
   if (object.type === "shape") {
+    if (hasFormField(object.data)) return "Form field";
     if (object.data.shapeType === "circle") return "Circle";
     if (object.data.shapeType === "line") return "Line";
     if (object.data.shapeType === "arrow") return "Arrow";
@@ -140,6 +150,7 @@ export function EditorLayerControls({ editor }: EditorLayerControlsProps) {
 
           <span className="h-5 w-px shrink-0 bg-slate-200" />
           <EditorLinkControls editor={editor} />
+          <EditorFormControls editor={editor} />
 
           <div className="ml-1 flex h-8 shrink-0 items-center gap-2 rounded-xl bg-white px-2 ring-1 ring-slate-200">
             <span className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
