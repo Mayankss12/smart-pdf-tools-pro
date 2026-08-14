@@ -1,4 +1,5 @@
 import { PDFDocument, rgb, type PDFPage } from "pdf-lib";
+import type { ExistingTextEditSource } from "../editor/existing-text-edit";
 import type { OcrResult } from "../pdf-ocr-engine";
 import { addSearchableTextLayer } from "../pdf-text-overlay";
 
@@ -51,6 +52,7 @@ type EditorExportObjectData = {
   readonly fillColor?: string;
   readonly lineStart?: EditorExportPoint;
   readonly lineEnd?: EditorExportPoint;
+  readonly sourceTextEdit?: ExistingTextEditSource;
 };
 
 export type EditorExportObject = {
@@ -140,6 +142,12 @@ async function drawEditorObject({
   readonly geometry: EditorPageGeometry;
 }) {
   if (object.type === "text") {
+    if (object.data.sourceTextEdit) {
+      drawEditorWhiteout(page, object.data.sourceTextEdit.coverBox, geometry, {
+        opacity: 1,
+      });
+    }
+
     drawEditorRichTextObject(page, object, fonts, geometry);
     return;
   }
