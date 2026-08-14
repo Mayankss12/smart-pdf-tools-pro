@@ -33,7 +33,10 @@ assert.match(usersSource, /isSameSiteStateChangingRequest\(request\)/);
 assert.match(usersSource, /normalizeLimit\(body\.dailyExportLimit\)/);
 assert.match(usersSource, /Your own administrator tier or expiry cannot be changed here/);
 assert.match(usersSource, /getDailyCleanExportLimit\(tier\)/);
-assert.match(usersSource, /PDFMantra admin profile update/);
+assert.match(usersSource, /beginAdminProfileAudit\(admin,/);
+assert.match(usersSource, /completeAdminProfileAudit\(admin,/);
+assert.match(usersSource, /Administrator audit log is unavailable\. No change was applied\./);
+assert.doesNotMatch(usersSource, /PDFMantra admin profile update/);
 
 assert.match(pageSource, /fetch\("\/api\/admin\/overview"/);
 assert.match(pageSource, /fetch\("\/api\/admin\/users"/);
@@ -50,6 +53,7 @@ console.log(
     adminSameSiteMutationGuard: "passed",
     adminSelfLockoutProtection: "passed",
     adminEntitlementManagement: "passed",
+    adminDurableAuditLogging: "passed",
     adminOperationsVisibility: "passed",
     adminConversionVisibility: "passed",
     adminSecretIsolation: "passed",
