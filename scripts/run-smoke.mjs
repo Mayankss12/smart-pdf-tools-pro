@@ -1,4 +1,5 @@
 const suites = [
+  "admin-audit-smoke.mjs",
   "admin-console-smoke.mjs",
   "auth-ui-smoke.mjs",
   "auth-otp-smoke.mjs",
