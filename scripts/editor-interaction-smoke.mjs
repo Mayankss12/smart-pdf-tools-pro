@@ -109,7 +109,12 @@ assert.match(canvasSource, /data-detected-image-actions/);
 assert.doesNotMatch(canvasSource, /top:\s*Math\.max\(0,\s*objectPopover\.y/);
 assert.match(canvasSource, /preserveAspectRatio="xMidYMid meet"/);
 assert.match(canvasSource, /relative overflow-hidden/);
-assert.match(textSource, /minWidth=\{72\}/);
+assert.match(textSource, /minWidth=\{sourceTextEdit \? 10 : 72\}/);
+assert.match(textSource, /minHeight=\{sourceTextEdit \? 8 : 28\}/);
+assert.match(
+  frameSource,
+  /object\.type === "text" && !isExistingTextEdit\s*\? Math\.max\(minWidth, TEXT_OBJECT_MIN_WIDTH\)/,
+);
 
 for (const source of [imageSource, signatureSource, stampSource]) {
   assert.match(source, /preserveAspectRatioOnCornerResize/);
@@ -154,5 +159,6 @@ console.log(
     overlayPreviewGeometry: "passed",
     keyboardNudging: "passed",
     textMinimumWidthUpgrade: "passed",
+    compactExistingTextException: "passed",
   }),
 );
