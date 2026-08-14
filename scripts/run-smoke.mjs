@@ -11,6 +11,7 @@ const suites = [
   "editor-link-smoke.mjs",
   "existing-text-edit-smoke.mjs",
   "export-entitlement-smoke.mjs",
+  "fill-sign-media-aspect-smoke.mjs",
   "fill-sign-smoke.mjs",
   "fill-sign-selection-smoke.mjs",
   "homepage-smoke.mjs",
