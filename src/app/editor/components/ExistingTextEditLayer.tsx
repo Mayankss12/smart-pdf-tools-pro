@@ -74,30 +74,36 @@ export function ExistingTextEditLayer({
     editor.zoom,
   ]);
 
+  const sourceTextObjects = useMemo(
+    () => editor.activePageObjects.filter((object) => Boolean(object.data.sourceTextEdit)),
+    [editor.activePageObjects],
+  );
+
   const replacedSourceKeys = useMemo(() => {
     return new Set(
-      editor.activePageObjects.flatMap((object) => {
+      sourceTextObjects.flatMap((object) => {
         const source = object.data.sourceTextEdit;
         return source
           ? [getExistingTextSourceKey(object.pageNumber, source.sourceItemId)]
           : [];
       }),
     );
-  }, [editor.activePageObjects]);
-
-  if (editor.activeTool !== "text") return null;
+  }, [sourceTextObjects]);
 
   const safeZoom = Math.max(0.01, editor.zoom);
   const unscaledPage = {
     width: Math.max(1, pageWidth / safeZoom),
     height: Math.max(1, pageHeight / safeZoom),
   };
-  const availableItems = items.filter(
-    (item) =>
-      !replacedSourceKeys.has(
-        getExistingTextSourceKey(editor.activePageNumber, item.id),
-      ),
-  );
+  const availableItems =
+    editor.activeTool === "text"
+      ? items.filter(
+          (item) =>
+            !replacedSourceKeys.has(
+              getExistingTextSourceKey(editor.activePageNumber, item.id),
+            ),
+        )
+      : [];
 
   function editExistingText(item: TextOverlayItem) {
     const source = getExistingTextEditSource(item, unscaledPage);
@@ -114,7 +120,6 @@ export function ExistingTextEditLayer({
         fontStyle: style.fontStyle,
         textDecoration: "none",
         color: "#111827",
-        backgroundColor: "#ffffff",
         sourceTextEdit: source,
       },
     });
@@ -123,6 +128,25 @@ export function ExistingTextEditLayer({
 
   return (
     <>
+      {sourceTextObjects.map((object) => {
+        const source = object.data.sourceTextEdit;
+        if (!source) return null;
+
+        return (
+          <div
+            key={`source-mask-${object.id}`}
+            data-existing-text-source-mask
+            className="pointer-events-none absolute z-[24] bg-white"
+            style={{
+              left: source.coverBox.x * safeZoom,
+              top: source.coverBox.y * safeZoom,
+              width: source.coverBox.width * safeZoom,
+              height: source.coverBox.height * safeZoom,
+            }}
+          />
+        );
+      })}
+
       {availableItems.map((item) => (
         <button
           key={item.id}
@@ -145,10 +169,12 @@ export function ExistingTextEditLayer({
         />
       ))}
 
-      {!loading && availableItems.length === 0 ? (
-        <div className="pointer-events-none absolute inset-x-0 top-4 z-30 flex justify-center">
-          <span className="rounded-full bg-slate-900/80 px-4 py-1.5 text-xs font-black text-white">
-            No editable text detected on this page — drag to add new text
+      {editor.activeTool === "text" && !loading ? (
+        <div className="pointer-events-none absolute inset-x-0 top-4 z-[26] flex justify-center">
+          <span className="rounded-full bg-slate-900/85 px-4 py-1.5 text-xs font-black text-white shadow-lg">
+            {availableItems.length > 0
+              ? "Click existing text to edit · drag blank area to add text"
+              : "No editable text detected — drag blank area to add text"}
           </span>
         </div>
       ) : null}
