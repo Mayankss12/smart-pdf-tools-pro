@@ -4,6 +4,10 @@ import type { OcrResult } from "../pdf-ocr-engine";
 import { addSearchableTextLayer } from "../pdf-text-overlay";
 
 import {
+  createEditorFormFields,
+  type EditorFormFieldConfig,
+} from "./editor-form-engine";
+import {
   drawEditorRichTextObject,
   embedEditorTextFonts,
   type EmbeddedTextFonts,
@@ -55,6 +59,7 @@ type EditorExportObjectData = {
   readonly lineEnd?: EditorExportPoint;
   readonly sourceTextEdit?: ExistingTextEditSource;
   readonly linkUrl?: string;
+  readonly formField?: EditorFormFieldConfig;
 };
 
 export type EditorExportObject = {
@@ -166,7 +171,9 @@ async function drawEditorObject({
   }
 
   if (object.type === "shape") {
-    drawEditorShapeObject(page, object, geometry);
+    if (!object.data.formField) {
+      drawEditorShapeObject(page, object, geometry);
+    }
     return;
   }
 
@@ -263,7 +270,7 @@ export async function exportEditorPdfBytes({
   }
 
   for (const object of objects) {
-    if (!object.data.linkUrl) continue;
+    if (!object.data.linkUrl || object.data.formField) continue;
 
     const page = pages[object.pageNumber - 1];
     if (!page) continue;
@@ -276,6 +283,12 @@ export async function exportEditorPdfBytes({
       url: object.data.linkUrl,
     });
   }
+
+  await createEditorFormFields({
+    pdfDoc,
+    objects,
+    getGeometry: getEditorPageGeometry,
+  });
 
   if (ocrPages.length > 0) {
     const ocrResults: Array<OcrResult | undefined> = Array.from({
