@@ -119,7 +119,10 @@ assert.match(linkControlsSource, /editor\.updateObjectData/);
 assert.match(linkControlsSource, /createLinkPatch\(undefined\)/);
 assert.match(exportSource, /readonly linkUrl\?: string/);
 assert.match(exportSource, /appendEditorLinkAnnotation\(\{/);
-assert.match(exportSource, /if \(!object\.data\.linkUrl\) continue/);
+assert.match(
+  exportSource,
+  /if \(!object\.data\.linkUrl \|\| object\.data\.formField\) continue/,
+);
 
 console.log(
   JSON.stringify({
@@ -130,5 +133,6 @@ console.log(
     selectedObjectLinkUi: "passed",
     linkRemoval: "passed",
     linkExportIntegration: "passed",
+    formWidgetLinkConflictGuard: "passed",
   }),
 );
