@@ -79,14 +79,14 @@ export function getExistingTextEditSource(
   const coverX = Math.max(0, rawX - COVER_PADDING);
   const coverY = Math.max(0, rawY - COVER_PADDING);
   const coverRight = Math.min(pageWidth, rawX + Math.max(rawWidth, 1) + COVER_PADDING);
-  const coverBottom = Math.min(pageHeight, rawY + Math.max(rawHeight, fontSize) + COVER_PADDING);
+  const coverBottom = Math.min(pageHeight, rawY + Math.max(rawHeight, 1) + COVER_PADDING);
 
   return {
     sourceItemId: item.id,
     originalText: item.text,
     fontName: item.fontName ?? null,
     fontSize,
-    baselineOffset: Math.max(fontSize, rawHeight * 0.9),
+    baselineOffset: Math.max(1, rawHeight),
     sourceBox,
     coverBox: {
       x: coverX,
