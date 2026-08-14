@@ -12,7 +12,7 @@ jobs:
   harden:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
@@ -21,11 +21,13 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - name: Update vulnerable dependencies without force
+      - name: Upgrade framework and remove unused vulnerable dependency
         shell: bash
         run: |
-          npm install next@15.5.23 --save-exact
           npm uninstall fabric
+          npm install next@16.3.1 react@latest react-dom@latest --save-exact
+          npm install --save-dev --save-exact eslint@latest eslint-config-next@16.3.1 @types/react@latest @types/react-dom@latest
+          npm pkg set scripts.lint="eslint ."
           npm audit fix --package-lock-only
           npm ci
       - name: Security gate
@@ -39,6 +41,8 @@ jobs:
           console.log(JSON.stringify({ vulnerabilities: counts, details: audit.vulnerabilities }, null, 2));
           if ((counts.critical ?? 0) > 0 || (counts.high ?? 0) > 0) process.exit(1);
           NODE
+      - name: Lint
+        run: npm run lint
       - name: TypeScript
         run: npx tsc --noEmit
       - name: Smoke tests
