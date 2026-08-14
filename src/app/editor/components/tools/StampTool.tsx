@@ -53,7 +53,7 @@ export function StampTool({
           src={imageDataUrl}
           alt="PDF stamp overlay"
           draggable={false}
-          className="h-full w-full select-none object-fill"
+          className="h-full w-full select-none object-contain"
         />
       ) : (
         <div className="flex h-full w-full items-center justify-center rounded-sm border border-dashed border-amber-300 bg-amber-50 text-[11px] font-black text-amber-500">

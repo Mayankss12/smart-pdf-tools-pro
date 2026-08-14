@@ -31,14 +31,27 @@ assert.ok(Math.abs(pixels(resized).width - pixels(resized).height) < 0.01);
 const scaled = scaleProportionalMarkBox(resized, 3, page);
 assert.ok(Math.abs(pixels(scaled).width - pixels(scaled).height) < 0.01);
 
-const pageSource = await readFile(
-  new URL("../src/app/tools/fill-sign/page.tsx", import.meta.url),
-  "utf8",
-);
+const [pageSource, engineSource] = await Promise.all([
+  readFile(
+    new URL("../src/app/tools/fill-sign/page.tsx", import.meta.url),
+    "utf8",
+  ),
+  readFile(
+    new URL("../src/lib/fill-sign-engine.ts", import.meta.url),
+    "utf8",
+  ),
+]);
+
 assert.doesNotMatch(pageSource, />\s*Drag\s*</);
 assert.match(pageSource, /data-fill-selection-controls/);
 assert.match(pageSource, /resizeProportionalMarkBox/);
 assert.match(pageSource, /scaleProportionalMarkBox/);
+assert.match(pageSource, /object-contain/);
+assert.match(engineSource, /function fitImageInsideBox/);
+assert.match(engineSource, /x: drawX \+ fitted\.offsetX/);
+assert.match(engineSource, /y: drawY \+ fitted\.offsetY/);
+assert.match(engineSource, /width: fitted\.width/);
+assert.match(engineSource, /height: fitted\.height/);
 
 console.log(
   JSON.stringify({
@@ -46,5 +59,6 @@ console.log(
     cornerResizeAspect: "passed",
     sizeControlAspect: "passed",
     unobstructedControls: "passed",
+    imagePreviewExportParity: "passed",
   }),
 );

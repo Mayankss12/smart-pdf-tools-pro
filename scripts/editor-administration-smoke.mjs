@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 
 import { PDFDocument } from "pdf-lib";
 
@@ -186,6 +187,21 @@ assert.equal(
   "Reorder requires a document with at least two pages.",
 );
 
+const layerControlsSource = await readFile(
+  new URL(
+    "../src/app/editor/components/EditorLayerControls.tsx",
+    import.meta.url,
+  ),
+  "utf8",
+);
+assert.match(layerControlsSource, /editor\.duplicateObject\(selectedObjectId\)/);
+assert.match(layerControlsSource, /editor\.deleteObject\(selectedObjectId\)/);
+assert.match(layerControlsSource, /object\.type === "shape"/);
+assert.match(layerControlsSource, /object\.type === "draw"/);
+assert.match(layerControlsSource, /selectedObject\.box\.width/);
+assert.match(layerControlsSource, /editor\.toggleObjectLock\(selectedObjectId\)/);
+assert.match(layerControlsSource, /editor\.setObjectOpacity\(/);
+
 console.log(
   JSON.stringify({
     addPage: "passed",
@@ -194,5 +210,6 @@ console.log(
     objectRemapping: "passed",
     pageNumbers: "passed",
     contextualToolbar: "passed",
+    objectAdministration: "passed",
   }),
 );

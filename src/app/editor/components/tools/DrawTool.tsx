@@ -147,6 +147,7 @@ export function DrawTool({
       minHeight={24}
       toolbarLabel="Draw"
       toolbarContent={toolbarContent}
+      preserveAspectRatioOnCornerResize
       onSelect={onSelect}
       onUpdateBox={onUpdateBox}
       onDelete={onDelete}
@@ -154,7 +155,7 @@ export function DrawTool({
       <svg
         viewBox={`0 0 ${viewBoxWidth} ${viewBoxHeight}`}
         className="block h-full w-full overflow-visible"
-        preserveAspectRatio="none"
+        preserveAspectRatio="xMidYMid meet"
         aria-hidden="true"
       >
         <path

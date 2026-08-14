@@ -292,6 +292,30 @@ function applyFormValues(
   return { filledFieldCount, replacementCount };
 }
 
+function fitImageInsideBox(
+  boxWidth: number,
+  boxHeight: number,
+  image: FillSignImage,
+) {
+  const safeBoxWidth = Math.max(0.01, boxWidth);
+  const safeBoxHeight = Math.max(0.01, boxHeight);
+  const safeImageWidth = Math.max(1, image.width);
+  const safeImageHeight = Math.max(1, image.height);
+  const scale = Math.min(
+    safeBoxWidth / safeImageWidth,
+    safeBoxHeight / safeImageHeight,
+  );
+  const width = safeImageWidth * scale;
+  const height = safeImageHeight * scale;
+
+  return {
+    width,
+    height,
+    offsetX: (safeBoxWidth - width) / 2,
+    offsetY: (safeBoxHeight - height) / 2,
+  };
+}
+
 export async function applyFillSignExport({
   file,
   objects,
@@ -387,11 +411,12 @@ export async function applyFillSignExport({
           embeddedImage = await pdf.embedPng(object.image.pngBytes);
           imageCache.set(object.image.id, embeddedImage);
         }
+        const fitted = fitImageInsideBox(boxWidth, boxHeight, object.image);
         targetPage.drawImage(embeddedImage, {
-          x: drawX,
-          y: drawY,
-          width: boxWidth,
-          height: boxHeight,
+          x: drawX + fitted.offsetX,
+          y: drawY + fitted.offsetY,
+          width: fitted.width,
+          height: fitted.height,
           opacity: 0.98,
         });
         return;

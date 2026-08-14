@@ -90,12 +90,14 @@ const RESIZE_HANDLES: readonly ResizeHandle[] = [
   "left",
 ];
 
-const CORNER_HANDLES = new Set<ResizeHandle>([
+const CORNER_RESIZE_HANDLES: readonly CornerResizeHandle[] = [
   "top-left",
   "top-right",
-  "bottom-left",
   "bottom-right",
-]);
+  "bottom-left",
+];
+
+const CORNER_HANDLES = new Set<ResizeHandle>(CORNER_RESIZE_HANDLES);
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
@@ -228,6 +230,11 @@ export function EditorObjectFrame({
     object.type === "text" ? Math.max(minWidth, TEXT_OBJECT_MIN_WIDTH) : minWidth;
   const effectiveMinHeight =
     object.type === "text" ? Math.max(minHeight, TEXT_OBJECT_MIN_HEIGHT) : minHeight;
+  const resizeHandles = preserveAspectRatioOnCornerResize
+    ? CORNER_RESIZE_HANDLES
+    : RESIZE_HANDLES;
+  const compactResizeHandles =
+    Math.min(object.box.width * pageScale, object.box.height * pageScale) < 42;
 
   function getPageBounds(): PageBounds | null {
     const root = rootRef.current;
@@ -714,21 +721,23 @@ export function EditorObjectFrame({
       ) : null}
 
       {selected && !locked
-        ? RESIZE_HANDLES.map((handle) => (
+        ? resizeHandles.map((handle) => (
             <button
               key={handle}
               type="button"
+              data-resize-handle={handle}
               onPointerDown={(event) => startResize(handle, event)}
               onPointerMove={resizeObject}
               onPointerUp={stopResize}
               onPointerCancel={stopResize}
               className={[
-                "absolute z-40 h-4 w-4 rounded-full border-2 border-white bg-violet-600 shadow-[0_2px_8px_rgba(79,70,229,0.32)] transition-transform duration-150 hover:scale-125 hover:bg-violet-700 focus-visible:scale-125 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300",
+                "absolute z-40 rounded-full border-2 border-white bg-violet-600 shadow-[0_2px_8px_rgba(79,70,229,0.32)] transition-transform duration-150 hover:scale-125 hover:bg-violet-700 focus-visible:scale-125 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300",
+                compactResizeHandles ? "h-3 w-3" : "h-4 w-4",
                 HANDLE_STYLES[handle],
               ].join(" ")}
               aria-label={`Resize ${toolbarLabel} from ${handle}`}
               title={
-                preserveAspectRatioOnCornerResize && isCornerHandle(handle)
+                preserveAspectRatioOnCornerResize
                   ? `Resize ${toolbarLabel} proportionally`
                   : `Resize ${toolbarLabel}`
               }

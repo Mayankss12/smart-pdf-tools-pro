@@ -69,15 +69,30 @@ function getDrawDimension(value: unknown, fallback: number) {
   return Math.max(MIN_DRAW_DIMENSION, fallback);
 }
 
-function toPdfPoint(geometry: EditorPageGeometry, object: DrawObject, point: DrawPoint) {
+function getDrawFit(object: DrawObject) {
   const drawWidth = getDrawDimension(object.data.drawWidth, object.box.width);
   const drawHeight = getDrawDimension(object.data.drawHeight, object.box.height);
-  const scaleX = object.box.width / drawWidth;
-  const scaleY = object.box.height / drawHeight;
+  const safeBoxWidth = Math.max(MIN_DRAW_DIMENSION, object.box.width);
+  const safeBoxHeight = Math.max(MIN_DRAW_DIMENSION, object.box.height);
+  const scale = Math.min(safeBoxWidth / drawWidth, safeBoxHeight / drawHeight);
+  const renderedWidth = drawWidth * scale;
+  const renderedHeight = drawHeight * scale;
 
   return {
-    x: object.box.x + point.x * scaleX,
-    y: geometry.viewportHeight - (object.box.y + point.y * scaleY),
+    scale,
+    offsetX: (safeBoxWidth - renderedWidth) / 2,
+    offsetY: (safeBoxHeight - renderedHeight) / 2,
+  };
+}
+
+function toPdfPoint(geometry: EditorPageGeometry, object: DrawObject, point: DrawPoint) {
+  const fit = getDrawFit(object);
+
+  return {
+    x: object.box.x + fit.offsetX + point.x * fit.scale,
+    y:
+      geometry.viewportHeight -
+      (object.box.y + fit.offsetY + point.y * fit.scale),
   };
 }
 

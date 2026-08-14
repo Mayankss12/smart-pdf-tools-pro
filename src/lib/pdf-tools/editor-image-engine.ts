@@ -47,6 +47,34 @@ function getSafeOpacity(opacity: number | undefined) {
   return Math.max(0, Math.min(1, Number(opacity)));
 }
 
+function fitImageInsideBox({
+  box,
+  imageWidth,
+  imageHeight,
+}: {
+  readonly box: EditorImageBox;
+  readonly imageWidth: number;
+  readonly imageHeight: number;
+}) {
+  const safeBoxWidth = Math.max(0.01, box.width);
+  const safeBoxHeight = Math.max(0.01, box.height);
+  const safeImageWidth = Math.max(0.01, imageWidth);
+  const safeImageHeight = Math.max(0.01, imageHeight);
+  const scale = Math.min(
+    safeBoxWidth / safeImageWidth,
+    safeBoxHeight / safeImageHeight,
+  );
+  const width = safeImageWidth * scale;
+  const height = safeImageHeight * scale;
+
+  return {
+    width,
+    height,
+    offsetX: (safeBoxWidth - width) / 2,
+    offsetY: (safeBoxHeight - height) / 2,
+  };
+}
+
 export async function drawEditorImageObject({
   pdfDoc,
   page,
@@ -75,12 +103,18 @@ export async function drawEditorImageObject({
   const embeddedImage = parsed.mimeType === "image/png"
     ? await pdfDoc.embedPng(imageBytes)
     : await pdfDoc.embedJpg(imageBytes);
+  const fitted = fitImageInsideBox({
+    box: object.box,
+    imageWidth: embeddedImage.width,
+    imageHeight: embeddedImage.height,
+  });
+  const boxBottom = geometry.viewportHeight - object.box.y - object.box.height;
 
   page.drawImage(embeddedImage, {
-    x: object.box.x,
-    y: geometry.viewportHeight - object.box.y - object.box.height,
-    width: object.box.width,
-    height: object.box.height,
+    x: object.box.x + fitted.offsetX,
+    y: boxBottom + fitted.offsetY,
+    width: fitted.width,
+    height: fitted.height,
     opacity,
   });
 }

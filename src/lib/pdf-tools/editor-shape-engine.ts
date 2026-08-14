@@ -139,6 +139,17 @@ function getSafeBox(box: EditorShapeBox, geometry: EditorPageGeometry) {
   };
 }
 
+function getCenteredSquareBox(box: EditorShapeBox): EditorShapeBox {
+  const size = Math.max(0.01, Math.min(box.width, box.height));
+
+  return {
+    x: box.x + (box.width - size) / 2,
+    y: box.y + (box.height - size) / 2,
+    width: size,
+    height: size,
+  };
+}
+
 function getRelativePoint(
   point: RelativePoint | undefined,
   fallback: RelativePoint,
@@ -313,12 +324,14 @@ function drawCircleShape({
   readonly opacity: number;
 }) {
   const fillColor = getFillColor(data);
+  const circleBox = getCenteredSquareBox(box);
+  const radius = Math.max(0.01, circleBox.width / 2);
 
   page.drawEllipse({
-    x: box.x + box.width / 2,
-    y: geometry.viewportHeight - box.y - box.height / 2,
-    xScale: Math.max(0.01, box.width / 2),
-    yScale: Math.max(0.01, box.height / 2),
+    x: circleBox.x + radius,
+    y: geometry.viewportHeight - circleBox.y - radius,
+    xScale: radius,
+    yScale: radius,
     color: fillColor,
     borderColor: strokeColor,
     borderWidth: strokeWidth,
