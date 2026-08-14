@@ -1,0 +1,43 @@
+name: Apply editor Find Replace
+
+on:
+  push:
+    branches:
+      - codex/editor-find-replace
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-validate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/editor-find-replace
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Patch Smart Tools panel
+        run: python scripts/apply-editor-find-replace.py
+      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: TypeScript
+        run: npx tsc --noEmit
+      - name: Smoke tests
+        run: npm run test:smoke
+      - name: Production build
+        run: npm run build
+      - name: Commit validated panel patch
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/editor/components/EditorSmartToolsPanel.tsx
+          git diff --cached --quiet && exit 0
+          git commit -m "Add safe editor Find and Replace controls"
+          git push origin HEAD:codex/editor-find-replace
