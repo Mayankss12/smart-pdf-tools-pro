@@ -11,6 +11,7 @@ import {
   type PDFPage,
 } from "pdf-lib";
 
+import type { ExistingTextEditSource } from "../editor/existing-text-edit";
 import type { EditorPageGeometry } from "./editor-page-geometry";
 
 export type EmbeddedTextFonts = {
@@ -52,6 +53,7 @@ export type RichTextExportData = {
   readonly textDecoration?: "none" | "underline";
   readonly color?: string;
   readonly opacity?: number;
+  readonly sourceTextEdit?: ExistingTextEditSource;
 };
 
 export type EditorRichTextExportObject = {
@@ -312,6 +314,7 @@ export function drawEditorRichTextObject(
 ) {
   const fontSize = object.data.fontSize || 16;
   const opacity = getSafeOpacity(object.data.opacity);
+  const sourceTextEdit = object.data.sourceTextEdit;
 
   if (opacity <= 0) return;
   const clipBox = getEditorTextClipBox(object.box, geometry);
@@ -323,12 +326,18 @@ export function drawEditorRichTextObject(
     endPath(),
   );
 
-  const lineHeight = fontSize * 1.3;
-  const startX = object.box.x + TEXT_PADDING_X;
-  const maxX = Math.max(startX, object.box.x + object.box.width - TEXT_PADDING_X);
+  const paddingX = sourceTextEdit ? 0 : TEXT_PADDING_X;
+  const paddingY = sourceTextEdit ? 0 : TEXT_PADDING_Y;
+  const lineHeight = fontSize * (sourceTextEdit ? 1.12 : 1.3);
+  const startX = object.box.x + paddingX;
+  const maxX = Math.max(startX, object.box.x + object.box.width - paddingX);
   const wrappingWidth = Math.max(1, maxX - startX);
   let cursorX = startX;
-  let baselineY = geometry.viewportHeight - object.box.y - TEXT_PADDING_Y - fontSize;
+  let baselineY = sourceTextEdit
+    ? geometry.viewportHeight -
+      object.box.y -
+      Math.max(fontSize, sourceTextEdit.baselineOffset)
+    : geometry.viewportHeight - object.box.y - paddingY - fontSize;
 
   const moveToNextLine = () => {
     cursorX = startX;
