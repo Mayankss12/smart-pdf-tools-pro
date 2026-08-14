@@ -790,6 +790,11 @@ export default function EditorPage() {
     setStatusMessage("Page numbers removed.");
   }
 
+  function handleOcrPagesChange(pages: EditorOcrPageResult[]) {
+    setOcrPages(pages);
+    editor.markDocumentChanged();
+  }
+
   return (
     <div className="flex h-screen min-h-screen flex-col overflow-hidden bg-[#f5f7fb] text-slate-950">
       <input
@@ -826,7 +831,7 @@ export default function EditorPage() {
         editor={editor}
         ocrPages={ocrPages}
         translationConfigured={capabilities.backendCapabilities.translation}
-        onOcrPagesChange={setOcrPages}
+        onOcrPagesChange={handleOcrPagesChange}
         onFindHighlightChange={setFindHighlights}
         onActivityChange={setSmartActivity}
         onStatusChange={setStatusMessage}
