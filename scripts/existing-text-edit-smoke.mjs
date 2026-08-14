@@ -103,10 +103,10 @@ assert.match(frameSource, /const isExistingTextEdit =/);
 assert.match(frameSource, /object\.type === "text" && !isExistingTextEdit/);
 assert.match(exportSource, /const sourceTextEdit = object\.data\.sourceTextEdit/);
 assert.match(exportSource, /drawEditorWhiteout\(page, sourceTextEdit\.coverBox, geometry/);
-assert.ok(
-  exportSource.indexOf("const sourceTextEdit = object.data.sourceTextEdit") <
-    exportSource.indexOf("drawEditorObject({"),
-  "Existing source text masks must be drawn before editor overlay objects.",
+assert.match(
+  exportSource,
+  /for \(const object of objects\) \{\s*const sourceTextEdit = object\.data\.sourceTextEdit;[\s\S]*?drawEditorWhiteout\(page, sourceTextEdit\.coverBox, geometry,[\s\S]*?\}\);\s*\}\s*\n\s*for \(const object of objects\) \{/,
+  "Existing source text masks must be drawn in a dedicated pre-pass before editor overlays.",
 );
 assert.match(richTextSource, /const sourceTextEdit = object\.data\.sourceTextEdit/);
 assert.match(richTextSource, /const paddingX = sourceTextEdit \? 0 : TEXT_PADDING_X/);
