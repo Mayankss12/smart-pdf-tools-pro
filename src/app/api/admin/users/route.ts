@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 
 import {
+  beginAdminProfileAudit,
+  completeAdminProfileAudit,
+} from "@/lib/admin/audit";
+import {
   createCorsPreflightResponse,
   createNoStoreHeaders,
   isSameSiteStateChangingRequest,
@@ -18,6 +22,11 @@ type UpdateUserBody = {
   tier?: unknown;
   tierExpiresAt?: unknown;
   dailyExportLimit?: unknown;
+};
+
+type AuditContext = {
+  readonly auditId: string;
+  readonly startedAtMs: number;
 };
 
 const MANAGED_TIERS: readonly ManagedTier[] = ["free", "plus", "pro", "admin"];
@@ -53,6 +62,18 @@ async function readBody(request: Request): Promise<UpdateUserBody> {
   } catch {
     return {};
   }
+}
+
+function sameNullableDate(left: string | null | undefined, right: string | null | undefined) {
+  if (!left && !right) return true;
+  if (!left || !right) return false;
+
+  const leftTime = new Date(left).getTime();
+  const rightTime = new Date(right).getTime();
+
+  return Number.isFinite(leftTime) && Number.isFinite(rightTime)
+    ? leftTime === rightTime
+    : left === right;
 }
 
 export async function OPTIONS(request: Request) {
@@ -112,6 +133,8 @@ export async function POST(request: Request) {
     return respond(request, { ok: false, error: "Invalid daily export limit." }, 400);
   }
 
+  let auditContext: AuditContext | null = null;
+
   try {
     const admin = createAdminClient();
     const { data: actorProfile, error: actorError } = await admin
@@ -148,7 +171,7 @@ export async function POST(request: Request) {
 
     const { data: existing, error: existingError } = await admin
       .from("profiles")
-      .select("id,tier,daily_export_limit")
+      .select("id,tier,tier_expires_at,daily_export_limit")
       .eq("id", userId)
       .maybeSingle();
     if (existingError) throw existingError;
@@ -157,16 +180,53 @@ export async function POST(request: Request) {
     }
 
     const updates: Record<string, string | number | null> = {};
-    if (tier !== undefined) updates.tier = tier;
-    if (expiry !== undefined) updates.tier_expires_at = expiry;
-    if (dailyLimit !== undefined && dailyLimit !== null) {
+    const tierChanged = tier !== undefined && tier !== existing.tier;
+
+    if (tierChanged && tier !== undefined) {
+      updates.tier = tier;
+    }
+
+    if (
+      expiry !== undefined &&
+      !sameNullableDate(expiry, existing.tier_expires_at)
+    ) {
+      updates.tier_expires_at = expiry;
+    }
+
+    if (
+      dailyLimit !== undefined &&
+      dailyLimit !== null &&
+      dailyLimit !== existing.daily_export_limit
+    ) {
       updates.daily_export_limit = dailyLimit;
-    } else if (tier !== undefined && tier !== existing.tier) {
+    } else if (tierChanged && tier !== undefined && body.dailyExportLimit === undefined) {
       updates.daily_export_limit = getDailyCleanExportLimit(tier);
     }
 
     if (Object.keys(updates).length === 0) {
       return respond(request, { ok: false, error: "No administrator change supplied." }, 400);
+    }
+
+    try {
+      auditContext = await beginAdminProfileAudit(admin, {
+        actorUserId: user.id,
+        targetUserId: userId,
+        requestedChanges: updates,
+        before: {
+          tier: existing.tier ?? null,
+          tier_expires_at: existing.tier_expires_at ?? null,
+          daily_export_limit: Number(existing.daily_export_limit ?? 0),
+        },
+      });
+    } catch {
+      return respond(
+        request,
+        {
+          ok: false,
+          error: "Administrator audit log is unavailable. No change was applied.",
+        },
+        503,
+      );
     }
 
     const { data: profile, error: updateError } = await admin
@@ -179,14 +239,32 @@ export async function POST(request: Request) {
       .single();
     if (updateError) throw updateError;
 
-    console.info("PDFMantra admin profile update", {
-      actorUserId: user.id,
-      targetUserId: userId,
-      fields: Object.keys(updates),
+    await completeAdminProfileAudit(admin, {
+      ...auditContext,
+      status: "completed",
+      after: {
+        tier: profile.tier ?? null,
+        tier_expires_at: profile.tier_expires_at ?? null,
+        daily_export_limit: Number(profile.daily_export_limit ?? 0),
+      },
     });
+    auditContext = null;
 
     return respond(request, { ok: true, profile });
   } catch (error) {
+    if (auditContext) {
+      try {
+        const admin = createAdminClient();
+        await completeAdminProfileAudit(admin, {
+          ...auditContext,
+          status: "failed",
+          errorCode: "ADMIN_PROFILE_UPDATE_FAILED",
+        });
+      } catch {
+        console.error("Unable to finalize failed administrator audit record");
+      }
+    }
+
     console.error("Admin profile update failed", error);
     return respond(
       request,
