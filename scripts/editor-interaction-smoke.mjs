@@ -105,6 +105,9 @@ assert.match(frameSource, /"h-3 w-3"\s*:\s*"h-4 w-4"/);
 assert.match(frameSource, /event\.key === "ArrowLeft"/);
 assert.match(frameSource, /event\.shiftKey \? 10 : 1/);
 assert.match(canvasSource, /id="editor-object-toolbar-host"/);
+assert.match(canvasSource, /data-detected-image-actions/);
+assert.doesNotMatch(canvasSource, /top:\s*Math\.max\(0,\s*objectPopover\.y/);
+assert.match(canvasSource, /preserveAspectRatio="xMidYMid meet"/);
 assert.match(canvasSource, /relative overflow-hidden/);
 assert.match(textSource, /minWidth=\{72\}/);
 
@@ -141,6 +144,7 @@ console.log(
   JSON.stringify({
     editorPageBoundaryClamp: "passed",
     contextualToolbarHost: "passed",
+    detectedImageActionsOutsideCanvas: "passed",
     nonAnimatedObjectMotion: "passed",
     precisionResizeHandles: "passed",
     proportionalMediaResize: "passed",
