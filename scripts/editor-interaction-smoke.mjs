@@ -12,6 +12,8 @@ const [
   drawEngineSource,
   imageEngineSource,
   shapeSource,
+  shapeEngineSource,
+  globalsSource,
 ] = await Promise.all([
   readFile(
     new URL(
@@ -74,6 +76,11 @@ const [
     ),
     "utf8",
   ),
+  readFile(
+    new URL("../src/lib/pdf-tools/editor-shape-engine.ts", import.meta.url),
+    "utf8",
+  ),
+  readFile(new URL("../src/app/globals.css", import.meta.url), "utf8"),
 ]);
 
 assert.match(frameSource, /TEXT_OBJECT_MIN_WIDTH\s*=\s*140/);
@@ -122,6 +129,13 @@ assert.match(
   /preserveAspectRatioOnCornerResize=\{shapeType === "circle"\}/,
 );
 assert.match(shapeSource, /<circle/);
+assert.match(shapeEngineSource, /function getCenteredSquareBox/);
+assert.match(shapeEngineSource, /xScale: radius/);
+assert.match(shapeEngineSource, /yScale: radius/);
+assert.match(globalsSource, /\[data-page-preview="true"\] > div:first-child/);
+assert.match(globalsSource, /aspect-ratio: auto !important/);
+assert.match(globalsSource, /width: 100% !important/);
+assert.match(globalsSource, /height: auto !important/);
 
 console.log(
   JSON.stringify({
@@ -133,6 +147,7 @@ console.log(
     proportionalMediaExport: "passed",
     proportionalFreeDraw: "passed",
     circularShapeIntegrity: "passed",
+    overlayPreviewGeometry: "passed",
     keyboardNudging: "passed",
     textMinimumWidthUpgrade: "passed",
   }),
