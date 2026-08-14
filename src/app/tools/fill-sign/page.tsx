@@ -45,8 +45,11 @@ import {
 import {
   isProportionalFillSignMarkKind,
   normalizeProportionalMarkBox,
+  normalizeProportionalMediaBox,
   resizeProportionalMarkBox,
+  resizeProportionalMediaBox,
   scaleProportionalMarkBox,
+  scaleProportionalMediaBox,
 } from "@/lib/fill-sign-layout";
 import {
   inspectPdfCompatibility,
@@ -547,6 +550,26 @@ export default function FillSignPage() {
             };
           }
 
+          if (
+            object.image &&
+            (object.kind === "image" || object.kind === "signature")
+          ) {
+            return {
+              ...object,
+              box: resizeProportionalMediaBox({
+                box: start,
+                handle: dragState.handle,
+                deltaXPercent: dxPercent,
+                deltaYPercent: dyPercent,
+                page: { width: rect.width, height: rect.height },
+                aspectRatio:
+                  object.image.width / Math.max(1, object.image.height),
+                minWidthPercent: minBox.width,
+                minHeightPercent: minBox.height,
+              }),
+            };
+          }
+
           let nextX = start.xPercent;
           let nextY = start.yPercent;
           let nextWidth = start.widthPercent;
@@ -986,6 +1009,20 @@ export default function FillSignPage() {
         width: pageRect.width,
         height: pageRect.height,
       });
+    } else if (
+      image &&
+      (kind === "image" || kind === "signature") &&
+      pageRect &&
+      pageRect.width > 0 &&
+      pageRect.height > 0
+    ) {
+      defaultBox = normalizeProportionalMediaBox({
+        box: defaultBox,
+        page: { width: pageRect.width, height: pageRect.height },
+        aspectRatio: image.width / Math.max(1, image.height),
+        minWidthPercent: getMinBox(kind).width,
+        minHeightPercent: getMinBox(kind).height,
+      });
     }
 
     const box = {
@@ -1227,6 +1264,27 @@ export default function FillSignPage() {
               box: scaleProportionalMarkBox(object.box, delta, {
                 width: pageRect.width,
                 height: pageRect.height,
+              }),
+            };
+          }
+
+          if (
+            object.image &&
+            (object.kind === "image" || object.kind === "signature") &&
+            pageRect &&
+            pageRect.width > 0 &&
+            pageRect.height > 0
+          ) {
+            return {
+              ...object,
+              box: scaleProportionalMediaBox({
+                box: object.box,
+                deltaWidthPercent: delta,
+                page: { width: pageRect.width, height: pageRect.height },
+                aspectRatio:
+                  object.image.width / Math.max(1, object.image.height),
+                minWidthPercent: minBox.width,
+                minHeightPercent: minBox.height,
               }),
             };
           }
