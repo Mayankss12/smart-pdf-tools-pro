@@ -304,6 +304,8 @@ export function EditorSmartToolsPanel({
   const [translateError, setTranslateError] = useState("");
   const [translateRunning, setTranslateRunning] = useState(false);
   const [translationSource, setTranslationSource] = useState("");
+  const [translatedDocumentIdentity, setTranslatedDocumentIdentity] =
+    useState<number | null>(null);
   const [translationOrigin, setTranslationOrigin] =
     useState<TranslationOrigin | null>(null);
 
@@ -319,6 +321,7 @@ export function EditorSmartToolsPanel({
     setTranslateError("");
     setTranslateRunning(false);
     setTranslationSource("");
+    setTranslatedDocumentIdentity(null);
     setTranslationOrigin(null);
     setMessage("");
     onFindHighlightChange([]);
@@ -556,6 +559,7 @@ export function EditorSmartToolsPanel({
     setTranslateError("");
     setTranslatedText("");
     setTranslationSource("");
+    setTranslatedDocumentIdentity(null);
     setTranslationOrigin(null);
     onActivityChange({ toolId: "translate", progress: null });
     trackEditorEvent({
@@ -614,6 +618,7 @@ export function EditorSmartToolsPanel({
           ? "selected editor text"
           : (pageSource?.source ?? "native text"),
       );
+      setTranslatedDocumentIdentity(documentIdentity);
       setTranslationOrigin(origin);
       onStatusChange(
         `Translation ready from ${
@@ -646,6 +651,7 @@ export function EditorSmartToolsPanel({
   function applyTranslation() {
     if (
       !translatedText ||
+      translatedDocumentIdentity !== documentIdentity ||
       !translationOrigin ||
       translationOrigin.documentIdentity !== documentIdentity
     ) {
@@ -687,6 +693,7 @@ export function EditorSmartToolsPanel({
     setTranslatedText("");
     setTranslateError("");
     setTranslationSource("");
+    setTranslatedDocumentIdentity(null);
     setTranslationOrigin(null);
     onStatusChange("Translation added as a new editable text object.");
   }
