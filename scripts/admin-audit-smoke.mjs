@@ -101,7 +101,7 @@ await assert.rejects(
   /ADMIN_AUDIT_START_FAILED/,
 );
 
-const [usersRoute, auditRoute, auditPage] = await Promise.all([
+const [usersRoute, auditRoute, auditPage, auditPolicyMigration] = await Promise.all([
   readFile(
     new URL("../src/app/api/admin/users/route.ts", import.meta.url),
     "utf8",
@@ -111,6 +111,13 @@ const [usersRoute, auditRoute, auditPage] = await Promise.all([
     "utf8",
   ),
   readFile(new URL("../src/app/admin/audit/page.tsx", import.meta.url), "utf8"),
+  readFile(
+    new URL(
+      "../supabase/migrations/0005_admin_audit_immutability.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  ),
 ]);
 
 assert.match(usersRoute, /beginAdminProfileAudit\(admin,/);
@@ -121,8 +128,10 @@ assert.match(usersRoute, /sameNullableDate/);
 assert.match(usersRoute, /Object\.keys\(updates\)\.length === 0/);
 const auditStartIndex = usersRoute.indexOf("auditContext = await beginAdminProfileAudit");
 const mutationIndex = usersRoute.indexOf(".update(updates)");
-assert.ok(auditStartIndex >= 0 && mutationIndex >= 0 && auditStartIndex < mutationIndex,
-  "Audit record must be created before the profile update is executed.");
+assert.ok(
+  auditStartIndex >= 0 && mutationIndex >= 0 && auditStartIndex < mutationIndex,
+  "Audit record must be created before the profile update is executed.",
+);
 assert.match(auditRoute, /adminProfile\?\.tier !== "admin"/);
 assert.match(auditRoute, /\.eq\("tool_key", ADMIN_PROFILE_UPDATE_TOOL_KEY\)/);
 assert.match(auditRoute, /input_summary,result_summary/);
@@ -131,6 +140,21 @@ assert.match(auditPage, /Mutations fail closed when the audit record cannot be c
 assert.match(auditPage, /Requested changes/);
 assert.match(auditPage, /Before/);
 assert.match(auditPage, /After \/ failure/);
+
+assert.match(
+  auditPolicyMigration,
+  /drop policy if exists "tool_runs_owner_write" on public\.tool_runs/,
+);
+for (const operation of ["insert", "update", "delete"]) {
+  assert.match(
+    auditPolicyMigration,
+    new RegExp(`create policy "tool_runs_owner_${operation}"[\\s\\S]*?tool_key <> 'admin\\.profile\\.update'`),
+  );
+}
+assert.doesNotMatch(
+  auditPolicyMigration,
+  /create policy "tool_runs_owner_(?:insert|update|delete)"[\s\S]*?tool_key = 'admin\.profile\.update'/,
+);
 
 console.log(
   JSON.stringify({
@@ -143,5 +167,8 @@ console.log(
     adminAuditReadAuthorization: "passed",
     adminAuditWorkspace: "passed",
     noOpAdminMutationProtection: "passed",
+    adminAuditClientInsertBlocked: "passed",
+    adminAuditClientUpdateBlocked: "passed",
+    adminAuditClientDeleteBlocked: "passed",
   }),
 );
