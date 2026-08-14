@@ -53,7 +53,7 @@ export function ImageTool({
           src={imageDataUrl}
           alt="PDF image overlay"
           draggable={false}
-          className="h-full w-full select-none object-fill"
+          className="h-full w-full select-none object-contain"
         />
       ) : (
         <div className="flex h-full w-full items-center justify-center rounded-sm border border-dashed border-slate-300 bg-slate-50 text-[11px] font-black text-slate-400">
