@@ -142,12 +142,6 @@ async function drawEditorObject({
   readonly geometry: EditorPageGeometry;
 }) {
   if (object.type === "text") {
-    if (object.data.sourceTextEdit) {
-      drawEditorWhiteout(page, object.data.sourceTextEdit.coverBox, geometry, {
-        opacity: 1,
-      });
-    }
-
     drawEditorRichTextObject(page, object, fonts, geometry);
     return;
   }
@@ -234,6 +228,21 @@ export async function exportEditorPdfBytes({
   const pdfDoc = await PDFDocument.load(fileBytes);
   const fonts = await embedEditorTextFonts(pdfDoc);
   const pages = pdfDoc.getPages();
+
+  for (const object of objects) {
+    const sourceTextEdit = object.data.sourceTextEdit;
+    if (!sourceTextEdit) continue;
+
+    const page = pages[object.pageNumber - 1];
+    if (!page) continue;
+    const geometry = getEditorPageGeometry(page);
+
+    await withEditorPageTransform(page, geometry, () => {
+      drawEditorWhiteout(page, sourceTextEdit.coverBox, geometry, {
+        opacity: 1,
+      });
+    });
+  }
 
   for (const object of objects) {
     const page = pages[object.pageNumber - 1];
