@@ -1,27 +1,56 @@
-name: Audit dependencies
+name: Harden dependencies
 
 on:
   push:
     branches:
       - codex/dependency-security-hardening
 
+permissions:
+  contents: write
+
 jobs:
-  audit:
+  harden:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: codex/dependency-security-hardening
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
-      - name: Dependency audit
+      - name: Update vulnerable dependencies without force
+        shell: bash
+        run: |
+          npm install next@15.5.23 --save-exact
+          npm uninstall fabric
+          npm audit fix --package-lock-only
+          npm ci
+      - name: Security gate
         shell: bash
         run: |
           npm audit --json > audit.json || true
           node - <<'NODE'
           const fs = require('fs');
           const audit = JSON.parse(fs.readFileSync('audit.json', 'utf8'));
-          console.log(JSON.stringify({ metadata: audit.metadata, vulnerabilities: audit.vulnerabilities }, null, 2));
+          const counts = audit.metadata?.vulnerabilities ?? {};
+          console.log(JSON.stringify({ vulnerabilities: counts, details: audit.vulnerabilities }, null, 2));
+          if ((counts.critical ?? 0) > 0 || (counts.high ?? 0) > 0) process.exit(1);
           NODE
+      - name: TypeScript
+        run: npx tsc --noEmit
+      - name: Smoke tests
+        run: npm run test:smoke
+      - name: Production build
+        run: npm run build
+      - name: Commit validated dependency update
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Patch vulnerable runtime dependencies"
+          git push origin HEAD:codex/dependency-security-hardening
