@@ -7,6 +7,7 @@ const suites = [
   "conversion-platform-smoke.mjs",
   "editor-administration-smoke.mjs",
   "editor-export-smoke.mjs",
+  "editor-find-replace-smoke.mjs",
   "editor-form-smoke.mjs",
   "editor-interaction-smoke.mjs",
   "editor-link-smoke.mjs",
