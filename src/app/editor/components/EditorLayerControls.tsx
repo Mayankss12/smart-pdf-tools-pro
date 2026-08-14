@@ -82,6 +82,7 @@ export function EditorLayerControls({ editor }: EditorLayerControlsProps) {
   }
 
   const locked = Boolean(selectedObject.locked);
+  const formField = hasFormField(selectedObject.data);
   const opacity = Math.round((selectedObject.data.opacity ?? 1) * 100);
   const objectLabel = getObjectLabel(selectedObject);
   const sizeLabel = `${Math.round(selectedObject.box.width)} × ${Math.round(selectedObject.box.height)}`;
@@ -104,8 +105,8 @@ export function EditorLayerControls({ editor }: EditorLayerControlsProps) {
 
           <LayerButton
             label="Duplicate"
-            title="Duplicate selected object"
-            disabled={locked}
+            title={formField ? "Remove form behavior before duplicating to avoid duplicate field names" : "Duplicate selected object"}
+            disabled={locked || formField}
             onClick={() => editor.duplicateObject(selectedObjectId)}
           />
           <LayerButton
@@ -149,7 +150,7 @@ export function EditorLayerControls({ editor }: EditorLayerControlsProps) {
           />
 
           <span className="h-5 w-px shrink-0 bg-slate-200" />
-          <EditorLinkControls editor={editor} />
+          {!formField ? <EditorLinkControls editor={editor} /> : null}
           <EditorFormControls editor={editor} />
 
           <div className="ml-1 flex h-8 shrink-0 items-center gap-2 rounded-xl bg-white px-2 ring-1 ring-slate-200">
