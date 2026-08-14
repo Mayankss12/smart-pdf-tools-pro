@@ -119,11 +119,10 @@ assert.match(usersRoute, /completeAdminProfileAudit\(admin,/);
 assert.match(usersRoute, /status: "failed"/);
 assert.match(usersRoute, /sameNullableDate/);
 assert.match(usersRoute, /Object\.keys\(updates\)\.length === 0/);
-assert.ok(
-  usersRoute.indexOf("auditContext = await beginAdminProfileAudit") <
-    usersRoute.indexOf('.from("profiles")\n      .update(updates)'),
-  "Audit record must be created before the profile update is executed.",
-);
+const auditStartIndex = usersRoute.indexOf("auditContext = await beginAdminProfileAudit");
+const mutationIndex = usersRoute.indexOf(".update(updates)");
+assert.ok(auditStartIndex >= 0 && mutationIndex >= 0 && auditStartIndex < mutationIndex,
+  "Audit record must be created before the profile update is executed.");
 assert.match(auditRoute, /adminProfile\?\.tier !== "admin"/);
 assert.match(auditRoute, /\.eq\("tool_key", ADMIN_PROFILE_UPDATE_TOOL_KEY\)/);
 assert.match(auditRoute, /input_summary,result_summary/);
