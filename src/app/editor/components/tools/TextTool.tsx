@@ -230,9 +230,10 @@ export function TextTool({
   const editableRef = useRef<HTMLDivElement | null>(null);
   const fallbackStyle = getFallbackStyle(object);
   const fontSize = Number(object.data.fontSize ?? 16);
+  const sourceTextEdit = object.data.sourceTextEdit;
 
   const hasInitialText = Boolean(object.data.text && object.data.text.trim().length);
-  const [editing, setEditing] = useState(!hasInitialText);
+  const [editing, setEditing] = useState(Boolean(sourceTextEdit) || !hasInitialText);
   const [toolbarState, setToolbarState] = useState({
     bold: false,
     italic: false,
@@ -259,8 +260,6 @@ export function TextTool({
     onUpdateData(object.id, { text, textRuns: runs });
   }
 
-  // Keep the rendered HTML in sync while NOT editing (after undo/redo or
-  // whole-box style toggles) without disturbing an active caret.
   useEffect(() => {
     const editable = editableRef.current;
     if (!editable || editing) return;
@@ -269,7 +268,6 @@ export function TextTool({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [object, editing]);
 
-  // Focus + caret-to-end when entering edit mode.
   useEffect(() => {
     if (!selected || !editing) return;
 
@@ -299,7 +297,6 @@ export function TextTool({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected, editing]);
 
-  // Live B/I/U button state while editing.
   useEffect(() => {
     if (!selected || !editing) return;
 
@@ -330,8 +327,6 @@ export function TextTool({
     }
   }
 
-  // Toggle a style across the whole box via the data model (used when the box
-  // is selected but not in edit mode).
   function toggleWholeBoxStyle(command: InlineCommand) {
     const mapping = COMMAND_TO_STYLE[command];
     const runs = getRunsFromObject(object);
@@ -353,7 +348,6 @@ export function TextTool({
     onSelect(object.id);
 
     if (editing && editableRef.current) {
-      // Selection-aware: applies to selection, or whole box if caret is collapsed.
       ensureSelectionInEditable();
       document.execCommand("styleWithCSS", false, "true");
       document.execCommand(command, false);
@@ -478,9 +472,9 @@ export function TextTool({
       object={object}
       selected={selected}
       pageScale={pageScale}
-      minWidth={72}
-      minHeight={28}
-      toolbarLabel="Text"
+      minWidth={sourceTextEdit ? 10 : 72}
+      minHeight={sourceTextEdit ? 8 : 28}
+      toolbarLabel={sourceTextEdit ? "Existing text" : "Text"}
       toolbarContent={toolbarContent}
       onSelect={onSelect}
       onUpdateBox={onUpdateBox}
@@ -503,8 +497,6 @@ export function TextTool({
         onPaste={insertPlainText}
         onKeyDown={handleKeyDown}
         onPointerDown={(event) => {
-          // Editing: keep the caret here. Not editing: let it bubble so the
-          // shared frame can start a full-body drag.
           if (editing) {
             event.stopPropagation();
             onSelect(object.id);
@@ -516,12 +508,16 @@ export function TextTool({
           setEditing(true);
         }}
         className={[
-          "block h-full w-full overflow-hidden whitespace-pre-wrap break-words rounded-none border-0 bg-transparent px-1 py-0.5 outline-none",
+          "block h-full w-full overflow-hidden whitespace-pre-wrap break-words rounded-none border-0 bg-transparent outline-none",
+          sourceTextEdit ? "p-0" : "px-1 py-0.5",
           editing ? "cursor-text select-text" : "cursor-move select-none",
         ].join(" ")}
-        style={{ fontSize: fontSize * pageScale, lineHeight: 1.3 }}
+        style={{
+          fontSize: fontSize * pageScale,
+          lineHeight: sourceTextEdit ? 1.12 : 1.3,
+        }}
         spellCheck={false}
-        aria-label="Edit PDF text"
+        aria-label={sourceTextEdit ? "Edit existing PDF text" : "Edit PDF text"}
       />
     </EditorObjectFrame>
   );
