@@ -54,6 +54,12 @@ type FindResult = Omit<EditorFindHighlight, "current"> & {
   readonly source: "pdf" | "ocr";
 };
 
+type TranslationOrigin = {
+  readonly documentIdentity: number;
+  readonly pageNumber: number;
+  readonly objectId: string | null;
+};
+
 type EditorSmartToolsPanelProps = {
   readonly documentIdentity: number;
   readonly editor: EditorController;
@@ -298,8 +304,8 @@ export function EditorSmartToolsPanel({
   const [translateError, setTranslateError] = useState("");
   const [translateRunning, setTranslateRunning] = useState(false);
   const [translationSource, setTranslationSource] = useState("");
-  const [translatedDocumentIdentity, setTranslatedDocumentIdentity] =
-    useState<number | null>(null);
+  const [translationOrigin, setTranslationOrigin] =
+    useState<TranslationOrigin | null>(null);
 
   useEffect(() => {
     abortControllerRef.current?.abort();
@@ -313,7 +319,7 @@ export function EditorSmartToolsPanel({
     setTranslateError("");
     setTranslateRunning(false);
     setTranslationSource("");
-    setTranslatedDocumentIdentity(null);
+    setTranslationOrigin(null);
     setMessage("");
     onFindHighlightChange([]);
     onActivityChange(null);
@@ -539,11 +545,18 @@ export function EditorSmartToolsPanel({
 
   async function runTranslation() {
     if (!translationConfigured || translateRunning) return;
+
+    const origin: TranslationOrigin = {
+      documentIdentity,
+      pageNumber: editor.activePageNumber,
+      objectId: translateMode === "selection" ? editor.selectedObjectId : null,
+    };
+
     setTranslateRunning(true);
     setTranslateError("");
     setTranslatedText("");
     setTranslationSource("");
-    setTranslatedDocumentIdentity(null);
+    setTranslationOrigin(null);
     onActivityChange({ toolId: "translate", progress: null });
     trackEditorEvent({
       type: "translate_attempted",
@@ -601,7 +614,7 @@ export function EditorSmartToolsPanel({
           ? "selected editor text"
           : (pageSource?.source ?? "native text"),
       );
-      setTranslatedDocumentIdentity(documentIdentity);
+      setTranslationOrigin(origin);
       onStatusChange(
         `Translation ready from ${
           translateMode === "selection"
@@ -633,31 +646,40 @@ export function EditorSmartToolsPanel({
   function applyTranslation() {
     if (
       !translatedText ||
-      translatedDocumentIdentity !== documentIdentity
+      !translationOrigin ||
+      translationOrigin.documentIdentity !== documentIdentity
     ) {
       setTranslateError(
         "This translation belongs to a different document. Translate again.",
       );
       return;
     }
-    const selected = editor.selectedObject;
-    const box = selected
+
+    const sourceObject = translationOrigin.objectId
+      ? editor.objects.find(
+          (object) =>
+            object.id === translationOrigin.objectId &&
+            object.pageNumber === translationOrigin.pageNumber,
+        )
+      : null;
+    const box = sourceObject
       ? {
-          x: selected.box.x + 18,
-          y: selected.box.y + 18,
-          width: selected.box.width,
-          height: Math.max(48, selected.box.height),
+          x: sourceObject.box.x + 18,
+          y: sourceObject.box.y + 18,
+          width: sourceObject.box.width,
+          height: Math.max(48, sourceObject.box.height),
         }
       : { x: 48, y: 48, width: 280, height: 96 };
 
+    editor.setActivePage(translationOrigin.pageNumber);
     editor.addObject({
       type: "text",
-      pageNumber: editor.activePageNumber,
+      pageNumber: translationOrigin.pageNumber,
       box,
       data: {
         text: translatedText,
-        fontSize: selected?.data.fontSize ?? 14,
-        color: selected?.data.color ?? "#111827",
+        fontSize: sourceObject?.data.fontSize ?? 14,
+        color: sourceObject?.data.color ?? "#111827",
         opacity: 1,
       },
       locked: false,
@@ -665,7 +687,7 @@ export function EditorSmartToolsPanel({
     setTranslatedText("");
     setTranslateError("");
     setTranslationSource("");
-    setTranslatedDocumentIdentity(null);
+    setTranslationOrigin(null);
     onStatusChange("Translation added as a new editable text object.");
   }
 
