@@ -7,6 +7,7 @@ const suites = [
   "editor-administration-smoke.mjs",
   "editor-export-smoke.mjs",
   "editor-interaction-smoke.mjs",
+  "existing-text-edit-smoke.mjs",
   "export-entitlement-smoke.mjs",
   "fill-sign-smoke.mjs",
   "fill-sign-selection-smoke.mjs",
