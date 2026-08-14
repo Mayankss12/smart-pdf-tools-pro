@@ -226,10 +226,15 @@ export function EditorObjectFrame({
   const [toolbarHost, setToolbarHost] = useState<HTMLElement | null>(null);
   const locked = Boolean(object.locked);
   const objectOpacity = object.data.opacity ?? 1;
+  const isExistingTextEdit = object.type === "text" && Boolean(object.data.sourceTextEdit);
   const effectiveMinWidth =
-    object.type === "text" ? Math.max(minWidth, TEXT_OBJECT_MIN_WIDTH) : minWidth;
+    object.type === "text" && !isExistingTextEdit
+      ? Math.max(minWidth, TEXT_OBJECT_MIN_WIDTH)
+      : minWidth;
   const effectiveMinHeight =
-    object.type === "text" ? Math.max(minHeight, TEXT_OBJECT_MIN_HEIGHT) : minHeight;
+    object.type === "text" && !isExistingTextEdit
+      ? Math.max(minHeight, TEXT_OBJECT_MIN_HEIGHT)
+      : minHeight;
   const resizeHandles = preserveAspectRatioOnCornerResize
     ? CORNER_RESIZE_HANDLES
     : RESIZE_HANDLES;

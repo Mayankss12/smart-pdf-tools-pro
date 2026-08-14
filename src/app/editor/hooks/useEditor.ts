@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 
 import { trackEditorEvent } from "@/lib/editor/editor-analytics";
+import type { ExistingTextEditSource } from "@/lib/editor/existing-text-edit";
 import { getEditorToolDefinition } from "@/lib/editor/editor-tool-registry";
 
 import type { EditorTool } from "./useActiveTool";
@@ -72,6 +73,7 @@ export type EditorObjectData = {
   readonly lineStart?: EditorPoint;
   readonly lineEnd?: EditorPoint;
   readonly pageNumberSetId?: string;
+  readonly sourceTextEdit?: ExistingTextEditSource;
 };
 
 export type EditorObject = {
@@ -224,6 +226,7 @@ function createFileMeta(file: File): EditorFileMeta {
 function cloneObjectData(data: EditorObjectData): EditorObjectData {
   return {
     ...data,
+    sourceTextEdit: undefined,
     textRuns: data.textRuns?.map((run) => ({
       ...run,
       id: createId(),

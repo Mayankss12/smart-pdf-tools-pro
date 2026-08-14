@@ -1,4 +1,5 @@
 import { PDFDocument, rgb, type PDFPage } from "pdf-lib";
+import type { ExistingTextEditSource } from "../editor/existing-text-edit";
 import type { OcrResult } from "../pdf-ocr-engine";
 import { addSearchableTextLayer } from "../pdf-text-overlay";
 
@@ -51,6 +52,7 @@ type EditorExportObjectData = {
   readonly fillColor?: string;
   readonly lineStart?: EditorExportPoint;
   readonly lineEnd?: EditorExportPoint;
+  readonly sourceTextEdit?: ExistingTextEditSource;
 };
 
 export type EditorExportObject = {
@@ -226,6 +228,21 @@ export async function exportEditorPdfBytes({
   const pdfDoc = await PDFDocument.load(fileBytes);
   const fonts = await embedEditorTextFonts(pdfDoc);
   const pages = pdfDoc.getPages();
+
+  for (const object of objects) {
+    const sourceTextEdit = object.data.sourceTextEdit;
+    if (!sourceTextEdit) continue;
+
+    const page = pages[object.pageNumber - 1];
+    if (!page) continue;
+    const geometry = getEditorPageGeometry(page);
+
+    await withEditorPageTransform(page, geometry, () => {
+      drawEditorWhiteout(page, sourceTextEdit.coverBox, geometry, {
+        opacity: 1,
+      });
+    });
+  }
 
   for (const object of objects) {
     const page = pages[object.pageNumber - 1];
