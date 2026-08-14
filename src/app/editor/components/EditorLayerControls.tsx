@@ -1,6 +1,7 @@
 "use client";
 
 import type { EditorController, EditorObject } from "../hooks/useEditor";
+import { EditorLinkControls } from "./EditorLinkControls";
 import { ExistingTextEditPortal } from "./ExistingTextEditPortal";
 
 type EditorLayerControlsProps = {
@@ -136,6 +137,9 @@ export function EditorLayerControls({ editor }: EditorLayerControlsProps) {
             title={locked ? "Unlock selected object" : "Lock selected object"}
             onClick={() => editor.toggleObjectLock(selectedObjectId)}
           />
+
+          <span className="h-5 w-px shrink-0 bg-slate-200" />
+          <EditorLinkControls editor={editor} />
 
           <div className="ml-1 flex h-8 shrink-0 items-center gap-2 rounded-xl bg-white px-2 ring-1 ring-slate-200">
             <span className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
