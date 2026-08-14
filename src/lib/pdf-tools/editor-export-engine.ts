@@ -11,6 +11,7 @@ import {
 } from "./editor-rich-text-engine";
 import { drawEditorWhiteout } from "./editor-whiteout-engine";
 import { drawEditorImageObject } from "./editor-image-engine";
+import { appendEditorLinkAnnotation } from "./editor-link-engine";
 import { drawEditorNoteObject } from "./editor-note-engine";
 import { drawEditorSignatureObject } from "./editor-signature-engine";
 import { drawEditorShapeObject } from "./editor-shape-engine";
@@ -53,6 +54,7 @@ type EditorExportObjectData = {
   readonly lineStart?: EditorExportPoint;
   readonly lineEnd?: EditorExportPoint;
   readonly sourceTextEdit?: ExistingTextEditSource;
+  readonly linkUrl?: string;
 };
 
 export type EditorExportObject = {
@@ -258,6 +260,21 @@ export async function exportEditorPdfBytes({
         geometry,
       }),
     );
+  }
+
+  for (const object of objects) {
+    if (!object.data.linkUrl) continue;
+
+    const page = pages[object.pageNumber - 1];
+    if (!page) continue;
+
+    appendEditorLinkAnnotation({
+      pdfDoc,
+      page,
+      box: object.box,
+      geometry: getEditorPageGeometry(page),
+      url: object.data.linkUrl,
+    });
   }
 
   if (ocrPages.length > 0) {
