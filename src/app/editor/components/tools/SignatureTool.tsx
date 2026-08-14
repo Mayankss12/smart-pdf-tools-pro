@@ -53,7 +53,7 @@ export function SignatureTool({
           src={imageDataUrl}
           alt="PDF signature overlay"
           draggable={false}
-          className="h-full w-full select-none object-fill"
+          className="h-full w-full select-none object-contain"
         />
       ) : (
         <div className="flex h-full w-full items-center justify-center rounded-sm border border-dashed border-emerald-300 bg-emerald-50 text-[11px] font-black text-emerald-500">
