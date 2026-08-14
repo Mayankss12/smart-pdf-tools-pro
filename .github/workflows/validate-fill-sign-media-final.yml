@@ -1,0 +1,26 @@
+name: Validate final Fill Sign media aspect
+
+on:
+  push:
+    branches:
+      - codex/fill-sign-media-aspect-lock-final
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: TypeScript
+        run: npx tsc --noEmit
+      - name: Smoke tests
+        run: npm run test:smoke
+      - name: Production build
+        run: npm run build
