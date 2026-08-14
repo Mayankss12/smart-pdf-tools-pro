@@ -26,7 +26,7 @@ jobs:
         run: |
           npm uninstall fabric
           npm install next@16.3.1 react@latest react-dom@latest --save-exact
-          npm install --save-dev --save-exact eslint@latest eslint-config-next@16.3.1 @types/react@latest @types/react-dom@latest
+          npm install --save-dev --save-exact eslint@9.39.5 eslint-config-next@16.3.1 postcss@8.5.26 @types/react@latest @types/react-dom@latest
           npm pkg set scripts.lint="eslint ."
           npm audit fix --package-lock-only
           npm ci
