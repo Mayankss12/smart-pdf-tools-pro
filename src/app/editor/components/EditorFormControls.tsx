@@ -25,6 +25,16 @@ function createFormPatch(formField: EditorFormFieldConfig | undefined) {
   return { formField } as unknown as Partial<EditorObjectData>;
 }
 
+function createFormRegionPatch(formField: EditorFormFieldConfig) {
+  return {
+    formField,
+    shapeType: "rectangle",
+    fillColor: "none",
+    strokeColor: "#7c3aed",
+    strokeWidth: 1,
+  } as unknown as Partial<EditorObjectData>;
+}
+
 function createDefaultConfig(objectId: string): EditorFormFieldConfig {
   const suffix = objectId.replace(/[^a-zA-Z0-9]/g, "").slice(-8) || "field";
   return {
@@ -56,7 +66,7 @@ export function EditorFormControls({ editor }: { readonly editor: EditorControll
     const current = getFormField(object.data) ?? createDefaultConfig(objectId);
     editor.updateObjectData(
       objectId,
-      createFormPatch({
+      createFormRegionPatch({
         ...current,
         ...patch,
       }),
@@ -70,7 +80,7 @@ export function EditorFormControls({ editor }: { readonly editor: EditorControll
         onClick={() => {
           editor.updateObjectData(
             objectId,
-            createFormPatch(createDefaultConfig(objectId)),
+            createFormRegionPatch(createDefaultConfig(objectId)),
           );
         }}
         className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50 px-2.5 text-[11px] font-black text-violet-700 transition hover:border-violet-300 hover:bg-violet-100"
@@ -141,7 +151,7 @@ export function EditorFormControls({ editor }: { readonly editor: EditorControll
         />
       ) : null}
 
-      {(config.type === "text" || config.type === "dropdown") ? (
+      {config.type === "text" || config.type === "dropdown" ? (
         <input
           value={config.defaultValue ?? ""}
           onChange={(event) => updateConfig({ defaultValue: event.target.value })}
@@ -190,6 +200,10 @@ export function EditorFormControls({ editor }: { readonly editor: EditorControll
         />
         Read-only
       </label>
+
+      <span className="rounded-lg bg-violet-50 px-2 py-1 text-[9px] font-black text-violet-600">
+        Interactive on export
+      </span>
 
       <button
         type="button"
