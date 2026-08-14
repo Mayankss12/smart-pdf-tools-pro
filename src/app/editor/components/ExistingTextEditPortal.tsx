@@ -21,15 +21,19 @@ export function ExistingTextEditPortal({ editor }: { readonly editor: EditorCont
   const [size, setSize] = useState<LayerSize>({ width: 0, height: 0 });
 
   useEffect(() => {
-    let observer: MutationObserver | null = null;
-    let resizeObserver: ResizeObserver | null = null;
     let cancelled = false;
+    let resizeObserver: ResizeObserver | null = null;
+
+    const mutationObserver = new MutationObserver(() => {
+      connectLayer();
+    });
 
     function connectLayer() {
       if (cancelled) return;
       const nextLayer = findPageLayer();
       if (!nextLayer) return;
 
+      mutationObserver.disconnect();
       setPageLayer(nextLayer);
       setSize({
         width: nextLayer.clientWidth,
@@ -46,15 +50,14 @@ export function ExistingTextEditPortal({ editor }: { readonly editor: EditorCont
       resizeObserver.observe(nextLayer);
     }
 
+    mutationObserver.observe(document.body, { childList: true, subtree: true });
     connectLayer();
-
-    observer = new MutationObserver(connectLayer);
-    observer.observe(document.body, { childList: true, subtree: true });
 
     return () => {
       cancelled = true;
-      observer?.disconnect();
+      mutationObserver.disconnect();
       resizeObserver?.disconnect();
+      setPageLayer(null);
     };
   }, [editor.file, editor.pdfDocument]);
 
