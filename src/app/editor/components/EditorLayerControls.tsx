@@ -10,11 +10,13 @@ function LayerButton({
   label,
   title,
   disabled,
+  danger,
   onClick,
 }: {
   readonly label: string;
   readonly title: string;
   readonly disabled?: boolean;
+  readonly danger?: boolean;
   readonly onClick: () => void;
 }) {
   return (
@@ -23,7 +25,12 @@ function LayerButton({
       disabled={disabled}
       title={title}
       onClick={onClick}
-      className="h-8 rounded-xl border border-slate-200 bg-white px-2 text-[11px] font-black text-slate-600 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
+      className={[
+        "h-8 rounded-xl border bg-white px-2 text-[11px] font-black transition disabled:cursor-not-allowed disabled:opacity-40",
+        danger
+          ? "border-red-200 text-red-600 hover:border-red-300 hover:bg-red-50"
+          : "border-slate-200 text-slate-600 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700",
+      ].join(" ")}
     >
       {label}
     </button>
@@ -42,6 +49,13 @@ function getObjectLabel(object: EditorObject) {
   if (object.type === "highlight") return "Highlight";
   if (object.type === "whiteout") return "Whiteout";
   if (object.type === "note") return "Note";
+  if (object.type === "draw") return "Drawing";
+  if (object.type === "shape") {
+    if (object.data.shapeType === "circle") return "Circle";
+    if (object.data.shapeType === "line") return "Line";
+    if (object.data.shapeType === "arrow") return "Arrow";
+    return "Rectangle";
+  }
 
   return "Object";
 }
@@ -57,6 +71,7 @@ export function EditorLayerControls({ editor }: EditorLayerControlsProps) {
   const locked = Boolean(selectedObject.locked);
   const opacity = Math.round((selectedObject.data.opacity ?? 1) * 100);
   const objectLabel = getObjectLabel(selectedObject);
+  const sizeLabel = `${Math.round(selectedObject.box.width)} × ${Math.round(selectedObject.box.height)}`;
 
   return (
     <div className="border-b border-slate-200 bg-white px-3 py-2 shadow-sm">
@@ -64,6 +79,29 @@ export function EditorLayerControls({ editor }: EditorLayerControlsProps) {
         <span className="shrink-0 rounded-xl bg-white px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-slate-400 ring-1 ring-slate-200">
           {objectLabel}
         </span>
+
+        <span
+          className="shrink-0 rounded-xl bg-white px-2.5 py-1.5 text-[10px] font-black tabular-nums text-slate-500 ring-1 ring-slate-200"
+          title="Selected object size in editor points"
+        >
+          {sizeLabel}
+        </span>
+
+        <LayerButton
+          label="Duplicate"
+          title="Duplicate selected object"
+          disabled={locked}
+          onClick={() => editor.duplicateObject(selectedObjectId)}
+        />
+        <LayerButton
+          label="Delete"
+          title="Delete selected object"
+          disabled={locked}
+          danger
+          onClick={() => editor.deleteObject(selectedObjectId)}
+        />
+
+        <span className="h-5 w-px shrink-0 bg-slate-200" />
 
         <LayerButton
           label="Back"
