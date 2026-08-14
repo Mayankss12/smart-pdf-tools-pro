@@ -1,0 +1,24 @@
+name: Validate form authoring
+
+on:
+  push:
+    branches:
+      - codex/editor-form-authoring
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: TypeScript
+        run: npx tsc --noEmit
+      - name: Smoke tests
+        run: npm run test:smoke
+      - name: Production build
+        run: npm run build
