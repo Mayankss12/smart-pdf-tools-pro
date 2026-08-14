@@ -496,3 +496,19 @@ a {
 .to-rose-50\/70 {
   --tw-gradient-to: var(--bg-panel) var(--tw-gradient-to-position) !important;
 }
+
+/* Keep standalone overlay coordinates anchored to the real PDF page image. */
+[data-page-preview="true"] > div:first-child {
+  display: block !important;
+  min-height: 0 !important;
+  aspect-ratio: auto !important;
+  padding: 0 !important;
+}
+
+[data-page-preview="true"] > div:first-child > img {
+  display: block !important;
+  width: 100% !important;
+  height: auto !important;
+  max-width: none !important;
+  max-height: none !important;
+}
