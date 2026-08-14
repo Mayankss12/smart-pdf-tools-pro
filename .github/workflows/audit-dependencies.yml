@@ -1,0 +1,27 @@
+name: Audit dependencies
+
+on:
+  push:
+    branches:
+      - codex/dependency-security-hardening
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Dependency audit
+        shell: bash
+        run: |
+          npm audit --json > audit.json || true
+          node - <<'NODE'
+          const fs = require('fs');
+          const audit = JSON.parse(fs.readFileSync('audit.json', 'utf8'));
+          console.log(JSON.stringify({ metadata: audit.metadata, vulnerabilities: audit.vulnerabilities }, null, 2));
+          NODE
