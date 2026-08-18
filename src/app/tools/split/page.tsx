@@ -360,6 +360,7 @@ export default function SplitPage() {
   async function renderThumbnails(selectedFile: File, totalPages: number) {
     const token = renderTokenRef.current + 1;
     renderTokenRef.current = token;
+    let pdf: pdfjsLib.PDFDocumentProxy | null = null;
 
     setBusyMode("rendering");
     setThumbnailStatus("loading");
@@ -370,31 +371,38 @@ export default function SplitPage() {
     try {
       configurePdfWorker();
 
-      const pdf = await pdfjsLib.getDocument({ data: await selectedFile.arrayBuffer() }).promise;
+      pdf = await pdfjsLib.getDocument({ data: await selectedFile.arrayBuffer() }).promise;
       const nextUrls: Record<number, string> = {};
 
       for (let pageNumber = 1; pageNumber <= totalPages; pageNumber += 1) {
         if (renderTokenRef.current !== token) return;
 
         const page = await pdf.getPage(pageNumber);
-        const viewport = page.getViewport({ scale: 0.38 });
-        const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
         const canvas = document.createElement("canvas");
-        const context = canvas.getContext("2d");
 
-        if (!context) continue;
+        try {
+          const viewport = page.getViewport({ scale: 0.38 });
+          const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+          const context = canvas.getContext("2d");
 
-        canvas.width = Math.ceil(viewport.width * pixelRatio);
-        canvas.height = Math.ceil(viewport.height * pixelRatio);
-        context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+          if (!context) continue;
 
-        await page.render({ canvasContext: context, viewport }).promise;
+          canvas.width = Math.ceil(viewport.width * pixelRatio);
+          canvas.height = Math.ceil(viewport.height * pixelRatio);
+          context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
 
-        nextUrls[pageNumber] = canvas.toDataURL("image/png");
+          await page.render({ canvasContext: context, viewport }).promise;
 
-        if (renderTokenRef.current === token) {
+          if (renderTokenRef.current !== token) return;
+
+          nextUrls[pageNumber] = canvas.toDataURL("image/png");
+
           setThumbnailUrls({ ...nextUrls });
           setRenderProgress({ done: pageNumber, total: totalPages });
+        } finally {
+          page.cleanup();
+          canvas.width = 0;
+          canvas.height = 0;
         }
       }
 
@@ -408,6 +416,14 @@ export default function SplitPage() {
         setStatus("PDF loaded, but thumbnails could not be rendered. You can still split with page ranges.");
       }
     } finally {
+      const documentToDestroy = pdf;
+      pdf = null;
+      try {
+        await documentToDestroy?.destroy();
+      } catch {
+        // Ignore cleanup failures; the render state still needs to settle.
+      }
+
       if (renderTokenRef.current === token) {
         setBusyMode("idle");
       }
