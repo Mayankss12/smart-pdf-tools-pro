@@ -32,64 +32,72 @@ function isTransformMatrix(value: unknown): value is number[] {
 }
 
 // Returns image rectangles in UNSCALED page units (scale = 1), matching the
-// editor's object box coordinate system.
+// editor's object box coordinate system. The page is acquired solely for this
+// detection pass, so release its operator-list/render caches before returning.
 export async function detectPageImages(page: PDFPageProxy): Promise<DetectedImage[]> {
   const OPS = pdfjsLib.OPS;
 
-  if (!OPS) return [];
-
-  const viewport = page.getViewport({ scale: 1 });
-  const opList = await page.getOperatorList();
-
-  const images: DetectedImage[] = [];
-  const stack: number[][] = [];
-  let ctm = [1, 0, 0, 1, 0, 0];
-
-  const IMAGE_OPS = new Set<number>(
-    [
-      OPS.paintImageXObject,
-      OPS.paintImageMaskXObject,
-      OPS.paintInlineImageXObject,
-    ].filter((value) => typeof value === "number"),
-  );
-
-  for (let index = 0; index < opList.fnArray.length; index += 1) {
-    const fn = opList.fnArray[index];
-    const args = opList.argsArray[index];
-
-    if (fn === OPS.save) {
-      stack.push(ctm.slice());
-    } else if (fn === OPS.restore) {
-      ctm = stack.pop() || ctm;
-    } else if (fn === OPS.transform && isTransformMatrix(args)) {
-      ctm = multiply(ctm, args);
-    } else if (IMAGE_OPS.has(fn)) {
-      const corners = [
-        [0, 0],
-        [1, 0],
-        [1, 1],
-        [0, 1],
-      ].map(([ux, uy]) => {
-        const [px, py] = applyMatrix(ctm, ux, uy);
-        return viewport.convertToViewportPoint(px, py);
-      });
-
-      const xs = corners.map((point) => point[0]);
-      const ys = corners.map((point) => point[1]);
-
-      const minX = Math.min(...xs);
-      const maxX = Math.max(...xs);
-      const minY = Math.min(...ys);
-      const maxY = Math.max(...ys);
-
-      const width = maxX - minX;
-      const height = maxY - minY;
-
-      if (width > 6 && height > 6) {
-        images.push({ x: minX, y: minY, width, height });
-      }
-    }
+  if (!OPS) {
+    page.cleanup();
+    return [];
   }
 
-  return images;
+  try {
+    const viewport = page.getViewport({ scale: 1 });
+    const opList = await page.getOperatorList();
+
+    const images: DetectedImage[] = [];
+    const stack: number[][] = [];
+    let ctm = [1, 0, 0, 1, 0, 0];
+
+    const IMAGE_OPS = new Set<number>(
+      [
+        OPS.paintImageXObject,
+        OPS.paintImageMaskXObject,
+        OPS.paintInlineImageXObject,
+      ].filter((value) => typeof value === "number"),
+    );
+
+    for (let index = 0; index < opList.fnArray.length; index += 1) {
+      const fn = opList.fnArray[index];
+      const args = opList.argsArray[index];
+
+      if (fn === OPS.save) {
+        stack.push(ctm.slice());
+      } else if (fn === OPS.restore) {
+        ctm = stack.pop() || ctm;
+      } else if (fn === OPS.transform && isTransformMatrix(args)) {
+        ctm = multiply(ctm, args);
+      } else if (IMAGE_OPS.has(fn)) {
+        const corners = [
+          [0, 0],
+          [1, 0],
+          [1, 1],
+          [0, 1],
+        ].map(([ux, uy]) => {
+          const [px, py] = applyMatrix(ctm, ux, uy);
+          return viewport.convertToViewportPoint(px, py);
+        });
+
+        const xs = corners.map((point) => point[0]);
+        const ys = corners.map((point) => point[1]);
+
+        const minX = Math.min(...xs);
+        const maxX = Math.max(...xs);
+        const minY = Math.min(...ys);
+        const maxY = Math.max(...ys);
+
+        const width = maxX - minX;
+        const height = maxY - minY;
+
+        if (width > 6 && height > 6) {
+          images.push({ x: minX, y: minY, width, height });
+        }
+      }
+    }
+
+    return images;
+  } finally {
+    page.cleanup();
+  }
 }
