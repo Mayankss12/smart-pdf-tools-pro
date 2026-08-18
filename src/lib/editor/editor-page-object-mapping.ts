@@ -55,12 +55,23 @@ function rotatePathData(
   return rotated.length ? rotated.join(" ") : pathData;
 }
 
+function getDrawDimension(value: number | undefined, fallback: number) {
+  if (Number.isFinite(value) && Number(value) > 0) {
+    return Number(value);
+  }
+
+  return Math.max(1, fallback);
+}
+
 function rotateObjectData(
   data: EditorObjectData,
   width: number,
   height: number,
   direction: EditorPageRotationDirection,
 ): EditorObjectData {
+  const drawWidth = getDrawDimension(data.drawWidth, width);
+  const drawHeight = getDrawDimension(data.drawHeight, height);
+
   return {
     ...data,
     lineStart: data.lineStart
@@ -69,9 +80,14 @@ function rotateObjectData(
     lineEnd: data.lineEnd
       ? rotatePoint(data.lineEnd, width, height, direction)
       : undefined,
-    pathData: rotatePathData(data.pathData, width, height, direction),
-    drawWidth: data.pathData ? height : data.drawWidth,
-    drawHeight: data.pathData ? width : data.drawHeight,
+    pathData: rotatePathData(
+      data.pathData,
+      drawWidth,
+      drawHeight,
+      direction,
+    ),
+    drawWidth: data.pathData ? drawHeight : data.drawWidth,
+    drawHeight: data.pathData ? drawWidth : data.drawHeight,
   };
 }
 
