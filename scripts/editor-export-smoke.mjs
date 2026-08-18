@@ -116,7 +116,7 @@ objects.push(
     pageNumber: 1,
     box: { x: 136, y: 174, width: 130, height: 86 },
     data: {
-      text: "हिंदी टिप्पणी",
+      text: "कखग",
       fontSize: 12,
       backgroundColor: "#fef3c7",
       opacity: 1,
@@ -165,7 +165,7 @@ try {
 }
 assert.match(firstPageText, /Café/);
 assert.match(firstPageText, /नमस्ते/);
-assert.match(firstPageText, /हिंदी टिप्पणी/);
+assert.match(firstPageText, /कखग/);
 assert.doesNotMatch(firstPageText, /你好|😀/);
 
 const transformedWords = transformOcrWordsToPdfSpace(
