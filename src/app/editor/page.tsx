@@ -317,6 +317,14 @@ export default function EditorPage() {
     };
   }
 
+  function restoreEditorOverlayCheckpoint(checkpoint: EditorDocumentCheckpoint) {
+    editor.replaceDocumentEditorState(checkpoint.editorState);
+    setOcrPages([...checkpoint.ocrPages]);
+    setFindHighlights([...checkpoint.findHighlights]);
+    setPageNumberSettings(checkpoint.pageNumberSettings);
+    setPageNumberSetId(checkpoint.pageNumberSetId);
+  }
+
   async function restoreDocumentCheckpoint(
     checkpoint: EditorDocumentCheckpoint,
   ) {
@@ -329,11 +337,7 @@ export default function EditorPage() {
       checkpoint.bytes,
       checkpoint.editorState.activePageNumber,
     );
-    editor.replaceDocumentEditorState(checkpoint.editorState);
-    setOcrPages(checkpoint.ocrPages);
-    setFindHighlights(checkpoint.findHighlights);
-    setPageNumberSettings(checkpoint.pageNumberSettings);
-    setPageNumberSetId(checkpoint.pageNumberSetId);
+    restoreEditorOverlayCheckpoint(checkpoint);
   }
 
   async function regenerateManagedPageNumbers(
@@ -743,7 +747,8 @@ export default function EditorPage() {
   }
 
   async function handleApplyPageNumbers(settings: EditorPageNumberSettings) {
-    if (!editor.pdfDocument) return;
+    if (!editor.pdfDocument || !fileBytes) return;
+    const before = createDocumentCheckpoint(fileBytes);
     setPageActionBusy(true);
     try {
       const pageSizes = await Promise.all(
@@ -751,9 +756,12 @@ export default function EditorPage() {
           const pageNumber = index + 1;
           const page = await editor.pdfDocument?.getPage(pageNumber);
           if (!page) throw new Error(`Unable to read page ${pageNumber}.`);
-          const viewport = page.getViewport({ scale: 1 });
-          page.cleanup();
-          return { pageNumber, width: viewport.width, height: viewport.height };
+          try {
+            const viewport = page.getViewport({ scale: 1 });
+            return { pageNumber, width: viewport.width, height: viewport.height };
+          } finally {
+            page.cleanup();
+          }
         }),
       );
       const setId = `page-number-${Date.now()}`;
@@ -765,9 +773,25 @@ export default function EditorPage() {
       const retainedObjects = editor.objects.filter(
         (object) => !object.data.pageNumberSetId,
       );
-      editor.applyObjectBatch([...retainedObjects, ...pageNumberObjects]);
-      setPageNumberSettings(settings);
-      setPageNumberSetId(setId);
+      const nextObjects = [...retainedObjects, ...pageNumberObjects];
+      const nextSelectedObjectId =
+        editor.selectedObjectId &&
+        nextObjects.some((object) => object.id === editor.selectedObjectId)
+          ? editor.selectedObjectId
+          : null;
+      const after = createDocumentCheckpoint(fileBytes, {
+        objects: nextObjects,
+        selectedObjectId: nextSelectedObjectId,
+        pageNumberSettings: settings,
+        pageNumberSetId: setId,
+        saveState: "unsaved",
+      });
+      restoreEditorOverlayCheckpoint(after);
+      editor.recordDocumentTransaction({
+        label: "apply page numbers",
+        undo: async () => restoreEditorOverlayCheckpoint(before),
+        redo: async () => restoreEditorOverlayCheckpoint(after),
+      });
       setPageDialogMode(null);
       trackEditorEvent({
         type: "pages_numbered",
@@ -786,11 +810,28 @@ export default function EditorPage() {
   }
 
   function handleRemovePageNumbers() {
+    if (!fileBytes) return;
+    const before = createDocumentCheckpoint(fileBytes);
     const retainedObjects = editor.objects.filter(
       (object) => !object.data.pageNumberSetId,
     );
-    editor.applyObjectBatch(retainedObjects);
-    setPageNumberSetId(null);
+    const nextSelectedObjectId =
+      editor.selectedObjectId &&
+      retainedObjects.some((object) => object.id === editor.selectedObjectId)
+        ? editor.selectedObjectId
+        : null;
+    const after = createDocumentCheckpoint(fileBytes, {
+      objects: retainedObjects,
+      selectedObjectId: nextSelectedObjectId,
+      pageNumberSetId: null,
+      saveState: "unsaved",
+    });
+    restoreEditorOverlayCheckpoint(after);
+    editor.recordDocumentTransaction({
+      label: "remove page numbers",
+      undo: async () => restoreEditorOverlayCheckpoint(before),
+      redo: async () => restoreEditorOverlayCheckpoint(after),
+    });
     setPageDialogMode(null);
     setStatusMessage("Page numbers removed.");
   }
