@@ -8,6 +8,14 @@ import {
   type PdfProcessingResult,
 } from "@/lib/pdf-engine";
 import {
+  drawUnicodeTextLine,
+  embedUnicodeFonts,
+  measureUnicodeText,
+  sanitizeUnicodeText,
+  type BundledUnicodeFontBytes,
+  type EmbeddedUnicodeFonts,
+} from "@/lib/pdf-unicode-fonts";
+import {
   getEditorPageGeometry,
   withEditorPageTransform,
 } from "@/lib/pdf-tools/editor-page-geometry";
@@ -29,6 +37,7 @@ export type PageNumberOptions = {
   readonly prefix: string;
   readonly suffix: string;
   readonly color: readonly [number, number, number];
+  readonly unicodeFontBytes?: BundledUnicodeFontBytes;
   readonly onProgress?: (progress: {
     readonly completed: number;
     readonly total: number;
@@ -47,6 +56,31 @@ function clamp(value: number, min: number, max: number) {
 
 function resolveAffix(value: string, totalNumberedPages: number) {
   return value.replace(/\{total\}/gi, String(totalNumberedPages));
+}
+
+function textNeedsUnicode(text: string, supported: ReadonlySet<number>) {
+  return Array.from(text).some((character) => {
+    const codePoint = character.codePointAt(0);
+    return codePoint !== undefined && !supported.has(codePoint);
+  });
+}
+
+function preparePageNumberText(
+  text: string,
+  unicodeFonts: EmbeddedUnicodeFonts | null,
+) {
+  return unicodeFonts ? sanitizeUnicodeText(text, unicodeFonts, true).text : text;
+}
+
+function measurePageNumberText(
+  text: string,
+  size: number,
+  font: Awaited<ReturnType<ReturnType<typeof loadPdfDocument>["embedFont"]>>,
+  unicodeFonts: EmbeddedUnicodeFonts | null,
+) {
+  return unicodeFonts
+    ? measureUnicodeText(text, size, unicodeFonts, true)
+    : font.widthOfTextAtSize(text, size);
 }
 
 export async function addPageNumbersWithOptions(
@@ -77,6 +111,14 @@ export async function addPageNumbersWithOptions(
   }
 
   const font = await pdf.embedFont(FONT_MAP[options.font]);
+  const supportedCodePoints = new Set(font.getCharacterSet());
+  const totalNumberedPages = new Set(options.targetPages).size;
+  const affixSample =
+    resolveAffix(options.prefix, totalNumberedPages) +
+    resolveAffix(options.suffix, totalNumberedPages);
+  const unicodeFonts = textNeedsUnicode(affixSample, supportedCodePoints)
+    ? await embedUnicodeFonts(pdf, options.font, options.unicodeFontBytes)
+    : null;
   const requestedFontSize = clamp(options.fontSize, 8, 72);
   const opacity = clamp(options.opacity, 0, 1);
   const xPercent = clamp(options.position.xPercent, 4, 96);
@@ -84,7 +126,6 @@ export async function addPageNumbersWithOptions(
   const targetIndexByPage = new Map(
     options.targetPages.map((pageNumber, index) => [pageNumber, index]),
   );
-  const totalNumberedPages = targetIndexByPage.size;
   let completedPages = 0;
 
   for (let index = 0; index < pages.length; index += 1) {
@@ -94,16 +135,21 @@ export async function addPageNumbersWithOptions(
 
     const geometry = getEditorPageGeometry(page);
     const displayNumber = options.startNumber + targetIndex;
-    const text =
+    const text = preparePageNumberText(
       `${resolveAffix(options.prefix, totalNumberedPages)}` +
-      `${displayNumber}` +
-      `${resolveAffix(options.suffix, totalNumberedPages)}`;
-    const widthAtOnePoint = Math.max(0.01, font.widthOfTextAtSize(text, 1));
+        `${displayNumber}` +
+        `${resolveAffix(options.suffix, totalNumberedPages)}`,
+      unicodeFonts,
+    );
+    const widthAtOnePoint = Math.max(
+      0.01,
+      measurePageNumberText(text, 1, font, unicodeFonts),
+    );
     const fontSize = Math.min(
       requestedFontSize,
       Math.max(1, (geometry.viewportWidth - 24) / widthAtOnePoint),
     );
-    const textWidth = font.widthOfTextAtSize(text, fontSize);
+    const textWidth = measurePageNumberText(text, fontSize, font, unicodeFonts);
     const maximumX = Math.max(12, geometry.viewportWidth - textWidth - 12);
     const maximumY = Math.max(12, geometry.viewportHeight - fontSize - 12);
     const x = clamp(
@@ -118,14 +164,30 @@ export async function addPageNumbersWithOptions(
       12,
       maximumY,
     );
+    const color = rgb(options.color[0], options.color[1], options.color[2]);
 
     await withEditorPageTransform(page, geometry, () => {
+      if (unicodeFonts) {
+        drawUnicodeTextLine({
+          page,
+          text,
+          x,
+          y,
+          size: fontSize,
+          fonts: unicodeFonts,
+          bold: true,
+          color,
+          opacity,
+        });
+        return;
+      }
+
       page.drawText(text, {
         x,
         y,
         size: fontSize,
         font,
-        color: rgb(options.color[0], options.color[1], options.color[2]),
+        color,
         opacity,
       });
     });
