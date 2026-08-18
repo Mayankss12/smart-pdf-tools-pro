@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 
+import * as pdfjs from "pdfjs-dist";
 import { degrees, PDFDocument } from "pdf-lib";
 
 import {
@@ -18,6 +20,15 @@ for (const rotation of rotations) {
 }
 
 const sourceBytes = await source.save();
+const [latinFontBytes, devanagariFontBytes] = await Promise.all([
+  readFile(new URL("../public/fonts/NotoSans-Regular.ttf", import.meta.url)),
+  readFile(
+    new URL(
+      "../public/fonts/NotoSansDevanagari-Regular.ttf",
+      import.meta.url,
+    ),
+  ),
+]);
 const pixel =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
 const objects = rotations.map((rotation, index) => ({
@@ -123,6 +134,10 @@ objects.push(
 const exportedBytes = await exportEditorPdfBytes({
   fileBytes: sourceBytes,
   objects,
+  unicodeFontBytes: {
+    latin: new Uint8Array(latinFontBytes),
+    devanagari: new Uint8Array(devanagariFontBytes),
+  },
 });
 const exported = await PDFDocument.load(exportedBytes);
 
@@ -132,6 +147,25 @@ assert.deepEqual(
   rotations,
 );
 assert.ok(exportedBytes.length > sourceBytes.length);
+
+const exportedPdf = await pdfjs.getDocument({ data: exportedBytes.slice() }).promise;
+let firstPageText = "";
+try {
+  const firstPage = await exportedPdf.getPage(1);
+  try {
+    const textContent = await firstPage.getTextContent();
+    firstPageText = textContent.items
+      .map((item) => ("str" in item ? item.str : ""))
+      .join(" ");
+  } finally {
+    firstPage.cleanup();
+  }
+} finally {
+  await exportedPdf.destroy();
+}
+assert.match(firstPageText, /Café/);
+assert.match(firstPageText, /नमस्ते/);
+assert.doesNotMatch(firstPageText, /你好|😀/);
 
 const transformedWords = transformOcrWordsToPdfSpace(
   [
@@ -168,7 +202,8 @@ console.log(
   JSON.stringify({
     rotations,
     objectTypes: [...new Set(objects.map((object) => object.type))],
-    unicodeText: "passed",
+    unicodeText: "devanagari passed",
+    unsupportedUnicodeFallback: "passed",
     asciiText: "passed",
     ocrPlacement: "passed",
     outputBytes: exportedBytes.length,
