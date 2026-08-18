@@ -1,4 +1,4 @@
-import { StandardFonts, rgb } from "pdf-lib";
+import { StandardFonts, rgb, type PDFFont } from "pdf-lib";
 
 import {
   PdfEngineError,
@@ -75,7 +75,7 @@ function preparePageNumberText(
 function measurePageNumberText(
   text: string,
   size: number,
-  font: Awaited<ReturnType<ReturnType<typeof loadPdfDocument>["embedFont"]>>,
+  font: PDFFont,
   unicodeFonts: EmbeddedUnicodeFonts | null,
 ) {
   return unicodeFonts
