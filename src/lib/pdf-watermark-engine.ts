@@ -17,6 +17,14 @@ import {
   type PdfProcessingResult,
 } from "@/lib/pdf-engine";
 import {
+  drawUnicodeTextLine,
+  embedUnicodeFonts,
+  measureUnicodeText,
+  sanitizeUnicodeText,
+  type BundledUnicodeFontBytes,
+  type EmbeddedUnicodeFonts,
+} from "@/lib/pdf-unicode-fonts";
+import {
   getEditorPageGeometry,
   withEditorPageTransform,
 } from "@/lib/pdf-tools/editor-page-geometry";
@@ -46,6 +54,7 @@ export type WatermarkExportOptions = {
   readonly tileGap: number;
   readonly imageFile: File | null;
   readonly imageScale: number;
+  readonly unicodeFontBytes?: BundledUnicodeFontBytes;
   readonly onProgress?: (progress: {
     readonly completed: number;
     readonly total: number;
@@ -61,6 +70,23 @@ const FONT_MAP: Record<WatermarkFontStyle, StandardFonts> = {
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
+}
+
+function isBoldStyle(style: WatermarkFontStyle) {
+  return style === "bold" || style === "boldItalic";
+}
+
+function isItalicStyle(style: WatermarkFontStyle) {
+  return style === "italic" || style === "boldItalic";
+}
+
+function textNeedsUnicode(text: string, font: PDFFont) {
+  const supported = new Set(font.getCharacterSet());
+
+  return Array.from(text).some((character) => {
+    const codePoint = character.codePointAt(0);
+    return codePoint !== undefined && !supported.has(codePoint);
+  });
 }
 
 function getTileCenters(width: number, height: number, gap: number) {
@@ -149,6 +175,7 @@ function withCenterRotation(
 function drawWatermarkText({
   page,
   font,
+  unicodeFonts,
   text,
   fontSize,
   opacity,
@@ -158,9 +185,12 @@ function drawWatermarkText({
   surfaceWidth,
   surfaceHeight,
   clipSafe,
+  bold,
+  italic,
 }: {
   readonly page: PDFPage;
   readonly font: PDFFont;
+  readonly unicodeFonts: EmbeddedUnicodeFonts | null;
   readonly text: string;
   readonly fontSize: number;
   readonly opacity: number;
@@ -170,8 +200,12 @@ function drawWatermarkText({
   readonly surfaceWidth: number;
   readonly surfaceHeight: number;
   readonly clipSafe: boolean;
+  readonly bold: boolean;
+  readonly italic: boolean;
 }) {
-  const textWidth = font.widthOfTextAtSize(text, fontSize);
+  const textWidth = unicodeFonts
+    ? measureUnicodeText(text, fontSize, unicodeFonts, bold, italic)
+    : font.widthOfTextAtSize(text, fontSize);
   const safeCenter = clipSafe
     ? getSafeCenter({
         ...center,
@@ -182,14 +216,31 @@ function drawWatermarkText({
         angle,
       })
     : center;
+  const textColor = rgb(color[0], color[1], color[2]);
 
   withCenterRotation(page, safeCenter.x, safeCenter.y, angle, () => {
+    if (unicodeFonts) {
+      drawUnicodeTextLine({
+        page,
+        text,
+        x: -textWidth / 2,
+        y: -fontSize / 2,
+        size: fontSize,
+        fonts: unicodeFonts,
+        bold,
+        italic,
+        color: textColor,
+        opacity,
+      });
+      return;
+    }
+
     page.drawText(text, {
       x: -textWidth / 2,
       y: -fontSize / 2,
       size: fontSize,
       font,
-      color: rgb(color[0], color[1], color[2]),
+      color: textColor,
       opacity,
     });
   });
@@ -271,11 +322,11 @@ export async function applyWatermark(
   file: File,
   options: WatermarkExportOptions,
 ): Promise<PdfProcessingResult> {
-  const text = options.text.trim();
+  const rawText = options.text.trim();
   const needsText = options.mode === "text" || options.mode === "both";
   const needsImage = options.mode === "image" || options.mode === "both";
 
-  if (needsText && !text) {
+  if (needsText && !rawText) {
     throw new PdfEngineError("PROCESSING_FAILED", "Enter watermark text first.");
   }
   if (needsImage && !options.imageFile) {
@@ -312,9 +363,18 @@ export async function applyWatermark(
   const fontSize = clamp(options.fontSize, 8, 220);
   const xPercent = clamp(options.position.xPercent, 4, 96);
   const yPercent = clamp(options.position.yPercent, 4, 96);
+  const bold = isBoldStyle(options.fontStyle);
+  const italic = isItalicStyle(options.fontStyle);
   const font = needsText
     ? await pdf.embedFont(FONT_MAP[options.fontStyle])
     : null;
+  const unicodeFonts =
+    needsText && font && textNeedsUnicode(rawText, font)
+      ? await embedUnicodeFonts(pdf, "helvetica", options.unicodeFontBytes)
+      : null;
+  const text = unicodeFonts
+    ? sanitizeUnicodeText(rawText, unicodeFonts, bold, italic).text
+    : rawText;
   let embeddedImage: PDFImage | null = null;
   let completedPages = 0;
 
@@ -355,6 +415,7 @@ export async function applyWatermark(
           drawWatermarkText({
             page,
             font,
+            unicodeFonts,
             text,
             fontSize,
             opacity,
@@ -364,6 +425,8 @@ export async function applyWatermark(
             surfaceWidth: geometry.viewportWidth,
             surfaceHeight: geometry.viewportHeight,
             clipSafe: options.layout === "single",
+            bold,
+            italic,
           });
         }
         if (needsImage && embeddedImage) {
