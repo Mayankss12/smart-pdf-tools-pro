@@ -82,7 +82,7 @@ export function downloadBlob(blob: Blob, fileName: string): void {
   link.click();
   link.remove();
 
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export async function readPdfFileBytes(file: File): Promise<Uint8Array> {
