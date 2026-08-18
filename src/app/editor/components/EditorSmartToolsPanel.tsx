@@ -284,8 +284,10 @@ export function EditorSmartToolsPanel({
   onStatusChange,
 }: EditorSmartToolsPanelProps) {
   const abortControllerRef = useRef<AbortController | null>(null);
+  const documentIdentityRef = useRef(documentIdentity);
   const findRunRef = useRef(0);
   const findInputRef = useRef<HTMLInputElement | null>(null);
+  documentIdentityRef.current = documentIdentity;
   const [ocrScope, setOcrScope] = useState<"current" | "all">("current");
   const [ocrLanguage, setOcrLanguage] = useState<OcrLanguage>("auto");
   const [ocrProgress, setOcrProgress] = useState<OcrProgress | null>(null);
@@ -309,6 +311,8 @@ export function EditorSmartToolsPanel({
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
     findRunRef.current += 1;
+    setOcrProgress(null);
+    setOcrRunning(false);
     setQuery("");
     setFindResults([]);
     setFindIndex(0);
@@ -366,6 +370,8 @@ export function EditorSmartToolsPanel({
   async function runOcr() {
     if (!editor.pdfDocument || ocrRunning) return;
 
+    const runDocumentIdentity = documentIdentity;
+    abortControllerRef.current?.abort();
     const controller = new AbortController();
     abortControllerRef.current = controller;
     setOcrRunning(true);
@@ -397,6 +403,13 @@ export function EditorSmartToolsPanel({
           quality: "balanced",
           signal: controller.signal,
           onProgress(progress) {
+            if (
+              abortControllerRef.current !== controller ||
+              documentIdentityRef.current !== runDocumentIdentity
+            ) {
+              return;
+            }
+
             const percent =
               ((index + progress.percent / 100) / pageNumbers.length) * 100;
             setOcrProgress({
@@ -409,6 +422,13 @@ export function EditorSmartToolsPanel({
             onActivityChange({ toolId: "ocr", progress: percent });
           },
         });
+
+        if (
+          abortControllerRef.current !== controller ||
+          documentIdentityRef.current !== runDocumentIdentity
+        ) {
+          return;
+        }
 
         if (result) {
           completed.push({ pageNumber, result });
@@ -424,6 +444,13 @@ export function EditorSmartToolsPanel({
         }
       }
 
+      if (
+        abortControllerRef.current !== controller ||
+        documentIdentityRef.current !== runDocumentIdentity
+      ) {
+        return;
+      }
+
       const successMessage =
         `OCR completed for ${completed.length} page${completed.length === 1 ? "" : "s"}. Searchable text will be included on export.`;
       setMessage(successMessage);
@@ -434,6 +461,13 @@ export function EditorSmartToolsPanel({
         pageCount: completed.length,
       });
     } catch (error) {
+      if (
+        abortControllerRef.current !== controller ||
+        documentIdentityRef.current !== runDocumentIdentity
+      ) {
+        return;
+      }
+
       const cancelled = controller.signal.aborted;
       const errorMessage = cancelled
         ? "OCR cancelled."
@@ -452,11 +486,22 @@ export function EditorSmartToolsPanel({
         trackEditorEvent({ type: "tool_error", toolId: "ocr", errorCode: "ocr_failed" });
       }
     } finally {
-      const { terminateOcrWorker } = await import("@/lib/pdf-ocr-engine");
-      await terminateOcrWorker();
-      abortControllerRef.current = null;
-      setOcrRunning(false);
-      onActivityChange(null);
+      const ownsController = abortControllerRef.current === controller;
+      const sameDocument = documentIdentityRef.current === runDocumentIdentity;
+
+      if (ownsController) {
+        const { terminateOcrWorker } = await import("@/lib/pdf-ocr-engine");
+        await terminateOcrWorker();
+
+        if (abortControllerRef.current === controller) {
+          abortControllerRef.current = null;
+          onActivityChange(null);
+        }
+      }
+
+      if (sameDocument) {
+        setOcrRunning(false);
+      }
     }
   }
 
@@ -574,6 +619,11 @@ export function EditorSmartToolsPanel({
 
   async function runTranslation() {
     if (!translationConfigured || translateRunning) return;
+
+    const runDocumentIdentity = documentIdentity;
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
     setTranslateRunning(true);
     setTranslateError("");
     setTranslatedText("");
@@ -587,13 +637,18 @@ export function EditorSmartToolsPanel({
     });
 
     try {
-      abortControllerRef.current?.abort();
-      const controller = new AbortController();
-      abortControllerRef.current = controller;
       const pageSource =
         translateMode === "page"
           ? await getPageTranslationText(editor, ocrPages)
           : null;
+
+      if (
+        abortControllerRef.current !== controller ||
+        documentIdentityRef.current !== runDocumentIdentity
+      ) {
+        return;
+      }
+
       const text =
         translateMode === "selection"
           ? getSelectedEditorText(editor)
@@ -618,6 +673,14 @@ export function EditorSmartToolsPanel({
         }),
       });
       const payload: unknown = await response.json();
+
+      if (
+        abortControllerRef.current !== controller ||
+        documentIdentityRef.current !== runDocumentIdentity
+      ) {
+        return;
+      }
+
       const result = readTranslationResponse(payload);
       if (!response.ok || !result) {
         const providerError =
@@ -636,7 +699,7 @@ export function EditorSmartToolsPanel({
           ? "selected editor text"
           : (pageSource?.source ?? "native text"),
       );
-      setTranslatedDocumentIdentity(documentIdentity);
+      setTranslatedDocumentIdentity(runDocumentIdentity);
       onStatusChange(
         `Translation ready from ${
           translateMode === "selection"
@@ -645,6 +708,13 @@ export function EditorSmartToolsPanel({
         }.`,
       );
     } catch (error) {
+      if (
+        abortControllerRef.current !== controller ||
+        documentIdentityRef.current !== runDocumentIdentity
+      ) {
+        return;
+      }
+
       const errorMessage =
         error instanceof DOMException && error.name === "AbortError"
           ? "Translation cancelled."
@@ -659,9 +729,17 @@ export function EditorSmartToolsPanel({
         errorCode: "translation_failed",
       });
     } finally {
-      abortControllerRef.current = null;
-      setTranslateRunning(false);
-      onActivityChange(null);
+      const ownsController = abortControllerRef.current === controller;
+      const sameDocument = documentIdentityRef.current === runDocumentIdentity;
+
+      if (ownsController) {
+        abortControllerRef.current = null;
+        onActivityChange(null);
+      }
+
+      if (sameDocument) {
+        setTranslateRunning(false);
+      }
     }
   }
 
