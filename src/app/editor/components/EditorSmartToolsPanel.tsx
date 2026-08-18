@@ -135,44 +135,48 @@ async function findNativePdfMatches(
   query: string,
 ) {
   const viewport = page.getViewport({ scale: 1 });
-  const textContent = await page.getTextContent();
   const results: FindResult[] = [];
 
-  textContent.items.forEach((item, itemIndex) => {
-    if (!("str" in item) || !item.str) return;
+  try {
+    const textContent = await page.getTextContent();
 
-    const ranges = findNormalizedSubstringRanges(item.str, query);
-    if (ranges.length === 0) return;
+    textContent.items.forEach((item, itemIndex) => {
+      if (!("str" in item) || !item.str) return;
 
-    const [x, baselineY] = viewport.convertToViewportPoint(
-      item.transform[4] ?? 0,
-      item.transform[5] ?? 0,
-    );
-    const height = Math.max(10, Math.abs(item.height || item.transform[3] || 12));
-    const width = Math.max(8, Math.abs(item.width || 8));
+      const ranges = findNormalizedSubstringRanges(item.str, query);
+      if (ranges.length === 0) return;
 
-    ranges.forEach((range, occurrenceIndex) => {
-      results.push({
-        id: `pdf-${pageNumber}-${itemIndex}-${occurrenceIndex}`,
-        pageNumber,
-        source: "pdf",
-        preview: item.str,
-        box: getPdfSubstringBox({
-          text: item.str,
-          start: range.start,
-          length: range.length,
-          x,
-          y: Math.max(0, baselineY - height),
-          width,
-          height,
-          direction: item.dir === "rtl" ? "rtl" : "ltr",
-        }),
+      const [x, baselineY] = viewport.convertToViewportPoint(
+        item.transform[4] ?? 0,
+        item.transform[5] ?? 0,
+      );
+      const height = Math.max(10, Math.abs(item.height || item.transform[3] || 12));
+      const width = Math.max(8, Math.abs(item.width || 8));
+
+      ranges.forEach((range, occurrenceIndex) => {
+        results.push({
+          id: `pdf-${pageNumber}-${itemIndex}-${occurrenceIndex}`,
+          pageNumber,
+          source: "pdf",
+          preview: item.str,
+          box: getPdfSubstringBox({
+            text: item.str,
+            start: range.start,
+            length: range.length,
+            x,
+            y: Math.max(0, baselineY - height),
+            width,
+            height,
+            direction: item.dir === "rtl" ? "rtl" : "ltr",
+          }),
+        });
       });
     });
-  });
 
-  page.cleanup();
-  return results;
+    return results;
+  } finally {
+    page.cleanup();
+  }
 }
 
 function findOcrMatches(
@@ -323,9 +327,14 @@ export function EditorSmartToolsPanel({
     if (editor.activeTool === "find") {
       window.requestAnimationFrame(() => findInputRef.current?.focus());
     } else {
+      findRunRef.current += 1;
+      if (findRunning) {
+        setFindRunning(false);
+        onActivityChange(null);
+      }
       onFindHighlightChange([]);
     }
-  }, [editor.activeTool, onFindHighlightChange]);
+  }, [editor.activeTool, findRunning, onActivityChange, onFindHighlightChange]);
 
   useEffect(() => {
     return () => {
@@ -336,13 +345,22 @@ export function EditorSmartToolsPanel({
     };
   }, []);
 
-  function clearFind() {
+  function invalidateFind() {
     findRunRef.current += 1;
-    setQuery("");
     setFindResults([]);
     setFindIndex(0);
     setMessage("");
     onFindHighlightChange([]);
+
+    if (findRunning) {
+      setFindRunning(false);
+      onActivityChange(null);
+    }
+  }
+
+  function clearFind() {
+    setQuery("");
+    invalidateFind();
   }
 
   async function runOcr() {
@@ -445,6 +463,8 @@ export function EditorSmartToolsPanel({
   async function runFind() {
     const normalizedQuery = query.trim();
 
+    if (findRunning) return;
+
     if (!editor.pdfDocument || !normalizedQuery) {
       setFindResults([]);
       setFindIndex(0);
@@ -453,6 +473,9 @@ export function EditorSmartToolsPanel({
     }
 
     setFindRunning(true);
+    setFindResults([]);
+    setFindIndex(0);
+    onFindHighlightChange([]);
     const runId = findRunRef.current + 1;
     findRunRef.current = runId;
     setMessage("");
@@ -464,10 +487,18 @@ export function EditorSmartToolsPanel({
       for (let pageNumber = 1; pageNumber <= editor.totalPages; pageNumber += 1) {
         if (findRunRef.current !== runId) return;
         const page = await editor.pdfDocument.getPage(pageNumber);
+
+        if (findRunRef.current !== runId) {
+          page.cleanup();
+          return;
+        }
+
         const viewport = page.getViewport({ scale: 1 });
         results.push(
           ...(await findNativePdfMatches(page, pageNumber, normalizedQuery)),
         );
+
+        if (findRunRef.current !== runId) return;
 
         const ocrPage = ocrPages.find((item) => item.pageNumber === pageNumber);
         if (ocrPage) {
@@ -513,6 +544,8 @@ export function EditorSmartToolsPanel({
         includedOcr: ocrPages.length > 0,
       });
     } catch (error) {
+      if (findRunRef.current !== runId) return;
+
       setFindResults([]);
       onFindHighlightChange([]);
       const errorMessage = error instanceof Error ? error.message : "Search failed.";
@@ -520,8 +553,10 @@ export function EditorSmartToolsPanel({
       onStatusChange(errorMessage);
       trackEditorEvent({ type: "tool_error", toolId: "find", errorCode: "find_failed" });
     } finally {
-      setFindRunning(false);
-      onActivityChange(null);
+      if (findRunRef.current === runId) {
+        setFindRunning(false);
+        onActivityChange(null);
+      }
     }
   }
 
@@ -759,7 +794,7 @@ export function EditorSmartToolsPanel({
               value={query}
               onChange={(event) => {
                 setQuery(event.target.value);
-                if (!event.target.value) clearFind();
+                invalidateFind();
               }}
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
