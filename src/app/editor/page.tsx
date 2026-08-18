@@ -84,7 +84,7 @@ function downloadBlob(blob: Blob, filename: string) {
   link.click();
   link.remove();
 
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function getPickerEvent(toolId: EditorToolbarItemId) {
