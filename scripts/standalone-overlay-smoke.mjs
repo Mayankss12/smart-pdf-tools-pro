@@ -89,6 +89,10 @@ const [latinFontBytes, devanagariFontBytes] = await Promise.all([
     ),
   ),
 ]);
+const unicodeFontBytes = {
+  latin: new Uint8Array(latinFontBytes),
+  devanagari: new Uint8Array(devanagariFontBytes),
+};
 const unicodeNumbered = await addPageNumbersWithOptions(sourceFile, {
   position: { xPercent: 50, yPercent: 92 },
   targetPages: [1],
@@ -99,10 +103,7 @@ const unicodeNumbered = await addPageNumbersWithOptions(sourceFile, {
   prefix: "कखग ",
   suffix: " / {total}",
   color: [0.2, 0.1, 0.6],
-  unicodeFontBytes: {
-    latin: new Uint8Array(latinFontBytes),
-    devanagari: new Uint8Array(devanagariFontBytes),
-  },
+  unicodeFontBytes,
 });
 const unicodeNumberedBytes = new Uint8Array(
   await unicodeNumbered.blob.arrayBuffer(),
@@ -174,6 +175,43 @@ try {
   await watermarkRender.destroy();
 }
 
+const unicodeWatermarked = await applyWatermark(sourceFile, {
+  mode: "text",
+  layout: "single",
+  targetPages: [1],
+  text: "कखग",
+  fontSize: 28,
+  opacity: 0.6,
+  angle: -28,
+  fontStyle: "boldItalic",
+  color: [0.2, 0.1, 0.6],
+  position: { xPercent: 50, yPercent: 50 },
+  tileGap: 220,
+  imageFile: null,
+  imageScale: 36,
+  unicodeFontBytes,
+});
+const unicodeWatermarkedBytes = new Uint8Array(
+  await unicodeWatermarked.blob.arrayBuffer(),
+);
+const unicodeWatermarkRender = await pdfjs.getDocument({
+  data: unicodeWatermarkedBytes.slice(),
+}).promise;
+try {
+  const page = await unicodeWatermarkRender.getPage(1);
+  try {
+    const content = await page.getTextContent();
+    const combinedText = content.items
+      .map((item) => ("str" in item ? item.str : ""))
+      .join("");
+    assert.match(combinedText, /कखग/);
+  } finally {
+    page.cleanup();
+  }
+} finally {
+  await unicodeWatermarkRender.destroy();
+}
+
 console.log(
   JSON.stringify({
     rotations: rotations.join("/"),
@@ -181,6 +219,8 @@ console.log(
     pageNumberFontOpacityRange: "passed",
     pageNumberUnicodeAffix: "devanagari passed",
     watermarkFullAngleOpacityRange: "passed",
+    watermarkUnicodeText: "devanagari passed",
+    watermarkBoldItalicUnicodePath: "passed",
     mixedRotationPreservation: "passed",
     overlayProgress: "passed",
   }),
