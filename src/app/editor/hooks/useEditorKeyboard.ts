@@ -115,6 +115,8 @@ export function useEditorKeyboard({
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
+      if (event.defaultPrevented) return;
+
       const state = stateRef.current;
       const currentEditor = state.editor;
       const typing = isTypingTarget(event.target);
