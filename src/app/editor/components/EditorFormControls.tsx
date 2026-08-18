@@ -108,6 +108,10 @@ export function EditorFormControls({ editor }: { readonly editor: EditorControll
             optionValue: type === "radio" ? config.optionValue || "Option 1" : undefined,
             checked: type === "checkbox" ? Boolean(config.checked) : undefined,
             multiline: type === "text" ? Boolean(config.multiline) : undefined,
+            defaultValue:
+              type === "text" || type === "dropdown"
+                ? config.defaultValue ?? ""
+                : undefined,
           });
         }}
         className="h-7 rounded-lg border border-slate-200 bg-white px-1.5 text-[10px] font-black text-slate-700 outline-none focus:border-violet-400"
