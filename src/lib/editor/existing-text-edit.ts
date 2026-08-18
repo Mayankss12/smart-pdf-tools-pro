@@ -58,35 +58,55 @@ export function getExistingTextEditSource(
   const rawWidth = (item.widthPercent / 100) * pageWidth;
   const rawHeight = (item.heightPercent / 100) * pageHeight;
   const fontSize = Math.max(5, Number(item.fontSizePdf || 0));
+  const minimumWidth = Math.min(MIN_EDIT_WIDTH, pageWidth);
+  const minimumHeight = Math.min(MIN_EDIT_HEIGHT, pageHeight);
+  const anchorX = clamp(rawX, 0, pageWidth);
+  const anchorY = clamp(rawY, 0, pageHeight);
 
   const width = clamp(
-    Math.max(MIN_EDIT_WIDTH, rawWidth + 4),
-    MIN_EDIT_WIDTH,
-    Math.max(MIN_EDIT_WIDTH, pageWidth - rawX),
+    Math.max(minimumWidth, rawWidth + 4),
+    minimumWidth,
+    Math.max(minimumWidth, pageWidth - anchorX),
   );
   const height = clamp(
-    Math.max(MIN_EDIT_HEIGHT, rawHeight + 2),
-    MIN_EDIT_HEIGHT,
-    Math.max(MIN_EDIT_HEIGHT, pageHeight - rawY),
+    Math.max(minimumHeight, rawHeight + 2),
+    minimumHeight,
+    Math.max(minimumHeight, pageHeight - anchorY),
   );
   const sourceBox = {
-    x: clamp(rawX, 0, Math.max(0, pageWidth - width)),
-    y: clamp(rawY, 0, Math.max(0, pageHeight - height)),
+    x: clamp(anchorX, 0, Math.max(0, pageWidth - width)),
+    y: clamp(anchorY, 0, Math.max(0, pageHeight - height)),
     width,
     height,
   };
 
-  const coverX = Math.max(0, rawX - COVER_PADDING);
-  const coverY = Math.max(0, rawY - COVER_PADDING);
-  const coverRight = Math.min(pageWidth, rawX + Math.max(rawWidth, 1) + COVER_PADDING);
-  const coverBottom = Math.min(pageHeight, rawY + Math.max(rawHeight, 1) + COVER_PADDING);
+  const coverX = clamp(
+    rawX - COVER_PADDING,
+    0,
+    Math.max(0, pageWidth - 1),
+  );
+  const coverY = clamp(
+    rawY - COVER_PADDING,
+    0,
+    Math.max(0, pageHeight - 1),
+  );
+  const coverRight = clamp(
+    rawX + Math.max(rawWidth, 1) + COVER_PADDING,
+    Math.min(pageWidth, coverX + 1),
+    pageWidth,
+  );
+  const coverBottom = clamp(
+    rawY + Math.max(rawHeight, 1) + COVER_PADDING,
+    Math.min(pageHeight, coverY + 1),
+    pageHeight,
+  );
 
   return {
     sourceItemId: item.id,
     originalText: item.text,
     fontName: item.fontName ?? null,
     fontSize,
-    baselineOffset: Math.max(1, rawHeight),
+    baselineOffset: clamp(Math.max(1, rawHeight), 1, sourceBox.height),
     sourceBox,
     coverBox: {
       x: coverX,
