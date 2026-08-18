@@ -116,7 +116,7 @@ objects.push(
     pageNumber: 1,
     box: { x: 136, y: 174, width: 130, height: 86 },
     data: {
-      text: "Exported note",
+      text: "कखग",
       fontSize: 12,
       backgroundColor: "#fef3c7",
       opacity: 1,
@@ -165,6 +165,7 @@ try {
 }
 assert.match(firstPageText, /Café/);
 assert.match(firstPageText, /नमस्ते/);
+assert.match(firstPageText, /कखग/);
 assert.doesNotMatch(firstPageText, /你好|😀/);
 
 const transformedWords = transformOcrWordsToPdfSpace(
@@ -203,6 +204,7 @@ console.log(
     rotations,
     objectTypes: [...new Set(objects.map((object) => object.type))],
     unicodeText: "devanagari passed",
+    unicodeNote: "devanagari passed",
     unsupportedUnicodeFallback: "passed",
     asciiText: "passed",
     ocrPlacement: "passed",
