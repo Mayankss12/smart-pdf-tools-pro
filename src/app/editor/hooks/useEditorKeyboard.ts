@@ -102,13 +102,18 @@ export function useEditorKeyboard({
     void document
       .getPage(pageNumber)
       .then((page) => {
-        if (cancelled) return;
-        const viewport = page.getViewport({ scale: 1 });
-        pageBoundsRef.current = {
-          pageNumber,
-          width: viewport.width,
-          height: viewport.height,
-        };
+        try {
+          if (cancelled) return;
+
+          const viewport = page.getViewport({ scale: 1 });
+          pageBoundsRef.current = {
+            pageNumber,
+            width: viewport.width,
+            height: viewport.height,
+          };
+        } finally {
+          page.cleanup();
+        }
       })
       .catch(() => {
         if (!cancelled) pageBoundsRef.current = null;
