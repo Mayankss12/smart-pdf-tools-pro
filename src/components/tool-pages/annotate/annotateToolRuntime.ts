@@ -131,30 +131,36 @@ async function renderPagePreview(input: {
 }> {
   const viewport = input.page.getViewport({ scale: input.renderScale });
   const canvas = document.createElement("canvas");
-  const context = canvas.getContext("2d");
 
-  if (!context) {
-    throw new Error("Unable to create a canvas preview for this PDF page.");
+  try {
+    const context = canvas.getContext("2d");
+
+    if (!context) {
+      throw new Error("Unable to create a canvas preview for this PDF page.");
+    }
+
+    const outputScale = window.devicePixelRatio || 1;
+
+    canvas.width = Math.max(1, Math.floor(viewport.width * outputScale));
+    canvas.height = Math.max(1, Math.floor(viewport.height * outputScale));
+    canvas.style.width = `${viewport.width}px`;
+    canvas.style.height = `${viewport.height}px`;
+
+    context.setTransform(outputScale, 0, 0, outputScale, 0, 0);
+
+    await input.page.render({
+      canvasContext: context,
+      viewport,
+    }).promise;
+
+    return {
+      previewUrl: canvas.toDataURL("image/png"),
+      viewport,
+    };
+  } finally {
+    canvas.width = 0;
+    canvas.height = 0;
   }
-
-  const outputScale = window.devicePixelRatio || 1;
-
-  canvas.width = Math.max(1, Math.floor(viewport.width * outputScale));
-  canvas.height = Math.max(1, Math.floor(viewport.height * outputScale));
-  canvas.style.width = `${viewport.width}px`;
-  canvas.style.height = `${viewport.height}px`;
-
-  context.setTransform(outputScale, 0, 0, outputScale, 0, 0);
-
-  await input.page.render({
-    canvasContext: context,
-    viewport,
-  }).promise;
-
-  return {
-    previewUrl: canvas.toDataURL("image/png"),
-    viewport,
-  };
 }
 
 export async function buildAnnotatePageSnapshot(input: {
@@ -163,32 +169,37 @@ export async function buildAnnotatePageSnapshot(input: {
   readonly renderScale: number;
 }): Promise<AnnotatePageSnapshot> {
   const page = await input.pdf.getPage(input.pageNumber);
-  const pageIndex = input.pageNumber - 1;
-  const pageRotation = page.rotate ?? 0;
-  const preview = await renderPagePreview({
-    page,
-    renderScale: input.renderScale,
-  });
-  const baseViewport = page.getViewport({ scale: 1, rotation: 0 });
 
-  const geometry = createPageGeometryContextFromPdfJs({
-    pageIndex,
-    pageNumber: input.pageNumber,
-    rotation: pageRotation,
-    pdfPageSize: {
-      width: baseViewport.width,
-      height: baseViewport.height,
-    },
-    viewport: preview.viewport,
-  });
+  try {
+    const pageIndex = input.pageNumber - 1;
+    const pageRotation = page.rotate ?? 0;
+    const preview = await renderPagePreview({
+      page,
+      renderScale: input.renderScale,
+    });
+    const baseViewport = page.getViewport({ scale: 1, rotation: 0 });
 
-  return {
-    pageIndex,
-    pageNumber: input.pageNumber,
-    pageLabel: `Page ${input.pageNumber}`,
-    previewUrl: preview.previewUrl,
-    geometry,
-  };
+    const geometry = createPageGeometryContextFromPdfJs({
+      pageIndex,
+      pageNumber: input.pageNumber,
+      rotation: pageRotation,
+      pdfPageSize: {
+        width: baseViewport.width,
+        height: baseViewport.height,
+      },
+      viewport: preview.viewport,
+    });
+
+    return {
+      pageIndex,
+      pageNumber: input.pageNumber,
+      pageLabel: `Page ${input.pageNumber}`,
+      previewUrl: preview.previewUrl,
+      geometry,
+    };
+  } finally {
+    page.cleanup();
+  }
 }
 
 export async function buildAllAnnotatePageSnapshots(input: {
