@@ -96,6 +96,7 @@ const MAX_WORKER_LOG_PERCENT = 86;
 let workerState: WorkerState | null = null;
 let activeTesseractLogger: ((message: unknown) => void) | null = null;
 let workerInitPromise: Promise<TesseractWorker> | null = null;
+let workerInitLanguage: OcrWorkerLanguage | null = null;
 
 export function getAvailableOcrLanguages() {
   return OCR_LANGUAGES;
@@ -120,6 +121,7 @@ export async function terminateOcrWorker() {
 
   workerState = null;
   workerInitPromise = null;
+  workerInitLanguage = null;
   activeTesseractLogger = null;
 
   if (currentWorker) {
@@ -281,11 +283,44 @@ async function getOcrWorker(workerLanguage: OcrWorkerLanguage, quality: OcrQuali
     await terminateOcrWorker();
   }
 
+  if (workerInitPromise && workerInitLanguage !== workerLanguage) {
+    await terminateOcrWorker();
+  }
+
   if (!workerInitPromise) {
+    workerInitLanguage = workerLanguage;
     workerInitPromise = createWorker(workerLanguage);
   }
 
-  const worker = await workerInitPromise;
+  const initPromise = workerInitPromise;
+  const initLanguage = workerInitLanguage;
+  let worker: TesseractWorker;
+
+  try {
+    worker = await initPromise;
+  } catch (error) {
+    if (workerInitPromise === initPromise) {
+      workerInitPromise = null;
+      workerInitLanguage = null;
+    }
+    throw error;
+  }
+
+  if (
+    workerInitPromise !== initPromise ||
+    workerInitLanguage !== initLanguage ||
+    initLanguage !== workerLanguage
+  ) {
+    try {
+      await worker.terminate();
+    } catch {
+      // The stale worker may already be terminating after cancellation.
+    }
+    throw new PdfEngineError(
+      "PROCESSING_FAILED",
+      "OCR worker initialization was cancelled or replaced.",
+    );
+  }
 
   workerState = {
     worker,
