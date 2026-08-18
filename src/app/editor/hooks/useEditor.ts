@@ -370,7 +370,10 @@ export function useEditor(): EditorController {
   }, [syncHistoryFlags]);
 
   const markChanged = useCallback((count = 1) => {
-    const saved = count === 0 && objectsRef.current === savedObjectsRef.current;
+    const saved =
+      count === 0 &&
+      objectsRef.current === savedObjectsRef.current &&
+      !documentDirtyRef.current;
     setUnsavedChanges(saved ? 0 : Math.max(1, count));
     setSaveState(saved ? "saved" : "unsaved");
   }, []);
