@@ -22,6 +22,13 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
+function hasMailtoRecipient(url: URL) {
+  const directRecipient = url.pathname.trim();
+  const queryRecipient = url.searchParams.get("to")?.trim() ?? "";
+
+  return Boolean(directRecipient || queryRecipient);
+}
+
 export function normalizeEditorLinkUrl(value: string | null | undefined) {
   const trimmed = value?.trim() ?? "";
   if (!trimmed) return null;
@@ -39,6 +46,10 @@ export function normalizeEditorLinkUrl(value: string | null | undefined) {
     }
 
     if ((protocol === "http:" || protocol === "https:") && !url.hostname) {
+      return null;
+    }
+
+    if (protocol === "mailto:" && !hasMailtoRecipient(url)) {
       return null;
     }
 
