@@ -259,6 +259,7 @@ export function drawUnicodeTextLine({
   bold = false,
   italic = false,
   color,
+  opacity = 1,
 }: {
   readonly page: PDFPage;
   readonly text: string;
@@ -269,6 +270,7 @@ export function drawUnicodeTextLine({
   readonly bold?: boolean;
   readonly italic?: boolean;
   readonly color: RGB;
+  readonly opacity?: number;
 }) {
   let cursorX = x;
 
@@ -281,6 +283,7 @@ export function drawUnicodeTextLine({
         size,
         font: run.font,
         color,
+        opacity,
       });
       cursorX += width;
     } catch {
@@ -303,6 +306,7 @@ export function drawUnicodeTextLine({
             size,
             font: fallbackFont,
             color,
+            opacity,
           });
           cursorX += width;
         } catch {

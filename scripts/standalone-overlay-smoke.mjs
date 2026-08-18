@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 
 import * as pdfjs from "pdfjs-dist";
 import { PDFDocument, degrees } from "pdf-lib";
@@ -79,6 +80,52 @@ for (const position of numberPositions) {
   assert.ok(position.yRatio > 0.15 && position.yRatio < 0.5);
 }
 
+const [latinFontBytes, devanagariFontBytes] = await Promise.all([
+  readFile(new URL("../public/fonts/NotoSans-Regular.ttf", import.meta.url)),
+  readFile(
+    new URL(
+      "../public/fonts/NotoSansDevanagari-Regular.ttf",
+      import.meta.url,
+    ),
+  ),
+]);
+const unicodeNumbered = await addPageNumbersWithOptions(sourceFile, {
+  position: { xPercent: 50, yPercent: 92 },
+  targetPages: [1],
+  startNumber: 1,
+  fontSize: 18,
+  font: "helvetica",
+  opacity: 0.65,
+  prefix: "कखग ",
+  suffix: " / {total}",
+  color: [0.2, 0.1, 0.6],
+  unicodeFontBytes: {
+    latin: new Uint8Array(latinFontBytes),
+    devanagari: new Uint8Array(devanagariFontBytes),
+  },
+});
+const unicodeNumberedBytes = new Uint8Array(
+  await unicodeNumbered.blob.arrayBuffer(),
+);
+const unicodeNumberedRender = await pdfjs.getDocument({
+  data: unicodeNumberedBytes.slice(),
+}).promise;
+try {
+  const page = await unicodeNumberedRender.getPage(1);
+  try {
+    const content = await page.getTextContent();
+    const combinedText = content.items
+      .map((candidate) => ("str" in candidate ? candidate.str : ""))
+      .join("");
+    assert.match(combinedText, /कखग/);
+    assert.match(combinedText, /1 \/ 1/);
+  } finally {
+    page.cleanup();
+  }
+} finally {
+  await unicodeNumberedRender.destroy();
+}
+
 const watermarkProgress = [];
 const watermarked = await applyWatermark(sourceFile, {
   mode: "text",
@@ -132,6 +179,7 @@ console.log(
     rotations: rotations.join("/"),
     nonCentralPageNumberPlacement: "passed",
     pageNumberFontOpacityRange: "passed",
+    pageNumberUnicodeAffix: "devanagari passed",
     watermarkFullAngleOpacityRange: "passed",
     mixedRotationPreservation: "passed",
     overlayProgress: "passed",
