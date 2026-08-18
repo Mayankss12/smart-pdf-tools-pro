@@ -72,22 +72,32 @@ function ReorderThumbnail({
       if (!canvas) return;
 
       const page = await pdfDocument.getPage(pageNumber);
-      const viewport = page.getViewport({ scale: 0.2 });
-      const context = canvas.getContext("2d");
-      if (!context || cancelled) return;
-
-      canvas.width = Math.max(1, Math.ceil(viewport.width));
-      canvas.height = Math.max(1, Math.ceil(viewport.height));
-      renderTask = page.render({ canvasContext: context, viewport });
 
       try {
+        if (cancelled) return;
+
+        const viewport = page.getViewport({ scale: 0.2 });
+        const context = canvas.getContext("2d");
+        if (!context || cancelled) return;
+
+        canvas.width = Math.max(1, Math.ceil(viewport.width));
+        canvas.height = Math.max(1, Math.ceil(viewport.height));
+        renderTask = page.render({ canvasContext: context, viewport });
         await renderTask.promise;
       } finally {
         page.cleanup();
       }
     }
 
-    void render();
+    void render().catch(() => {
+      if (!cancelled) {
+        const canvas = canvasRef.current;
+        if (canvas) {
+          canvas.width = 0;
+          canvas.height = 0;
+        }
+      }
+    });
 
     return () => {
       cancelled = true;
