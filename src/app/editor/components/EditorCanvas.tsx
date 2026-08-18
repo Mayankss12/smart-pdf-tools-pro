@@ -145,11 +145,14 @@ function clampBoxToPage(
   minHeight: number,
 ) {
   const page = getUnscaledPageSize(pageSize, pageScale);
-
-  const safePageWidth = Math.max(minWidth, page.width || minWidth);
-  const safePageHeight = Math.max(minHeight, page.height || minHeight);
-  const safeWidth = clamp(box.width, minWidth, safePageWidth);
-  const safeHeight = clamp(box.height, minHeight, safePageHeight);
+  const measuredPageWidth = page.width > 0 ? page.width : minWidth;
+  const measuredPageHeight = page.height > 0 ? page.height : minHeight;
+  const safePageWidth = Math.max(1, measuredPageWidth);
+  const safePageHeight = Math.max(1, measuredPageHeight);
+  const effectiveMinWidth = Math.min(Math.max(0.01, minWidth), safePageWidth);
+  const effectiveMinHeight = Math.min(Math.max(0.01, minHeight), safePageHeight);
+  const safeWidth = clamp(box.width, effectiveMinWidth, safePageWidth);
+  const safeHeight = clamp(box.height, effectiveMinHeight, safePageHeight);
   const safeX = clamp(box.x, 0, Math.max(0, safePageWidth - safeWidth));
   const safeY = clamp(box.y, 0, Math.max(0, safePageHeight - safeHeight));
 
