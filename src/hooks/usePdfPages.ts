@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as pdfjsLib from "pdfjs-dist";
-import { configurePdfJsWorker } from "@/lib/pdfjs-worker";
 
+import { configurePdfJsWorker } from "@/lib/pdfjs-worker";
 import {
   PdfEngineError,
   loadPdfDocument,
@@ -107,6 +107,8 @@ export function usePdfPages(options: UsePdfPagesOptions = {}) {
       setProgress(0);
       setError(null);
 
+      let pdf: pdfjsLib.PDFDocumentProxy | null = null;
+
       try {
         configurePdfJsWorker(pdfjsLib);
 
@@ -130,74 +132,73 @@ export function usePdfPages(options: UsePdfPagesOptions = {}) {
           data: await selectedFile.arrayBuffer(),
         });
 
-        const pdf = await loadingTask.promise;
+        pdf = await loadingTask.promise;
 
-        if (renderTokenRef.current !== token) {
-          await pdf.destroy();
-          return;
-        }
+        if (renderTokenRef.current !== token) return;
 
         const nextPages = createEmptyPages(totalPages);
 
         for (let pageNumber = 1; pageNumber <= totalPages; pageNumber += 1) {
-          if (renderTokenRef.current !== token) {
-            await pdf.destroy();
-            return;
-          }
+          if (renderTokenRef.current !== token) return;
 
           const page = await pdf.getPage(pageNumber);
-          const viewport = page.getViewport({ scale: thumbnailScale });
-          const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
 
-          const canvas = document.createElement("canvas");
-          const context = canvas.getContext("2d");
+          try {
+            if (renderTokenRef.current !== token) return;
 
-          if (!context) {
+            const viewport = page.getViewport({ scale: thumbnailScale });
+            const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+
+            const canvas = document.createElement("canvas");
+            const context = canvas.getContext("2d");
+
+            if (!context) {
+              nextPages[pageNumber - 1] = {
+                pageNumber,
+                thumbnail: "",
+                thumbnailUrl: "",
+              };
+
+              setPages([...nextPages]);
+              setProgress(Math.round((pageNumber / totalPages) * 100));
+              continue;
+            }
+
+            canvas.width = Math.ceil(viewport.width * pixelRatio);
+            canvas.height = Math.ceil(viewport.height * pixelRatio);
+            context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+
+            const renderTask = page.render({
+              canvasContext: context,
+              viewport,
+            });
+
+            activeRenderTaskRef.current = renderTask;
+
+            try {
+              await renderTask.promise;
+            } finally {
+              if (activeRenderTaskRef.current === renderTask) {
+                activeRenderTaskRef.current = null;
+              }
+            }
+
+            if (renderTokenRef.current !== token) return;
+
+            const thumbnail = canvas.toDataURL("image/png");
+
             nextPages[pageNumber - 1] = {
               pageNumber,
-              thumbnail: "",
-              thumbnailUrl: "",
+              thumbnail,
+              thumbnailUrl: thumbnail,
             };
 
             setPages([...nextPages]);
             setProgress(Math.round((pageNumber / totalPages) * 100));
-            continue;
+          } finally {
+            page.cleanup();
           }
-
-          canvas.width = Math.ceil(viewport.width * pixelRatio);
-          canvas.height = Math.ceil(viewport.height * pixelRatio);
-          context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-
-          const renderTask = page.render({
-            canvasContext: context,
-            viewport,
-          });
-
-          activeRenderTaskRef.current = renderTask;
-
-          await renderTask.promise;
-
-          if (renderTokenRef.current !== token) {
-            await pdf.destroy();
-            return;
-          }
-
-          const thumbnail = canvas.toDataURL("image/png");
-
-          nextPages[pageNumber - 1] = {
-            pageNumber,
-            thumbnail,
-            thumbnailUrl: thumbnail,
-          };
-
-          setPages([...nextPages]);
-          setProgress(Math.round((pageNumber / totalPages) * 100));
-
-          activeRenderTaskRef.current = null;
-          page.cleanup();
         }
-
-        await pdf.destroy();
 
         if (renderTokenRef.current === token) {
           setProgress(100);
@@ -207,14 +208,16 @@ export function usePdfPages(options: UsePdfPagesOptions = {}) {
       } catch (caughtError) {
         if (renderTokenRef.current !== token) return;
 
-        cancelActiveRender();
-
         setFile(null);
         setPages([]);
         setPageCount(0);
         setProgress(0);
         setLoading(false);
         setError(getPdfPagesErrorMessage(caughtError));
+      } finally {
+        if (pdf) {
+          await pdf.destroy();
+        }
       }
     },
     [cancelActiveRender, options.validation, thumbnailScale],
