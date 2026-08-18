@@ -1,5 +1,6 @@
 import { PDFDocument, rgb, type PDFPage } from "pdf-lib";
 import type { ExistingTextEditSource } from "../editor/existing-text-edit";
+import type { BundledUnicodeFontBytes } from "../pdf-unicode-fonts";
 import type { OcrResult } from "../pdf-ocr-engine";
 import { addSearchableTextLayer } from "../pdf-text-overlay";
 
@@ -225,17 +226,37 @@ async function drawEditorObject({
   }
 }
 
+function getEditorTextSamples(objects: readonly EditorExportObject[]) {
+  const samples: string[] = [];
+
+  for (const object of objects) {
+    if (object.data.text) samples.push(object.data.text);
+    if (object.data.stampLabel) samples.push(object.data.stampLabel);
+    object.data.textRuns?.forEach((run) => {
+      if (run.text) samples.push(run.text);
+    });
+  }
+
+  return samples;
+}
+
 export async function exportEditorPdfBytes({
   fileBytes,
   objects,
   ocrPages = [],
+  unicodeFontBytes,
 }: {
   readonly fileBytes: Uint8Array;
   readonly objects: readonly EditorExportObject[];
   readonly ocrPages?: readonly EditorExportOcrPage[];
+  readonly unicodeFontBytes?: BundledUnicodeFontBytes;
 }) {
   const pdfDoc = await PDFDocument.load(fileBytes);
-  const fonts = await embedEditorTextFonts(pdfDoc);
+  const fonts = await embedEditorTextFonts(
+    pdfDoc,
+    getEditorTextSamples(objects),
+    unicodeFontBytes,
+  );
   const pages = pdfDoc.getPages();
 
   for (const object of objects) {

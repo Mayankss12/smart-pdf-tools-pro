@@ -12,6 +12,11 @@ import {
 } from "pdf-lib";
 
 import type { ExistingTextEditSource } from "../editor/existing-text-edit";
+import {
+  embedUnicodeFonts,
+  type BundledUnicodeFontBytes,
+  type EmbeddedUnicodeFonts,
+} from "../pdf-unicode-fonts";
 import type { EditorPageGeometry } from "./editor-page-geometry";
 
 export type EmbeddedTextFonts = {
@@ -19,6 +24,13 @@ export type EmbeddedTextFonts = {
   readonly bold: PDFFont;
   readonly italic: PDFFont;
   readonly boldItalic: PDFFont;
+  readonly unicode?: EmbeddedUnicodeFonts;
+  readonly supportedCodePoints: {
+    readonly regular: ReadonlySet<number>;
+    readonly bold: ReadonlySet<number>;
+    readonly italic: ReadonlySet<number>;
+    readonly boldItalic: ReadonlySet<number>;
+  };
 };
 
 export type RichTextExportBox = {
@@ -61,6 +73,11 @@ export type EditorRichTextExportObject = {
   readonly data: RichTextExportData;
 };
 
+type FontRun = {
+  readonly text: string;
+  readonly font: PDFFont;
+};
+
 const TEXT_PADDING_X = 4;
 const TEXT_PADDING_Y = 2;
 
@@ -76,12 +93,61 @@ export function getEditorTextClipBox(
   };
 }
 
-export async function embedEditorTextFonts(pdfDoc: PDFDocument): Promise<EmbeddedTextFonts> {
+function isControlCharacter(codePoint: number) {
+  return (
+    codePoint === 0 ||
+    (codePoint < 0x20 && codePoint !== 0x09 && codePoint !== 0x0a && codePoint !== 0x0d)
+  );
+}
+
+function needsUnicodeFonts(
+  textSamples: readonly string[],
+  supportedCodePoints: ReadonlySet<number>,
+) {
+  return textSamples.some((text) =>
+    Array.from(text).some((character) => {
+      if (character === "\n" || character === "\r" || character === "\t") return false;
+      const codePoint = character.codePointAt(0);
+      return codePoint !== undefined && !isControlCharacter(codePoint) && !supportedCodePoints.has(codePoint);
+    }),
+  );
+}
+
+export async function embedEditorTextFonts(
+  pdfDoc: PDFDocument,
+  textSamples: readonly string[] = [],
+  unicodeFontBytes?: BundledUnicodeFontBytes,
+): Promise<EmbeddedTextFonts> {
+  const [regular, bold, italic, boldItalic] = await Promise.all([
+    pdfDoc.embedFont(StandardFonts.Helvetica),
+    pdfDoc.embedFont(StandardFonts.HelveticaBold),
+    pdfDoc.embedFont(StandardFonts.HelveticaOblique),
+    pdfDoc.embedFont(StandardFonts.HelveticaBoldOblique),
+  ]);
+  const supportedCodePoints = {
+    regular: new Set(regular.getCharacterSet()),
+    bold: new Set(bold.getCharacterSet()),
+    italic: new Set(italic.getCharacterSet()),
+    boldItalic: new Set(boldItalic.getCharacterSet()),
+  };
+  let unicode: EmbeddedUnicodeFonts | undefined;
+
+  if (needsUnicodeFonts(textSamples, supportedCodePoints.regular)) {
+    try {
+      unicode = await embedUnicodeFonts(pdfDoc, "helvetica", unicodeFontBytes);
+    } catch (error) {
+      if (unicodeFontBytes) throw error;
+      // Browser exports keep working with safe replacement glyphs if bundled fonts cannot load.
+    }
+  }
+
   return {
-    regular: await pdfDoc.embedFont(StandardFonts.Helvetica),
-    bold: await pdfDoc.embedFont(StandardFonts.HelveticaBold),
-    italic: await pdfDoc.embedFont(StandardFonts.HelveticaOblique),
-    boldItalic: await pdfDoc.embedFont(StandardFonts.HelveticaBoldOblique),
+    regular,
+    bold,
+    italic,
+    boldItalic,
+    unicode,
+    supportedCodePoints,
   };
 }
 
@@ -106,15 +172,64 @@ function getSafeOpacity(opacity: number | undefined) {
   return Math.max(0, Math.min(1, Number(opacity)));
 }
 
-function getTextFontFromStyle(style: Required<ExportTextStyle>, fonts: EmbeddedTextFonts) {
-  const bold = style.fontWeight === "bold" || style.fontWeight === "700";
+function isBoldStyle(style: Required<ExportTextStyle>) {
+  return style.fontWeight === "bold" || style.fontWeight === "700";
+}
+
+function getStandardFontFromStyle(
+  style: Required<ExportTextStyle>,
+  fonts: EmbeddedTextFonts,
+) {
+  const bold = isBoldStyle(style);
   const italic = style.fontStyle === "italic";
 
-  if (bold && italic) return fonts.boldItalic;
-  if (bold) return fonts.bold;
-  if (italic) return fonts.italic;
+  if (bold && italic) {
+    return {
+      font: fonts.boldItalic,
+      supported: fonts.supportedCodePoints.boldItalic,
+    };
+  }
+  if (bold) {
+    return { font: fonts.bold, supported: fonts.supportedCodePoints.bold };
+  }
+  if (italic) {
+    return { font: fonts.italic, supported: fonts.supportedCodePoints.italic };
+  }
 
-  return fonts.regular;
+  return { font: fonts.regular, supported: fonts.supportedCodePoints.regular };
+}
+
+function getFontForCharacter(
+  character: string,
+  style: Required<ExportTextStyle>,
+  fonts: EmbeddedTextFonts,
+): PDFFont | null {
+  const codePoint = character.codePointAt(0);
+  if (codePoint === undefined || isControlCharacter(codePoint)) return null;
+
+  const standard = getStandardFontFromStyle(style, fonts);
+  if (standard.supported.has(codePoint)) return standard.font;
+
+  const unicode = fonts.unicode;
+  if (!unicode) return null;
+
+  if (
+    codePoint >= 0x0900 &&
+    codePoint <= 0x097f &&
+    unicode.supportedCodePoints.devanagari.has(codePoint)
+  ) {
+    return unicode.devanagari;
+  }
+
+  if (unicode.supportedCodePoints.latin.has(codePoint)) {
+    return unicode.latin;
+  }
+
+  if (unicode.supportedCodePoints.devanagari.has(codePoint)) {
+    return unicode.devanagari;
+  }
+
+  return null;
 }
 
 function getObjectBaseTextStyle(object: EditorRichTextExportObject): Required<ExportTextStyle> {
@@ -154,37 +269,83 @@ function getTextRuns(object: EditorRichTextExportObject): readonly ExportTextRun
   ];
 }
 
-function replaceUnsupportedCharacters(text: string, font: PDFFont, fontSize: number) {
+function replaceUnsupportedCharacters(
+  text: string,
+  style: Required<ExportTextStyle>,
+  fonts: EmbeddedTextFonts,
+) {
+  const replacement = fonts.unicode?.replacement ?? "?";
+
   return Array.from(text)
     .map((character) => {
-      if (character === "\n" || character === "\r") return character;
-
-      try {
-        font.widthOfTextAtSize(character, fontSize);
-        return character;
-      } catch {
-        return "?";
-      }
+      if (character === "\n" || character === "\r" || character === "\t") return character;
+      const codePoint = character.codePointAt(0);
+      if (codePoint === undefined || isControlCharacter(codePoint)) return "";
+      return getFontForCharacter(character, style, fonts) ? character : replacement;
     })
     .join("");
 }
 
-function measureTextSafely(text: string, font: PDFFont, fontSize: number) {
-  try {
-    return font.widthOfTextAtSize(text, fontSize);
-  } catch {
-    return Array.from(text).reduce((width, character) => {
-      try {
-        return width + font.widthOfTextAtSize(character, fontSize);
-      } catch {
-        return width;
-      }
-    }, 0);
+function splitFontRuns(
+  text: string,
+  style: Required<ExportTextStyle>,
+  fonts: EmbeddedTextFonts,
+) {
+  const runs: FontRun[] = [];
+  const replacement = fonts.unicode?.replacement ?? "?";
+
+  for (const character of text) {
+    const font =
+      getFontForCharacter(character, style, fonts) ??
+      getFontForCharacter(replacement, style, fonts) ??
+      fonts.regular;
+    const safeCharacter = getFontForCharacter(character, style, fonts)
+      ? character
+      : replacement;
+    const previous = runs.at(-1);
+
+    if (previous?.font === font) {
+      runs[runs.length - 1] = { text: previous.text + safeCharacter, font };
+    } else {
+      runs.push({ text: safeCharacter, font });
+    }
   }
+
+  return runs;
 }
 
-function breakLongToken(text: string, font: PDFFont, fontSize: number, maxWidth: number) {
-  if (measureTextSafely(text, font, fontSize) <= maxWidth) {
+function measureTextSafely(
+  text: string,
+  style: Required<ExportTextStyle>,
+  fonts: EmbeddedTextFonts,
+  fontSize: number,
+) {
+  return splitFontRuns(text, style, fonts).reduce((width, run) => {
+    try {
+      return width + run.font.widthOfTextAtSize(run.text, fontSize);
+    } catch {
+      return (
+        width +
+        Array.from(run.text).reduce((characterWidth, character) => {
+          try {
+            return characterWidth + run.font.widthOfTextAtSize(character, fontSize);
+          } catch {
+            return characterWidth;
+          }
+        }, 0)
+      );
+    }
+  }, 0);
+}
+
+function breakLongToken(
+  text: string,
+  style: Required<ExportTextStyle>,
+  fonts: EmbeddedTextFonts,
+  fontSize: number,
+  maxWidth: number,
+) {
+  if (measureTextSafely(text, style, fonts, fontSize) <= maxWidth) {
     return [text];
   }
 
@@ -194,7 +355,10 @@ function breakLongToken(text: string, font: PDFFont, fontSize: number, maxWidth:
   Array.from(text).forEach((character) => {
     const candidate = fragment + character;
 
-    if (fragment && measureTextSafely(candidate, font, fontSize) > maxWidth) {
+    if (
+      fragment &&
+      measureTextSafely(candidate, style, fonts, fontSize) > maxWidth
+    ) {
       fragments.push(fragment);
       fragment = character;
       return;
@@ -216,9 +380,9 @@ function drawTextSafely({
   x,
   y,
   fontSize,
-  font,
+  fonts,
+  style,
   color,
-  maxWidth,
   opacity,
 }: {
   readonly page: PDFPage;
@@ -226,47 +390,44 @@ function drawTextSafely({
   readonly x: number;
   readonly y: number;
   readonly fontSize: number;
-  readonly font: PDFFont;
+  readonly fonts: EmbeddedTextFonts;
+  readonly style: Required<ExportTextStyle>;
   readonly color: ReturnType<typeof rgb>;
-  readonly maxWidth: number;
   readonly opacity: number;
 }) {
-  try {
-    page.drawText(text, {
-      x,
-      y,
-      size: fontSize,
-      font,
-      color,
-      maxWidth,
-      opacity,
-    });
-    return;
-  } catch {
-    // Fall back to drawing only characters that the selected font accepts.
-  }
+  let cursorX = x;
 
-  let characterX = x;
-
-  Array.from(text).forEach((character) => {
+  for (const run of splitFontRuns(text, style, fonts)) {
     try {
-      const characterWidth = font.widthOfTextAtSize(character, fontSize);
-
-      page.drawText(character, {
-        x: characterX,
+      const width = run.font.widthOfTextAtSize(run.text, fontSize);
+      page.drawText(run.text, {
+        x: cursorX,
         y,
         size: fontSize,
-        font,
+        font: run.font,
         color,
-        maxWidth,
         opacity,
       });
-
-      characterX += characterWidth;
+      cursorX += width;
     } catch {
-      // Skip a character if it still cannot be measured or encoded.
+      for (const character of run.text) {
+        try {
+          const width = run.font.widthOfTextAtSize(character, fontSize);
+          page.drawText(character, {
+            x: cursorX,
+            y,
+            size: fontSize,
+            font: run.font,
+            color,
+            opacity,
+          });
+          cursorX += width;
+        } catch {
+          // A single unusable glyph is skipped so it cannot fail the document.
+        }
+      }
     }
-  });
+  }
 }
 
 function drawUnderlineSegment({
@@ -326,91 +487,104 @@ export function drawEditorRichTextObject(
     endPath(),
   );
 
-  const paddingX = sourceTextEdit ? 0 : TEXT_PADDING_X;
-  const paddingY = sourceTextEdit ? 0 : TEXT_PADDING_Y;
-  const lineHeight = fontSize * (sourceTextEdit ? 1.12 : 1.3);
-  const startX = object.box.x + paddingX;
-  const maxX = Math.max(startX, object.box.x + object.box.width - paddingX);
-  const wrappingWidth = Math.max(1, maxX - startX);
-  let cursorX = startX;
-  let baselineY = sourceTextEdit
-    ? geometry.viewportHeight -
-      object.box.y -
-      Math.max(fontSize, sourceTextEdit.baselineOffset)
-    : geometry.viewportHeight - object.box.y - paddingY - fontSize;
+  try {
+    const paddingX = sourceTextEdit ? 0 : TEXT_PADDING_X;
+    const paddingY = sourceTextEdit ? 0 : TEXT_PADDING_Y;
+    const lineHeight = fontSize * (sourceTextEdit ? 1.12 : 1.3);
+    const startX = object.box.x + paddingX;
+    const maxX = Math.max(startX, object.box.x + object.box.width - paddingX);
+    const wrappingWidth = Math.max(1, maxX - startX);
+    let cursorX = startX;
+    let baselineY = sourceTextEdit
+      ? geometry.viewportHeight -
+        object.box.y -
+        Math.max(fontSize, sourceTextEdit.baselineOffset)
+      : geometry.viewportHeight - object.box.y - paddingY - fontSize;
 
-  const moveToNextLine = () => {
-    cursorX = startX;
-    baselineY -= lineHeight;
-  };
+    const moveToNextLine = () => {
+      cursorX = startX;
+      baselineY -= lineHeight;
+    };
 
-  getTextRuns(object).forEach((run) => {
-    if (!run.text) return;
+    getTextRuns(object).forEach((run) => {
+      if (!run.text) return;
 
-    const style = getRunTextStyle(object, run);
-    const font = getTextFontFromStyle(style, fonts);
-    const colorValue = hexToRgb(style.color);
-    const textColor = rgb(colorValue.r, colorValue.g, colorValue.b);
-    const safeText = replaceUnsupportedCharacters(run.text, font, fontSize);
-    const tokens = safeText.split(/(\r\n|\n|\s+)/g).filter((token) => token.length > 0);
+      const style = getRunTextStyle(object, run);
+      const colorValue = hexToRgb(style.color);
+      const textColor = rgb(colorValue.r, colorValue.g, colorValue.b);
+      const safeText = replaceUnsupportedCharacters(run.text, style, fonts);
+      const tokens = safeText.split(/(\r\n|\n|\s+)/g).filter((token) => token.length > 0);
 
-    tokens.forEach((token) => {
-      if (token === "\n" || token === "\r\n") {
-        moveToNextLine();
-        return;
-      }
-
-      const isOnlyWhitespace = /^\s+$/.test(token);
-
-      if (isOnlyWhitespace) {
-        cursorX += measureTextSafely(token, font, fontSize);
-
-        if (cursorX > maxX) {
+      tokens.forEach((token) => {
+        if (token === "\n" || token === "\r\n") {
           moveToNextLine();
-        }
-        return;
-      }
-
-      const fragments = breakLongToken(token, font, fontSize, wrappingWidth);
-
-      fragments.forEach((fragment, fragmentIndex) => {
-        const fragmentWidth = measureTextSafely(fragment, font, fontSize);
-
-        if (cursorX > startX && cursorX + fragmentWidth > maxX) {
-          moveToNextLine();
+          return;
         }
 
-        drawTextSafely({
-          page,
-          text: fragment,
-          x: cursorX,
-          y: baselineY,
+        const isOnlyWhitespace = /^\s+$/.test(token);
+
+        if (isOnlyWhitespace) {
+          cursorX += measureTextSafely(token, style, fonts, fontSize);
+
+          if (cursorX > maxX) {
+            moveToNextLine();
+          }
+          return;
+        }
+
+        const fragments = breakLongToken(
+          token,
+          style,
+          fonts,
           fontSize,
-          font,
-          color: textColor,
-          maxWidth: wrappingWidth,
-          opacity,
-        });
+          wrappingWidth,
+        );
 
-        if (style.textDecoration === "underline") {
-          drawUnderlineSegment({
-            page,
-            startX: cursorX,
-            endX: cursorX + fragmentWidth,
-            baselineY,
+        fragments.forEach((fragment, fragmentIndex) => {
+          const fragmentWidth = measureTextSafely(
+            fragment,
+            style,
+            fonts,
             fontSize,
+          );
+
+          if (cursorX > startX && cursorX + fragmentWidth > maxX) {
+            moveToNextLine();
+          }
+
+          drawTextSafely({
+            page,
+            text: fragment,
+            x: cursorX,
+            y: baselineY,
+            fontSize,
+            fonts,
+            style,
             color: textColor,
             opacity,
           });
-        }
 
-        cursorX += fragmentWidth;
+          if (style.textDecoration === "underline") {
+            drawUnderlineSegment({
+              page,
+              startX: cursorX,
+              endX: cursorX + fragmentWidth,
+              baselineY,
+              fontSize,
+              color: textColor,
+              opacity,
+            });
+          }
 
-        if (fragmentIndex < fragments.length - 1) {
-          moveToNextLine();
-        }
+          cursorX += fragmentWidth;
+
+          if (fragmentIndex < fragments.length - 1) {
+            moveToNextLine();
+          }
+        });
       });
     });
-  });
-  page.pushOperators(popGraphicsState());
+  } finally {
+    page.pushOperators(popGraphicsState());
+  }
 }
