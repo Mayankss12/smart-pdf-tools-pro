@@ -241,18 +241,28 @@ export async function buildAllHighlightPageSnapshots(input: {
 }): Promise<readonly HighlightPageSnapshot[]> {
   const pages: HighlightPageSnapshot[] = [];
 
-  for (let pageNumber = 1; pageNumber <= input.pdf.numPages; pageNumber += 1) {
-    const snapshot = await buildHighlightPageSnapshot({
-      pdf: input.pdf,
-      pageNumber,
-      renderScale: input.renderScale,
-    });
+  try {
+    for (let pageNumber = 1; pageNumber <= input.pdf.numPages; pageNumber += 1) {
+      const snapshot = await buildHighlightPageSnapshot({
+        pdf: input.pdf,
+        pageNumber,
+        renderScale: input.renderScale,
+      });
 
-    pages.push(snapshot);
-    input.onProgress?.(pageNumber, input.pdf.numPages);
+      pages.push(snapshot);
+      input.onProgress?.(pageNumber, input.pdf.numPages);
+    }
+
+    return pages;
+  } catch (error) {
+    try {
+      await input.pdf.destroy();
+    } catch {
+      // The caller only retains this PDF on success, so failure cleanup is best-effort.
+    }
+
+    throw error;
   }
-
-  return pages;
 }
 
 export function createNormalizedDragBounds(input: {
