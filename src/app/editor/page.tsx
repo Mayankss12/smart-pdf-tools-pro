@@ -407,9 +407,14 @@ export default function EditorPage() {
     } catch (error) {
       if (loadGenerationRef.current !== loadGeneration) return;
 
-      if (loadedDocument && pdfDocumentRef.current !== loadedDocument) {
-        await loadedDocument.destroy();
-      }
+      const documentsToDestroy = new Set<PDFDocumentProxy>();
+      if (loadedDocument) documentsToDestroy.add(loadedDocument);
+      if (pdfDocumentRef.current) documentsToDestroy.add(pdfDocumentRef.current);
+      pdfDocumentRef.current = null;
+      await Promise.allSettled(
+        Array.from(documentsToDestroy, (document) => document.destroy()),
+      );
+
       setFileBytes(null);
       setOcrPages([]);
       setFindHighlights([]);
