@@ -22,6 +22,7 @@ export type EmbeddedUnicodeFonts = {
   readonly base: PDFFont;
   readonly boldBase: PDFFont;
   readonly italicBase: PDFFont;
+  readonly boldItalicBase: PDFFont;
   readonly latin: PDFFont;
   readonly devanagari: PDFFont;
   readonly replacement: string;
@@ -29,6 +30,7 @@ export type EmbeddedUnicodeFonts = {
     readonly base: ReadonlySet<number>;
     readonly boldBase: ReadonlySet<number>;
     readonly italicBase: ReadonlySet<number>;
+    readonly boldItalicBase: ReadonlySet<number>;
     readonly latin: ReadonlySet<number>;
     readonly devanagari: ReadonlySet<number>;
   };
@@ -50,22 +52,26 @@ const BASE_FONT_MAP: Record<
     readonly regular: StandardFonts;
     readonly bold: StandardFonts;
     readonly italic: StandardFonts;
+    readonly boldItalic: StandardFonts;
   }
 > = {
   helvetica: {
     regular: StandardFonts.Helvetica,
     bold: StandardFonts.HelveticaBold,
     italic: StandardFonts.HelveticaOblique,
+    boldItalic: StandardFonts.HelveticaBoldOblique,
   },
   times: {
     regular: StandardFonts.TimesRoman,
     bold: StandardFonts.TimesRomanBold,
     italic: StandardFonts.TimesRomanItalic,
+    boldItalic: StandardFonts.TimesRomanBoldItalic,
   },
   courier: {
     regular: StandardFonts.Courier,
     bold: StandardFonts.CourierBold,
     italic: StandardFonts.CourierOblique,
+    boldItalic: StandardFonts.CourierBoldOblique,
   },
 };
 
@@ -99,10 +105,11 @@ export async function embedUnicodeFonts(
   const fontBytes = bytes ?? (await loadBundledUnicodeFontBytes());
   pdf.registerFontkit(fontkit);
 
-  const [base, boldBase, italicBase, latin, devanagari] = await Promise.all([
+  const [base, boldBase, italicBase, boldItalicBase, latin, devanagari] = await Promise.all([
     pdf.embedFont(BASE_FONT_MAP[baseFont].regular),
     pdf.embedFont(BASE_FONT_MAP[baseFont].bold),
     pdf.embedFont(BASE_FONT_MAP[baseFont].italic),
+    pdf.embedFont(BASE_FONT_MAP[baseFont].boldItalic),
     pdf.embedFont(fontBytes.latin, { subset: true }),
     pdf.embedFont(fontBytes.devanagari, { subset: true }),
   ]);
@@ -110,6 +117,7 @@ export async function embedUnicodeFonts(
     base: new Set(base.getCharacterSet()),
     boldBase: new Set(boldBase.getCharacterSet()),
     italicBase: new Set(italicBase.getCharacterSet()),
+    boldItalicBase: new Set(boldItalicBase.getCharacterSet()),
     latin: new Set(latin.getCharacterSet()),
     devanagari: new Set(devanagari.getCharacterSet()),
   };
@@ -119,6 +127,7 @@ export async function embedUnicodeFonts(
     base,
     boldBase,
     italicBase,
+    boldItalicBase,
     latin,
     devanagari,
     replacement,
@@ -133,6 +142,26 @@ function isControlCharacter(codePoint: number) {
   );
 }
 
+function getBaseFontSelection(
+  fonts: EmbeddedUnicodeFonts,
+  bold: boolean,
+  italic: boolean,
+) {
+  if (bold && italic) {
+    return {
+      font: fonts.boldItalicBase,
+      supported: fonts.supportedCodePoints.boldItalicBase,
+    };
+  }
+  if (bold) {
+    return { font: fonts.boldBase, supported: fonts.supportedCodePoints.boldBase };
+  }
+  if (italic) {
+    return { font: fonts.italicBase, supported: fonts.supportedCodePoints.italicBase };
+  }
+  return { font: fonts.base, supported: fonts.supportedCodePoints.base };
+}
+
 function supportsCharacter(
   character: string,
   fonts: EmbeddedUnicodeFonts,
@@ -141,14 +170,10 @@ function supportsCharacter(
 ) {
   const codePoint = character.codePointAt(0);
   if (codePoint === undefined) return false;
-  const baseSet = bold
-    ? fonts.supportedCodePoints.boldBase
-    : italic
-      ? fonts.supportedCodePoints.italicBase
-      : fonts.supportedCodePoints.base;
+  const base = getBaseFontSelection(fonts, bold, italic);
 
   return (
-    baseSet.has(codePoint) ||
+    base.supported.has(codePoint) ||
     fonts.supportedCodePoints.latin.has(codePoint) ||
     fonts.supportedCodePoints.devanagari.has(codePoint)
   );
@@ -158,6 +183,7 @@ export function sanitizeUnicodeText(
   value: string,
   fonts: EmbeddedUnicodeFonts,
   bold = false,
+  italic = false,
 ): SanitizedUnicodeText {
   let text = "";
   let replacementCount = 0;
@@ -169,7 +195,7 @@ export function sanitizeUnicodeText(
     if (
       character === "\n" ||
       character === "\t" ||
-      supportsCharacter(character, fonts, bold)
+      supportsCharacter(character, fonts, bold, italic)
     ) {
       text += character === "\t" ? "    " : character;
       continue;
@@ -197,17 +223,8 @@ function getFontForCharacter(
     return fonts.devanagari;
   }
 
-  const baseFont = bold
-    ? fonts.boldBase
-    : italic
-      ? fonts.italicBase
-      : fonts.base;
-  const baseSet = bold
-    ? fonts.supportedCodePoints.boldBase
-    : italic
-      ? fonts.supportedCodePoints.italicBase
-      : fonts.supportedCodePoints.base;
-  if (baseSet.has(codePoint)) return baseFont;
+  const base = getBaseFontSelection(fonts, bold, italic);
+  if (base.supported.has(codePoint)) return base.font;
   if (fonts.supportedCodePoints.latin.has(codePoint)) return fonts.latin;
   return fonts.latin;
 }
