@@ -5,6 +5,13 @@ import type {
 } from "@/app/editor/hooks/useEditor";
 import type { EditorPageRotationDirection } from "@/lib/pdf-tools/editor-page-management";
 
+type RotatableBox = {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+};
+
 function rotatePoint(
   point: EditorPoint,
   width: number,
@@ -21,6 +28,29 @@ function rotatePoint(
   return {
     x: point.y,
     y: width - point.x,
+  };
+}
+
+function rotatePageBox(
+  box: RotatableBox,
+  oldViewportWidth: number,
+  oldViewportHeight: number,
+  direction: EditorPageRotationDirection,
+): RotatableBox {
+  if (direction === "clockwise") {
+    return {
+      x: oldViewportHeight - box.y - box.height,
+      y: box.x,
+      width: box.height,
+      height: box.width,
+    };
+  }
+
+  return {
+    x: box.y,
+    y: oldViewportWidth - box.x - box.width,
+    width: box.height,
+    height: box.width,
   };
 }
 
@@ -67,6 +97,8 @@ function rotateObjectData(
   data: EditorObjectData,
   width: number,
   height: number,
+  oldViewportWidth: number,
+  oldViewportHeight: number,
   direction: EditorPageRotationDirection,
 ): EditorObjectData {
   const drawWidth = getDrawDimension(data.drawWidth, width);
@@ -88,6 +120,23 @@ function rotateObjectData(
     ),
     drawWidth: data.pathData ? drawHeight : data.drawWidth,
     drawHeight: data.pathData ? drawWidth : data.drawHeight,
+    sourceTextEdit: data.sourceTextEdit
+      ? {
+          ...data.sourceTextEdit,
+          sourceBox: rotatePageBox(
+            data.sourceTextEdit.sourceBox,
+            oldViewportWidth,
+            oldViewportHeight,
+            direction,
+          ),
+          coverBox: rotatePageBox(
+            data.sourceTextEdit.coverBox,
+            oldViewportWidth,
+            oldViewportHeight,
+            direction,
+          ),
+        }
+      : undefined,
   };
 }
 
@@ -132,26 +181,25 @@ export function remapObjectsAfterPageRotation({
   return objects.map((object) => {
     if (object.pageNumber !== pageNumber) return object;
 
-    const { x, y, width, height } = object.box;
-    const nextBox =
-      direction === "clockwise"
-        ? {
-            x: oldViewportHeight - y - height,
-            y: x,
-            width: height,
-            height: width,
-          }
-        : {
-            x: y,
-            y: oldViewportWidth - x - width,
-            width: height,
-            height: width,
-          };
+    const { width, height } = object.box;
+    const nextBox = rotatePageBox(
+      object.box,
+      oldViewportWidth,
+      oldViewportHeight,
+      direction,
+    );
 
     return {
       ...object,
       box: nextBox,
-      data: rotateObjectData(object.data, width, height, direction),
+      data: rotateObjectData(
+        object.data,
+        width,
+        height,
+        oldViewportWidth,
+        oldViewportHeight,
+        direction,
+      ),
     };
   });
 }
