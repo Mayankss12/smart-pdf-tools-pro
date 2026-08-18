@@ -240,6 +240,7 @@ async function scanCompress(
         const context = canvas.getContext("2d", { alpha: false });
 
         if (!context) {
+          page.cleanup();
           throw new PdfEngineError(
             "PROCESSING_FAILED",
             "The browser could not allocate a page-rendering canvas.",
