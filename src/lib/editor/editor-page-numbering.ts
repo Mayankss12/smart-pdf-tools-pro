@@ -95,15 +95,23 @@ function getPageNumberBox({
   readonly height: number;
 }): EditorObjectBox {
   const horizontal = position.split("-")[1];
+  const horizontalMargin = Math.min(
+    24,
+    Math.max(0, (pageWidth - width) / 2),
+  );
+  const verticalMargin = Math.min(
+    24,
+    Math.max(0, (pageHeight - height) / 2),
+  );
   const x =
     horizontal === "left"
-      ? 24
+      ? horizontalMargin
       : horizontal === "right"
-        ? Math.max(24, pageWidth - width - 24)
-        : Math.max(24, (pageWidth - width) / 2);
+        ? Math.max(0, pageWidth - width - horizontalMargin)
+        : Math.max(0, (pageWidth - width) / 2);
   const y = position.startsWith("top")
-    ? 24
-    : Math.max(24, pageHeight - height - 24);
+    ? verticalMargin
+    : Math.max(0, pageHeight - height - verticalMargin);
 
   return { x, y, width, height };
 }
@@ -128,12 +136,18 @@ export function createEditorPageNumberObjects({
     const pageSize = pageSizes.find((item) => item.pageNumber === pageNumber);
     if (!pageSize) return [];
 
+    const safePageWidth = Math.max(1, pageSize.width);
+    const safePageHeight = Math.max(1, pageSize.height);
+    const horizontalGutter = Math.min(48, safePageWidth * 0.2);
+    const verticalGutter = Math.min(48, safePageHeight * 0.2);
+    const maxBoxWidth = Math.max(1, safePageWidth - horizontalGutter);
+    const maxBoxHeight = Math.max(1, safePageHeight - verticalGutter);
     const text = `${settings.prefix}${settings.startNumber + targetIndex}${settings.suffix}`;
     const width = Math.min(
-      pageSize.width - 48,
+      maxBoxWidth,
       Math.max(60, text.length * fontSize * 0.65 + 12),
     );
-    const height = Math.max(24, fontSize * 1.55);
+    const height = Math.min(maxBoxHeight, Math.max(24, fontSize * 1.55));
 
     const pageNumberObject: EditorObject = {
       id: createPageNumberId(setId, pageNumber),
@@ -141,8 +155,8 @@ export function createEditorPageNumberObjects({
       pageNumber,
       box: getPageNumberBox({
         position: settings.position,
-        pageWidth: pageSize.width,
-        pageHeight: pageSize.height,
+        pageWidth: safePageWidth,
+        pageHeight: safePageHeight,
         width,
         height,
       }),
