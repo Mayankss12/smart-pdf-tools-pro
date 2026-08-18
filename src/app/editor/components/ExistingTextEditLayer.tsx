@@ -40,18 +40,24 @@ export function ExistingTextEditLayer({
     void (async () => {
       try {
         const page = await editor.pdfDocument?.getPage(editor.activePageNumber);
-        if (!page || cancelled) return;
+        if (!page) return;
 
-        const viewport = page.getViewport({ scale: editor.zoom });
-        const extracted = await extractTextOverlayItems({
-          page,
-          viewport,
-          pageNumber: editor.activePageNumber,
-          renderScale: editor.zoom,
-        });
+        try {
+          if (cancelled) return;
 
-        if (!cancelled) {
-          setItems(extracted);
+          const viewport = page.getViewport({ scale: editor.zoom });
+          const extracted = await extractTextOverlayItems({
+            page,
+            viewport,
+            pageNumber: editor.activePageNumber,
+            renderScale: editor.zoom,
+          });
+
+          if (!cancelled) {
+            setItems(extracted);
+          }
+        } finally {
+          page.cleanup();
         }
       } catch {
         if (!cancelled) {
