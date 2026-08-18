@@ -209,18 +209,28 @@ export async function buildAllAnnotatePageSnapshots(input: {
 }): Promise<readonly AnnotatePageSnapshot[]> {
   const pages: AnnotatePageSnapshot[] = [];
 
-  for (let pageNumber = 1; pageNumber <= input.pdf.numPages; pageNumber += 1) {
-    const snapshot = await buildAnnotatePageSnapshot({
-      pdf: input.pdf,
-      pageNumber,
-      renderScale: input.renderScale,
-    });
+  try {
+    for (let pageNumber = 1; pageNumber <= input.pdf.numPages; pageNumber += 1) {
+      const snapshot = await buildAnnotatePageSnapshot({
+        pdf: input.pdf,
+        pageNumber,
+        renderScale: input.renderScale,
+      });
 
-    pages.push(snapshot);
-    input.onProgress?.(pageNumber, input.pdf.numPages);
+      pages.push(snapshot);
+      input.onProgress?.(pageNumber, input.pdf.numPages);
+    }
+
+    return pages;
+  } catch (error) {
+    try {
+      await input.pdf.destroy();
+    } catch {
+      // The caller only retains this PDF on success, so failure cleanup is best-effort.
+    }
+
+    throw error;
   }
-
-  return pages;
 }
 
 function parseHexColor(value: string, fallback: RgbColor): RgbColor {
