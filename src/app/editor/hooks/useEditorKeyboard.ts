@@ -37,6 +37,12 @@ function isTypingTarget(target: EventTarget | null) {
   );
 }
 
+function isModalDialogTarget(target: EventTarget | null) {
+  if (!(target instanceof Element)) return false;
+
+  return Boolean(target.closest('[role="dialog"][aria-modal="true"]'));
+}
+
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
@@ -115,7 +121,7 @@ export function useEditorKeyboard({
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.defaultPrevented) return;
+      if (event.defaultPrevented || isModalDialogTarget(event.target)) return;
 
       const state = stateRef.current;
       const currentEditor = state.editor;
