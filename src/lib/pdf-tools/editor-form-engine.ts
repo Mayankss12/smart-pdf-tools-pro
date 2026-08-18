@@ -148,7 +148,15 @@ export async function createEditorFormFields({
   const existingNames = new Set(form.getFields().map((field) => field.getName()));
   const createdNames = new Set<string>();
   const createdFieldNames: string[] = [];
-  const radioGroups = new Map<string, ReturnType<typeof form.createRadioGroup>>();
+  const radioGroups = new Map<
+    string,
+    {
+      group: ReturnType<typeof form.createRadioGroup>;
+      required: boolean;
+      readOnly: boolean;
+      defaultValue: string | null;
+    }
+  >();
   const appearanceFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
   for (const object of formObjects) {
@@ -170,27 +178,60 @@ export async function createEditorFormFields({
         );
       }
 
-      let group = radioGroups.get(name);
-      if (!group) {
-        group = form.createRadioGroup(name);
-        radioGroups.set(name, group);
+      const required = Boolean(config.required);
+      const readOnly = Boolean(config.readOnly);
+      let radioState = radioGroups.get(name);
+
+      if (!radioState) {
+        const group = form.createRadioGroup(name);
+        applyCommonFlags(group, config);
+        radioState = {
+          group,
+          required,
+          readOnly,
+          defaultValue: null,
+        };
+        radioGroups.set(name, radioState);
         createdNames.add(name);
         createdFieldNames.push(name);
+      } else if (
+        radioState.required !== required ||
+        radioState.readOnly !== readOnly
+      ) {
+        throw new Error(
+          `Radio field “${name}” must use the same required and read-only settings for every option.`,
+        );
       }
 
       const optionValue = cleanValue(config.optionValue).slice(0, MAX_OPTION_LENGTH);
       if (!optionValue) {
         throw new Error(`Radio field “${name}” needs an option value.`);
       }
-      if (group.getOptions().includes(optionValue)) {
+      if (radioState.group.getOptions().includes(optionValue)) {
         throw new Error(
           `Radio field “${name}” has duplicate option “${optionValue}”.`,
         );
       }
 
-      group.addOptionToPage(optionValue, page, widgetOptions);
-      applyCommonFlags(group, config);
-      if (config.defaultValue === optionValue) group.select(optionValue);
+      radioState.group.addOptionToPage(optionValue, page, widgetOptions);
+
+      const defaultValue = cleanValue(config.defaultValue).slice(0, MAX_OPTION_LENGTH);
+      if (defaultValue) {
+        if (defaultValue !== optionValue) {
+          throw new Error(
+            `Radio field “${name}” default value must match the option it is configured on.`,
+          );
+        }
+        if (radioState.defaultValue && radioState.defaultValue !== defaultValue) {
+          throw new Error(
+            `Radio field “${name}” can have only one default option.`,
+          );
+        }
+        if (!radioState.defaultValue) {
+          radioState.group.select(defaultValue);
+          radioState.defaultValue = defaultValue;
+        }
+      }
       continue;
     }
 
