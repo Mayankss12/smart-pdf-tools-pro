@@ -5,7 +5,6 @@ import {
   pushGraphicsState,
   rectangle,
   rgb,
-  type PDFFont,
   type PDFPage,
 } from "pdf-lib";
 
@@ -72,21 +71,6 @@ function getSafeBox(box: EditorNoteBox, geometry: EditorPageGeometry) {
   };
 }
 
-function replaceUnsupportedCharacters(text: string, font: PDFFont, fontSize: number) {
-  return Array.from(text)
-    .map((character) => {
-      if (character === "\n" || character === "\r") return character;
-
-      try {
-        font.widthOfTextAtSize(character, fontSize);
-        return character;
-      } catch {
-        return "?";
-      }
-    })
-    .join("");
-}
-
 export function drawEditorNoteObject(
   page: PDFPage,
   object: EditorNoteExportObject,
@@ -130,7 +114,6 @@ export function drawEditorNoteObject(
     opacity: opacity * 0.7,
   });
 
-  const font = fonts.regular;
   const fontSize = clamp(object.data.fontSize ?? 14, 8, 36);
   const padding = Math.min(10, safeBox.width / 5, safeBox.height / 5);
   const textBox = {
@@ -144,7 +127,6 @@ export function drawEditorNoteObject(
     return;
   }
 
-  const safeText = replaceUnsupportedCharacters(object.data.text ?? "", font, fontSize);
   const clipY = pageHeight - textBox.y - textBox.height;
 
   page.pushOperators(
@@ -160,7 +142,7 @@ export function drawEditorNoteObject(
       {
         box: textBox,
         data: {
-          text: safeText,
+          text: object.data.text ?? "",
           fontSize,
           color: object.data.color ?? DEFAULT_TEXT_COLOR,
           opacity,
