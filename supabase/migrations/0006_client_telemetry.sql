@@ -28,6 +28,8 @@ alter table public.client_telemetry enable row level security;
 
 -- No public policies: browser clients cannot access the table directly.
 -- Same-origin writes and administrator reads go through service-role API routes.
+revoke all on table public.client_telemetry from anon, authenticated;
+grant select, insert, update, delete on table public.client_telemetry to service_role;
 
 comment on table public.client_telemetry is
   'Technical reliability events only. Do not store document data, credentials, PII, or full URLs.';
