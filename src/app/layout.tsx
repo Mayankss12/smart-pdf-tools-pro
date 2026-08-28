@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { DM_Sans, Plus_Jakarta_Sans } from "next/font/google";
 import "@/styles/tokens.css";
 import "./globals.css";
+import { ReliabilityTelemetry } from "@/components/ReliabilityTelemetry";
 
 const body = DM_Sans({
   subsets: ["latin"],
@@ -85,6 +86,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${body.variable} ${display.variable}`}>
       <body className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)] antialiased">
+        <ReliabilityTelemetry />
         {children}
       </body>
     </html>

@@ -18,9 +18,8 @@ export default function PrivacyPage() {
         </h1>
 
         <p className="mt-5 text-base leading-7 text-slate-600">
-          This Privacy Policy explains how PDFMantra handles basic account,
-          document, and service-related information. This page is currently a
-          starter policy and should be reviewed before public launch.
+          This Privacy Policy explains how PDFMantra handles account,
+          document, reliability, and service-related information.
         </p>
 
         <div className="mt-10 space-y-8 text-sm leading-7 text-slate-700">
@@ -69,7 +68,20 @@ export default function PrivacyPage() {
 
           <section>
             <h2 className="text-xl font-bold text-slate-950">
-              5. Data security
+              5. Reliability telemetry
+            </h2>
+            <p className="mt-3">
+              PDFMantra may collect limited technical events such as page route,
+              browser performance measurements, and sanitized error messages to
+              identify failures and improve reliability. This telemetry is not
+              designed to include document contents, filenames, passwords, form
+              values, email addresses, or full page URLs.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-bold text-slate-950">
+              6. Data security
             </h2>
             <p className="mt-3">
               We aim to use reasonable technical safeguards to protect account
@@ -80,7 +92,7 @@ export default function PrivacyPage() {
 
           <section>
             <h2 className="text-xl font-bold text-slate-950">
-              6. Contact
+              7. Contact
             </h2>
             <p className="mt-3">
               For questions about this Privacy Policy, please contact the
@@ -89,10 +101,6 @@ export default function PrivacyPage() {
           </section>
         </div>
 
-        <p className="mt-10 rounded-2xl border border-violet-100 bg-violet-50 px-5 py-4 text-xs leading-6 text-violet-800">
-          Note: This is a starter Privacy page for development use. Final legal
-          wording should be reviewed before production launch.
-        </p>
       </section>
     </main>
   );

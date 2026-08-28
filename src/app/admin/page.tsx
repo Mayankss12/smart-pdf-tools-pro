@@ -90,6 +90,20 @@ type AdminPayload = {
     duration_ms: number | null;
     created_at: string;
   }>;
+  reliability: {
+    configured: boolean;
+    events24h: number;
+    errors24h: number;
+    poorVitals24h: number;
+    p75: { LCP: number | null; INP: number | null; CLS: number | null };
+    recentErrors: Array<{
+      event_type: string;
+      route: string;
+      error_name: string | null;
+      error_message: string | null;
+      created_at: string;
+    }>;
+  };
 };
 
 type ProfileDraft = {
@@ -552,6 +566,26 @@ export default function AdminPage() {
 
               {view === "operations" ? (
                 <div className="mt-5 grid gap-5 xl:grid-cols-2">
+                  <Panel>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-sm font-black text-slate-950">Client reliability · last 24 hours</div>
+                      <Status good={data.reliability.configured}>{data.reliability.configured ? "Collecting" : "Migration required"}</Status>
+                    </div>
+                    <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                      <Metric label="Client errors" value={data.reliability.errors24h} note={`${data.reliability.events24h} telemetry events`} />
+                      <Metric label="Poor vitals" value={data.reliability.poorVitals24h} note="Rated poor" />
+                      <Metric label="LCP p75" value={data.reliability.p75.LCP === null ? "—" : `${Math.round(data.reliability.p75.LCP)} ms`} note={`INP ${data.reliability.p75.INP === null ? "—" : `${Math.round(data.reliability.p75.INP)} ms`} · CLS ${data.reliability.p75.CLS === null ? "—" : data.reliability.p75.CLS.toFixed(3)}`} />
+                    </div>
+                    <div className="mt-4 space-y-2">
+                      {data.reliability.recentErrors.length ? data.reliability.recentErrors.slice(0, 8).map((item, index) => (
+                        <div key={`${item.created_at}-${index}`} className="rounded-xl bg-slate-50 px-3 py-2.5">
+                          <div className="flex items-center justify-between gap-3"><span className="text-xs font-black text-slate-700">{item.error_name ?? item.event_type}</span><span className="text-[10px] font-bold text-slate-400">{formatDate(item.created_at)}</span></div>
+                          <div className="mt-1 truncate text-[10px] font-semibold text-slate-500">{item.route} · {item.error_message ?? "No message"}</div>
+                        </div>
+                      )) : <div className="py-6 text-center text-sm font-bold text-slate-500">No client errors recorded.</div>}
+                    </div>
+                  </Panel>
+
                   <Panel>
                     <div className="text-sm font-black text-slate-950">Recent processing jobs</div>
                     <div className="mt-3 space-y-2">

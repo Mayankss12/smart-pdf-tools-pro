@@ -118,11 +118,20 @@ export async function GET(request: Request) {
       .limit(50);
     if (toolRunsQuery.error) throw toolRunsQuery.error;
 
+    const telemetrySince = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const telemetryQuery = await admin
+      .from("client_telemetry")
+      .select("event_type,route,metric_name,metric_value,rating,error_name,error_message,created_at")
+      .gte("created_at", telemetrySince)
+      .order("created_at", { ascending: false })
+      .limit(1000);
+
     const profiles = profilesQuery.data ?? [];
     const usage = usageQuery.data ?? [];
     const subscriptions = subscriptionsQuery.data ?? [];
     const jobs = jobsQuery.data ?? [];
     const toolRuns = toolRunsQuery.data ?? [];
+    const telemetry = telemetryQuery.error ? [] : telemetryQuery.data ?? [];
 
     const tierCounts: Record<ManagedTier, number> = {
       free: 0,
@@ -156,6 +165,15 @@ export async function GET(request: Request) {
       (item) => item.status === "failed",
     ).length;
     const backend = getBackendCapabilityReport();
+    const p75 = (metricName: string) => {
+      const values = telemetry
+        .filter((item) => item.event_type === "web-vital" && item.metric_name === metricName && typeof item.metric_value === "number")
+        .map((item) => Number(item.metric_value))
+        .sort((a, b) => a - b);
+      if (!values.length) return null;
+      return values[Math.min(values.length - 1, Math.ceil(values.length * 0.75) - 1)];
+    };
+    const clientErrors = telemetry.filter((item) => item.event_type !== "web-vital");
 
     return respond(request, {
       ok: true,
@@ -187,6 +205,14 @@ export async function GET(request: Request) {
       profiles,
       recentJobs: jobs.slice(0, 25),
       recentToolRuns: toolRuns.slice(0, 25),
+      reliability: {
+        configured: !telemetryQuery.error,
+        events24h: telemetry.length,
+        errors24h: clientErrors.length,
+        poorVitals24h: telemetry.filter((item) => item.event_type === "web-vital" && item.rating === "poor").length,
+        p75: { LCP: p75("LCP"), INP: p75("INP"), CLS: p75("CLS") },
+        recentErrors: clientErrors.slice(0, 20),
+      },
     });
   } catch (error) {
     console.error("Admin overview failed", error);

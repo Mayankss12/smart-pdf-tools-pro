@@ -1,0 +1,6 @@
+"use client";
+import { useEffect } from "react";
+export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  useEffect(() => { void fetch("/api/telemetry", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ eventType: "client-error", route: window.location.pathname, errorName: error.name, errorMessage: error.message, errorDigest: error.digest }) }).catch(() => undefined); }, [error]);
+  return <html lang="en"><body className="flex min-h-screen items-center justify-center bg-slate-50 p-6"><main className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-xl"><h1 className="text-2xl font-bold text-slate-950">PDFMantra hit an unexpected error</h1><p className="mt-3 text-sm leading-6 text-slate-600">Your source file remains on your device. Retry the current screen or return to the tools directory.</p><div className="mt-6 flex flex-col gap-3 sm:flex-row"><button type="button" onClick={reset} className="h-11 flex-1 rounded-xl bg-violet-600 font-bold text-white">Try again</button><a href="/tools" className="flex h-11 flex-1 items-center justify-center rounded-xl border border-slate-200 font-bold text-slate-700">All tools</a></div></main></body></html>;
+}
