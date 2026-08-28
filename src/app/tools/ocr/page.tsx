@@ -24,6 +24,7 @@ import {
 } from "@/lib/conversions/searchable-pdf-engine";
 import type {
   OcrLanguage,
+  OcrPreprocessMode,
   OcrQuality,
 } from "@/lib/pdf-ocr-engine";
 
@@ -52,6 +53,7 @@ export default function OcrPdfPage() {
   const [targetMode, setTargetMode] = useState<TargetMode>("all");
   const [language, setLanguage] = useState<OcrLanguage>("auto");
   const [quality, setQuality] = useState<OcrQuality>("balanced");
+  const [preprocessMode, setPreprocessMode] = useState<OcrPreprocessMode>("auto");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState(
     "Upload a scanned PDF to add searchable text.",
@@ -61,6 +63,11 @@ export default function OcrPdfPage() {
     outputSize: number;
     ocrPages: number;
     wordCount: number;
+    averageConfidence: number;
+    detectedLanguages: string[];
+    deskewedPages: number;
+    binarizedPages: number;
+    lowConfidencePages: number;
   } | null>(null);
 
   useEffect(() => () => abortRef.current?.abort(), []);
@@ -110,6 +117,7 @@ export default function OcrPdfPage() {
                 : [currentPage],
             language,
             quality,
+            preprocessMode,
             signal: controller.signal,
             onProgress(next) {
               setProgress(next);
@@ -131,6 +139,11 @@ export default function OcrPdfPage() {
         outputSize,
         ocrPages: prepared.output.ocrPageCount,
         wordCount: prepared.output.wordCount,
+        averageConfidence: prepared.output.averageConfidence,
+        detectedLanguages: prepared.output.detectedLanguages,
+        deskewedPages: prepared.output.deskewedPages,
+        binarizedPages: prepared.output.binarizedPages,
+        lowConfidencePages: prepared.output.lowConfidencePages,
       });
       setStatus(
         `Searchable PDF created with ${prepared.output.wordCount} recognized word${prepared.output.wordCount === 1 ? "" : "s"}. Download started.`,
@@ -245,6 +258,13 @@ export default function OcrPdfPage() {
                   </span>
                   <span>{result.ocrPages} OCR pages</span>
                   <span>{result.wordCount} words</span>
+                  <span>{result.averageConfidence}% confidence</span>
+                  <span>{result.detectedLanguages.join(", ") || "language unknown"}</span>
+                  {result.deskewedPages ? <span>{result.deskewedPages} deskewed</span> : null}
+                  {result.binarizedPages ? <span>{result.binarizedPages} document-cleaned</span> : null}
+                  {result.lowConfidencePages ? (
+                    <span className="text-amber-800">Review {result.lowConfidencePages} low-confidence page{result.lowConfidencePages === 1 ? "" : "s"}</span>
+                  ) : null}
                   <span>{formatFileSize(result.outputSize)}</span>
                 </div>
               ) : null}
@@ -319,6 +339,24 @@ export default function OcrPdfPage() {
                 </select>
               </label>
               <label className="mt-3 block text-xs font-bold text-slate-500">
+                Scan type
+                <select
+                  value={preprocessMode}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    if (value === "auto" || value === "document" || value === "photo") {
+                      setPreprocessMode(value);
+                    }
+                  }}
+                  disabled={busy}
+                  className="mt-2 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                >
+                  <option value="auto">Auto</option>
+                  <option value="document">Faded or noisy document</option>
+                  <option value="photo">Photo or mixed graphics</option>
+                </select>
+              </label>
+              <label className="mt-3 block text-xs font-bold text-slate-500">
                 Quality
                 <select
                   value={quality}
@@ -334,9 +372,9 @@ export default function OcrPdfPage() {
                   }}
                   className="mt-2 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm"
                 >
-                  <option value="fast">Fast</option>
-                  <option value="balanced">Balanced</option>
-                  <option value="high">High</option>
+                  <option value="fast">Fast · minimal cleanup</option>
+                  <option value="balanced">Balanced · contrast cleanup</option>
+                  <option value="high">High · deskew, sharpen and denoise</option>
                 </select>
               </label>
 

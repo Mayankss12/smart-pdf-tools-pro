@@ -3,6 +3,7 @@ import { PdfEngineError } from "@/lib/pdf-engine";
 export type OcrLanguage = "auto" | "eng" | "hin" | "spa" | "fra" | "deu" | "ara";
 export type OcrWorkerLanguage = "eng" | "hin" | "spa" | "fra" | "deu" | "ara" | "eng+hin" | "hin+eng" | "ara+eng";
 export type OcrQuality = "fast" | "balanced" | "high";
+export type OcrPreprocessMode = "auto" | "document" | "photo";
 export type OcrStage = "preprocess" | "ocr" | "overlay";
 
 export type OcrDetectedLanguage =
@@ -58,6 +59,19 @@ export type OcrResult = {
   languageBreakdown: OcrLanguageBreakdown;
   languageSymbol: string;
   fullText: string;
+  preprocessing: {
+    sourceWidth: number;
+    sourceHeight: number;
+    outputWidth: number;
+    outputHeight: number;
+    skewAngle: number;
+    deskewed: boolean;
+    contrastEnhanced: boolean;
+    sharpened: boolean;
+    denoised: boolean;
+    binarized: boolean;
+    mode: OcrPreprocessMode;
+  };
 };
 
 type TesseractModule = typeof import("tesseract.js");
@@ -73,6 +87,14 @@ type PreprocessedImage = {
   width: number;
   height: number;
   skewAngle: number;
+  sourceWidth: number;
+  sourceHeight: number;
+  deskewed: boolean;
+  contrastEnhanced: boolean;
+  sharpened: boolean;
+  denoised: boolean;
+  binarized: boolean;
+  mode: OcrPreprocessMode;
 };
 
 type TesseractWordCandidate = Record<string, unknown>;
@@ -134,6 +156,7 @@ export async function runOcrPipeline(
   options: {
     language: string;
     quality: OcrQuality;
+    preprocessMode?: OcrPreprocessMode;
     onProgress?: (progress: OcrProgress) => void;
     signal?: AbortSignal;
   },
@@ -143,6 +166,7 @@ export async function runOcrPipeline(
   const requestedLanguage = normalizeRequestedLanguage(options.language);
   const workerLanguage = resolveWorkerLanguage(requestedLanguage);
   const quality = options.quality || "balanced";
+  const preprocessMode = options.preprocessMode || "auto";
   const totalImages = files.length;
 
   if (!files.length) {
@@ -175,7 +199,12 @@ export async function runOcrPipeline(
         message: `Scanning image ${imageIndex} of ${totalImages}...`,
       });
 
-      const preprocessed = await preprocessImageForOcr(file, quality, options.signal);
+      const preprocessed = await preprocessImageForOcr(
+        file,
+        quality,
+        preprocessMode,
+        options.signal,
+      );
 
       try {
         throwIfAborted(options.signal);
@@ -252,6 +281,19 @@ export async function runOcrPipeline(
           languageBreakdown,
           languageSymbol,
           fullText,
+          preprocessing: {
+            sourceWidth: preprocessed.sourceWidth,
+            sourceHeight: preprocessed.sourceHeight,
+            outputWidth: preprocessed.width,
+            outputHeight: preprocessed.height,
+            skewAngle: preprocessed.skewAngle,
+            deskewed: preprocessed.deskewed,
+            contrastEnhanced: preprocessed.contrastEnhanced,
+            sharpened: preprocessed.sharpened,
+            denoised: preprocessed.denoised,
+            binarized: preprocessed.binarized,
+            mode: preprocessed.mode,
+          },
         });
       } finally {
         activeTesseractLogger = null;
@@ -373,6 +415,7 @@ async function configureWorker(
 async function preprocessImageForOcr(
   file: File,
   quality: OcrQuality,
+  mode: OcrPreprocessMode,
   signal?: AbortSignal,
 ): Promise<PreprocessedImage> {
   throwIfAborted(signal);
@@ -382,7 +425,8 @@ async function preprocessImageForOcr(
   try {
     throwIfAborted(signal);
 
-    if (quality !== "fast") {
+    const contrastEnhanced = quality !== "fast";
+    if (contrastEnhanced) {
       grayscaleAndBoostContrast(source.canvas);
     }
 
@@ -390,7 +434,8 @@ async function preprocessImageForOcr(
 
     const skewAngle = quality === "high" ? estimateSkewAngle(source.canvas, quality) : 0;
 
-    if (quality === "high" && Math.abs(skewAngle) >= 0.45 && Math.abs(skewAngle) <= 5) {
+    const deskewed = quality === "high" && Math.abs(skewAngle) >= 0.45 && Math.abs(skewAngle) <= 5;
+    if (deskewed) {
       rotateCanvasInPlace(source.canvas, skewAngle);
     }
 
@@ -401,11 +446,24 @@ async function preprocessImageForOcr(
       reduceSaltPepperNoise(source.canvas);
     }
 
+    const binarized = mode === "document" && quality !== "fast";
+    if (binarized) {
+      applyOtsuBinarization(source.canvas);
+    }
+
     return {
       canvas: source.canvas,
       width: source.canvas.width,
       height: source.canvas.height,
       skewAngle,
+      sourceWidth: source.sourceWidth,
+      sourceHeight: source.sourceHeight,
+      deskewed,
+      contrastEnhanced,
+      sharpened: quality === "high",
+      denoised: quality === "high",
+      binarized,
+      mode,
     };
   } catch (error) {
     cleanupCanvas(source.canvas);
@@ -448,6 +506,8 @@ async function loadImageToCanvas(file: File, quality: OcrQuality) {
     canvas,
     width,
     height,
+    sourceWidth: image.naturalWidth,
+    sourceHeight: image.naturalHeight,
   };
 }
 
@@ -501,6 +561,54 @@ function grayscaleAndBoostContrast(canvas: HTMLCanvasElement) {
     data[index] = boosted;
     data[index + 1] = boosted;
     data[index + 2] = boosted;
+    data[index + 3] = 255;
+  }
+
+  context.putImageData(imageData, 0, 0);
+}
+
+function applyOtsuBinarization(canvas: HTMLCanvasElement) {
+  const context = getCanvasContext(canvas);
+  const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+  const histogram = new Uint32Array(256);
+  const data = imageData.data;
+  const pixelCount = Math.max(1, canvas.width * canvas.height);
+
+  for (let index = 0; index < data.length; index += 4) {
+    histogram[data[index]] += 1;
+  }
+
+  let totalIntensity = 0;
+  for (let value = 0; value < histogram.length; value += 1) {
+    totalIntensity += value * histogram[value];
+  }
+
+  let backgroundWeight = 0;
+  let backgroundIntensity = 0;
+  let bestVariance = -1;
+  let threshold = 160;
+
+  for (let value = 0; value < histogram.length; value += 1) {
+    backgroundWeight += histogram[value];
+    if (!backgroundWeight) continue;
+    const foregroundWeight = pixelCount - backgroundWeight;
+    if (!foregroundWeight) break;
+    backgroundIntensity += value * histogram[value];
+    const backgroundMean = backgroundIntensity / backgroundWeight;
+    const foregroundMean = (totalIntensity - backgroundIntensity) / foregroundWeight;
+    const betweenClassVariance =
+      backgroundWeight * foregroundWeight * (backgroundMean - foregroundMean) ** 2;
+    if (betweenClassVariance > bestVariance) {
+      bestVariance = betweenClassVariance;
+      threshold = value;
+    }
+  }
+
+  for (let index = 0; index < data.length; index += 4) {
+    const value = data[index] <= threshold ? 0 : 255;
+    data[index] = value;
+    data[index + 1] = value;
+    data[index + 2] = value;
     data[index + 3] = 255;
   }
 

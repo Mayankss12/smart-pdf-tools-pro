@@ -6,6 +6,7 @@ import { readValidatedPdfBytes } from "@/lib/pdf-document-safety";
 import {
   runOcrPipeline,
   type OcrLanguage,
+  type OcrPreprocessMode,
   type OcrQuality,
   type OcrResult,
 } from "@/lib/pdf-ocr-engine";
@@ -96,6 +97,7 @@ export async function createSearchablePdf(
     readonly targetPages: readonly number[];
     readonly language: OcrLanguage;
     readonly quality: OcrQuality;
+    readonly preprocessMode?: OcrPreprocessMode;
     readonly signal?: AbortSignal;
     readonly onProgress?: (progress: SearchablePdfProgress) => void;
   },
@@ -154,6 +156,7 @@ export async function createSearchablePdf(
   const selectedResults = await runOcrPipeline(images, {
     language: options.language,
     quality: options.quality,
+    preprocessMode: options.preprocessMode,
     signal: options.signal,
     onProgress(progress) {
       options.onProgress?.({
@@ -216,5 +219,15 @@ export async function createSearchablePdf(
       (sum, result) => sum + result.words.length,
       0,
     ),
+    averageConfidence: selectedResults.length
+      ? Math.round(
+          selectedResults.reduce((sum, result) => sum + result.averageConfidence, 0) /
+            selectedResults.length,
+        )
+      : 0,
+    detectedLanguages: [...new Set(selectedResults.map((result) => result.detectedLanguage))],
+    deskewedPages: selectedResults.filter((result) => result.preprocessing.deskewed).length,
+    binarizedPages: selectedResults.filter((result) => result.preprocessing.binarized).length,
+    lowConfidencePages: selectedResults.filter((result) => result.averageConfidence < 55).length,
   };
 }
