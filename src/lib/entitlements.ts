@@ -136,6 +136,17 @@ export const ADVANCED_TOOL_KEYS = [
   "unlock",
   "redact",
   "watermark-remover",
+  "crop",
+  "flatten",
+  "repair",
+  "metadata",
+  "bates",
+  "advanced-split",
+] as const;
+
+export const BATCH_TOOL_KEYS = [
+  "batch-processing",
+  "workflow-chaining",
 ] as const;
 
 export const BACKEND_TOOL_KEYS = [
@@ -148,6 +159,7 @@ export const BACKEND_TOOL_KEYS = [
 export type CoreToolKey = (typeof CORE_TOOL_KEYS)[number];
 export type AdvancedToolKey = (typeof ADVANCED_TOOL_KEYS)[number];
 export type BackendToolKey = (typeof BACKEND_TOOL_KEYS)[number];
+export type BatchToolKey = (typeof BATCH_TOOL_KEYS)[number];
 
 export function normalizeTier(value: string | null | undefined): UserTier {
   if (
@@ -204,6 +216,10 @@ export function canUseToolByTier({
 
   if (includesToolKey(BACKEND_TOOL_KEYS, toolKey)) {
     return plan.canUseBackendTools;
+  }
+
+  if (includesToolKey(BATCH_TOOL_KEYS, toolKey)) {
+    return plan.canUseBatchTools;
   }
 
   return false;
