@@ -23,6 +23,7 @@ const suites = [
   "pdf-security-smoke.mjs",
   "pdf-to-images-smoke.mjs",
   "standalone-overlay-smoke.mjs",
+  "stage-one-platform-smoke.mjs",
   "text-to-pdf-unicode-smoke.mjs",
   "verified-bugs-smoke.mjs",
 ];

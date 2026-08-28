@@ -85,7 +85,6 @@ for (const id of ["heic-to-pdf", "webpage-to-pdf"]) {
 
 for (const id of [
   "watermark-remover",
-  "redact-pdf",
 ]) {
   assert.ok(
     groups.comingSoon.some((tool) => tool.id === id),
@@ -117,10 +116,9 @@ const guardedRoutes = [
   "heic-to-pdf",
   "webpage-to-pdf",
   "watermark-remover",
-  "redact",
 ];
 
-for (const id of ["protect-pdf", "unlock-pdf"]) {
+for (const id of ["protect-pdf", "unlock-pdf", "redact-pdf"]) {
   assert.ok(
     groups.publicWorking.some((tool) => tool.id === id),
     `PDF security tool is not publicly launch ready: ${id}`,
@@ -128,7 +126,7 @@ for (const id of ["protect-pdf", "unlock-pdf"]) {
 }
 
 const securityRouteSources = await Promise.all(
-  ["protect", "unlock"].map((route) =>
+  ["protect", "unlock", "redact"].map((route) =>
     readFile(
       new URL(`../src/app/tools/${route}/page.tsx`, import.meta.url),
       "utf8",
@@ -136,7 +134,7 @@ const securityRouteSources = await Promise.all(
   ),
 );
 for (const source of securityRouteSources) {
-  assert.match(source, /PdfSecurityToolClient/);
+  assert.match(source, /PdfSecurityToolClient|PdfRedactToolClient/);
   assert.match(source, /requirePublicLaunchReadyTool\(/);
   assert.doesNotMatch(source, /BackendToolShell/);
 }

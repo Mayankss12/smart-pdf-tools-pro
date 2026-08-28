@@ -4,7 +4,7 @@ import { PdfSecurityToolClient } from "@/components/PdfSecurityToolClient";
 import { requirePublicLaunchReadyTool } from "@/lib/public-launch-guard";
 
 export const metadata: Metadata = {
-  title: "Protect PDF with AES-256 Encryption | PDFMantra",
+  title: "Protect PDF with AES-256 Encryption",
   description:
     "Password protect a PDF locally in your browser with verified AES-256 encryption and document permissions.",
 };

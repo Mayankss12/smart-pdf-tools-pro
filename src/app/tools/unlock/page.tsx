@@ -4,7 +4,7 @@ import { PdfSecurityToolClient } from "@/components/PdfSecurityToolClient";
 import { requirePublicLaunchReadyTool } from "@/lib/public-launch-guard";
 
 export const metadata: Metadata = {
-  title: "Unlock PDF & Remove a Known Password | PDFMantra",
+  title: "Unlock PDF & Remove a Known Password",
   description:
     "Remove PDF password encryption locally when you know the password and are authorized to access the document.",
 };

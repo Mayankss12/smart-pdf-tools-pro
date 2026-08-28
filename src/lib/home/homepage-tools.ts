@@ -68,6 +68,14 @@ export const HOMEPAGE_TOOL_GRID_ORDER_IDS = [
   "watermark-pdf",
   "protect-pdf",
   "unlock-pdf",
+  "redact-pdf",
+  "crop-pdf",
+  "flatten-pdf",
+  "repair-pdf",
+  "pdf-metadata",
+  "bates-numbering",
+  "advanced-split",
+  "batch-workflows",
   "sign-pdf",
   "annotate-pdf",
   "highlight-pdf",
@@ -114,6 +122,8 @@ const HOMEPAGE_EDIT_SIGN_IDS = [
   "watermark-pdf",
   "annotate-pdf",
   "page-numbers",
+  "bates-numbering",
+  "pdf-metadata",
 ] as const;
 
 const HOMEPAGE_ORGANIZE_IDS = [
@@ -123,14 +133,19 @@ const HOMEPAGE_ORGANIZE_IDS = [
   "extract-pages",
   "rotate-pdf",
   "delete-pages",
+  "crop-pdf",
+  "advanced-split",
 ] as const;
 
 const HOMEPAGE_OPTIMIZE_OCR_IDS = [
   "compress-pdf",
   "pdf-to-searchable-pdf",
+  "flatten-pdf",
+  "repair-pdf",
+  "batch-workflows",
 ] as const;
 
-const HOMEPAGE_SECURITY_IDS = ["protect-pdf", "unlock-pdf"] as const;
+const HOMEPAGE_SECURITY_IDS = ["protect-pdf", "unlock-pdf", "redact-pdf"] as const;
 
 export const HOMEPAGE_PENDING_CONVERSION_IDS = [
   "pdf-to-word",
