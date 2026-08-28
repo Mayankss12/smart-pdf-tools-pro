@@ -66,6 +66,8 @@ export const HOMEPAGE_TOOL_GRID_ORDER_IDS = [
   "extract-pages",
   "page-numbers",
   "watermark-pdf",
+  "protect-pdf",
+  "unlock-pdf",
   "sign-pdf",
   "annotate-pdf",
   "highlight-pdf",
@@ -88,7 +90,8 @@ export type ToolDiscoveryGroupId =
   | "organize"
   | "convert-from"
   | "convert-to"
-  | "optimize-ocr";
+  | "optimize-ocr"
+  | "security";
 
 export type ToolDiscoveryAvailability = "ready" | "coming-soon";
 
@@ -126,6 +129,8 @@ const HOMEPAGE_OPTIMIZE_OCR_IDS = [
   "compress-pdf",
   "pdf-to-searchable-pdf",
 ] as const;
+
+const HOMEPAGE_SECURITY_IDS = ["protect-pdf", "unlock-pdf"] as const;
 
 export const HOMEPAGE_PENDING_CONVERSION_IDS = [
   "pdf-to-word",
@@ -167,6 +172,11 @@ const TOOL_DISCOVERY_GROUPS: readonly {
     id: "optimize-ocr",
     label: "Optimize & OCR",
     toolIds: HOMEPAGE_OPTIMIZE_OCR_IDS,
+  },
+  {
+    id: "security",
+    label: "Security",
+    toolIds: HOMEPAGE_SECURITY_IDS,
   },
 ] as const;
 

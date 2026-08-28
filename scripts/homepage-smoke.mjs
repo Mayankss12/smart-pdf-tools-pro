@@ -80,6 +80,7 @@ assert.deepEqual(
     "Convert from PDF",
     "Convert to PDF",
     "Optimize & OCR",
+    "Security",
   ],
 );
 const discoveryItems = discoveryGroups.flatMap((group) => group.items);
@@ -95,6 +96,22 @@ assert.deepEqual(
     )
     .map((group) => group.id),
   ["optimize-ocr"],
+);
+assert.deepEqual(
+  discoveryGroups
+    .filter((group) =>
+      group.items.some((item) => item.tool.id === "protect-pdf"),
+    )
+    .map((group) => group.id),
+  ["security"],
+);
+assert.deepEqual(
+  new Set(
+    discoveryGroups
+      .find((group) => group.id === "security")
+      ?.items.map((item) => item.tool.id),
+  ),
+  new Set(["protect-pdf", "unlock-pdf"]),
 );
 
 for (const id of LOCAL_BROWSER_CONVERSION_IDS) {

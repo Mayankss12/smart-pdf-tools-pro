@@ -20,6 +20,7 @@ const suites = [
   "launch-readiness.mjs",
   "office-conversions-smoke.mjs",
   "pdf-rebuild-safety-smoke.mjs",
+  "pdf-security-smoke.mjs",
   "pdf-to-images-smoke.mjs",
   "standalone-overlay-smoke.mjs",
   "text-to-pdf-unicode-smoke.mjs",
