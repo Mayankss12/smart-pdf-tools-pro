@@ -53,6 +53,8 @@ export const HOMEPAGE_TO_PDF_IDS = [
 
 export const HOMEPAGE_TOOL_GRID_ORDER_IDS = [
   "pdf-editor",
+  "compare-pdf",
+  "form-creator",
   "merge-pdf",
   "split-pdf",
   "compress-pdf",
@@ -60,6 +62,7 @@ export const HOMEPAGE_TOOL_GRID_ORDER_IDS = [
   "pdf-to-images",
   "images-to-pdf",
   "pdf-to-searchable-pdf",
+  "pdfa-preflight",
   "reorder-pages",
   "rotate-pdf",
   "delete-pages",
@@ -116,6 +119,8 @@ export type ToolDiscoveryGroup = {
 
 const HOMEPAGE_EDIT_SIGN_IDS = [
   "pdf-editor",
+  "compare-pdf",
+  "form-creator",
   "sign-pdf",
   "fill-sign",
   "highlight-pdf",
@@ -140,6 +145,7 @@ const HOMEPAGE_ORGANIZE_IDS = [
 const HOMEPAGE_OPTIMIZE_OCR_IDS = [
   "compress-pdf",
   "pdf-to-searchable-pdf",
+  "pdfa-preflight",
   "flatten-pdf",
   "repair-pdf",
   "batch-workflows",

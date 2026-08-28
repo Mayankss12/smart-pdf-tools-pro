@@ -12,10 +12,23 @@ until their server capabilities are configured.
 - Crop, full form/annotation flattening, structural repair and metadata editing
 - Bates numbering and advanced split by size, bookmark or page text
 - Batch processing and ordered local workflow chaining
+- Page-by-page PDF comparison with visual diffs and text-change reports
+- Interactive AcroForm creation for text, checkbox, dropdown and radio fields
+- Standards-honest PDF/A preflight and archival preparation without false certification
+- OCR scan profiles, deskewing, document binarization and confidence diagnostics
 - Canonical public launch readiness across homepage, menus, search and sitemap
 - Supabase-backed authentication, entitlements, admin controls and audit history
 - Privacy-safe client error telemetry and Core Web Vitals administration
-- Deterministic launch, security, editor, conversion and Stage 1 regression suites
+- Deterministic launch, security, editor, conversion, Stage 1 and Stage 2 regression suites
+
+## Stage 2 professional workflows
+
+`/tools/compare`, `/tools/form-creator`, and `/tools/pdfa` run locally in the
+browser and are registered through the same fail-closed public launch policy as
+the rest of PDFMantra. Advanced outputs use the existing entitlement and audit
+path. PDF/A preparation intentionally does not add a conformance declaration;
+regulated archival use still requires validation with a standards-grade
+validator such as veraPDF.
 
 ## How to run
 

@@ -132,6 +132,9 @@ export const CORE_TOOL_KEYS = [
 
 export const ADVANCED_TOOL_KEYS = [
   "editor",
+  "compare",
+  "pdfa",
+  "form-creator",
   "protect",
   "unlock",
   "redact",
