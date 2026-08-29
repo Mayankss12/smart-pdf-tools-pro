@@ -22,6 +22,7 @@ const suites = [
   "pdf-rebuild-safety-smoke.mjs",
   "pdf-security-smoke.mjs",
   "pdf-to-images-smoke.mjs",
+  "pro-comparison-smoke.mjs",
   "standalone-overlay-smoke.mjs",
   "stage-one-platform-smoke.mjs",
   "stage-two-platform-smoke.mjs",

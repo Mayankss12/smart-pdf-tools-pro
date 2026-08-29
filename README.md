@@ -13,6 +13,7 @@ until their server capabilities are configured.
 - Bates numbering and advanced split by size, bookmark or page text
 - Batch processing and ordered local workflow chaining
 - Page-by-page PDF comparison with visual diffs and text-change reports
+- Version-aware PDF comparison with inserted/removed page alignment, line-level review, and JSON/CSV audit reports
 - Interactive AcroForm creation for text, checkbox, dropdown and radio fields
 - Standards-honest PDF/A preflight and archival preparation without false certification
 - OCR scan profiles, deskewing, document binarization and confidence diagnostics
@@ -29,6 +30,12 @@ the rest of PDFMantra. Advanced outputs use the existing entitlement and audit
 path. PDF/A preparation intentionally does not add a conformance declaration;
 regulated archival use still requires validation with a standards-grade
 validator such as veraPDF.
+
+The Compare PDFs workflow first aligns page text before rendering visual
+differences. An inserted or removed page therefore does not incorrectly mark
+every later page as changed. Its audit exports include original/revised page
+mapping and line-level change samples; image-only pages still rely primarily on
+the visual comparison signal.
 
 ## How to run
 
