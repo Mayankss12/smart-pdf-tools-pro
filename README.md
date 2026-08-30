@@ -69,6 +69,9 @@ and workspace audit events. Metadata writes are service-role-only. PDF bytes
 are transferred with short-lived signed upload/download URLs and the private
 `pdf-documents` bucket intentionally has no general browser object policy.
 Apply this migration before exposing `/dashboard` in production.
+The current account quotas are deliberately capped at the deployed Supabase
+project's 1 GB storage ceiling; raise both infrastructure and application
+quotas together when the storage plan is upgraded.
 
 Telemetry is technical only: route paths, sanitized error summaries and Web
 Vitals. The API rejects full URLs and sanitizes email-like strings; document

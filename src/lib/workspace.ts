@@ -70,25 +70,25 @@ const ACCOUNT_QUOTAS: Record<Exclude<UserTier, "guest">, Omit<WorkspaceQuota, "t
   free: {
     maximumDocuments: 10,
     maximumVersions: 25,
-    maximumStorageBytes: 500 * MEBIBYTE,
+    maximumStorageBytes: 250 * MEBIBYTE,
     maximumFileBytes: 100 * MEBIBYTE,
   },
   plus: {
     maximumDocuments: 100,
     maximumVersions: 500,
-    maximumStorageBytes: 5 * GIBIBYTE,
+    maximumStorageBytes: 500 * MEBIBYTE,
     maximumFileBytes: 500 * MEBIBYTE,
   },
   pro: {
     maximumDocuments: 500,
     maximumVersions: 2_500,
-    maximumStorageBytes: 20 * GIBIBYTE,
+    maximumStorageBytes: 1 * GIBIBYTE,
     maximumFileBytes: 1 * GIBIBYTE,
   },
   admin: {
     maximumDocuments: 5_000,
     maximumVersions: 25_000,
-    maximumStorageBytes: 100 * GIBIBYTE,
+    maximumStorageBytes: 1 * GIBIBYTE,
     maximumFileBytes: 1 * GIBIBYTE,
   },
 };

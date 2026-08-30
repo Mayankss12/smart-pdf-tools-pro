@@ -17,7 +17,9 @@ const pro = getWorkspaceQuota("pro");
 assert.equal(free.maximumDocuments, 10);
 assert.equal(free.maximumVersions, 25);
 assert.equal(free.maximumFileBytes, 100 * 1024 * 1024);
-assert.equal(plus.maximumStorageBytes, 5 * 1024 ** 3);
+assert.equal(free.maximumStorageBytes, 250 * 1024 ** 2);
+assert.equal(plus.maximumStorageBytes, 500 * 1024 ** 2);
+assert.equal(pro.maximumStorageBytes, 1024 ** 3);
 assert.equal(pro.maximumFileBytes, 1024 ** 3);
 assert.equal(getWorkspaceQuota("unexpected").tier, "free");
 
