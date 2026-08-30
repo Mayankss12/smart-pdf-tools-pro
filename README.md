@@ -63,6 +63,13 @@ by `/api/telemetry` and the administrator Operations screen. If that migration
 has not yet been applied, telemetry safely falls back to structured server logs
 and the admin screen reports that the migration is required.
 
+Migration `0007_document_workspace_versions.sql` activates the authenticated
+document workspace, private version storage, restore history, quota enforcement
+and workspace audit events. Metadata writes are service-role-only. PDF bytes
+are transferred with short-lived signed upload/download URLs and the private
+`pdf-documents` bucket intentionally has no general browser object policy.
+Apply this migration before exposing `/dashboard` in production.
+
 Telemetry is technical only: route paths, sanitized error summaries and Web
 Vitals. The API rejects full URLs and sanitizes email-like strings; document
 content, filenames, passwords and form values must never be submitted.

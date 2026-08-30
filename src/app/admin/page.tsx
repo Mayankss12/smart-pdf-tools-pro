@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Database,
+  HardDrive,
   Loader2,
   RefreshCw,
   Save,
@@ -104,6 +105,15 @@ type AdminPayload = {
       created_at: string;
     }>;
   };
+  workspace: {
+    configured: boolean;
+    documents: number;
+    versions: number;
+    storageBytes: number;
+    uploading: number;
+    failedUploads: number;
+    recentEvents: Array<{ event_type: string; created_at: string }>;
+  };
 };
 
 type ProfileDraft = {
@@ -131,6 +141,12 @@ function toDateInput(value: string | null) {
   if (!value) return "";
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 10);
+}
+
+function formatStorage(value: number) {
+  if (value >= 1024 ** 3) return `${(value / 1024 ** 3).toFixed(1)} GB`;
+  if (value >= 1024 ** 2) return `${(value / 1024 ** 2).toFixed(1)} MB`;
+  return `${Math.round(value / 1024)} KB`;
 }
 
 function createDraft(profile: AdminProfile): ProfileDraft {
@@ -566,6 +582,33 @@ export default function AdminPage() {
 
               {view === "operations" ? (
                 <div className="mt-5 grid gap-5 xl:grid-cols-2">
+                  <Panel>
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2 text-sm font-black text-slate-950">
+                          <HardDrive size={16} className="text-violet-600" />
+                          Document workspace
+                        </div>
+                        <div className="mt-1 text-xs font-bold text-slate-500">Private storage and version activity</div>
+                      </div>
+                      <Status good={data.workspace.configured}>{data.workspace.configured ? "Ready" : "Migration required"}</Status>
+                    </div>
+                    <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      <Metric label="Documents" value={data.workspace.documents} note="Active records" />
+                      <Metric label="Versions" value={data.workspace.versions} note="Stored history" />
+                      <Metric label="Storage" value={formatStorage(data.workspace.storageBytes)} note="Ready versions" />
+                      <Metric label="Uploads" value={data.workspace.uploading} note={`${data.workspace.failedUploads} failed`} />
+                    </div>
+                    <div className="mt-4 space-y-2">
+                      {data.workspace.recentEvents.length ? data.workspace.recentEvents.slice(0, 8).map((event, index) => (
+                        <div key={`${event.created_at}-${index}`} className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2.5">
+                          <span className="text-xs font-black text-slate-700">{event.event_type.replaceAll("_", " ")}</span>
+                          <span className="text-[10px] font-bold text-slate-400">{formatDate(event.created_at)}</span>
+                        </div>
+                      )) : <div className="py-5 text-center text-sm font-bold text-slate-500">No workspace events recorded.</div>}
+                    </div>
+                  </Panel>
+
                   <Panel>
                     <div className="flex items-center justify-between gap-3">
                       <div className="text-sm font-black text-slate-950">Client reliability · last 24 hours</div>

@@ -28,6 +28,7 @@ const suites = [
   "stage-two-platform-smoke.mjs",
   "text-to-pdf-unicode-smoke.mjs",
   "verified-bugs-smoke.mjs",
+  "workspace-versioning-smoke.mjs",
 ];
 
 for (const suite of suites) {

@@ -126,6 +126,21 @@ export async function GET(request: Request) {
       .order("created_at", { ascending: false })
       .limit(1000);
 
+    const workspaceDocumentsQuery = await admin
+      .from("documents")
+      .select("status", { count: "exact" })
+      .neq("status", "archived")
+      .limit(5000);
+    const workspaceVersionsQuery = await admin
+      .from("document_versions")
+      .select("size_bytes,upload_status", { count: "exact" })
+      .limit(25000);
+    const workspaceEventsQuery = await admin
+      .from("workspace_events")
+      .select("event_type,created_at")
+      .order("created_at", { ascending: false })
+      .limit(25);
+
     const profiles = profilesQuery.data ?? [];
     const usage = usageQuery.data ?? [];
     const subscriptions = subscriptionsQuery.data ?? [];
@@ -174,6 +189,13 @@ export async function GET(request: Request) {
       return values[Math.min(values.length - 1, Math.ceil(values.length * 0.75) - 1)];
     };
     const clientErrors = telemetry.filter((item) => item.event_type !== "web-vital");
+    const workspaceConfigured =
+      !workspaceDocumentsQuery.error &&
+      !workspaceVersionsQuery.error &&
+      !workspaceEventsQuery.error;
+    const workspaceVersions = workspaceVersionsQuery.error
+      ? []
+      : workspaceVersionsQuery.data ?? [];
 
     return respond(request, {
       ok: true,
@@ -212,6 +234,19 @@ export async function GET(request: Request) {
         poorVitals24h: telemetry.filter((item) => item.event_type === "web-vital" && item.rating === "poor").length,
         p75: { LCP: p75("LCP"), INP: p75("INP"), CLS: p75("CLS") },
         recentErrors: clientErrors.slice(0, 20),
+      },
+      workspace: {
+        configured: workspaceConfigured,
+        documents: workspaceDocumentsQuery.error ? 0 : workspaceDocumentsQuery.count ?? 0,
+        versions: workspaceVersionsQuery.error ? 0 : workspaceVersionsQuery.count ?? 0,
+        storageBytes: workspaceVersions
+          .filter((item) => item.upload_status === "ready")
+          .reduce((total, item) => total + Number(item.size_bytes ?? 0), 0),
+        uploading: workspaceVersions.filter((item) => item.upload_status === "uploading").length,
+        failedUploads: workspaceEventsQuery.error
+          ? 0
+          : (workspaceEventsQuery.data ?? []).filter((item) => item.event_type === "upload_failed").length,
+        recentEvents: workspaceEventsQuery.error ? [] : workspaceEventsQuery.data ?? [],
       },
     });
   } catch (error) {
