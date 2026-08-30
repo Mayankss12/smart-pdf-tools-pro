@@ -2,6 +2,8 @@
 -- This migration reconciles the original foundation schema without exposing
 -- document bytes publicly. File objects remain under <auth.uid()>/... paths.
 
+begin;
+
 create extension if not exists pgcrypto;
 
 alter table public.documents
@@ -302,3 +304,5 @@ comment on table public.workspace_events is
 
 comment on column public.document_versions.version_number is
   'Monotonic display number scoped to one document.';
+
+commit;
