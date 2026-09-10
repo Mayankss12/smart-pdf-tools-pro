@@ -114,6 +114,28 @@ type AdminPayload = {
     failedUploads: number;
     recentEvents: Array<{ event_type: string; created_at: string }>;
   };
+  operations: {
+    generatedAt: string;
+    metrics: {
+      schemaConfigured: boolean;
+      storageBytes: number;
+      storageCapacityBytes: number;
+      staleUploads: number;
+      failedUploads24h: number;
+      failedJobs24h: number;
+      lockedOtpScopes: number;
+      clientErrors24h: number;
+    };
+    alerts: Array<{
+      fingerprint: string;
+      severity: "warning" | "critical";
+      category: string;
+      title: string;
+      summary: string;
+      value: number;
+      threshold: number;
+    }>;
+  };
 };
 
 type ProfileDraft = {
@@ -582,6 +604,33 @@ export default function AdminPage() {
 
               {view === "operations" ? (
                 <div className="mt-5 grid gap-5 xl:grid-cols-2">
+                  <Panel>
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2 text-sm font-black text-slate-950">
+                          <ShieldCheck size={16} className="text-violet-600" />
+                          Production assurance
+                        </div>
+                        <div className="mt-1 text-xs font-bold text-slate-500">Capacity, upload, processing and authentication thresholds</div>
+                      </div>
+                      <Status good={!data.operations.alerts.length}>{data.operations.alerts.length ? `${data.operations.alerts.length} active` : "Healthy"}</Status>
+                    </div>
+                    <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      <Metric label="Capacity" value={formatStorage(data.operations.metrics.storageCapacityBytes)} note="Configured ceiling" />
+                      <Metric label="Reserved" value={formatStorage(data.operations.metrics.storageBytes)} note={`${Math.round((data.operations.metrics.storageBytes / Math.max(1, data.operations.metrics.storageCapacityBytes)) * 100)}% used`} />
+                      <Metric label="Stale uploads" value={data.operations.metrics.staleUploads} note="Beyond safety window" />
+                      <Metric label="OTP locks" value={data.operations.metrics.lockedOtpScopes} note="Active protected scopes" />
+                    </div>
+                    <div className="mt-4 space-y-2">
+                      {data.operations.alerts.length ? data.operations.alerts.map((alert) => (
+                        <div key={alert.fingerprint} className={`rounded-xl border px-3 py-3 ${alert.severity === "critical" ? "border-red-200 bg-red-50" : "border-amber-200 bg-amber-50"}`}>
+                          <div className={`text-xs font-black ${alert.severity === "critical" ? "text-red-800" : "text-amber-900"}`}>{alert.title}</div>
+                          <div className={`mt-1 text-[11px] font-semibold ${alert.severity === "critical" ? "text-red-700" : "text-amber-800"}`}>{alert.summary}</div>
+                        </div>
+                      )) : <div className="py-5 text-center text-sm font-bold text-slate-500">No operational threshold is currently breached.</div>}
+                    </div>
+                  </Panel>
+
                   <Panel>
                     <div className="flex items-center justify-between gap-3">
                       <div>

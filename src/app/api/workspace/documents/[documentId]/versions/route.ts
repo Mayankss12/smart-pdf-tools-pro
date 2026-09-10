@@ -14,6 +14,11 @@ import {
   normalizeVersionKind,
   sanitizeVersionLabel,
 } from "@/lib/workspace";
+import {
+  assertGlobalWorkspaceCapacity,
+  getWorkspaceStorageCapacityBytes,
+} from "@/lib/operations";
+import { getGlobalWorkspaceStorageUsage } from "@/lib/operations/server";
 import { readWorkspaceJson, workspaceResponse } from "@/lib/workspace/api";
 import {
   getOwnedDocument,
@@ -57,9 +62,10 @@ export async function POST(request: Request, routeContext: Context) {
   }
 
   try {
-    const [owned, usage, latestVersion] = await Promise.all([
+    const [owned, usage, globalStorageBytes, latestVersion] = await Promise.all([
       getOwnedDocument(admin, user.id, documentId),
       getWorkspaceUsage(admin, user.id),
+      getGlobalWorkspaceStorageUsage(admin),
       admin
         .from("document_versions")
         .select("version_number")
@@ -82,6 +88,14 @@ export async function POST(request: Request, routeContext: Context) {
       createsDocument: false,
     });
     if (capacityError) return workspaceResponse(request, { ok: false, error: capacityError }, 409);
+    const infrastructureCapacityError = assertGlobalWorkspaceCapacity({
+      storageBytes: globalStorageBytes,
+      incomingBytes: sizeBytes,
+      storageCapacityBytes: getWorkspaceStorageCapacityBytes(),
+    });
+    if (infrastructureCapacityError) {
+      return workspaceResponse(request, { ok: false, error: infrastructureCapacityError }, 503);
+    }
 
     const versionNumber = Number(latestVersion.data?.version_number ?? 0) + 1;
     const versionId = randomUUID();

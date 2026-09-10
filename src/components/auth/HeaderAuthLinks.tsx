@@ -11,6 +11,8 @@ import {
   Info,
   LayoutDashboard,
   LogOut,
+  Settings,
+  UserRound,
 } from "lucide-react";
 
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -32,8 +34,18 @@ type SessionResponse = {
 const ACCOUNT_MENU_ITEMS = [
   {
     label: "My Account",
+    href: "/account",
+    icon: UserRound,
+  },
+  {
+    label: "My Workspace",
     href: "/dashboard",
     icon: LayoutDashboard,
+  },
+  {
+    label: "Settings",
+    href: "/account?tab=settings",
+    icon: Settings,
   },
   {
     label: "Subscription details",
@@ -69,23 +81,6 @@ function getAccountLabel(displayName: string | null, email: string | null) {
   return "PDFMantra User";
 }
 
-function getDisplayNameFromMetadata(
-  metadata: Record<string, unknown> | null | undefined,
-) {
-  const fullName = metadata?.full_name;
-  const name = metadata?.name;
-
-  if (typeof fullName === "string" && fullName.trim()) {
-    return fullName.trim();
-  }
-
-  if (typeof name === "string" && name.trim()) {
-    return name.trim();
-  }
-
-  return null;
-}
-
 function useHeaderAuthState(): HeaderAuthState {
   const pathname = usePathname();
   const supabase = createSupabaseBrowserClient();
@@ -111,22 +106,6 @@ function useHeaderAuthState(): HeaderAuthState {
     }
 
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (user) {
-        setAuthState({
-          isAvailable: true,
-          isLoaded: true,
-          isSignedIn: true,
-          email: user.email ?? null,
-          displayName: getDisplayNameFromMetadata(user.user_metadata),
-        });
-
-        return;
-      }
-
       const response = await fetch("/api/auth/session", {
         cache: "no-store",
         credentials: "include",
@@ -383,10 +362,24 @@ export function MobileHeaderAuthLink() {
     return (
       <div>
         <Link
-          href="/dashboard"
+          href="/account"
           className="flex items-center justify-between border-b border-violet-100 px-4 py-4 text-sm font-bold text-slate-700 transition hover:bg-violet-50 hover:text-violet-700"
         >
           My Account
+          <ArrowRight size={15} />
+        </Link>
+        <Link
+          href="/dashboard"
+          className="flex items-center justify-between border-b border-violet-100 px-4 py-4 text-sm font-bold text-slate-700 transition hover:bg-violet-50 hover:text-violet-700"
+        >
+          My Workspace
+          <ArrowRight size={15} />
+        </Link>
+        <Link
+          href="/account?tab=settings"
+          className="flex items-center justify-between border-b border-violet-100 px-4 py-4 text-sm font-bold text-slate-700 transition hover:bg-violet-50 hover:text-violet-700"
+        >
+          Settings
           <ArrowRight size={15} />
         </Link>
         <Link

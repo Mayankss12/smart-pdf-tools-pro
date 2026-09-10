@@ -19,6 +19,7 @@ interface AuthInputProps {
   readonly label: string;
   readonly type: "text" | "email" | "tel" | "password";
   readonly placeholder?: string;
+  readonly defaultValue?: string;
   readonly autoComplete?: string;
   readonly required?: boolean;
   readonly optional?: boolean;
@@ -51,6 +52,7 @@ export function AuthInput({
   label,
   type,
   placeholder,
+  defaultValue,
   autoComplete,
   required,
   optional,
@@ -93,6 +95,7 @@ export function AuthInput({
           name={name}
           type={canReveal && isVisible ? "text" : type}
           placeholder={placeholder}
+          defaultValue={defaultValue}
           autoComplete={autoComplete}
           required={required}
           disabled={disabled}

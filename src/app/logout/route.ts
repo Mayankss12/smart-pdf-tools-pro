@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { isSameSiteStateChangingRequest } from "@/lib/api-security";
+import { PASSWORD_RECOVERY_COOKIE } from "@/lib/auth/password-recovery";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 async function logout(request: NextRequest) {
@@ -10,7 +11,9 @@ async function logout(request: NextRequest) {
     await supabase.auth.signOut();
   }
 
-  return NextResponse.redirect(new URL("/login", request.nextUrl.origin));
+  const response = NextResponse.redirect(new URL("/login", request.nextUrl.origin));
+  response.cookies.delete(PASSWORD_RECOVERY_COOKIE);
+  return response;
 }
 
 export async function POST(request: NextRequest) {

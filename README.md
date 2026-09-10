@@ -73,6 +73,30 @@ The current account quotas are deliberately capped at the deployed Supabase
 project's 1 GB storage ceiling; raise both infrastructure and application
 quotas together when the storage plan is upgraded.
 
+Migration `0008_production_assurance.sql` remediates the Supabase
+`active_subscriptions` security-advisor finding with an invoker-rights view,
+adds service-role-only operational alerts, and provides aggregate workspace
+capacity measurement. The daily `/api/operations/health` check records storage,
+upload, processing, authentication and client-reliability threshold breaches.
+Configure `CRON_SECRET`, keep `WORKSPACE_STORAGE_CAPACITY_BYTES` aligned with
+the purchased Supabase storage plan, and optionally provide an HTTPS
+`OPERATIONS_ALERT_WEBHOOK_URL`. See
+`docs/operations/production-assurance.md` for backup and restore procedures.
+
+Migration `0009_supabase_advisor_hardening.sql` pins the shared update-trigger
+search path and removes public API execution rights from internal trigger
+helpers. Apply it immediately after migration `0008` and rerun the Supabase
+security advisor.
+
+Migration `0010_profile_update_permissions.sql` restricts customer profile
+updates to presentation-only fields. Apply it before enabling the My Account
+personal-details form so authenticated customers cannot alter plan, quota, or
+entitlement columns through the public API.
+
+Migration `0011_saved_signature_storage_hardening.sql` keeps reusable account
+signatures private, limits PNG files to 2 MB, and bounds signature labels.
+Apply it before enabling multiple saved signatures in Fill & Sign.
+
 Telemetry is technical only: route paths, sanitized error summaries and Web
 Vitals. The API rejects full URLs and sanitizes email-like strings; document
 content, filenames, passwords and form values must never be submitted.

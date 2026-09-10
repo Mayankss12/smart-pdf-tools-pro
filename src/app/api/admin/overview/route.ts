@@ -9,6 +9,7 @@ import { getBackendCapabilityReport } from "@/lib/backend/capabilities";
 import { getConversionAdminControls } from "@/lib/conversions/administration";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { collectOperationalHealth } from "@/lib/operations/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -196,6 +197,7 @@ export async function GET(request: Request) {
     const workspaceVersions = workspaceVersionsQuery.error
       ? []
       : workspaceVersionsQuery.data ?? [];
+    const operations = await collectOperationalHealth(admin);
 
     return respond(request, {
       ok: true,
@@ -248,6 +250,7 @@ export async function GET(request: Request) {
           : (workspaceEventsQuery.data ?? []).filter((item) => item.event_type === "upload_failed").length,
         recentEvents: workspaceEventsQuery.error ? [] : workspaceEventsQuery.data ?? [],
       },
+      operations,
     });
   } catch (error) {
     console.error("Admin overview failed", error);

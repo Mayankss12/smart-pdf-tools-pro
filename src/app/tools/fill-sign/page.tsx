@@ -1,6 +1,7 @@
 "use client";
 
 import { Header } from "@/components/Header";
+import NextImage from "next/image";
 import {
   CalendarDays,
   Check,
@@ -19,6 +20,7 @@ import {
   PenLine,
   Plus,
   RotateCcw,
+  Save,
   Square,
   Trash2,
   Type,
@@ -51,6 +53,7 @@ import {
   scaleProportionalMarkBox,
   scaleProportionalMediaBox,
 } from "@/lib/fill-sign-layout";
+import type { SavedSignatureView } from "@/lib/saved-signatures";
 import {
   inspectPdfCompatibility,
   readValidatedPdfBytes,
@@ -147,6 +150,8 @@ const TOOLBAR_ITEMS: Array<{
 
 const DEFAULT_STATUS =
   "Upload a PDF, choose a tool, click on the page, then drag or resize your added fields.";
+const MAX_IMPORTED_IMAGE_BYTES = 20 * 1024 * 1024;
+const MAX_IMPORTED_IMAGE_PIXELS = 25_000_000;
 
 function createId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -165,13 +170,15 @@ function isPdfFile(file: File) {
 
 function isImageFile(file: File) {
   const name = file.name.toLowerCase();
+  const allowedMimeTypes = ["image/png", "image/jpeg", "image/webp"];
 
   return (
-    file.type.startsWith("image/") ||
-    name.endsWith(".png") ||
-    name.endsWith(".jpg") ||
-    name.endsWith(".jpeg") ||
-    name.endsWith(".webp")
+    allowedMimeTypes.includes(file.type.toLowerCase()) ||
+    (!file.type &&
+      (name.endsWith(".png") ||
+        name.endsWith(".jpg") ||
+        name.endsWith(".jpeg") ||
+        name.endsWith(".webp")))
   );
 }
 
@@ -347,7 +354,10 @@ async function renderPdfPageToPng(
   }
 }
 
-async function convertImageToPng(file: File): Promise<ImportedImage> {
+async function convertImageToPng(
+  file: File,
+  removeLightBackground = false,
+): Promise<ImportedImage> {
   const objectUrl = URL.createObjectURL(file);
   let canvas: HTMLCanvasElement | null = null;
 
@@ -359,6 +369,14 @@ async function convertImageToPng(file: File): Promise<ImportedImage> {
       img.onerror = () => reject(new Error("Unable to read image."));
       img.src = objectUrl;
     });
+
+    if (
+      image.naturalWidth <= 0 ||
+      image.naturalHeight <= 0 ||
+      image.naturalWidth * image.naturalHeight > MAX_IMPORTED_IMAGE_PIXELS
+    ) {
+      throw new Error("This image is too large to process safely. Choose a smaller image.");
+    }
 
     canvas = document.createElement("canvas");
     const context = canvas.getContext("2d");
@@ -372,6 +390,21 @@ async function convertImageToPng(file: File): Promise<ImportedImage> {
 
     context.clearRect(0, 0, canvas.width, canvas.height);
     context.drawImage(image, 0, 0);
+
+    if (removeLightBackground) {
+      const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+      for (let index = 0; index < imageData.data.length; index += 4) {
+        const lightestInk = Math.min(
+          imageData.data[index] ?? 0,
+          imageData.data[index + 1] ?? 0,
+          imageData.data[index + 2] ?? 0,
+        );
+        if (lightestInk <= 225) continue;
+        const opacity = Math.max(0, Math.min(1, (255 - lightestInk) / 30));
+        imageData.data[index + 3] = Math.round((imageData.data[index + 3] ?? 255) * opacity);
+      }
+      context.putImageData(imageData, 0, 0);
+    }
 
     const blob = await new Promise<Blob>((resolve, reject) => {
       canvas.toBlob((outputBlob) => {
@@ -436,7 +469,11 @@ function createFormValueMap(fields: readonly AcroFormFieldInfo[]) {
 }
 
 export default function FillSignPage() {
-  const { recordExport } = useEntitlement();
+  const {
+    identityType,
+    loading: entitlementLoading,
+    recordExport,
+  } = useEntitlement();
   const pdfInputRef = useRef<HTMLInputElement | null>(null);
   const signatureImageInputRef = useRef<HTMLInputElement | null>(null);
   const objectImageInputRef = useRef<HTMLInputElement | null>(null);
@@ -481,10 +518,50 @@ export default function FillSignPage() {
   const [busy, setBusy] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [savedSignatures, setSavedSignatures] = useState<SavedSignatureView[]>([]);
+  const [signatureLibraryAvailable, setSignatureLibraryAvailable] = useState(false);
+  const [signatureLibraryBusy, setSignatureLibraryBusy] = useState(false);
+  const [signatureLabel, setSignatureLabel] = useState("My signature");
 
   useEffect(() => {
     configurePdfJsWorker(pdfjsLib);
   }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadSavedSignatures() {
+      if (entitlementLoading) return;
+      if (identityType !== "user") {
+        setSignatureLibraryAvailable(false);
+        setSavedSignatures([]);
+        return;
+      }
+
+      try {
+        const response = await fetch("/api/signatures", {
+          cache: "no-store",
+          credentials: "include",
+        });
+        const body = (await response.json()) as {
+          ok?: boolean;
+          signatures?: SavedSignatureView[];
+        };
+        if (!active) return;
+        if (response.ok && body.ok) {
+          setSignatureLibraryAvailable(true);
+          setSavedSignatures(body.signatures ?? []);
+        }
+      } catch {
+        // Signing stays fully local when account storage is unavailable.
+      }
+    }
+
+    void loadSavedSignatures();
+    return () => {
+      active = false;
+    };
+  }, [entitlementLoading, identityType]);
 
   useEffect(() => {
     const imageUrls = imageUrlsRef.current;
@@ -854,11 +931,19 @@ export default function FillSignPage() {
       return;
     }
 
+    if (selectedFile.size > MAX_IMPORTED_IMAGE_BYTES) {
+      setStatus("Please upload an image smaller than 20 MB.");
+      return;
+    }
+
     setBusy(true);
     setStatus("Importing image...");
 
     try {
-      const importedImage = await convertImageToPng(selectedFile);
+      const importedImage = await convertImageToPng(
+        selectedFile,
+        target === "signature",
+      );
       trackImage(importedImage);
 
       if (target === "signature") {
@@ -871,7 +956,7 @@ export default function FillSignPage() {
         setSignatureImage(importedImage);
         setSignatureSource("uploaded");
         setActiveTool("signature");
-        setStatus("Signature image imported. Click on the PDF page to place it.");
+        setStatus("Uploaded — background made transparent. Click the PDF page to place your signature.");
       } else {
         if (
           objectImage &&
@@ -888,6 +973,124 @@ export default function FillSignPage() {
       setStatus("Unable to import this image. Try another PNG or JPG.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function saveCurrentSignature() {
+    if (!signatureLibraryAvailable) {
+      setStatus("Sign in to save and reuse multiple signatures.");
+      return;
+    }
+
+    const sourceImage =
+      signatureSource === "drawn"
+        ? drawnSignature
+        : signatureSource === "uploaded"
+          ? signatureImage
+          : null;
+    if (signatureSource === "typed" && !signerName.trim()) {
+      setStatus("Enter a typed signature before saving.");
+      return;
+    }
+    if (signatureSource !== "typed" && !sourceImage) {
+      setStatus("Draw or upload a signature before saving.");
+      return;
+    }
+
+    setSignatureLibraryBusy(true);
+    setStatus("Saving signature securely...");
+    try {
+      const form = new FormData();
+      form.set("label", signatureLabel);
+      form.set("signatureType", signatureSource);
+      if (signatureSource === "typed") {
+        form.set("text", signerName.trim());
+      } else if (sourceImage) {
+        form.set("width", String(sourceImage.width));
+        form.set("height", String(sourceImage.height));
+        form.set(
+          "image",
+          new File([sourceImage.pngBytes.slice().buffer], "signature.png", {
+            type: "image/png",
+          }),
+        );
+      }
+
+      const response = await fetch("/api/signatures", {
+        method: "POST",
+        body: form,
+        credentials: "include",
+      });
+      const body = (await response.json()) as {
+        ok?: boolean;
+        signature?: SavedSignatureView;
+        error?: string;
+      };
+      if (!response.ok || !body.ok || !body.signature) {
+        throw new Error(body.error || "Unable to save this signature.");
+      }
+      setSavedSignatures((current) => [
+        body.signature as SavedSignatureView,
+        ...current.filter((item) => item.id !== body.signature?.id),
+      ]);
+      setStatus(`Saved “${body.signature.label}” to your account.`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Unable to save this signature.");
+    } finally {
+      setSignatureLibraryBusy(false);
+    }
+  }
+
+  async function selectSavedSignature(signature: SavedSignatureView) {
+    setSignatureLibraryBusy(true);
+    setStatus(`Loading “${signature.label}”...`);
+    try {
+      if (signature.signatureType === "typed") {
+        if (!signature.text) throw new Error("This saved signature has no text.");
+        setSignerName(signature.text);
+        setSignatureSource("typed");
+      } else {
+        if (!signature.previewUrl) throw new Error("This saved signature image is unavailable.");
+        const response = await fetch(signature.previewUrl, { cache: "no-store" });
+        if (!response.ok) throw new Error("This saved signature image could not be loaded.");
+        const blob = await response.blob();
+        const importedImage = await convertImageToPng(
+          new File([blob], `${signature.label}.png`, { type: "image/png" }),
+        );
+        trackImage(importedImage);
+        if (
+          signatureImage &&
+          !objects.some((object) => object.image?.id === signatureImage.id)
+        ) {
+          revokeImage(signatureImage);
+        }
+        setSignatureImage(importedImage);
+        setSignatureSource("uploaded");
+      }
+      setActiveTool("signature");
+      setStatus(`“${signature.label}” selected. Click the PDF page to place it.`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Unable to load this saved signature.");
+    } finally {
+      setSignatureLibraryBusy(false);
+    }
+  }
+
+  async function deleteSavedSignature(signature: SavedSignatureView) {
+    setSignatureLibraryBusy(true);
+    try {
+      const response = await fetch(`/api/signatures/${signature.id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const body = (await response.json()) as { ok?: boolean; error?: string };
+      if (!response.ok || !body.ok) throw new Error(body.error || "Unable to remove this signature.");
+      setSavedSignatures((current) => current.filter((item) => item.id !== signature.id));
+      setStatus(`Removed “${signature.label}” from your account.`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Unable to remove this signature.");
+    } finally {
+      setSignatureLibraryBusy(false);
     }
   }
 
@@ -2089,9 +2292,99 @@ export default function FillSignPage() {
                             >
                               Upload sign
                             </button>
+                            {signatureSource === "uploaded" && signatureImage ? (
+                              <span className="inline-flex flex-1 items-center justify-center gap-1 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700">
+                                <CheckCircle2 size={14} /> Uploaded · transparent
+                              </span>
+                            ) : null}
                           </div>
                         </div>
                       </div>
+                    </div>
+
+                    <div className="mt-4 border-t border-[var(--border-light)] pt-4">
+                      {signatureLibraryAvailable ? (
+                        <>
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                            <label className="min-w-0 flex-1">
+                              <span className="text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]">
+                                Save for your account
+                              </span>
+                              <input
+                                value={signatureLabel}
+                                onChange={(event) => setSignatureLabel(event.target.value)}
+                                maxLength={60}
+                                className="mt-2 h-10 w-full rounded-xl border border-[var(--border-light)] px-3 text-sm font-semibold outline-none focus:border-[var(--border-focus)] focus:ring-4 focus:ring-[rgba(101,80,232,0.12)]"
+                                placeholder="Signature label"
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => void saveCurrentSignature()}
+                              disabled={signatureLibraryBusy}
+                              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[var(--violet-600)] px-4 text-sm font-bold text-white hover:bg-[var(--violet-500)] disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {signatureLibraryBusy ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+                              Save signature
+                            </button>
+                          </div>
+
+                          {savedSignatures.length > 0 ? (
+                            <div className="mt-4">
+                              <div className="mb-2 text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]">
+                                Saved signatures ({savedSignatures.length}/12)
+                              </div>
+                              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                                {savedSignatures.map((signature) => (
+                                  <div key={signature.id} className="flex min-w-0 items-center gap-2 rounded-xl border border-[var(--border-light)] bg-slate-50 p-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => void selectSavedSignature(signature)}
+                                      disabled={signatureLibraryBusy}
+                                      className="flex min-w-0 flex-1 items-center gap-2 rounded-lg text-left focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-100"
+                                    >
+                                      <span className="flex h-10 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white px-1 text-sm font-semibold italic text-indigo-700">
+                                        {signature.previewUrl ? (
+                                          <NextImage
+                                            src={signature.previewUrl}
+                                            alt=""
+                                            width={64}
+                                            height={36}
+                                            unoptimized
+                                            className="max-h-9 max-w-full object-contain"
+                                          />
+                                        ) : (
+                                          <span className="truncate">{signature.text}</span>
+                                        )}
+                                      </span>
+                                      <span className="truncate text-xs font-bold text-[var(--text-primary)]">
+                                        {signature.label}
+                                      </span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => void deleteSavedSignature(signature)}
+                                      disabled={signatureLibraryBusy}
+                                      aria-label={`Delete ${signature.label}`}
+                                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-100"
+                                    >
+                                      <Trash2 size={15} />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="mt-3 text-xs font-medium text-[var(--text-muted)]">
+                              Save up to 12 typed, drawn, or uploaded signatures for reuse.
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        <a href="/login?next=/tools/fill-sign" className="text-sm font-bold text-[var(--violet-600)] hover:underline">
+                          Sign in to save and reuse multiple signatures
+                        </a>
+                      )}
                     </div>
                   </div>
                 )}
@@ -2297,7 +2590,7 @@ export default function FillSignPage() {
         </section>
 
         {selectedObject && (
-          <div className="fixed bottom-4 left-1/2 z-50 w-[calc(100%-2rem)] max-w-5xl -translate-x-1/2 rounded-2xl border border-[var(--border-focus)] bg-white/95 p-3 shadow-[0_24px_80px_rgba(15,23,42,0.20)] backdrop-blur">
+          <div className="mx-auto mb-8 w-[calc(100%-2rem)] max-w-5xl rounded-2xl border border-[var(--border-focus)] bg-white p-3 shadow-[0_12px_36px_rgba(15,23,42,0.10)]">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div className="min-w-0">
                 <div className="text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]">

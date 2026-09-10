@@ -1,6 +1,7 @@
 const suites = [
   "admin-audit-smoke.mjs",
   "admin-console-smoke.mjs",
+  "account-recovery-smoke.mjs",
   "auth-ui-smoke.mjs",
   "auth-otp-smoke.mjs",
   "compression-smoke.mjs",
@@ -21,8 +22,10 @@ const suites = [
   "office-conversions-smoke.mjs",
   "pdf-rebuild-safety-smoke.mjs",
   "pdf-security-smoke.mjs",
+  "production-assurance-smoke.mjs",
   "pdf-to-images-smoke.mjs",
   "pro-comparison-smoke.mjs",
+  "saved-signatures-smoke.mjs",
   "standalone-overlay-smoke.mjs",
   "stage-one-platform-smoke.mjs",
   "stage-two-platform-smoke.mjs",

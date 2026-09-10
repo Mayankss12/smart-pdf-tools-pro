@@ -15,6 +15,10 @@ import {
   sanitizeWorkspaceTitle,
 } from "@/lib/workspace";
 import {
+  assertGlobalWorkspaceCapacity,
+  getWorkspaceStorageCapacityBytes,
+} from "@/lib/operations";
+import {
   readWorkspaceJson,
   workspaceResponse,
   workspaceSchemaUnavailable,
@@ -25,6 +29,7 @@ import {
   isWorkspaceSchemaError,
   mapWorkspaceDocuments,
 } from "@/lib/workspace/server";
+import { getGlobalWorkspaceStorageUsage } from "@/lib/operations/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -120,7 +125,10 @@ export async function POST(request: Request) {
   const storagePath = createWorkspaceStoragePath({ ownerId: user.id, documentId, versionId });
 
   try {
-    const usage = await getWorkspaceUsage(admin, user.id);
+    const [usage, globalStorageBytes] = await Promise.all([
+      getWorkspaceUsage(admin, user.id),
+      getGlobalWorkspaceStorageUsage(admin),
+    ]);
     const capacityError = assertWorkspaceCapacity({
       quota,
       usage,
@@ -128,6 +136,14 @@ export async function POST(request: Request) {
       createsDocument: true,
     });
     if (capacityError) return workspaceResponse(request, { ok: false, error: capacityError }, 409);
+    const infrastructureCapacityError = assertGlobalWorkspaceCapacity({
+      storageBytes: globalStorageBytes,
+      incomingBytes: sizeBytes,
+      storageCapacityBytes: getWorkspaceStorageCapacityBytes(),
+    });
+    if (infrastructureCapacityError) {
+      return workspaceResponse(request, { ok: false, error: infrastructureCapacityError }, 503);
+    }
 
     const { error: documentError } = await admin.from("documents").insert({
       id: documentId,

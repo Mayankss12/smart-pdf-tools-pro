@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
@@ -9,6 +10,10 @@ import {
   normalizeAuthEmail,
   normalizeOtpToken,
 } from "@/lib/auth/otp-flow";
+import {
+  isPasswordRecoveryMarker,
+  PASSWORD_RECOVERY_COOKIE,
+} from "@/lib/auth/password-recovery";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export type ActionResult =
@@ -304,8 +309,12 @@ export async function forgotPasswordAction(
   try {
     const supabase = await getConfiguredServerClient();
 
+    const callbackUrl = new URL("/auth/callback", getSiteUrl());
+    callbackUrl.searchParams.set("flow", "password-recovery");
+    callbackUrl.searchParams.set("next", "/reset-password");
+
     await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${getSiteUrl()}/auth/callback?type=recovery`,
+      redirectTo: callbackUrl.toString(),
     });
   } catch {
     // Keep response generic so email existence is never exposed.
@@ -334,6 +343,18 @@ export async function resetPasswordAction(
   }
 
   try {
+    const cookieStore = await cookies();
+    if (
+      !isPasswordRecoveryMarker(
+        cookieStore.get(PASSWORD_RECOVERY_COOKIE)?.value,
+      )
+    ) {
+      return {
+        success: false,
+        error: "This password reset session is invalid or has expired. Request a new reset link.",
+      };
+    }
+
     const supabase = await getConfiguredServerClient();
 
     const { error } = await supabase.auth.updateUser({
@@ -345,6 +366,7 @@ export async function resetPasswordAction(
     }
 
     await supabase.auth.signOut();
+    cookieStore.delete(PASSWORD_RECOVERY_COOKIE);
     return { success: true, message: "Password updated successfully. Please log in with your new password." };
   } catch {
     return { success: false, error: "Authentication service is not configured yet." };
@@ -352,11 +374,14 @@ export async function resetPasswordAction(
 }
 
 export async function logoutAction(): Promise<void> {
+  const cookieStore = await cookies();
   const supabase = await createServerSupabaseClient();
 
   if (supabase) {
     await supabase.auth.signOut();
   }
+
+  cookieStore.delete(PASSWORD_RECOVERY_COOKIE);
 
   redirect("/login");
 }
