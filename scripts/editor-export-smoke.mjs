@@ -31,6 +31,38 @@ const [latinFontBytes, devanagariFontBytes] = await Promise.all([
 ]);
 const pixel =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+const searchableOcrResult = {
+  fileName: "page-1.png",
+  imageData: { width: 420, height: 300 },
+  words: [
+    {
+      text: "SEARCHABLE-OCR-FIXTURE",
+      confidence: 99,
+      bbox: { x0: 20, y0: 240, x1: 240, y1: 272 },
+    },
+  ],
+  rawWords: [],
+  averageConfidence: 99,
+  language: "eng",
+  workerLanguage: "eng",
+  detectedLanguage: "english",
+  languageBreakdown: { english: 20, hindi: 0, arabic: 0, other: 0 },
+  languageSymbol: "EN",
+  fullText: "SEARCHABLE-OCR-FIXTURE",
+  preprocessing: {
+    sourceWidth: 420,
+    sourceHeight: 300,
+    outputWidth: 420,
+    outputHeight: 300,
+    skewAngle: 0,
+    deskewed: false,
+    contrastEnhanced: false,
+    sharpened: false,
+    denoised: false,
+    binarized: false,
+    mode: "auto",
+  },
+};
 const objects = rotations.map((rotation, index) => ({
   id: `rotation-${rotation}`,
   type: "text",
@@ -81,6 +113,21 @@ objects.push(
     pageNumber: 1,
     box: { x: 158, y: 122, width: 54, height: 34 },
     data: { imageDataUrl: pixel, opacity: 1 },
+  },
+  {
+    id: "generated-stamp",
+    type: "stamp",
+    pageNumber: 1,
+    box: { x: 224, y: 122, width: 168, height: 48 },
+    data: {
+      stampLabel: "AUTHORIZED · Authorized: Mayank Singh · 11/09/2026",
+      stampPreset: "Authorized",
+      stampFormat: "pill",
+      stampAuthorizedName: "Mayank Singh",
+      stampDate: "2026-09-11",
+      stampColor: "#166534",
+      opacity: 0.88,
+    },
   },
   {
     id: "shape",
@@ -134,6 +181,7 @@ objects.push(
 const exportedBytes = await exportEditorPdfBytes({
   fileBytes: sourceBytes,
   objects,
+  ocrPages: [{ pageNumber: 1, result: searchableOcrResult }],
   unicodeFontBytes: {
     latin: new Uint8Array(latinFontBytes),
     devanagari: new Uint8Array(devanagariFontBytes),
@@ -166,6 +214,9 @@ try {
 assert.match(firstPageText, /Café/);
 assert.match(firstPageText, /नमस्ते/);
 assert.match(firstPageText, /कखग/);
+assert.match(firstPageText, /SEARCHABLE-OCR-FIXTURE/);
+assert.match(firstPageText, /AUTHORIZED/);
+assert.match(firstPageText, /Mayank\s+Singh/);
 assert.doesNotMatch(firstPageText, /你好|😀/);
 
 const transformedWords = transformOcrWordsToPdfSpace(
@@ -208,6 +259,9 @@ console.log(
     unsupportedUnicodeFallback: "passed",
     asciiText: "passed",
     ocrPlacement: "passed",
+    searchablePdfTextLayer: "passed",
+    searchablePdfOfflineReopen: "passed",
+    generatedAuthorizedStamp: "passed",
     outputBytes: exportedBytes.length,
   }),
 );

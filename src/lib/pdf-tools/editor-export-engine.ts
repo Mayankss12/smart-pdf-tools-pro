@@ -21,6 +21,11 @@ import { drawEditorNoteObject } from "./editor-note-engine";
 import { drawEditorSignatureObject } from "./editor-signature-engine";
 import { drawEditorShapeObject } from "./editor-shape-engine";
 import { drawEditorDrawObject } from "./editor-draw-engine";
+import { drawEditorGeneratedStamp } from "./editor-stamp-engine";
+import type {
+  EditorStampFormat,
+  EditorStampPreset,
+} from "../editor/editor-stamp";
 import {
   getEditorPageGeometry,
   withEditorPageTransform,
@@ -51,6 +56,11 @@ type EditorExportObjectData = {
   readonly opacity?: number;
   readonly imageDataUrl?: string;
   readonly stampLabel?: string;
+  readonly stampPreset?: EditorStampPreset;
+  readonly stampFormat?: EditorStampFormat;
+  readonly stampAuthorizedName?: string;
+  readonly stampDate?: string;
+  readonly stampColor?: string;
   readonly pathData?: string;
   readonly shapeType?: "rectangle" | "circle" | "line" | "arrow";
   readonly strokeColor?: string;
@@ -185,24 +195,9 @@ async function drawEditorObject({
 
   if (
     object.type === "stamp" &&
-    !object.data.imageDataUrl &&
-    object.data.stampLabel
+    !object.data.imageDataUrl
   ) {
-    drawEditorRichTextObject(
-      page,
-      {
-        box: object.box,
-        data: {
-          text: object.data.stampLabel,
-          fontSize: Math.max(10, Math.min(28, object.box.height * 0.4)),
-          fontWeight: "bold",
-          color: object.data.color ?? "#92400e",
-          opacity: object.data.opacity,
-        },
-      },
-      fonts,
-      geometry,
-    );
+    drawEditorGeneratedStamp(page, object, fonts, geometry);
     return;
   }
 
@@ -232,6 +227,8 @@ function getEditorTextSamples(objects: readonly EditorExportObject[]) {
   for (const object of objects) {
     if (object.data.text) samples.push(object.data.text);
     if (object.data.stampLabel) samples.push(object.data.stampLabel);
+    if (object.data.stampPreset) samples.push(object.data.stampPreset);
+    if (object.data.stampAuthorizedName) samples.push(object.data.stampAuthorizedName);
     object.data.textRuns?.forEach((run) => {
       if (run.text) samples.push(run.text);
     });

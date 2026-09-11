@@ -19,9 +19,15 @@ import {
 import type { PDFPageProxy } from "pdfjs-dist";
 
 import { detectPageImages, type DetectedImage } from "@/lib/editor/pdf-image-detect";
+import {
+  buildStampLines,
+  getStampDefaultSize,
+  type EditorStampDefinition,
+} from "@/lib/editor/editor-stamp";
 
 import type { EditorController } from "../hooks/useEditor";
 import type { EditorFindHighlight } from "./EditorSmartToolsPanel";
+import { EditorStampComposer } from "./EditorStampComposer";
 import { DrawTool } from "./tools/DrawTool";
 import { HighlightTool } from "./tools/HighlightTool";
 import { ImageTool } from "./tools/ImageTool";
@@ -303,6 +309,7 @@ function PdfPageRenderer({
   const [drawStroke, setDrawStroke] = useState<DrawStroke | null>(null);
   const [detectedImages, setDetectedImages] = useState<DetectedImage[]>([]);
   const [objectPopover, setObjectPopover] = useState<DetectedImage | null>(null);
+  const [stampComposerOpen, setStampComposerOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -436,7 +443,7 @@ function PdfPageRenderer({
 
     pendingStampPointRef.current = getDefaultImagePoint();
     editor.setActiveTool("select");
-    stampInputRef.current?.click();
+    setStampComposerOpen(true);
   }
 
   pickerHandlersRef.current = {
@@ -786,6 +793,43 @@ function PdfPageRenderer({
     });
   }
 
+  function addGeneratedStampObject(definition: EditorStampDefinition) {
+    const point = pendingStampPointRef.current ?? getDefaultImagePoint();
+    if (!point) return;
+    const page = getUnscaledPageSize(pageSize, editor.zoom);
+    const size = getStampDefaultSize(definition.format);
+    const safeBox = clampBoxToPage(
+      { x: point.x, y: point.y, width: size.width, height: size.height },
+      pageSize,
+      editor.zoom,
+      MIN_IMAGE_BOX.width,
+      MIN_IMAGE_BOX.height,
+    );
+    const stampLabel = buildStampLines(definition).join(" · ");
+
+    editor.addObject({
+      type: "stamp",
+      pageNumber: editor.activePageNumber,
+      box: {
+        ...safeBox,
+        width: Math.min(safeBox.width, page.width),
+        height: Math.min(safeBox.height, page.height),
+      },
+      data: {
+        stampLabel,
+        stampPreset: definition.preset,
+        stampFormat: definition.format,
+        stampAuthorizedName: definition.authorizedName,
+        stampDate: definition.date,
+        stampColor: definition.color,
+        opacity: 0.88,
+      },
+    });
+    pendingStampPointRef.current = null;
+    setStampComposerOpen(false);
+    editor.setActiveTool("select");
+  }
+
   function getFallbackTextBox(startX: number, startY: number) {
     return clampBoxToPage(
       { x: startX, y: startY, width: DEFAULT_TEXT_BOX.width, height: DEFAULT_TEXT_BOX.height },
@@ -829,6 +873,7 @@ function PdfPageRenderer({
 
     if (!file || !point) return;
 
+    setStampComposerOpen(false);
     void addStampObject(point, file);
   }
 
@@ -1370,6 +1415,16 @@ function PdfPageRenderer({
           </svg>
         ) : null}
       </div>
+      <EditorStampComposer
+        open={stampComposerOpen}
+        pageNumber={editor.activePageNumber}
+        onClose={() => {
+          pendingStampPointRef.current = null;
+          setStampComposerOpen(false);
+        }}
+        onUpload={() => stampInputRef.current?.click()}
+        onCreate={addGeneratedStampObject}
+      />
     </div>
   );
 }
