@@ -51,7 +51,7 @@ export default function OcrPdfPage() {
   const [pageCount, setPageCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [targetMode, setTargetMode] = useState<TargetMode>("all");
-  const [language, setLanguage] = useState<OcrLanguage>("auto");
+  const [language, setLanguage] = useState<OcrLanguage>("eng");
   const [quality, setQuality] = useState<OcrQuality>("balanced");
   const [preprocessMode, setPreprocessMode] = useState<OcrPreprocessMode>("auto");
   const [busy, setBusy] = useState(false);
@@ -329,7 +329,7 @@ export default function OcrPdfPage() {
                   }}
                   className="mt-2 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm"
                 >
-                  <option value="auto">Auto detect</option>
+                  <option value="auto">Auto · English + Hindi (larger download)</option>
                   <option value="eng">English</option>
                   <option value="hin">Hindi</option>
                   <option value="spa">Spanish</option>

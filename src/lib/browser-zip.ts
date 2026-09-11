@@ -59,16 +59,15 @@ function getDosDateTime(date = new Date()) {
   return { dosDate, dosTime };
 }
 
-function safeZipEntryName(fileName: string) {
-  const cleanedName =
-    fileName
-      .replace(/\\/g, "/")
-      .split("/")
-      .filter(Boolean)
-      .join("/")
-      .replace(/[\u0000-\u001f]/g, "") || "file.pdf";
+export function normalizeZipEntryName(fileName: string) {
+  const cleanedName = fileName
+    .replace(/\\/g, "/")
+    .split("/")
+    .map((part) => part.replace(/[\u0000-\u001f]/g, "").trim())
+    .filter((part) => Boolean(part) && part !== "." && part !== "..")
+    .join("/");
 
-  return cleanedName.toLowerCase().endsWith(".pdf") ? cleanedName : `${cleanedName}.pdf`;
+  return cleanedName || "file";
 }
 
 function getBlobPartSize(part: BlobPart) {
@@ -91,7 +90,7 @@ export async function createZipBlob(files: ZipFileInput[]) {
   let offset = 0;
 
   for (const file of files) {
-    const safeName = safeZipEntryName(file.fileName);
+    const safeName = normalizeZipEntryName(file.fileName);
     const nameBytes = encoder.encode(safeName);
     const fileBytes = new Uint8Array(await file.blob.arrayBuffer());
     const crc32 = calculateCrc32(fileBytes);

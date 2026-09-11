@@ -16,6 +16,38 @@ export type PdfaReport = {
   readonly checks: readonly PdfaCheck[];
 };
 
+export function serializePdfaReport(
+  report: PdfaReport,
+  fileName: string,
+  inspectedAt = new Date(),
+) {
+  const summary = report.checks.reduce(
+    (counts, check) => ({ ...counts, [check.status]: counts[check.status] + 1 }),
+    { pass: 0, warning: 0, fail: 0 },
+  );
+
+  return JSON.stringify(
+    {
+      report: "PDFMantra PDF/A archival-readiness preflight",
+      fileName,
+      inspectedAt: inspectedAt.toISOString(),
+      pageCount: report.pageCount,
+      declaration:
+        report.declaredPart && report.declaredConformance
+          ? `PDF/A-${report.declaredPart}${report.declaredConformance.toLowerCase()}`
+          : null,
+      summary,
+      appearsPdfa: report.appearsPdfa,
+      certificationRequired: report.certificationRequired,
+      checks: report.checks,
+      notice:
+        "This browser preflight is not an ISO 19005 certification. Validate regulated archival files with a dedicated conforming validator.",
+    },
+    null,
+    2,
+  );
+}
+
 function sourceText(bytes: Uint8Array) {
   return new TextDecoder("latin1").decode(bytes);
 }

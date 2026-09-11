@@ -6,7 +6,11 @@ import { PDFDocument, StandardFonts } from "pdf-lib";
 import { canUseToolByTier } from "../src/lib/entitlements.ts";
 import { getHomepageToolGridTools } from "../src/lib/home/homepage-tools.ts";
 import { compareTextContent } from "../src/lib/pdf-compare-engine.ts";
-import { inspectPdfaReadiness, preparePdfForArchival } from "../src/lib/pdfa-engine.ts";
+import {
+  inspectPdfaReadiness,
+  preparePdfForArchival,
+  serializePdfaReport,
+} from "../src/lib/pdfa-engine.ts";
 import { createEditorFormFields } from "../src/lib/pdf-tools/editor-form-engine.ts";
 import { getEditorPageGeometry } from "../src/lib/pdf-tools/editor-page-geometry.ts";
 import { isToolPubliclyLaunchReady } from "../src/lib/public-launch.ts";
@@ -34,6 +38,16 @@ assert.equal(preflight.certificationRequired, true);
 assert.equal(preflight.declaredPart, null);
 assert.equal(preflight.appearsPdfa, false);
 assert.equal(preflight.checks.some((check) => check.id === "output-intent" && check.status === "fail"), true);
+const serializedPreflight = JSON.parse(
+  serializePdfaReport(
+    preflight,
+    "fixture.pdf",
+    new Date("2026-09-11T00:00:00.000Z"),
+  ),
+);
+assert.equal(serializedPreflight.fileName, "fixture.pdf");
+assert.equal(serializedPreflight.summary.fail > 0, true);
+assert.equal(serializedPreflight.certificationRequired, true);
 
 const preparedBytes = await preparePdfForArchival(sourceBytes, {
   title: "Archive Record",
@@ -105,6 +119,8 @@ assert.match(compareSource, /serializePdfComparison/);
 assert.match(compareSource, /prepareEntitledExport/);
 assert.match(pdfaSource, /not an ISO 19005 certification/);
 assert.match(pdfaSource, /prepareEntitledExport/);
+assert.match(pdfaSource, /Download report/);
+assert.match(pdfaSource, /serializePdfaReport/);
 assert.match(formSource, /createEditorFormFields/);
 assert.match(formSource, /MAX_FORM_FIELDS = 200/);
 assert.match(formSource, /prepareEntitledExport/);
@@ -119,6 +135,7 @@ console.log(
     pdfComparison: "passed",
     pdfaPreflight: "passed",
     pdfaHonestPreparation: "passed",
+    pdfaDownloadableReport: "passed",
     formCreator: "passed",
     ocrProfessionalPipeline: "passed",
     publicDiscovery: stageTwoIds.length,

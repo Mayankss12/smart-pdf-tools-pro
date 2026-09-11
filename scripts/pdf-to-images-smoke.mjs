@@ -8,6 +8,10 @@ import {
   getPdfRenderScale,
   getSafePdfThumbnailScale,
 } from "../src/lib/pdf-to-image-engine.ts";
+import {
+  createZipBlob,
+  normalizeZipEntryName,
+} from "../src/lib/browser-zip.ts";
 
 assert.equal(getPdfRenderScale(96), 96 / 72);
 assert.equal(getPdfRenderScale(150), 150 / 72);
@@ -47,6 +51,30 @@ const [jpgWrapper, pngWrapper] = await Promise.all([
 assert.match(jpgWrapper, /from "\.\.\/pdf-to-images\/page"/);
 assert.match(pngWrapper, /from "\.\.\/pdf-to-images\/page"/);
 
+assert.equal(normalizeZipEntryName("page-001.png"), "page-001.png");
+assert.equal(normalizeZipEntryName("page-002.jpg"), "page-002.jpg");
+assert.equal(normalizeZipEntryName("../unsafe/page-003.webp"), "unsafe/page-003.webp");
+assert.equal(normalizeZipEntryName("document.pdf"), "document.pdf");
+
+const pngBytes = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const jpegBytes = Uint8Array.from([0xff, 0xd8, 0xff, 0xdb]);
+const zipBlob = await createZipBlob([
+  {
+    fileName: "PDFMantra-page-001.png",
+    blob: new Blob([pngBytes], { type: "image/png" }),
+  },
+  {
+    fileName: "PDFMantra-page-002.jpg",
+    blob: new Blob([jpegBytes], { type: "image/jpeg" }),
+  },
+]);
+const zipBytes = new Uint8Array(await zipBlob.arrayBuffer());
+assert.deepEqual(Array.from(zipBytes.slice(0, 4)), [0x50, 0x4b, 0x03, 0x04]);
+const zipText = new TextDecoder().decode(zipBytes);
+assert.match(zipText, /PDFMantra-page-001\.png/);
+assert.match(zipText, /PDFMantra-page-002\.jpg/);
+assert.doesNotMatch(zipText, /\.png\.pdf|\.jpg\.pdf/);
+
 console.log(
   JSON.stringify({
     dpiPresets: "passed",
@@ -54,5 +82,7 @@ console.log(
     largePageRejection: "passed",
     thumbnailDownscaling: "passed",
     jpgAndPngSharedImplementation: "passed",
+    imageZipExtensions: "passed",
+    imageZipMagicBytes: "passed",
   }),
 );

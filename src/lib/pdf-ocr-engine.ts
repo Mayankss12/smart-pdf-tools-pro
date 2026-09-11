@@ -182,7 +182,25 @@ export async function runOcrPipeline(
   options.signal?.addEventListener("abort", abortHandler, { once: true });
 
   try {
-    const worker = await getOcrWorker(workerLanguage, quality);
+    let activeWorkerLanguage = workerLanguage;
+    let worker: TesseractWorker;
+
+    try {
+      worker = await getOcrWorker(workerLanguage, quality);
+    } catch (error) {
+      if (requestedLanguage !== "auto") throw error;
+
+      await terminateOcrWorker();
+      activeWorkerLanguage = "eng";
+      reportProgress(options.onProgress, {
+        stage: "ocr",
+        imageIndex: 1,
+        totalImages,
+        percent: 1,
+        message: "The multilingual OCR pack was unavailable. Retrying with the smaller English pack…",
+      });
+      worker = await getOcrWorker(activeWorkerLanguage, quality);
+    }
     const results: OcrResult[] = [];
 
     for (let index = 0; index < files.length; index += 1) {
@@ -250,7 +268,7 @@ export async function runOcrPipeline(
 
         const selectedWords = selectReliableOcrWords(rawWords, fullText, preprocessed.width, preprocessed.height);
         const languageBreakdown = getLanguageBreakdown(selectedWords, fullText);
-        const detectedLanguage = detectResultLanguage(languageBreakdown, workerLanguage);
+        const detectedLanguage = detectResultLanguage(languageBreakdown, activeWorkerLanguage);
         const languageSymbol = getSymbolForDetectedLanguage(detectedLanguage);
         const averageConfidence = selectedWords.length
           ? selectedWords.reduce((sum, word) => sum + word.confidence, 0) / selectedWords.length
@@ -276,7 +294,7 @@ export async function runOcrPipeline(
           rawWords,
           averageConfidence: Math.round(averageConfidence),
           language: requestedLanguage,
-          workerLanguage,
+          workerLanguage: activeWorkerLanguage,
           detectedLanguage,
           languageBreakdown,
           languageSymbol,
