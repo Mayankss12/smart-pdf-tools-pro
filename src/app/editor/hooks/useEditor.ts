@@ -6,6 +6,10 @@ import type { PDFDocumentProxy } from "pdfjs-dist";
 import { trackEditorEvent } from "@/lib/editor/editor-analytics";
 import type { ExistingTextEditSource } from "@/lib/editor/existing-text-edit";
 import { getEditorToolDefinition } from "@/lib/editor/editor-tool-registry";
+import type {
+  EditorStampFormat,
+  EditorStampPreset,
+} from "@/lib/editor/editor-stamp";
 
 import type { EditorTool } from "./useActiveTool";
 
@@ -63,6 +67,11 @@ export type EditorObjectData = {
   readonly imageDataUrl?: string;
   readonly note?: string;
   readonly stampLabel?: string;
+  readonly stampPreset?: EditorStampPreset;
+  readonly stampFormat?: EditorStampFormat;
+  readonly stampAuthorizedName?: string;
+  readonly stampDate?: string;
+  readonly stampColor?: string;
   readonly pathData?: string;
   readonly drawWidth?: number;
   readonly drawHeight?: number;
@@ -313,8 +322,13 @@ export function useEditor(): EditorController {
   );
 
   const selectedObject = useMemo(
-    () => objects.find((object) => object.id === selectedObjectId) ?? null,
-    [objects, selectedObjectId],
+    () =>
+      objects.find(
+        (object) =>
+          object.id === selectedObjectId &&
+          object.pageNumber === activePageNumber,
+      ) ?? null,
+    [activePageNumber, objects, selectedObjectId],
   );
 
   useEffect(() => {

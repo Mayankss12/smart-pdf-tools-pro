@@ -746,8 +746,14 @@ export default function FillSignPage() {
   }, [activePageNumber, objects]);
 
   const selectedObject = useMemo(() => {
-    return objects.find((object) => object.id === selectedObjectId) || null;
-  }, [objects, selectedObjectId]);
+    return (
+      objects.find(
+        (object) =>
+          object.id === selectedObjectId &&
+          object.pageNumber === activePageNumber,
+      ) || null
+    );
+  }, [activePageNumber, objects, selectedObjectId]);
 
   const canPlaceCurrentTool = useMemo(() => {
     if (!file || activeTool === "select") return false;
@@ -1138,6 +1144,7 @@ export default function FillSignPage() {
   function selectPage(pageNumber: number) {
     setActivePageNumber(pageNumber);
     setSelectedObjectId(null);
+    dragStateRef.current = null;
     setStatus(`Page ${pageNumber} selected.`);
   }
 
