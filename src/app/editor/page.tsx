@@ -69,6 +69,13 @@ import { useEditorKeyboard } from "./hooks/useEditorKeyboard";
 const OPEN_IMAGE_PICKER_EVENT = "pdfmantra:editor-open-image-picker";
 const OPEN_SIGNATURE_PICKER_EVENT = "pdfmantra:editor-open-signature-picker";
 const OPEN_STAMP_PICKER_EVENT = "pdfmantra:editor-open-stamp-picker";
+const OCR_BLOCKED_DOCUMENT_ACTIONS = new Set<EditorToolbarItemId>([
+  "undo",
+  "redo",
+  "add-page",
+  "reorder-pages",
+  "rotate-page",
+]);
 
 function isPdfFile(file: File) {
   return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
@@ -491,6 +498,14 @@ export default function EditorPage() {
   }
 
   function handleToolAction(toolId: EditorToolbarItemId) {
+    if (
+      smartActivity?.toolId === "ocr" &&
+      OCR_BLOCKED_DOCUMENT_ACTIONS.has(toolId)
+    ) {
+      setStatusMessage("Cancel or finish OCR before changing the PDF structure.");
+      return;
+    }
+
     const definition = getEditorToolDefinition(toolId);
     const resolved = resolveEditorTool(definition, toolContext);
     if (!resolved.enabled) {
@@ -548,6 +563,10 @@ export default function EditorPage() {
     readonly size: EditorBlankPageSize;
   }) {
     if (!fileBytes) return;
+    if (smartActivity?.toolId === "ocr") {
+      setStatusMessage("Cancel or finish OCR before adding a page.");
+      return;
+    }
     const before = createDocumentCheckpoint(fileBytes);
     setPageActionBusy(true);
     let preparedDocument: PDFDocumentProxy | null = null;
@@ -620,6 +639,10 @@ export default function EditorPage() {
 
   async function handleReorderPages(pageOrder: readonly number[]) {
     if (!fileBytes) return;
+    if (smartActivity?.toolId === "ocr") {
+      setStatusMessage("Cancel or finish OCR before reordering pages.");
+      return;
+    }
     const before = createDocumentCheckpoint(fileBytes);
     setPageActionBusy(true);
     let preparedDocument: PDFDocumentProxy | null = null;
@@ -679,6 +702,10 @@ export default function EditorPage() {
 
   async function handleRotatePage(direction: EditorPageRotationDirection) {
     if (!fileBytes) return;
+    if (smartActivity?.toolId === "ocr") {
+      setStatusMessage("Cancel or finish OCR before rotating a page.");
+      return;
+    }
     const before = createDocumentCheckpoint(fileBytes);
     const pageNumber = editor.activePageNumber;
     setPageActionBusy(true);
@@ -836,6 +863,11 @@ export default function EditorPage() {
     setStatusMessage("Page numbers removed.");
   }
 
+  function handleOcrPagesChange(pages: EditorOcrPageResult[]) {
+    setOcrPages(pages);
+    editor.markDocumentChanged();
+  }
+
   return (
     <div className="flex h-screen min-h-screen flex-col overflow-hidden bg-[#f5f7fb] text-slate-950">
       <input
@@ -872,7 +904,7 @@ export default function EditorPage() {
         editor={editor}
         ocrPages={ocrPages}
         translationConfigured={capabilities.backendCapabilities.translation}
-        onOcrPagesChange={setOcrPages}
+        onOcrPagesChange={handleOcrPagesChange}
         onFindHighlightChange={setFindHighlights}
         onActivityChange={setSmartActivity}
         onStatusChange={setStatusMessage}
