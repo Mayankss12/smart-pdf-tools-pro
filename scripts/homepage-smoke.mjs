@@ -111,7 +111,7 @@ assert.deepEqual(
       .find((group) => group.id === "security")
       ?.items.map((item) => item.tool.id),
   ),
-  new Set(["protect-pdf", "unlock-pdf", "redact-pdf"]),
+  new Set(["protect-pdf", "unlock-pdf", "redact-pdf", "watermark-remover"]),
 );
 
 for (const id of LOCAL_BROWSER_CONVERSION_IDS) {

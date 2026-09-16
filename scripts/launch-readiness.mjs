@@ -76,19 +76,17 @@ for (const id of LOCAL_BROWSER_CONVERSION_IDS) {
   assert.equal(capability?.processingMode, "client");
 }
 
-for (const id of ["heic-to-pdf", "webpage-to-pdf"]) {
+for (const id of ["webpage-to-pdf"]) {
   assert.ok(
     groups.backendRequired.some((tool) => tool.id === id),
     `Backend-required launch group is missing ${id}`,
   );
 }
 
-for (const id of [
-  "watermark-remover",
-]) {
+for (const id of ["heic-to-pdf", "watermark-remover"]) {
   assert.ok(
-    groups.comingSoon.some((tool) => tool.id === id),
-    `Coming-soon launch group is missing ${id}`,
+    groups.publicWorking.some((tool) => tool.id === id),
+    `Priority-one browser tool is not publicly launch ready: ${id}`,
   );
 }
 
@@ -113,9 +111,7 @@ for (const [surface, surfaceTools] of Object.entries(publicSurfaces)) {
 }
 
 const guardedRoutes = [
-  "heic-to-pdf",
   "webpage-to-pdf",
-  "watermark-remover",
 ];
 
 for (const id of ["protect-pdf", "unlock-pdf", "redact-pdf"]) {

@@ -24,6 +24,7 @@ const suites = [
   "pdf-rebuild-safety-smoke.mjs",
   "pdf-security-smoke.mjs",
   "production-assurance-smoke.mjs",
+  "priority-one-tools-smoke.mjs",
   "pdf-to-images-smoke.mjs",
   "pro-comparison-smoke.mjs",
   "saved-signatures-smoke.mjs",

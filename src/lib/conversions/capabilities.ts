@@ -17,6 +17,7 @@ const CLIENT_CAPABILITIES = new Set<ConversionCapabilityKey>([
   "browser-image-pdf",
   "browser-text-pdf",
   "browser-structured-pdf",
+  "heic-decoder",
 ]);
 
 export interface PublicConversionCapability {

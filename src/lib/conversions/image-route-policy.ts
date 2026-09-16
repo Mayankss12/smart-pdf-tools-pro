@@ -1,4 +1,4 @@
-export type ImageRouteSource = "mixed" | "jpg" | "png" | "webp";
+export type ImageRouteSource = "mixed" | "jpg" | "png" | "webp" | "heic";
 
 export const MAX_IMAGE_QUEUE_COUNT = 80;
 
@@ -8,6 +8,7 @@ const ROUTE_EXTENSIONS: Readonly<
   jpg: [".jpg", ".jpeg"],
   png: [".png"],
   webp: [".webp"],
+  heic: [".heic", ".heif"],
 };
 
 const ROUTE_MIME_TYPES: Readonly<
@@ -16,6 +17,7 @@ const ROUTE_MIME_TYPES: Readonly<
   jpg: ["image/jpeg"],
   png: ["image/png"],
   webp: ["image/webp"],
+  heic: ["image/heic", "image/heif"],
 };
 
 function extensionOf(fileName: string) {
@@ -43,19 +45,22 @@ export function selectImageQueueCandidates({
   files,
   source,
   currentCount,
+  maximumCount = MAX_IMAGE_QUEUE_COUNT,
 }: {
   readonly files: readonly File[];
   readonly source: ImageRouteSource;
   readonly currentCount: number;
+  readonly maximumCount?: number;
 }) {
   const routeAccepted = files.filter((file) =>
     fileMatchesImageRoute(file, source),
   );
   const wrongFormatCount = files.length - routeAccepted.length;
-  const remainingCapacity = Math.max(
-    0,
-    MAX_IMAGE_QUEUE_COUNT - currentCount,
+  const safeMaximumCount = Math.min(
+    MAX_IMAGE_QUEUE_COUNT,
+    Math.max(1, Math.floor(maximumCount)),
   );
+  const remainingCapacity = Math.max(0, safeMaximumCount - currentCount);
   const accepted = routeAccepted.slice(0, remainingCapacity);
   return {
     accepted,

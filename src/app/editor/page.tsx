@@ -39,6 +39,7 @@ import {
   type EditorPageRotationDirection,
 } from "@/lib/pdf-tools/editor-page-management";
 import { configurePdfJsWorker } from "@/lib/pdfjs-worker";
+import { isBrowserTranslationApiAvailable } from "@/lib/translation/browser";
 
 import {
   exportEditorPdfBytes,
@@ -128,6 +129,20 @@ export default function EditorPage() {
   const [capabilities, setCapabilities] = useState<EditorCapabilityResponse>(
     getDefaultEditorCapabilities,
   );
+  const [browserTranslationAvailable, setBrowserTranslationAvailable] = useState(false);
+
+  const effectiveCapabilities = useMemo<EditorCapabilityResponse>(
+    () => ({
+      ...capabilities,
+      configured: capabilities.configured || browserTranslationAvailable,
+      backendCapabilities: {
+        ...capabilities.backendCapabilities,
+        translation:
+          capabilities.backendCapabilities.translation || browserTranslationAvailable,
+      },
+    }),
+    [browserTranslationAvailable, capabilities],
+  );
 
   const toolContext = useMemo<EditorToolContext>(
     () => ({
@@ -139,15 +154,15 @@ export default function EditorPage() {
       selectedObjectLocked: Boolean(editor.selectedObject?.locked),
       canUndo: editor.canUndo,
       canRedo: editor.canRedo,
-      backendCapabilities: capabilities.backendCapabilities,
+      backendCapabilities: effectiveCapabilities.backendCapabilities,
       userTier: entitlement.tier,
       canUseCoreTools: plan.canUseCoreTools,
       canUseAdvancedTools: plan.canUseAdvancedTools,
       canUseBackendTools: plan.canUseBackendTools,
-      featureControl: capabilities.featureControl,
+      featureControl: effectiveCapabilities.featureControl,
     }),
     [
-      capabilities,
+      effectiveCapabilities,
       editor.canRedo,
       editor.canUndo,
       editor.pdfDocument,
@@ -170,6 +185,7 @@ export default function EditorPage() {
 
   useEffect(() => {
     configurePdfJsWorker(pdfjsLib);
+    setBrowserTranslationAvailable(isBrowserTranslationApiAvailable());
 
     if (typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches) {
       setLeftPanelCollapsed(true);
@@ -871,7 +887,9 @@ export default function EditorPage() {
         documentIdentity={documentIdentity}
         editor={editor}
         ocrPages={ocrPages}
-        translationConfigured={capabilities.backendCapabilities.translation}
+        translationConfigured={effectiveCapabilities.backendCapabilities.translation}
+        browserTranslationAvailable={browserTranslationAvailable}
+        providerTranslationConfigured={capabilities.backendCapabilities.translation}
         onOcrPagesChange={setOcrPages}
         onFindHighlightChange={setFindHighlights}
         onActivityChange={setSmartActivity}

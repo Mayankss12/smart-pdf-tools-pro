@@ -309,7 +309,7 @@ export const EDITOR_TOOL_DEFINITIONS = [
     icon: Languages,
     visible: true,
     enabled: true,
-    disabledReason: "Backend configuration required.",
+    disabledReason: "Translation is unavailable in this browser and no translation provider is configured.",
     availability: "requires-backend",
     backendCapability: "translation",
     exportSupport: "object",

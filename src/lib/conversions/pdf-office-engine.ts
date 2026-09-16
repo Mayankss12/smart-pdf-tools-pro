@@ -8,14 +8,16 @@ import {
   type PdfTextExtractionProgress,
 } from "@/lib/conversions/pdf-text-engine";
 import {
+  createDocxFromPageImages,
   createDocxFromPdfText,
   createPptxFromPageImages,
   createXlsxFromPdfText,
-  type PptxPageImage,
+  type DocxPageImage,
 } from "@/lib/conversions/office-open-xml";
 import type { OcrLanguage, OcrQuality } from "@/lib/pdf-ocr-engine";
 
 export type PdfOfficeFormat = "docx" | "xlsx" | "pptx";
+export type PdfDocxMode = "preserve-layout" | "editable-text";
 
 export type PdfOfficeProgress = {
   readonly completed: number;
@@ -39,7 +41,7 @@ function canvasToPng(canvas: HTMLCanvasElement) {
   return new Promise<Uint8Array>((resolve, reject) => {
     canvas.toBlob((blob) => {
       if (!blob) {
-        reject(new PdfEngineError("PROCESSING_FAILED", "Unable to render a PDF page for PowerPoint."));
+        reject(new PdfEngineError("PROCESSING_FAILED", "Unable to render this PDF page for the Office document."));
         return;
       }
       void blob.arrayBuffer().then((buffer) => resolve(new Uint8Array(buffer)), reject);
@@ -47,8 +49,9 @@ function canvasToPng(canvas: HTMLCanvasElement) {
   });
 }
 
-async function renderPdfPagesForPptx(
+async function renderPdfPagesForOffice(
   file: File,
+  purpose: "Word" | "PowerPoint",
   options: {
     readonly signal?: AbortSignal;
     readonly onProgress?: (progress: PdfOfficeProgress) => void;
@@ -58,9 +61,11 @@ async function renderPdfPagesForPptx(
   const bytes = await readValidatedPdfBytes(file);
   const loadingTask = pdfjsLib.getDocument({ data: bytes.slice() });
   const pdf = await loadingTask.promise;
-  const images: PptxPageImage[] = [];
-  const scale = 1.45;
+  const images: DocxPageImage[] = [];
+  const scale = purpose === "Word" ? 2 : 1.45;
   const maxPixels = 20_000_000;
+  const maxTotalImageBytes = 180 * 1024 * 1024;
+  let totalImageBytes = 0;
 
   try {
     for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
@@ -68,10 +73,11 @@ async function renderPdfPagesForPptx(
       options.onProgress?.({
         completed: pageNumber - 1,
         total: pdf.numPages,
-        message: `Rendering page ${pageNumber} of ${pdf.numPages} for PowerPoint...`,
+        message: `Rendering page ${pageNumber} of ${pdf.numPages} for ${purpose}...`,
       });
       const page = await pdf.getPage(pageNumber);
       try {
+        const pageViewport = page.getViewport({ scale: 1 });
         const viewport = page.getViewport({ scale });
         const width = Math.ceil(viewport.width);
         const height = Math.ceil(viewport.height);
@@ -96,7 +102,21 @@ async function renderPdfPagesForPptx(
         try {
           await task.promise;
           throwIfAborted(options.signal);
-          images.push({ bytes: await canvasToPng(canvas), width, height });
+          const pngBytes = await canvasToPng(canvas);
+          totalImageBytes += pngBytes.length;
+          if (totalImageBytes > maxTotalImageBytes) {
+            throw new PdfEngineError(
+              "PROCESSING_FAILED",
+              "This PDF is too large to package safely in a browser. Try a smaller file or the editable-text Word mode.",
+            );
+          }
+          images.push({
+            bytes: pngBytes,
+            width,
+            height,
+            pageWidthPoints: pageViewport.width,
+            pageHeightPoints: pageViewport.height,
+          });
         } finally {
           options.signal?.removeEventListener("abort", cancel);
           canvas.width = 0;
@@ -108,7 +128,7 @@ async function renderPdfPagesForPptx(
       options.onProgress?.({
         completed: pageNumber,
         total: pdf.numPages,
-        message: `Prepared slide ${pageNumber} of ${pdf.numPages}.`,
+        message: `Prepared page ${pageNumber} of ${pdf.numPages} for ${purpose}.`,
       });
     }
     return { images, pageCount: pdf.numPages };
@@ -121,6 +141,7 @@ export async function convertPdfToOffice(
   file: File,
   format: PdfOfficeFormat,
   options: {
+    readonly docxMode?: PdfDocxMode;
     readonly ocrFallback: boolean;
     readonly ocrLanguage: OcrLanguage;
     readonly ocrQuality: OcrQuality;
@@ -129,7 +150,7 @@ export async function convertPdfToOffice(
   },
 ): Promise<PdfOfficeResult> {
   if (format === "pptx") {
-    const rendered = await renderPdfPagesForPptx(file, options);
+    const rendered = await renderPdfPagesForOffice(file, "PowerPoint", options);
     options.onProgress?.({
       completed: rendered.pageCount,
       total: rendered.pageCount,
@@ -137,6 +158,20 @@ export async function convertPdfToOffice(
     });
     return {
       bytes: createPptxFromPageImages(rendered.images),
+      pageCount: rendered.pageCount,
+      ocrPageCount: 0,
+    };
+  }
+
+  if (format === "docx" && (options.docxMode ?? "preserve-layout") === "preserve-layout") {
+    const rendered = await renderPdfPagesForOffice(file, "Word", options);
+    options.onProgress?.({
+      completed: rendered.pageCount,
+      total: rendered.pageCount,
+      message: "Packaging a layout-preserved Word document...",
+    });
+    return {
+      bytes: createDocxFromPageImages(rendered.images),
       pageCount: rendered.pageCount,
       ocrPageCount: 0,
     };

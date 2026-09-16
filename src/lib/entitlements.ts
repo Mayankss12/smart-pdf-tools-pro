@@ -122,6 +122,7 @@ export const CORE_TOOL_KEYS = [
   "markdown-to-pdf",
   "html-to-pdf",
   "csv-to-pdf",
+  "heic-to-pdf",
   "pdf-to-word",
   "pdf-to-excel",
   "pdf-to-powerpoint",
@@ -154,7 +155,6 @@ export const BATCH_TOOL_KEYS = [
 
 export const BACKEND_TOOL_KEYS = [
   "ocr",
-  "heic-to-pdf",
   "webpage-to-pdf",
   "translate",
 ] as const;

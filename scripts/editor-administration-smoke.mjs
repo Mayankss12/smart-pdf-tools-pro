@@ -150,7 +150,10 @@ const unavailableTranslate = resolveEditorTool(
 );
 assert.equal(unavailableTranslate.visible, false);
 assert.equal(unavailableTranslate.enabled, false);
-assert.equal(unavailableTranslate.disabledReason, "Backend configuration required.");
+assert.equal(
+  unavailableTranslate.disabledReason,
+  "Translation is unavailable in this browser and no translation provider is configured.",
+);
 
 const availableTranslate = resolveEditorTool(
   getEditorToolDefinition("translate"),

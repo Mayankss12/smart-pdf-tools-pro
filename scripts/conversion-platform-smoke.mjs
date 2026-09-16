@@ -86,7 +86,7 @@ for (const id of LOCAL_BROWSER_CONVERSION_IDS) {
 }
 assert.equal(
   canUseToolByTier({ tier: "free", toolKey: "heic-to-pdf" }),
-  false,
+  true,
 );
 assert.equal(
   canUseToolByTier({ tier: "pro", toolKey: "heic-to-pdf" }),
@@ -297,7 +297,7 @@ console.log(
     uniqueRoutes: "passed",
     routeCoverage: "passed",
     localOfficeCapabilities: [...LOCAL_BROWSER_CONVERSION_IDS],
-    remainingBackendBlockers: ["heic-to-pdf", "webpage-to-pdf"],
+    remainingBackendBlockers: ["webpage-to-pdf"],
     magicBytes: "passed",
     heicSignature: "passed",
     officeStructureAndMacroBlock: "passed",

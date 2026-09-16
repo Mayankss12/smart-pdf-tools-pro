@@ -11,6 +11,11 @@ export type PptxPageImage = {
   readonly height: number;
 };
 
+export type DocxPageImage = PptxPageImage & {
+  readonly pageWidthPoints: number;
+  readonly pageHeightPoints: number;
+};
+
 const encoder = new TextEncoder();
 const CRC_TABLE = new Uint32Array(256);
 for (let index = 0; index < 256; index += 1) {
@@ -160,6 +165,58 @@ export function createDocxFromPdfText(result: PdfTextExtractionResult) {
     { name: "docProps/core.xml", data: coreProperties("PDFMantra Word conversion") },
     { name: "docProps/app.xml", data: APP_PROPERTIES },
     { name: "word/document.xml", data: document },
+  ]);
+}
+
+function wordPageSection(image: DocxPageImage, includeBreak: boolean) {
+  const width = Math.max(1, Math.round(image.pageWidthPoints * 20));
+  const height = Math.max(1, Math.round(image.pageHeightPoints * 20));
+  const orientation = width > height ? ' w:orient="landscape"' : "";
+  return `<w:sectPr>${includeBreak ? '<w:type w:val="nextPage"/>' : ""}<w:pgSz w:w="${width}" w:h="${height}"${orientation}/><w:pgMar w:top="0" w:right="0" w:bottom="0" w:left="0" w:header="0" w:footer="0" w:gutter="0"/><w:cols w:space="0"/><w:docGrid w:linePitch="0"/></w:sectPr>`;
+}
+
+function wordPageDrawing(image: DocxPageImage, index: number) {
+  const width = Math.max(1, Math.round(image.pageWidthPoints * 12_700));
+  const height = Math.max(1, Math.round(image.pageHeightPoints * 12_700));
+  const pageNumber = index + 1;
+  return `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><wp:extent cx="${width}" cy="${height}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="${pageNumber}" name="PDF page ${pageNumber}" descr="PDF page ${pageNumber}"/><wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="${pageNumber}" name="PDF page ${pageNumber}.png" descr="PDF page ${pageNumber}"/><pic:cNvPicPr><a:picLocks noChangeAspect="1"/></pic:cNvPicPr></pic:nvPicPr><pic:blipFill><a:blip r:embed="rId${pageNumber}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${width}" cy="${height}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln><a:noFill/></a:ln></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
+}
+
+export function createDocxFromPageImages(images: readonly DocxPageImage[]) {
+  if (images.length === 0) {
+    throw new Error("At least one rendered PDF page is required to create a Word document.");
+  }
+
+  const mediaEntries: ZipEntry[] = [];
+  const relationships: string[] = [];
+  const body = images
+    .map((image, index) => {
+      const isLast = index === images.length - 1;
+      const section = isLast ? "" : wordPageSection(image, true);
+      mediaEntries.push({
+        name: `word/media/page-${index + 1}.png`,
+        data: image.bytes,
+      });
+      relationships.push(`<Relationship Id="rId${index + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/page-${index + 1}.png"/>`);
+      return `<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="1" w:lineRule="exact"/>${section}</w:pPr>${wordPageDrawing(image, index)}</w:p>`;
+    })
+    .join("");
+
+  const lastSection = wordPageSection(images[images.length - 1], false);
+  const document = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:body>${body}${lastSection}</w:body></w:document>`;
+  const documentRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${relationships.join("")}</Relationships>`;
+  const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>`;
+
+  return createStoredZip([
+    { name: "[Content_Types].xml", data: contentTypes },
+    { name: "_rels/.rels", data: ROOT_RELS("word/document.xml") },
+    { name: "docProps/core.xml", data: coreProperties("PDFMantra layout-preserved Word conversion") },
+    { name: "docProps/app.xml", data: APP_PROPERTIES },
+    { name: "word/document.xml", data: document },
+    { name: "word/_rels/document.xml.rels", data: documentRels },
+    ...mediaEntries,
   ]);
 }
 

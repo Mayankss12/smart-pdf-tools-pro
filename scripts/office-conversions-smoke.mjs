@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
+import { createDocxFromPageImages } from "../src/lib/conversions/office-open-xml.ts";
+
 const paths = {
   writer: "../src/lib/conversions/office-open-xml.ts",
   reader: "../src/lib/conversions/office-open-xml-reader.ts",
@@ -9,6 +11,7 @@ const paths = {
   officePdfPage: "../src/components/OfficeToPdfConversionPage.tsx",
   localConversions: "../src/lib/conversions/local-browser-conversions.ts",
   entitlements: "../src/lib/entitlements.ts",
+  registry: "../src/lib/conversions/registry.ts",
 };
 const entries = await Promise.all(
   Object.entries(paths).map(async ([key, path]) => [
@@ -21,6 +24,7 @@ const sources = Object.fromEntries(entries);
 for (const value of [
   "export function createStoredZip",
   "export function createDocxFromPdfText",
+  "export function createDocxFromPageImages",
   "export function createXlsxFromPdfText",
   "export function createPptxFromPageImages",
   "0x04034b50",
@@ -28,6 +32,9 @@ for (const value of [
   "0x06054b50",
   "[Content_Types].xml",
   "word/document.xml",
+  "word/_rels/document.xml.rels",
+  "word/media/page-",
+  "wordprocessingDrawing",
   "xl/workbook.xml",
   "ppt/presentation.xml",
   "ppt/slides/slide",
@@ -53,10 +60,13 @@ for (const value of [
 for (const value of [
   "export async function convertPdfToOffice",
   "createDocxFromPdfText",
+  "createDocxFromPageImages",
   "createXlsxFromPdfText",
   "createPptxFromPageImages",
   "extractPdfTextContent",
-  "renderPdfPagesForPptx",
+  "renderPdfPagesForOffice",
+  '"preserve-layout"',
+  '"editable-text"',
 ]) {
   assert.ok(sources.engine.includes(value), `PDF Office engine is missing ${value}`);
 }
@@ -66,6 +76,9 @@ for (const value of [
   "prepareEntitledExport",
   "application/vnd.openxmlformats",
   "Browser processing",
+  "Preserve layout",
+  "Recommended",
+  "Editable text",
 ]) {
   assert.ok(
     sources.pdfOfficePage.includes(value),
@@ -104,6 +117,69 @@ for (const id of localIds) {
 }
 assert.equal(sources.localConversions.includes('"heic-to-pdf"'), false);
 assert.equal(sources.localConversions.includes('"webpage-to-pdf"'), false);
+
+assert.ok(
+  sources.registry.includes('capabilityKey: "browser-pdf-render"'),
+  "PDF to Word must use the browser renderer capability",
+);
+assert.ok(
+  sources.registry.includes('preservesLayout: "yes"'),
+  "PDF to Word must advertise the layout-preserved default honestly",
+);
+
+function readStoredZipEntries(bytes) {
+  const entries = new Map();
+  const decoder = new TextDecoder();
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let offset = 0;
+  while (offset + 30 <= bytes.length && view.getUint32(offset, true) === 0x04034b50) {
+    const compression = view.getUint16(offset + 8, true);
+    assert.equal(compression, 0, "Generated Office entry must use stored ZIP data");
+    const size = view.getUint32(offset + 18, true);
+    const nameLength = view.getUint16(offset + 26, true);
+    const extraLength = view.getUint16(offset + 28, true);
+    const nameStart = offset + 30;
+    const dataStart = nameStart + nameLength + extraLength;
+    const name = decoder.decode(bytes.subarray(nameStart, nameStart + nameLength));
+    entries.set(name, bytes.slice(dataStart, dataStart + size));
+    offset = dataStart + size;
+  }
+  return entries;
+}
+
+const onePixelPng = Uint8Array.from(
+  Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+    "base64",
+  ),
+);
+const generatedDocx = createDocxFromPageImages([
+  {
+    bytes: onePixelPng,
+    width: 1190,
+    height: 1684,
+    pageWidthPoints: 595,
+    pageHeightPoints: 842,
+  },
+  {
+    bytes: onePixelPng,
+    width: 1684,
+    height: 1190,
+    pageWidthPoints: 842,
+    pageHeightPoints: 595,
+  },
+]);
+const generatedEntries = readStoredZipEntries(generatedDocx);
+assert.ok(generatedEntries.has("word/media/page-1.png"));
+assert.ok(generatedEntries.has("word/media/page-2.png"));
+assert.ok(generatedEntries.has("word/_rels/document.xml.rels"));
+const generatedDocumentXml = new TextDecoder().decode(
+  generatedEntries.get("word/document.xml"),
+);
+assert.equal((generatedDocumentXml.match(/<wp:inline/g) ?? []).length, 2);
+assert.match(generatedDocumentXml, /w:w="11900" w:h="16840"/);
+assert.match(generatedDocumentXml, /w:w="16840" w:h="11900" w:orient="landscape"/);
+assert.match(generatedDocumentXml, /descr="PDF page 1"/);
 
 const routeChecks = [
   ["pdf-to-word", "PdfOfficeConversionPage", 'format="docx"'],

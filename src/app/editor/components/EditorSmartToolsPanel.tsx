@@ -24,6 +24,7 @@ import {
   type OcrProgress,
   type OcrResult,
 } from "@/lib/pdf-ocr-engine";
+import { translateWithBrowser } from "@/lib/translation/browser";
 
 import type { EditorController } from "../hooks/useEditor";
 
@@ -59,6 +60,8 @@ type EditorSmartToolsPanelProps = {
   readonly editor: EditorController;
   readonly ocrPages: readonly EditorOcrPageResult[];
   readonly translationConfigured: boolean;
+  readonly browserTranslationAvailable: boolean;
+  readonly providerTranslationConfigured: boolean;
   readonly onOcrPagesChange: (pages: EditorOcrPageResult[]) => void;
   readonly onFindHighlightChange: (highlights: EditorFindHighlight[]) => void;
   readonly onActivityChange: (activity: EditorSmartToolActivity | null) => void;
@@ -278,6 +281,8 @@ export function EditorSmartToolsPanel({
   editor,
   ocrPages,
   translationConfigured,
+  browserTranslationAvailable,
+  providerTranslationConfigured,
   onOcrPagesChange,
   onFindHighlightChange,
   onActivityChange,
@@ -661,18 +666,49 @@ export function EditorSmartToolsPanel({
         );
       }
 
-      const response = await fetch("/api/translate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        cache: "no-store",
-        signal: controller.signal,
-        body: JSON.stringify({
-          text,
-          sourceLanguage: sourceLanguage === "auto" ? undefined : sourceLanguage,
-          targetLanguage,
-        }),
-      });
-      const payload: unknown = await response.json();
+      const request = {
+        text,
+        sourceLanguage: sourceLanguage === "auto" ? undefined : sourceLanguage,
+        targetLanguage,
+      };
+      let result = "";
+
+      if (browserTranslationAvailable) {
+        try {
+          const local = await translateWithBrowser(request, {
+            signal: controller.signal,
+            onProgress: ({ progress }) => {
+              onActivityChange({ toolId: "translate", progress });
+            },
+          });
+          result = local.translatedText;
+        } catch (error) {
+          if (!providerTranslationConfigured) throw error;
+        }
+      }
+
+      if (!result) {
+        const response = await fetch("/api/translate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          cache: "no-store",
+          signal: controller.signal,
+          body: JSON.stringify(request),
+        });
+        const payload: unknown = await response.json();
+        result = readTranslationResponse(payload);
+        if (!response.ok || !result) {
+          const providerError =
+            payload && typeof payload === "object"
+              ? Reflect.get(payload, "error")
+              : null;
+          throw new Error(
+            typeof providerError === "string"
+              ? providerError
+              : "Translation failed.",
+          );
+        }
+      }
 
       if (
         abortControllerRef.current !== controller ||
@@ -681,18 +717,6 @@ export function EditorSmartToolsPanel({
         return;
       }
 
-      const result = readTranslationResponse(payload);
-      if (!response.ok || !result) {
-        const providerError =
-          payload && typeof payload === "object"
-            ? Reflect.get(payload, "error")
-            : null;
-        throw new Error(
-          typeof providerError === "string"
-            ? providerError
-            : "Translation failed.",
-        );
-      }
       setTranslatedText(result);
       setTranslationSource(
         translateMode === "selection"

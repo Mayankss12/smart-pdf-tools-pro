@@ -14,7 +14,7 @@ const LOCAL_BROWSER_CONVERSION_DESCRIPTIONS: Record<
   LocalBrowserConversionId,
   string
 > = {
-  "pdf-to-word": "Extract PDF text into an editable Word document with optional OCR.",
+  "pdf-to-word": "Create a layout-preserved Word document or extract basic editable text.",
   "pdf-to-excel": "Export PDF text into one Excel worksheet per page.",
   "pdf-to-powerpoint": "Turn every PDF page into a visual PowerPoint slide.",
   "docx-to-pdf": "Convert readable Word text and paragraphs into a clean PDF.",

@@ -22,6 +22,7 @@ import { formatFileSize, safeFileBaseName } from "@/lib/pdf-engine";
 import { readValidatedPdfBytes } from "@/lib/pdf-document-safety";
 import {
   convertPdfToOffice,
+  type PdfDocxMode,
   type PdfOfficeFormat,
 } from "@/lib/conversions/pdf-office-engine";
 import type { OcrLanguage, OcrQuality } from "@/lib/pdf-ocr-engine";
@@ -52,7 +53,7 @@ const FORMAT_META: Record<
     mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     toolKey: "pdf-to-word",
     quality:
-      "Creates editable Word paragraphs page-by-page. Text remains editable, while complex columns, tables, fonts, and exact visual placement may differ from the PDF.",
+      "Choose exact visual preservation or basic editable text before converting.",
   },
   xlsx: {
     label: "Excel",
@@ -109,10 +110,12 @@ export function PdfOfficeConversionPage({
   const [ocrFallback, setOcrFallback] = useState(true);
   const [ocrLanguage, setOcrLanguage] = useState<OcrLanguage>("auto");
   const [ocrQuality, setOcrQuality] = useState<OcrQuality>("balanced");
+  const [docxMode, setDocxMode] = useState<PdfDocxMode>("preserve-layout");
   const [result, setResult] = useState<{
     readonly outputSize: number;
     readonly pages: number;
     readonly ocrPages: number;
+    readonly docxMode: PdfDocxMode | null;
   } | null>(null);
 
   useEffect(() => () => abortRef.current?.abort(), []);
@@ -157,7 +160,11 @@ export function PdfOfficeConversionPage({
         recordExport,
         prepare: () =>
           convertPdfToOffice(file, format, {
-            ocrFallback: format === "pptx" ? false : ocrFallback,
+            docxMode,
+            ocrFallback:
+              format === "xlsx" || (format === "docx" && docxMode === "editable-text")
+                ? ocrFallback
+                : false,
             ocrLanguage,
             ocrQuality,
             signal: controller.signal,
@@ -182,10 +189,15 @@ export function PdfOfficeConversionPage({
         outputSize,
         pages: prepared.output.pageCount,
         ocrPages: prepared.output.ocrPageCount,
+        docxMode: format === "docx" ? docxMode : null,
       });
       setState("completed");
       setProgress({ completed: prepared.output.pageCount, total: prepared.output.pageCount });
-      setStatus(`${meta.label} file created successfully. Download started.`);
+      setStatus(
+        format === "docx" && docxMode === "preserve-layout"
+          ? "Layout-preserved Word file created successfully. Download started."
+          : `${meta.label} file created successfully. Download started.`,
+      );
     } catch (error) {
       const cancelled = controller.signal.aborted;
       setState(cancelled ? "ready" : "failed");
@@ -219,6 +231,14 @@ export function PdfOfficeConversionPage({
   }
 
   const busy = state === "processing" || state === "cancelling" || state === "validating";
+  const showTextOcr =
+    format === "xlsx" || (format === "docx" && docxMode === "editable-text");
+  const qualityNotice =
+    format === "docx"
+      ? docxMode === "preserve-layout"
+        ? "Best for invoices, forms, and designed documents. Every page keeps its PDF appearance in Word; page text is not independently editable."
+        : "Creates editable paragraphs from detected text. Tables, columns, graphics, fonts, and exact positioning can change."
+      : meta.quality;
 
   return (
     <>
@@ -280,7 +300,14 @@ export function PdfOfficeConversionPage({
               {result ? (
                 <div className="mt-4 grid gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 sm:grid-cols-3">
                   <div className="flex items-center gap-2 font-bold text-emerald-800"><CheckCircle2 size={18} /> Completed</div>
-                  <div className="text-sm font-semibold text-emerald-800">{result.pages} pages{format !== "pptx" ? ` · ${result.ocrPages} OCR` : ""}</div>
+                  <div className="text-sm font-semibold text-emerald-800">
+                    {result.pages} pages
+                    {result.docxMode === "preserve-layout"
+                      ? " · Layout preserved"
+                      : format !== "pptx"
+                        ? ` · ${result.ocrPages} OCR`
+                        : ""}
+                  </div>
                   <div className="text-sm font-semibold text-emerald-800">{formatFileSize(result.outputSize)}</div>
                 </div>
               ) : null}
@@ -288,9 +315,29 @@ export function PdfOfficeConversionPage({
 
             <aside className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
               <h2 className="font-bold">Conversion options</h2>
-              {format !== "pptx" ? (
+              {format === "docx" ? (
+                <fieldset className="mt-4 grid gap-3">
+                  <legend className="sr-only">Word conversion mode</legend>
+                  <label className={`cursor-pointer rounded-2xl border p-4 transition ${docxMode === "preserve-layout" ? "border-violet-500 bg-violet-50 ring-2 ring-violet-100" : "border-slate-200 hover:border-violet-300"}`}>
+                    <span className="flex items-start gap-3">
+                      <input type="radio" name="docx-mode" value="preserve-layout" checked={docxMode === "preserve-layout"} onChange={() => setDocxMode("preserve-layout")} disabled={busy} className="mt-1 accent-violet-600" />
+                      <span><span className="block text-sm font-bold text-slate-900">Preserve layout <span className="text-xs text-violet-700">Recommended</span></span><span className="mt-1 block text-xs leading-5 text-slate-600">Keeps invoices, forms, tables, graphics, and page design visually intact.</span></span>
+                    </span>
+                  </label>
+                  <label className={`cursor-pointer rounded-2xl border p-4 transition ${docxMode === "editable-text" ? "border-violet-500 bg-violet-50 ring-2 ring-violet-100" : "border-slate-200 hover:border-violet-300"}`}>
+                    <span className="flex items-start gap-3">
+                      <input type="radio" name="docx-mode" value="editable-text" checked={docxMode === "editable-text"} onChange={() => setDocxMode("editable-text")} disabled={busy} className="mt-1 accent-violet-600" />
+                      <span><span className="block text-sm font-bold text-slate-900">Editable text</span><span className="mt-1 block text-xs leading-5 text-slate-600">Extracts text into paragraphs; complex page layout can change.</span></span>
+                    </span>
+                  </label>
+                </fieldset>
+              ) : format === "pptx" ? (
+                <div className="mt-4 rounded-2xl border border-violet-100 bg-violet-50 p-4 text-sm font-semibold leading-6 text-violet-800">Each PDF page becomes one visual PowerPoint slide.</div>
+              ) : null}
+
+              {showTextOcr ? (
                 <>
-                  <label className="mt-4 flex items-start gap-3 rounded-2xl border border-slate-200 p-3">
+                  <label className={`${format === "docx" ? "mt-3" : "mt-4"} flex items-start gap-3 rounded-2xl border border-slate-200 p-3`}>
                     <input type="checkbox" checked={ocrFallback} onChange={(event) => setOcrFallback(event.target.checked)} disabled={busy} className="mt-1" />
                     <span><span className="block text-sm font-bold">OCR scan-like pages</span><span className="mt-1 block text-xs leading-5 text-slate-500">Use OCR when a page contains little or no native text.</span></span>
                   </label>
@@ -301,16 +348,14 @@ export function PdfOfficeConversionPage({
                     </div>
                   ) : null}
                 </>
-              ) : (
-                <div className="mt-4 rounded-2xl border border-violet-100 bg-violet-50 p-4 text-sm font-semibold leading-6 text-violet-800">Each PDF page becomes one visual PowerPoint slide.</div>
-              )}
+              ) : null}
 
               <div className="mt-5 rounded-2xl border border-slate-200 p-4">
                 <ShieldCheck size={19} className="text-emerald-600" />
                 <h3 className="mt-2 text-sm font-bold">Browser processing</h3>
                 <p className="mt-1 text-xs leading-5 text-slate-500">Your source PDF is processed in this browser for this conversion.</p>
               </div>
-              <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs font-medium leading-5 text-amber-900">{meta.quality}</div>
+              <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs font-medium leading-5 text-amber-900">{qualityNotice}</div>
 
               <div className="mt-5 grid gap-2">
                 {state === "processing" || state === "cancelling" ? (

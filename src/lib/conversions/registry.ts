@@ -138,32 +138,30 @@ const imageInput = {
 } as const;
 
 export const CONVERSION_REGISTRY = [
-  backendConversion({
+  clientConversion({
     ...pdfInput,
     id: "pdf-to-word",
     sourceFormat: "pdf",
     destinationFormat: "docx",
     title: "PDF to Word",
     description:
-      "Create DOCX output only through a configured document-processing provider.",
+      "Create a real Word document with layout-preserved or editable-text output.",
     route: "/tools/pdf-to-word",
-    capabilityKey: "document-conversion-worker",
-    disabledReason:
-      "A DOCX writer/conversion worker is not configured. PDFMantra will not rename text or HTML as a Word document.",
+    capabilityKey: "browser-pdf-render",
     supportsBatch: false,
     supportsProgress: true,
     supportsCancellation: true,
     preservesText: "partial",
-    preservesLayout: "partial",
-    preservesImages: "partial",
-    preservesTables: "partial",
-    preservesLinks: "partial",
+    preservesLayout: "yes",
+    preservesImages: "yes",
+    preservesTables: "yes",
+    preservesLinks: "no",
     expectedOutputMime:
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     entitlementToolKey: "pdf-to-word",
     analyticsEvent: "conversion_pdf_to_word",
     qualityNotice:
-      "OCR, editable Word output, and layout preservation are provider-dependent and are not available or claimed without a verified provider.",
+      "Layout-preserved mode keeps each page visually intact but its text is not independently editable. Editable-text mode may change complex layout.",
   }),
   backendConversion({
     ...pdfInput,
@@ -388,7 +386,7 @@ export const CONVERSION_REGISTRY = [
     qualityNotice:
       "Image appearance and queue order are preserved; optional OCR adds searchable text.",
   }),
-  backendConversion({
+  clientConversion({
     id: "heic-to-pdf",
     sourceFormat: "heic",
     destinationFormat: "pdf",
@@ -398,10 +396,8 @@ export const CONVERSION_REGISTRY = [
     acceptedMimeTypes: ["image/heic", "image/heif"],
     acceptedExtensions: [".heic", ".heif"],
     maxFileSize: 40 * MB,
-    maxFileCount: 40,
+    maxFileCount: 20,
     capabilityKey: "heic-decoder",
-    disabledReason:
-      "No production-safe HEIC decoder is installed. Configure the conversion worker with HEIC/HEIF decoding support.",
     supportsBatch: true,
     supportsProgress: true,
     supportsCancellation: true,
@@ -414,9 +410,9 @@ export const CONVERSION_REGISTRY = [
     entitlementToolKey: "heic-to-pdf",
     analyticsEvent: "conversion_heic_to_pdf",
     qualityNotice:
-      "EXIF orientation and color profiles must be normalized by the configured decoder.",
+      "Photos are decoded locally to high-quality JPEG before PDF creation. Some camera metadata and advanced color profiles are not copied.",
     maxPageCount: null,
-    batchLimit: 40,
+    batchLimit: 20,
   }),
   clientConversion({
     id: "txt-to-pdf",

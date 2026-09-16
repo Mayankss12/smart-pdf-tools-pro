@@ -1,6 +1,8 @@
 import {
   StandardFonts,
+  beginMarkedContent,
   concatTransformationMatrix,
+  endMarkedContent,
   popGraphicsState,
   pushGraphicsState,
   rgb,
@@ -409,6 +411,7 @@ export async function applyWatermark(
             },
           ];
 
+    page.pushOperators(beginMarkedContent("PDFMantraWatermark"));
     await withEditorPageTransform(page, geometry, () => {
       for (const center of centers) {
         if (needsText && font) {
@@ -444,6 +447,7 @@ export async function applyWatermark(
         }
       }
     });
+    page.pushOperators(endMarkedContent());
     completedPages += 1;
     options.onProgress?.({
       completed: completedPages,

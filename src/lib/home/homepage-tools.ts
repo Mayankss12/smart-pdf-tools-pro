@@ -69,6 +69,7 @@ export const HOMEPAGE_TOOL_GRID_ORDER_IDS = [
   "extract-pages",
   "page-numbers",
   "watermark-pdf",
+  "watermark-remover",
   "protect-pdf",
   "unlock-pdf",
   "redact-pdf",
@@ -151,16 +152,19 @@ const HOMEPAGE_OPTIMIZE_OCR_IDS = [
   "batch-workflows",
 ] as const;
 
-const HOMEPAGE_SECURITY_IDS = ["protect-pdf", "unlock-pdf", "redact-pdf"] as const;
+const HOMEPAGE_SECURITY_IDS = [
+  "protect-pdf",
+  "unlock-pdf",
+  "redact-pdf",
+  "watermark-remover",
+] as const;
 
 export const HOMEPAGE_PENDING_CONVERSION_IDS = [
-  "pdf-to-word",
   "pdf-to-excel",
   "pdf-to-powerpoint",
   "docx-to-pdf",
   "xlsx-to-pdf",
   "pptx-to-pdf",
-  "heic-to-pdf",
   "webpage-to-pdf",
 ] as const;
 

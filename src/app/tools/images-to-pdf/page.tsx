@@ -68,13 +68,14 @@ type ImageQueueItem = {
   previewUrl: string;
 };
 
-type ImagesToPdfVariant = {
+export type ImagesToPdfVariant = {
   title: string;
   subtitle: string;
   initialStatus: string;
   accept: string;
   outputSlug: string;
   source: ImageRouteSource;
+  maxFiles?: number;
 };
 
 const DEFAULT_IMAGES_TO_PDF_VARIANT: ImagesToPdfVariant = {
@@ -84,6 +85,7 @@ const DEFAULT_IMAGES_TO_PDF_VARIANT: ImagesToPdfVariant = {
   accept: "image/png,image/jpeg,image/jpg,image/webp",
   outputSlug: "images-to-pdf",
   source: "mixed",
+  maxFiles: 80,
 };
 
 type OcrSummary = {
@@ -489,7 +491,7 @@ export default function ImagesToPdfPage({ variant = DEFAULT_IMAGES_TO_PDF_VARIAN
     setOpenDropdown((current) => (current === nextDropdown ? null : nextDropdown));
   }
 
-  function addImages(selectedFiles?: FileList | File[]) {
+  async function addImages(selectedFiles?: FileList | File[]) {
     if (!selectedFiles || selectedFiles.length === 0 || busy) return;
 
     const incomingFiles = Array.from(selectedFiles);
@@ -497,8 +499,34 @@ export default function ImagesToPdfPage({ variant = DEFAULT_IMAGES_TO_PDF_VARIAN
       files: incomingFiles,
       source: variant.source,
       currentCount: images.length,
+      maximumCount: variant.maxFiles,
     });
-    const validation = validateImageFiles([...candidates.accepted]);
+    let routeFiles = [...candidates.accepted];
+    const decodingHeic = variant.source === "heic" && routeFiles.length > 0;
+
+    if (decodingHeic) {
+      setBusy(true);
+      setResult(null);
+      setStatus(`Decoding ${pluralizeImage(routeFiles.length)} securely in your browser...`);
+      try {
+        const { decodeHeicFilesForPdf } = await import(
+          "@/lib/conversions/heic-browser"
+        );
+        routeFiles = await decodeHeicFilesForPdf(routeFiles, {
+          onProgress(progress) {
+            setStatus(
+              `Decoded ${progress.completed} of ${progress.total}: ${progress.fileName}`,
+            );
+          },
+        });
+      } catch (error) {
+        setStatus(getErrorMessage(error));
+        setBusy(false);
+        return;
+      }
+    }
+
+    const validation = validateImageFiles(routeFiles);
     const preparedImages = validation.accepted.map((file) => ({
       id: createQueueId(),
       file,
@@ -531,11 +559,12 @@ export default function ImagesToPdfPage({ variant = DEFAULT_IMAGES_TO_PDF_VARIAN
     }
     if (candidates.queueLimitCount > 0) {
       messageParts.push(
-        `${candidates.queueLimitCount} image${candidates.queueLimitCount === 1 ? "" : "s"} rejected: the queue accepts at most 80 images.`,
+        `${candidates.queueLimitCount} image${candidates.queueLimitCount === 1 ? "" : "s"} rejected: the queue accepts at most ${variant.maxFiles ?? 80} images.`,
       );
     }
 
     setStatus(messageParts.join(" ") || "No supported images were selected.");
+    if (decodingHeic) setBusy(false);
   }
 
   function moveImage(index: number, direction: "up" | "down") {
@@ -966,7 +995,7 @@ export default function ImagesToPdfPage({ variant = DEFAULT_IMAGES_TO_PDF_VARIAN
             multiple
             className="hidden"
             onChange={(event) => {
-              addImages(event.target.files || undefined);
+              void addImages(event.target.files || undefined);
               event.currentTarget.value = "";
             }}
           />
@@ -1445,6 +1474,8 @@ export default function ImagesToPdfPage({ variant = DEFAULT_IMAGES_TO_PDF_VARIAN
                     ? "JPG, PNG, WebP"
                     : variant.source === "jpg"
                       ? "JPG and JPEG"
+                      : variant.source === "heic"
+                        ? "HEIC and HEIF"
                       : variant.source.toUpperCase()}{" "}
                   supported · Multiple OK
                 </div>

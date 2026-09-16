@@ -265,7 +265,8 @@ assert.match(jobRoute, /webpageSecurityPolicy/);
 assert.match(footer, /href: "\/tools\/reorder"/);
 assert.doesNotMatch(footer, /href: "\/tools\/organize"/);
 assert.match(exportEngine, /object\.data\.stampLabel/);
-assert.match(pdfWordRegistry, /OCR, editable Word output, and layout preservation are provider-dependent/);
+assert.match(pdfWordRegistry, /Layout-preserved mode keeps each page visually intact/);
+assert.match(pdfWordRegistry, /capabilityKey: "browser-pdf-render"/);
 
 console.log(
   JSON.stringify({
