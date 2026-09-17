@@ -4,6 +4,11 @@ import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { editorThumbnailRenderQueue } from "@/lib/editor/thumbnail-render-queue";
+import {
+  EDITOR_THUMBNAIL_MAX_PIXELS,
+  getEditorRenderOutputScale,
+  getPdfJsOutputTransform,
+} from "@/lib/editor/pdf-render-quality";
 import type { EditorController, PdfDocumentLike } from "../hooks/useEditor";
 
 type ThumbnailProps = {
@@ -58,16 +63,24 @@ function PageThumbnail({ documentProxy, pageNumber, active, onSelect }: Thumbnai
           const page = await documentProxy.getPage(pageNumber);
           try {
             const viewport = page.getViewport({ scale: 0.26 });
-            const ratio = Math.min(window.devicePixelRatio || 1, 2);
+            const outputScale = getEditorRenderOutputScale(viewport.width, viewport.height, {
+              devicePixelRatio: window.devicePixelRatio,
+              maximumPixels: EDITOR_THUMBNAIL_MAX_PIXELS,
+            });
             const context = canvas.getContext("2d");
             if (!context || controller.signal.aborted) return;
-            canvas.width = Math.ceil(viewport.width * ratio);
-            canvas.height = Math.ceil(viewport.height * ratio);
+            canvas.width = Math.ceil(viewport.width * outputScale);
+            canvas.height = Math.ceil(viewport.height * outputScale);
             canvas.style.width = `${viewport.width}px`;
             canvas.style.height = `${viewport.height}px`;
-            context.setTransform(ratio, 0, 0, ratio, 0, 0);
-            context.clearRect(0, 0, viewport.width, viewport.height);
-            renderTask = page.render({ canvasContext: context, viewport });
+            context.setTransform(1, 0, 0, 1, 0, 0);
+            context.fillStyle = "#ffffff";
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            renderTask = page.render({
+              canvasContext: context,
+              viewport,
+              transform: getPdfJsOutputTransform(outputScale),
+            });
             await renderTask.promise;
           } finally {
             page.cleanup();

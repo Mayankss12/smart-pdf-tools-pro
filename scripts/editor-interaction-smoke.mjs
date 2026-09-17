@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
+import {
+  EDITOR_MAIN_CANVAS_MAX_PIXELS,
+  EDITOR_THUMBNAIL_MAX_PIXELS,
+  getEditorRenderOutputScale,
+  getPdfJsOutputTransform,
+} from "../src/lib/editor/pdf-render-quality.ts";
+
 const [
   frameSource,
   canvasSource,
@@ -109,6 +116,27 @@ assert.match(canvasSource, /data-detected-image-actions/);
 assert.doesNotMatch(canvasSource, /top:\s*Math\.max\(0,\s*objectPopover\.y/);
 assert.match(canvasSource, /preserveAspectRatio="xMidYMid meet"/);
 assert.match(canvasSource, /relative overflow-hidden/);
+assert.match(canvasSource, /getEditorRenderOutputScale/);
+assert.match(canvasSource, /transform:\s*getPdfJsOutputTransform\(outputScale\)/);
+assert.equal(getEditorRenderOutputScale(596, 843, { devicePixelRatio: 1 }), 2);
+assert.equal(getEditorRenderOutputScale(596, 843, { devicePixelRatio: 2.5 }), 2.5);
+assert.equal(getEditorRenderOutputScale(596, 843, { devicePixelRatio: 4 }), 3);
+assert.equal(
+  getEditorRenderOutputScale(2384, 3372, {
+    devicePixelRatio: 3,
+    maximumPixels: EDITOR_MAIN_CANVAS_MAX_PIXELS,
+  }) <= 2,
+  true,
+);
+assert.equal(
+  getEditorRenderOutputScale(155, 219, {
+    devicePixelRatio: 1,
+    maximumPixels: EDITOR_THUMBNAIL_MAX_PIXELS,
+  }),
+  2,
+);
+assert.deepEqual(getPdfJsOutputTransform(2), [2, 0, 0, 2, 0, 0]);
+assert.equal(getPdfJsOutputTransform(1), undefined);
 assert.match(textSource, /minWidth=\{sourceTextEdit \? 10 : 72\}/);
 assert.match(textSource, /minHeight=\{sourceTextEdit \? 8 : 28\}/);
 assert.match(

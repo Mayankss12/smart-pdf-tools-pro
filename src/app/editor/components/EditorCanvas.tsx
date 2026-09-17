@@ -26,6 +26,11 @@ import {
 } from "@/lib/editor/editor-stamp";
 
 import type { EditorController } from "../hooks/useEditor";
+import {
+  EDITOR_MAIN_CANVAS_MAX_PIXELS,
+  getEditorRenderOutputScale,
+  getPdfJsOutputTransform,
+} from "@/lib/editor/pdf-render-quality";
 import type { EditorFindHighlight } from "./EditorSmartToolsPanel";
 import { EditorStampComposer } from "./EditorStampComposer";
 import { DrawTool } from "./tools/DrawTool";
@@ -327,23 +332,30 @@ function PdfPageRenderer({
         const page = await editor.pdfDocument.getPage(editor.activePageNumber);
         renderedPage = page;
         const viewport = page.getViewport({ scale: editor.zoom });
-        const ratio = Math.min(window.devicePixelRatio || 1, 2);
+        const outputScale = getEditorRenderOutputScale(viewport.width, viewport.height, {
+          devicePixelRatio: window.devicePixelRatio,
+          maximumPixels: EDITOR_MAIN_CANVAS_MAX_PIXELS,
+        });
         const context = canvas.getContext("2d", { alpha: false });
 
         if (!context || cancelled) return;
 
-        canvas.width = Math.ceil(viewport.width * ratio);
-        canvas.height = Math.ceil(viewport.height * ratio);
+        canvas.width = Math.ceil(viewport.width * outputScale);
+        canvas.height = Math.ceil(viewport.height * outputScale);
         canvas.style.width = `${viewport.width}px`;
         canvas.style.height = `${viewport.height}px`;
 
         setPageSize({ width: viewport.width, height: viewport.height });
 
-        context.setTransform(ratio, 0, 0, ratio, 0, 0);
+        context.setTransform(1, 0, 0, 1, 0, 0);
         context.fillStyle = "#ffffff";
-        context.fillRect(0, 0, viewport.width, viewport.height);
+        context.fillRect(0, 0, canvas.width, canvas.height);
 
-        renderTask = page.render({ canvasContext: context, viewport });
+        renderTask = page.render({
+          canvasContext: context,
+          viewport,
+          transform: getPdfJsOutputTransform(outputScale),
+        });
 
         await renderTask.promise;
 
