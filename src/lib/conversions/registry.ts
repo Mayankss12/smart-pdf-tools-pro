@@ -145,7 +145,7 @@ export const CONVERSION_REGISTRY = [
     destinationFormat: "docx",
     title: "PDF to Word",
     description:
-      "Create a real Word document with layout-preserved or editable-text output.",
+      "Create a real Word document with editable layout reconstruction, exact visual preservation, or simple flowing text.",
     route: "/tools/pdf-to-word",
     capabilityKey: "browser-pdf-render",
     supportsBatch: false,
@@ -161,7 +161,7 @@ export const CONVERSION_REGISTRY = [
     entitlementToolKey: "pdf-to-word",
     analyticsEvent: "conversion_pdf_to_word",
     qualityNotice:
-      "Layout-preserved mode keeps each page visually intact but its text is not independently editable. Editable-text mode may change complex layout.",
+      "Editable-layout mode preserves page graphics and positioning while rebuilding detected text as editable Word text boxes. Exact-visual and simple-text fallbacks remain available.",
   }),
   backendConversion({
     ...pdfInput,

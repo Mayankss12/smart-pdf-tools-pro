@@ -53,7 +53,7 @@ const FORMAT_META: Record<
     mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     toolKey: "pdf-to-word",
     quality:
-      "Choose exact visual preservation or basic editable text before converting.",
+      "Choose editable layout reconstruction, an exact visual copy, or simple flowing text before converting.",
   },
   xlsx: {
     label: "Excel",
@@ -110,7 +110,7 @@ export function PdfOfficeConversionPage({
   const [ocrFallback, setOcrFallback] = useState(true);
   const [ocrLanguage, setOcrLanguage] = useState<OcrLanguage>("auto");
   const [ocrQuality, setOcrQuality] = useState<OcrQuality>("balanced");
-  const [docxMode, setDocxMode] = useState<PdfDocxMode>("preserve-layout");
+  const [docxMode, setDocxMode] = useState<PdfDocxMode>("editable-layout");
   const [result, setResult] = useState<{
     readonly outputSize: number;
     readonly pages: number;
@@ -162,7 +162,7 @@ export function PdfOfficeConversionPage({
           convertPdfToOffice(file, format, {
             docxMode,
             ocrFallback:
-              format === "xlsx" || (format === "docx" && docxMode === "editable-text")
+              format === "xlsx" || (format === "docx" && docxMode !== "preserve-layout")
                 ? ocrFallback
                 : false,
             ocrLanguage,
@@ -194,8 +194,10 @@ export function PdfOfficeConversionPage({
       setState("completed");
       setProgress({ completed: prepared.output.pageCount, total: prepared.output.pageCount });
       setStatus(
-        format === "docx" && docxMode === "preserve-layout"
-          ? "Layout-preserved Word file created successfully. Download started."
+        format === "docx" && docxMode === "editable-layout"
+          ? "Editable-layout Word file created successfully. Download started."
+          : format === "docx" && docxMode === "preserve-layout"
+            ? "Exact visual Word copy created successfully. Download started."
           : `${meta.label} file created successfully. Download started.`,
       );
     } catch (error) {
@@ -232,12 +234,14 @@ export function PdfOfficeConversionPage({
 
   const busy = state === "processing" || state === "cancelling" || state === "validating";
   const showTextOcr =
-    format === "xlsx" || (format === "docx" && docxMode === "editable-text");
+    format === "xlsx" || (format === "docx" && docxMode !== "preserve-layout");
   const qualityNotice =
     format === "docx"
-      ? docxMode === "preserve-layout"
-        ? "Best for invoices, forms, and designed documents. Every page keeps its PDF appearance in Word; page text is not independently editable."
-        : "Creates editable paragraphs from detected text. Tables, columns, graphics, fonts, and exact positioning can change."
+      ? docxMode === "editable-layout"
+        ? "Best for invoices, forms, and designed documents. A high-quality 300-DPI page layer keeps graphics and table lines sharp while detected text is rebuilt as editable Word text boxes. Very complex fonts may be substituted."
+        : docxMode === "preserve-layout"
+          ? "Creates a high-quality 300-DPI visual page copy. Use this fallback when appearance matters more than editing individual text."
+          : "Creates simple editable paragraphs for easy rewriting. Tables, columns, graphics, fonts, and exact positioning can change."
       : meta.quality;
 
   return (
@@ -302,8 +306,10 @@ export function PdfOfficeConversionPage({
                   <div className="flex items-center gap-2 font-bold text-emerald-800"><CheckCircle2 size={18} /> Completed</div>
                   <div className="text-sm font-semibold text-emerald-800">
                     {result.pages} pages
-                    {result.docxMode === "preserve-layout"
-                      ? " · Layout preserved"
+                    {result.docxMode === "editable-layout"
+                      ? ` · Editable layout${result.ocrPages ? ` · ${result.ocrPages} OCR` : ""}`
+                      : result.docxMode === "preserve-layout"
+                        ? " · Exact visual copy"
                       : format !== "pptx"
                         ? ` · ${result.ocrPages} OCR`
                         : ""}
@@ -318,16 +324,22 @@ export function PdfOfficeConversionPage({
               {format === "docx" ? (
                 <fieldset className="mt-4 grid gap-3">
                   <legend className="sr-only">Word conversion mode</legend>
+                  <label className={`cursor-pointer rounded-2xl border p-4 transition ${docxMode === "editable-layout" ? "border-violet-500 bg-violet-50 ring-2 ring-violet-100" : "border-slate-200 hover:border-violet-300"}`}>
+                    <span className="flex items-start gap-3">
+                      <input type="radio" name="docx-mode" value="editable-layout" checked={docxMode === "editable-layout"} onChange={() => setDocxMode("editable-layout")} disabled={busy} className="mt-1 accent-violet-600" />
+                      <span><span className="block text-sm font-bold text-slate-900">Editable layout <span className="text-xs text-violet-700">Recommended</span></span><span className="mt-1 block text-xs leading-5 text-slate-600">Keeps page design, table lines, and graphics while rebuilding detected text as editable Word text boxes.</span></span>
+                    </span>
+                  </label>
                   <label className={`cursor-pointer rounded-2xl border p-4 transition ${docxMode === "preserve-layout" ? "border-violet-500 bg-violet-50 ring-2 ring-violet-100" : "border-slate-200 hover:border-violet-300"}`}>
                     <span className="flex items-start gap-3">
                       <input type="radio" name="docx-mode" value="preserve-layout" checked={docxMode === "preserve-layout"} onChange={() => setDocxMode("preserve-layout")} disabled={busy} className="mt-1 accent-violet-600" />
-                      <span><span className="block text-sm font-bold text-slate-900">Preserve layout <span className="text-xs text-violet-700">Recommended</span></span><span className="mt-1 block text-xs leading-5 text-slate-600">Keeps invoices, forms, tables, graphics, and page design visually intact.</span></span>
+                      <span><span className="block text-sm font-bold text-slate-900">Exact visual copy</span><span className="mt-1 block text-xs leading-5 text-slate-600">Places each original PDF page in Word without reconstructing its text.</span></span>
                     </span>
                   </label>
                   <label className={`cursor-pointer rounded-2xl border p-4 transition ${docxMode === "editable-text" ? "border-violet-500 bg-violet-50 ring-2 ring-violet-100" : "border-slate-200 hover:border-violet-300"}`}>
                     <span className="flex items-start gap-3">
                       <input type="radio" name="docx-mode" value="editable-text" checked={docxMode === "editable-text"} onChange={() => setDocxMode("editable-text")} disabled={busy} className="mt-1 accent-violet-600" />
-                      <span><span className="block text-sm font-bold text-slate-900">Editable text</span><span className="mt-1 block text-xs leading-5 text-slate-600">Extracts text into paragraphs; complex page layout can change.</span></span>
+                      <span><span className="block text-sm font-bold text-slate-900">Simple editable text</span><span className="mt-1 block text-xs leading-5 text-slate-600">Extracts flowing paragraphs for rewriting when the original page design is not needed.</span></span>
                     </span>
                   </label>
                 </fieldset>

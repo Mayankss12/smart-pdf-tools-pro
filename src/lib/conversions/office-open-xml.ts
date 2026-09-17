@@ -16,6 +16,26 @@ export type DocxPageImage = PptxPageImage & {
   readonly pageHeightPoints: number;
 };
 
+export type EditableDocxTextBox = {
+  readonly text: string;
+  readonly x: number;
+  readonly top: number;
+  readonly width: number;
+  readonly height: number;
+  readonly fontSize: number;
+  readonly fontFamily: string;
+  readonly color: string;
+  readonly bold: boolean;
+  readonly italic: boolean;
+  readonly direction: "ltr" | "rtl";
+  readonly rotation: number;
+};
+
+export type EditableDocxPage = {
+  readonly background: DocxPageImage;
+  readonly textBoxes: readonly EditableDocxTextBox[];
+};
+
 const encoder = new TextEncoder();
 const CRC_TABLE = new Uint32Array(256);
 for (let index = 0; index < 256; index += 1) {
@@ -180,6 +200,78 @@ function wordPageDrawing(image: DocxPageImage, index: number) {
   const height = Math.max(1, Math.round(image.pageHeightPoints * 12_700));
   const pageNumber = index + 1;
   return `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><wp:extent cx="${width}" cy="${height}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="${pageNumber}" name="PDF page ${pageNumber}" descr="PDF page ${pageNumber}"/><wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="${pageNumber}" name="PDF page ${pageNumber}.png" descr="PDF page ${pageNumber}"/><pic:cNvPicPr><a:picLocks noChangeAspect="1"/></pic:cNvPicPr></pic:nvPicPr><pic:blipFill><a:blip r:embed="rId${pageNumber}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${width}" cy="${height}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln><a:noFill/></a:ln></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
+}
+
+function wordPageBackground(image: DocxPageImage, index: number) {
+  const width = Math.max(1, Math.round(image.pageWidthPoints * 12_700));
+  const height = Math.max(1, Math.round(image.pageHeightPoints * 12_700));
+  const pageNumber = index + 1;
+  return `<w:r><w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="0" behindDoc="1" locked="1" layoutInCell="1" allowOverlap="1"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="page"><wp:posOffset>0</wp:posOffset></wp:positionH><wp:positionV relativeFrom="page"><wp:posOffset>0</wp:posOffset></wp:positionV><wp:extent cx="${width}" cy="${height}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapNone/><wp:docPr id="${pageNumber}" name="PDF page ${pageNumber} background" descr="PDF page ${pageNumber} graphics and page design"/><wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${pageNumber}" name="PDF page ${pageNumber} background.png" descr="PDF page ${pageNumber} graphics and page design"/><pic:cNvPicPr><a:picLocks noChangeAspect="1"/></pic:cNvPicPr></pic:nvPicPr><pic:blipFill><a:blip r:embed="rId${pageNumber}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${width}" cy="${height}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln><a:noFill/></a:ln></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:anchor></w:drawing></w:r>`;
+}
+
+function normalizeWordFontFamily(value: string) {
+  const clean = value.replace(/^[A-Z]{6}\+/, "").replace(/-(Bold|Italic|Oblique|Regular).*$/i, "").trim();
+  if (!clean || /^(sans-serif|system-ui)$/i.test(clean)) return "Arial";
+  if (/^serif$/i.test(clean)) return "Times New Roman";
+  if (/monospace/i.test(clean)) return "Courier New";
+  return clean;
+}
+
+function wordEditableTextBox(textBox: EditableDocxTextBox, pageIndex: number, boxIndex: number) {
+  const left = Math.max(0, textBox.x).toFixed(2);
+  const top = Math.max(0, textBox.top).toFixed(2);
+  const width = Math.max(2, textBox.width).toFixed(2);
+  const height = Math.max(textBox.fontSize * 1.15, textBox.height).toFixed(2);
+  const size = Math.max(2, Math.round(textBox.fontSize * 2));
+  const family = xml(normalizeWordFontFamily(textBox.fontFamily));
+  const color = /^[0-9A-F]{6}$/i.test(textBox.color) ? textBox.color.toUpperCase() : "111827";
+  const rotation = Math.abs(textBox.rotation) >= 0.1 ? `;rotation:${textBox.rotation.toFixed(2)}` : "";
+  const rtl = textBox.direction === "rtl" ? '<w:bidi/><w:jc w:val="right"/>' : "";
+  const bold = textBox.bold ? "<w:b/>" : "";
+  const italic = textBox.italic ? "<w:i/>" : "";
+  const shapeId = `pdfm_text_${pageIndex + 1}_${boxIndex + 1}`;
+  return `<w:r><w:pict><v:rect id="${shapeId}" stroked="f" filled="f" style="position:absolute;margin-left:${left}pt;margin-top:${top}pt;width:${width}pt;height:${height}pt;z-index:251659264;mso-position-horizontal-relative:page;mso-position-vertical-relative:page;mso-wrap-style:none${rotation}"><v:textbox inset="0,0,0,0"><w:txbxContent><w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="${Math.max(20, Math.round(textBox.height * 20))}" w:lineRule="exact"/>${rtl}</w:pPr><w:r><w:rPr><w:rFonts w:ascii="${family}" w:hAnsi="${family}" w:cs="${family}"/><w:sz w:val="${size}"/><w:szCs w:val="${size}"/><w:color w:val="${color}"/>${bold}${italic}</w:rPr><w:t xml:space="preserve">${xml(textBox.text)}</w:t></w:r></w:p></w:txbxContent></v:textbox><w10:wrap type="none" anchorx="page" anchory="page"/></v:rect></w:pict></w:r>`;
+}
+
+export function createEditableLayoutDocx(pages: readonly EditableDocxPage[]) {
+  if (pages.length === 0) {
+    throw new Error("At least one PDF page is required to create an editable-layout Word document.");
+  }
+
+  const mediaEntries: ZipEntry[] = [];
+  const relationships: string[] = [];
+  const body = pages
+    .map((page, pageIndex) => {
+      const isLast = pageIndex === pages.length - 1;
+      const section = isLast ? "" : wordPageSection(page.background, true);
+      mediaEntries.push({
+        name: `word/media/page-${pageIndex + 1}-background.png`,
+        data: page.background.bytes,
+      });
+      relationships.push(`<Relationship Id="rId${pageIndex + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/page-${pageIndex + 1}-background.png"/>`);
+      const textBoxes = page.textBoxes
+        .map((textBox, boxIndex) => wordEditableTextBox(textBox, pageIndex, boxIndex))
+        .join("");
+      return `<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="1" w:lineRule="exact"/>${section}</w:pPr>${wordPageBackground(page.background, pageIndex)}${textBoxes}</w:p>`;
+    })
+    .join("");
+
+  const lastSection = wordPageSection(pages[pages.length - 1].background, false);
+  const document = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w10="urn:schemas-microsoft-com:office:word"><w:body>${body}${lastSection}</w:body></w:document>`;
+  const documentRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${relationships.join("")}</Relationships>`;
+  const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>`;
+
+  return createStoredZip([
+    { name: "[Content_Types].xml", data: contentTypes },
+    { name: "_rels/.rels", data: ROOT_RELS("word/document.xml") },
+    { name: "docProps/core.xml", data: coreProperties("PDFMantra editable-layout Word conversion") },
+    { name: "docProps/app.xml", data: APP_PROPERTIES },
+    { name: "word/document.xml", data: document },
+    { name: "word/_rels/document.xml.rels", data: documentRels },
+    ...mediaEntries,
+  ]);
 }
 
 export function createDocxFromPageImages(images: readonly DocxPageImage[]) {

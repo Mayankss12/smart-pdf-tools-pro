@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-import { createDocxFromPageImages } from "../src/lib/conversions/office-open-xml.ts";
+import {
+  createDocxFromPageImages,
+  createEditableLayoutDocx,
+} from "../src/lib/conversions/office-open-xml.ts";
 
 const paths = {
   writer: "../src/lib/conversions/office-open-xml.ts",
@@ -25,6 +28,7 @@ for (const value of [
   "export function createStoredZip",
   "export function createDocxFromPdfText",
   "export function createDocxFromPageImages",
+  "export function createEditableLayoutDocx",
   "export function createXlsxFromPdfText",
   "export function createPptxFromPageImages",
   "0x04034b50",
@@ -35,6 +39,8 @@ for (const value of [
   "word/_rels/document.xml.rels",
   "word/media/page-",
   "wordprocessingDrawing",
+  "w:txbxContent",
+  "wp:anchor",
   "xl/workbook.xml",
   "ppt/presentation.xml",
   "ppt/slides/slide",
@@ -61,10 +67,13 @@ for (const value of [
   "export async function convertPdfToOffice",
   "createDocxFromPdfText",
   "createDocxFromPageImages",
+  "createEditableLayoutDocx",
   "createXlsxFromPdfText",
   "createPptxFromPageImages",
   "extractPdfTextContent",
   "renderPdfPagesForOffice",
+  "renderPdfPagesForEditableWord",
+  '"editable-layout"',
   '"preserve-layout"',
   '"editable-text"',
 ]) {
@@ -76,9 +85,10 @@ for (const value of [
   "prepareEntitledExport",
   "application/vnd.openxmlformats",
   "Browser processing",
-  "Preserve layout",
+  "Editable layout",
+  "Exact visual copy",
   "Recommended",
-  "Editable text",
+  "Simple editable text",
 ]) {
   assert.ok(
     sources.pdfOfficePage.includes(value),
@@ -124,7 +134,7 @@ assert.ok(
 );
 assert.ok(
   sources.registry.includes('preservesLayout: "yes"'),
-  "PDF to Word must advertise the layout-preserved default honestly",
+  "PDF to Word must advertise editable layout reconstruction honestly",
 );
 
 function readStoredZipEntries(bytes) {
@@ -180,6 +190,62 @@ assert.equal((generatedDocumentXml.match(/<wp:inline/g) ?? []).length, 2);
 assert.match(generatedDocumentXml, /w:w="11900" w:h="16840"/);
 assert.match(generatedDocumentXml, /w:w="16840" w:h="11900" w:orient="landscape"/);
 assert.match(generatedDocumentXml, /descr="PDF page 1"/);
+
+const editableDocx = createEditableLayoutDocx([
+  {
+    background: {
+      bytes: onePixelPng,
+      width: 1190,
+      height: 1684,
+      pageWidthPoints: 595,
+      pageHeightPoints: 842,
+    },
+    textBoxes: [
+      {
+        text: "Editable invoice number 1042",
+        x: 44,
+        top: 36,
+        width: 180,
+        height: 15,
+        fontSize: 11,
+        fontFamily: "Carlito-Bold",
+        color: "3A1F08",
+        bold: true,
+        italic: false,
+        direction: "ltr",
+        rotation: 0,
+      },
+      {
+        text: "Editable total 1499.00",
+        x: 390,
+        top: 700,
+        width: 120,
+        height: 13,
+        fontSize: 10,
+        fontFamily: "Carlito-Regular",
+        color: "111827",
+        bold: false,
+        italic: false,
+        direction: "ltr",
+        rotation: 0,
+      },
+    ],
+  },
+]);
+const editableEntries = readStoredZipEntries(editableDocx);
+assert.ok(editableEntries.has("word/media/page-1-background.png"));
+assert.ok(editableEntries.has("word/_rels/document.xml.rels"));
+const editableDocumentXml = new TextDecoder().decode(
+  editableEntries.get("word/document.xml"),
+);
+assert.equal((editableDocumentXml.match(/<wp:anchor/g) ?? []).length, 1);
+assert.equal((editableDocumentXml.match(/<w:txbxContent>/g) ?? []).length, 2);
+assert.match(editableDocumentXml, /behindDoc="1"/);
+assert.match(editableDocumentXml, /Editable invoice number 1042/);
+assert.match(editableDocumentXml, /Editable total 1499\.00/);
+assert.match(editableDocumentXml, /w:ascii="Carlito"/);
+assert.match(editableDocumentXml, /<w:b\/>/);
+assert.match(editableDocumentXml, /w:color w:val="3A1F08"/);
 
 const routeChecks = [
   ["pdf-to-word", "PdfOfficeConversionPage", 'format="docx"'],
