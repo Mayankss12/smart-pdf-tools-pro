@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "audit:domain": "node --experimental-loader ./scripts/ts-extension-loader.mjs ./scripts/domain-readiness.mjs",
     "audit:launch": "node --experimental-loader ./scripts/ts-extension-loader.mjs ./scripts/launch-readiness.mjs",
     "test:smoke": "node --experimental-loader ./scripts/ts-extension-loader.mjs ./scripts/run-smoke.mjs",
     "test:production:workspace": "node --env-file-if-exists=.env.local ./scripts/workspace-production-acceptance.mjs"

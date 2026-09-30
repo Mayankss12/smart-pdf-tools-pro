@@ -3,6 +3,7 @@ import { DM_Sans, Plus_Jakarta_Sans } from "next/font/google";
 import "@/styles/tokens.css";
 import "./globals.css";
 import { ReliabilityTelemetry } from "@/components/ReliabilityTelemetry";
+import { getSiteUrl } from "@/lib/site-url";
 
 const body = DM_Sans({
   subsets: ["latin"],
@@ -18,7 +19,7 @@ const display = Plus_Jakarta_Sans({
   variable: "--font-display",
 });
 
-const siteUrl = "https://smart-pdf-tools-pro.vercel.app";
+const siteUrl = getSiteUrl();
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),

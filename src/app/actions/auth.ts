@@ -14,6 +14,7 @@ import {
   isPasswordRecoveryMarker,
   PASSWORD_RECOVERY_COOKIE,
 } from "@/lib/auth/password-recovery";
+import { getSiteUrl } from "@/lib/site-url";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export type ActionResult =
@@ -69,10 +70,6 @@ function getFirstValidationError(error: z.ZodError): { message: string; field?: 
     message: firstError?.message ?? "Invalid form input.",
     field: typeof firstError?.path[0] === "string" ? firstError.path[0] : undefined,
   };
-}
-
-function getSiteUrl(): string {
-  return process.env.NEXT_PUBLIC_SITE_URL?.trim() || "http://localhost:3000";
 }
 
 async function getConfiguredServerClient(): Promise<Awaited<ReturnType<typeof createServerSupabaseClient>>> {

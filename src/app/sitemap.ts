@@ -2,8 +2,7 @@ import type { MetadataRoute } from "next";
 
 import { getPublicSitemapTools } from "@/lib/public-launch";
 import { getPublicLaunchCapabilitySnapshot } from "@/lib/public-launch-snapshot";
-
-const SITE_URL = "https://smart-pdf-tools-pro.vercel.app";
+import { getSiteUrl } from "@/lib/site-url";
 
 const KEY_PAGES = [
   "",
@@ -18,7 +17,8 @@ const KEY_PAGES = [
 ] as const;
 
 function absoluteUrl(path: string) {
-  return `${SITE_URL}${path.startsWith("/") ? path : `/${path}`}`;
+  const siteUrl = getSiteUrl();
+  return `${siteUrl}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
 function uniquePaths(paths: readonly string[]) {

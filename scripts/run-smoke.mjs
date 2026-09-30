@@ -6,6 +6,7 @@ const suites = [
   "auth-otp-smoke.mjs",
   "compression-smoke.mjs",
   "conversion-platform-smoke.mjs",
+  "domain-readiness-smoke.mjs",
   "editor-administration-smoke.mjs",
   "editor-export-smoke.mjs",
   "editor-form-smoke.mjs",

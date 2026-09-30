@@ -5,9 +5,26 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 
-const baseUrl = new URL(
-  process.env.PDFMANTRA_ACCEPTANCE_BASE_URL ?? "https://smart-pdf-tools-pro.vercel.app",
-);
+const configuredBaseUrl = (
+  process.env.PDFMANTRA_ACCEPTANCE_BASE_URL ??
+  process.env.NEXT_PUBLIC_SITE_URL
+)?.trim();
+
+if (!configuredBaseUrl) {
+  throw new Error(
+    "PDFMANTRA_ACCEPTANCE_BASE_URL or NEXT_PUBLIC_SITE_URL is required for the production workspace acceptance test.",
+  );
+}
+
+const baseUrl = new URL(configuredBaseUrl);
+const isLocalAcceptanceTarget =
+  baseUrl.hostname === "localhost" ||
+  baseUrl.hostname === "127.0.0.1" ||
+  baseUrl.hostname === "[::1]";
+
+if (baseUrl.protocol !== "https:" && !(baseUrl.protocol === "http:" && isLocalAcceptanceTarget)) {
+  throw new Error("The production workspace acceptance URL must use HTTPS.");
+}
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
 const publishableKey = (
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
