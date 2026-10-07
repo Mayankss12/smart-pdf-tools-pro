@@ -19,6 +19,8 @@
     "@pdf-lib/fontkit": "1.1.1",
     "@supabase/ssr": "0.10.3",
     "@supabase/supabase-js": "2.106.0",
+    "@vercel/analytics": "^2.0.1",
+    "@vercel/speed-insights": "^2.0.0",
     "lucide-react": "0.468.0",
     "next": "16.3.1",
     "pdf-lib": "1.17.1",

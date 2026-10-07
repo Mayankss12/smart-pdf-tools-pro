@@ -26,6 +26,10 @@ const [
 
 assert.match(rootLayout, /verification:\s*\{\s*google:/s);
 assert.match(rootLayout, /ZLJyGy3l5VBH6-AK-RcwZJ6CSQmzHDJV4BAMVo_JZuw/);
+assert.match(rootLayout, /@vercel\/analytics\/next/);
+assert.match(rootLayout, /@vercel\/speed-insights\/next/);
+assert.match(rootLayout, /<Analytics \/>/);
+assert.match(rootLayout, /<SpeedInsights \/>/);
 
 for (const toolId of [
   "merge-pdf",
@@ -57,5 +61,7 @@ console.log(
     honestLimitations: "passed",
     faqContent: "passed",
     sitemapCoverage: "passed",
+    webAnalytics: "enabled",
+    speedInsights: "enabled",
   }),
 );
