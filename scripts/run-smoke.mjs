@@ -1,4 +1,5 @@
 const suites = [
+  "all-tools-deep-audit.mjs",
   "admin-audit-smoke.mjs",
   "admin-console-smoke.mjs",
   "account-recovery-smoke.mjs",

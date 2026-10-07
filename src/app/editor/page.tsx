@@ -30,6 +30,7 @@ import {
   type EditorToolContext,
 } from "@/lib/editor/editor-tool-registry";
 import { getEntitlementPlan } from "@/lib/entitlements";
+import { validatePdfFile } from "@/lib/pdf-engine";
 import {
   addEditorBlankPage,
   reorderEditorPages,
@@ -70,10 +71,6 @@ const OPEN_IMAGE_PICKER_EVENT = "pdfmantra:editor-open-image-picker";
 const OPEN_SIGNATURE_PICKER_EVENT = "pdfmantra:editor-open-signature-picker";
 const OPEN_STAMP_PICKER_EVENT = "pdfmantra:editor-open-stamp-picker";
 
-function isPdfFile(file: File) {
-  return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
-}
-
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -102,6 +99,31 @@ type EditorDocumentCheckpoint = {
   readonly pageNumberSettings: EditorPageNumberSettings;
   readonly pageNumberSetId: string | null;
 };
+
+async function readEditorPageSizes(document: PDFDocumentProxy) {
+  const pageSizes: Array<{
+    readonly pageNumber: number;
+    readonly width: number;
+    readonly height: number;
+  }> = [];
+
+  for (let index = 0; index < document.numPages; index += 1) {
+    const pageNumber = index + 1;
+    const page = await document.getPage(pageNumber);
+    try {
+      const viewport = page.getViewport({ scale: 1 });
+      pageSizes.push({
+        pageNumber,
+        width: viewport.width,
+        height: viewport.height,
+      });
+    } finally {
+      page.cleanup();
+    }
+  }
+
+  return pageSizes;
+}
 
 export default function EditorPage() {
   const editor = useEditor();
@@ -182,6 +204,18 @@ export default function EditorPage() {
       void documentToDestroy?.destroy();
     };
   }, [setLeftPanelCollapsed]);
+
+  useEffect(() => {
+    if (editor.saveState === "saved") return;
+
+    function warnBeforeLeaving(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+
+    window.addEventListener("beforeunload", warnBeforeLeaving);
+    return () => window.removeEventListener("beforeunload", warnBeforeLeaving);
+  }, [editor.saveState]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -347,18 +381,7 @@ export default function EditorPage() {
     setId: string | null,
   ) {
     if (!setId) return [...objects];
-    const pageSizes = await Promise.all(
-      Array.from({ length: document.numPages }, async (_, index) => {
-        const pageNumber = index + 1;
-        const page = await document.getPage(pageNumber);
-        try {
-          const viewport = page.getViewport({ scale: 1 });
-          return { pageNumber, width: viewport.width, height: viewport.height };
-        } finally {
-          page.cleanup();
-        }
-      }),
-    );
+    const pageSizes = await readEditorPageSizes(document);
     return [
       ...objects.filter((object) => !object.data.pageNumberSetId),
       ...createEditorPageNumberObjects({ settings, pageSizes, setId }),
@@ -366,8 +389,12 @@ export default function EditorPage() {
   }
 
   async function loadPdfFile(file: File) {
-    if (!isPdfFile(file)) {
-      setStatusMessage("Please select a valid PDF file.");
+    try {
+      validatePdfFile(file, { maxSizeMb: plan.maxFileSizeMb });
+    } catch (error) {
+      setStatusMessage(
+        error instanceof Error ? error.message : "Please select a valid PDF file.",
+      );
       return;
     }
 
@@ -480,10 +507,6 @@ export default function EditorPage() {
     } finally {
       setLoading(false);
     }
-  }
-
-  function handleShare() {
-    setStatusMessage("Share requires a configured sharing backend.");
   }
 
   function handleUnavailableTool(message: string) {
@@ -751,19 +774,7 @@ export default function EditorPage() {
     const before = createDocumentCheckpoint(fileBytes);
     setPageActionBusy(true);
     try {
-      const pageSizes = await Promise.all(
-        Array.from({ length: editor.totalPages }, async (_, index) => {
-          const pageNumber = index + 1;
-          const page = await editor.pdfDocument?.getPage(pageNumber);
-          if (!page) throw new Error(`Unable to read page ${pageNumber}.`);
-          try {
-            const viewport = page.getViewport({ scale: 1 });
-            return { pageNumber, width: viewport.width, height: viewport.height };
-          } finally {
-            page.cleanup();
-          }
-        }),
-      );
+      const pageSizes = await readEditorPageSizes(editor.pdfDocument);
       const setId = `page-number-${Date.now()}`;
       const pageNumberObjects = createEditorPageNumberObjects({
         settings,
@@ -861,7 +872,6 @@ export default function EditorPage() {
         busyProgress={smartActivity?.progress ?? null}
         onOpenFile={openFilePicker}
         onExport={exportEditedPdf}
-        onShare={handleShare}
         onToolAction={handleToolAction}
         onUnavailableTool={handleUnavailableTool}
       />

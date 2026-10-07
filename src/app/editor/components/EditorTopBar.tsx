@@ -12,7 +12,6 @@ import {
   MoreHorizontal,
   Plus,
   ServerOff,
-  Share2,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -35,7 +34,6 @@ type EditorTopBarProps = {
   readonly busyProgress?: number | null;
   readonly onOpenFile: () => void;
   readonly onExport?: () => void;
-  readonly onShare?: () => void;
   readonly onToolAction: (toolId: EditorToolbarItemId) => void;
   readonly onUnavailableTool: (message: string) => void;
 };
@@ -148,7 +146,6 @@ export function EditorTopBar({
   busyProgress,
   onOpenFile,
   onExport,
-  onShare,
   onToolAction,
   onUnavailableTool,
 }: EditorTopBarProps) {
@@ -344,17 +341,6 @@ export function EditorTopBar({
           >
             <Download size={16} />
             <span className="hidden sm:inline">Export</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={onShare}
-            disabled={!hasDocument}
-            className="hidden h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-700 hover:border-violet-300 hover:bg-violet-50 focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:cursor-not-allowed disabled:text-slate-300 xl:inline-flex"
-            title={hasDocument ? "Share PDF" : "Open a PDF before sharing"}
-          >
-            <Share2 size={16} />
-            Share
           </button>
 
           <button

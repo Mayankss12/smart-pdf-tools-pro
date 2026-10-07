@@ -43,9 +43,6 @@ export const metadata: Metadata = {
   applicationName: "PDFMantra",
   creator: "PDFMantra",
   publisher: "PDFMantra",
-  alternates: {
-    canonical: "/",
-  },
   robots: {
     index: true,
     follow: true,

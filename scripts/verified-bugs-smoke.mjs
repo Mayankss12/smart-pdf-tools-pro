@@ -243,6 +243,10 @@ const [
 assert.match(editorPage, /recordDocumentTransaction/);
 assert.match(editorPage, /preparePdfDocument\(result\.bytes\)/);
 assert.match(editorPage, /data: bytes\.slice\(\)/);
+assert.match(editorPage, /validatePdfFile\(file, \{ maxSizeMb: plan\.maxFileSizeMb \}\)/);
+assert.match(editorPage, /window\.addEventListener\("beforeunload", warnBeforeLeaving\)/);
+assert.match(editorPage, /for \(let index = 0; index < document\.numPages; index \+= 1\)/);
+assert.doesNotMatch(editorPage, /function handleShare/);
 assert.match(editorHook, /kind: "document"/);
 assert.match(editorHook, /redoStackRef\.current = \[\]/);
 assert.match(smartTools, /findRunRef/);
@@ -254,6 +258,7 @@ assert.match(objectFrame, /aria-label=\{`\$\{toolbarLabel\} object/);
 assert.match(editorTopBar, /role="dialog"/);
 assert.match(editorTopBar, /aria-modal="true"/);
 assert.match(editorTopBar, /handleMobileDialogKeyDown/);
+assert.doesNotMatch(editorTopBar, /Share PDF|Share2|onShare/);
 assert.match(pageDialog, /invokerRef/);
 assert.match(thumbnailPanel, /IntersectionObserver/);
 assert.match(thumbnailPanel, /page\.cleanup\(\)/);
@@ -281,6 +286,10 @@ console.log(
     objectKeyboardAccessibility: "passed",
     imageRouteIdentityAndQueueLimit: "passed",
     malformedPdfReplacement: "passed",
+    entitlementFileLimit: "passed",
+    unsavedExitProtection: "passed",
+    boundedPageInspection: "passed",
+    unavailableShareControlHidden: "passed",
     translateAuthorizationAndRateLimit: "passed",
     footerAndStampFallback: "passed",
     pdfToWordHonesty: "passed",
