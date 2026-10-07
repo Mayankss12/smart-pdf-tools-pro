@@ -1,4 +1,5 @@
 import { buildToolMetadata } from "@/lib/tool-metadata";
+import { ToolGuideRouteLayout } from "@/components/ToolGuideRouteLayout";
 
 export const metadata = buildToolMetadata("pdf-to-images");
 
@@ -7,5 +8,5 @@ export default function ToolRouteLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return children;
+  return <ToolGuideRouteLayout toolId="pdf-to-images">{children}</ToolGuideRouteLayout>;
 }

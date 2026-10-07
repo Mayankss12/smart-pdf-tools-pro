@@ -21,8 +21,9 @@ const footerGroups = [
       { label: "Merge PDF", href: "/tools/merge" },
       { label: "Split PDF", href: "/tools/split" },
       { label: "Compress PDF", href: "/tools/compress" },
-      { label: "Highlight PDF", href: "/tools/highlight-pdf" },
-      { label: "Watermark PDF", href: "/tools/watermark" },
+      { label: "PDF to Word", href: "/tools/pdf-to-word" },
+      { label: "OCR PDF", href: "/tools/ocr" },
+      { label: "Protect PDF", href: "/tools/protect" },
     ],
   },
   {

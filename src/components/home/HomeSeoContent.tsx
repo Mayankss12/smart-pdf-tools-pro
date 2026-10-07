@@ -35,6 +35,18 @@ const CONTENT_GROUPS = [
       </>
     ),
   },
+  {
+    title: "Create forms and secure finished PDFs",
+    copy: (
+      <>
+        Build interactive fields with the{" "}
+        <Link href="/tools/form-creator">PDF Form Creator</Link>, compare
+        revisions with <Link href="/tools/compare">Compare PDFs</Link> and{" "}
+        <Link href="/tools/protect">password protect a PDF</Link> before
+        authorized sharing.
+      </>
+    ),
+  },
 ] as const;
 
 export function HomeSeoContent() {
@@ -58,7 +70,7 @@ export function HomeSeoContent() {
           </p>
         </div>
 
-        <div className="mt-9 grid gap-7 border-t border-slate-200 pt-8 md:grid-cols-3">
+        <div className="mt-9 grid gap-7 border-t border-slate-200 pt-8 md:grid-cols-2 lg:grid-cols-4">
           {CONTENT_GROUPS.map((group) => (
             <article key={group.title}>
               <h3 className="text-lg font-bold tracking-[-0.025em] text-slate-950">

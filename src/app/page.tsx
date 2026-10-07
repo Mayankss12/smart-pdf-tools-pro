@@ -16,9 +16,9 @@ import {
 import { getSiteUrl } from "@/lib/site-url";
 
 export const metadata: Metadata = {
-  title: "Online PDF Editor, Converter & PDF Tools",
+  title: "Online PDF Tools - Edit, Merge, Compress & Convert",
   description:
-    "Edit, merge, split, compress, sign, protect, OCR and convert PDFs online with PDFMantra. Focused browser-based tools for everyday documents.",
+    "Edit, merge, split, compress, sign, protect, OCR and convert PDF files online with practical PDFMantra tools for everyday document work.",
   keywords: [
     "online PDF editor",
     "PDF tools",
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
     canonical: "/",
   },
   openGraph: {
-    title: "PDFMantra — Online PDF Editor, Converter & PDF Tools",
+    title: "PDFMantra - Online PDF Tools for Everyday Documents",
     description:
       "Edit, organize, compress, sign, protect, OCR and convert PDFs in one focused online workspace.",
     url: "/",
@@ -43,7 +43,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "PDFMantra — Online PDF Editor & PDF Tools",
+    title: "PDFMantra - Online PDF Editor & PDF Tools",
     description:
       "Edit, merge, split, compress, sign, protect, OCR and convert PDFs online.",
   },

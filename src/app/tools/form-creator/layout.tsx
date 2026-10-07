@@ -1,4 +1,5 @@
 import { buildToolMetadata } from "@/lib/tool-metadata";
+import { ToolGuideRouteLayout } from "@/components/ToolGuideRouteLayout";
 
 export const metadata = buildToolMetadata("form-creator");
 
@@ -7,5 +8,5 @@ export default function ToolRouteLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return children;
+  return <ToolGuideRouteLayout toolId="form-creator">{children}</ToolGuideRouteLayout>;
 }
