@@ -61,16 +61,22 @@ export default function HomePage() {
         "@type": "Organization",
         "@id": `${siteUrl}/#organization`,
         name: "PDFMantra",
+        alternateName: ["PDF Mantra", "PDFMantra PDF Tools"],
         url: siteUrl,
         logo: `${siteUrl}/icon.svg`,
+        disambiguatingDescription:
+          "PDFMantra is PDF productivity software for working with user-provided documents online.",
       },
       {
         "@type": "WebSite",
         "@id": `${siteUrl}/#website`,
         name: "PDFMantra",
+        alternateName: "PDFMantra PDF Tools",
         url: siteUrl,
         description:
           "An online workspace for editing, organizing, converting, signing, protecting and searching PDF documents.",
+        disambiguatingDescription:
+          "PDFMantra is an online PDF software application, not a document-download or religious-text library.",
         publisher: { "@id": `${siteUrl}/#organization` },
       },
       {
@@ -83,6 +89,15 @@ export default function HomePage() {
         browserRequirements: "Requires a modern web browser",
         description:
           "Online PDF editing, organization, conversion, signing, security and OCR tools.",
+        disambiguatingDescription:
+          "A browser-based PDF productivity application for editing and processing documents supplied by the user.",
+        featureList: [
+          "Edit PDF documents",
+          "Merge, split and organize PDF pages",
+          "Compress and convert PDF files",
+          "Fill, sign and protect PDFs",
+          "Run OCR on scanned PDFs",
+        ],
       },
       {
         "@type": "ItemList",

@@ -13,6 +13,8 @@ const [
   ocrPage,
   officePage,
   sitemapSource,
+  homepageSource,
+  aboutPage,
 ] = await Promise.all([
   read("src/app/layout.tsx"),
   read("src/lib/tool-guides.ts"),
@@ -22,6 +24,8 @@ const [
   read("src/app/tools/ocr/page.tsx"),
   read("src/components/PdfOfficeConversionPage.tsx"),
   read("src/app/sitemap.ts"),
+  read("src/app/page.tsx"),
+  read("src/app/about/page.tsx"),
 ]);
 
 assert.match(rootLayout, /verification:\s*\{\s*google:/s);
@@ -52,6 +56,9 @@ assert.match(officePage, /TOOL_GUIDES\["pdf-to-word"\]/);
 
 assert.match(sitemapSource, /"\/editor"/);
 assert.match(sitemapSource, /getPublicSitemapTools/);
+assert.match(homepageSource, /disambiguatingDescription/);
+assert.match(homepageSource, /PDF productivity software/);
+assert.match(aboutPage, /not a library of downloadable books or religious texts/);
 
 console.log(
   JSON.stringify({
@@ -63,5 +70,6 @@ console.log(
     sitemapCoverage: "passed",
     webAnalytics: "enabled",
     speedInsights: "enabled",
+    brandDisambiguation: "passed",
   }),
 );

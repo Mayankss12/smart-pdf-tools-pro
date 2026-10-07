@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Header } from "@/components/Header";
 import {
@@ -9,6 +10,15 @@ import {
   Sparkles,
   Target,
 } from "lucide-react";
+
+export const metadata: Metadata = {
+  title: "About PDFMantra Online PDF Software",
+  description:
+    "PDFMantra is an online PDF productivity workspace for editing, organizing, converting, signing, protecting and searching user-provided documents.",
+  alternates: {
+    canonical: "/about",
+  },
+};
 
 const principles = [
   {
@@ -59,6 +69,9 @@ export default function AboutPage() {
 
               <p className="mt-4 max-w-3xl text-[15px] font-normal leading-7 text-[var(--text-secondary)] sm:text-base">
                 PDFMantra is a focused PDF workspace for people who want tools that look clear, work with purpose, and make document tasks easier to understand.
+              </p>
+              <p className="mt-3 max-w-3xl text-sm font-normal leading-7 text-[var(--text-secondary)]">
+                It is interactive PDF productivity software for documents you provide—not a library of downloadable books or religious texts.
               </p>
 
               <div className="mt-7 flex flex-col gap-3 sm:flex-row">
