@@ -4,7 +4,6 @@ import {
 } from "@/lib/conversions/registry";
 import {
   getToolById,
-  tools,
   type Tool,
 } from "@/lib/tools";
 import {
@@ -51,49 +50,22 @@ export const HOMEPAGE_TO_PDF_IDS = [
   "webpage-to-pdf",
 ] as const;
 
-export const HOMEPAGE_TOOL_GRID_ORDER_IDS = [
+export const HOMEPAGE_FEATURED_TOOL_IDS = [
   "pdf-editor",
-  "compare-pdf",
-  "form-creator",
   "merge-pdf",
   "split-pdf",
   "compress-pdf",
   "fill-sign",
+  "pdf-to-word",
   "pdf-to-images",
   "images-to-pdf",
+  "jpg-to-pdf",
   "pdf-to-searchable-pdf",
-  "pdfa-preflight",
+  "compare-pdf",
+  "form-creator",
   "reorder-pages",
   "rotate-pdf",
-  "delete-pages",
-  "extract-pages",
-  "page-numbers",
-  "watermark-pdf",
   "protect-pdf",
-  "unlock-pdf",
-  "redact-pdf",
-  "crop-pdf",
-  "flatten-pdf",
-  "repair-pdf",
-  "pdf-metadata",
-  "bates-numbering",
-  "advanced-split",
-  "batch-workflows",
-  "sign-pdf",
-  "annotate-pdf",
-  "highlight-pdf",
-  "pdf-to-text",
-  "pdf-to-html",
-  "pdf-to-jpg",
-  "pdf-to-png",
-  "pdf-to-webp",
-  "jpg-to-pdf",
-  "png-to-pdf",
-  "webp-to-pdf",
-  "txt-to-pdf",
-  "markdown-to-pdf",
-  "html-to-pdf",
-  "csv-to-pdf",
 ] as const;
 
 export type ToolDiscoveryGroupId =
@@ -307,34 +279,14 @@ export function resolveHomepageConversions(
 export function getHomepageToolGridTools(
   capabilitySnapshot: PublicLaunchCapabilitySnapshot,
 ) {
-  const seen = new Set<string>();
-  const launchReadyTools = tools.filter((tool) => {
-    if (
-      !tool.visibility.searchable ||
-      seen.has(tool.id) ||
-      !isToolPubliclyLaunchReady(tool, capabilitySnapshot)
-    ) {
-      return false;
-    }
-    seen.add(tool.id);
-    return true;
-  });
-  const launchReadyById = new Map(
-    launchReadyTools.map((tool) => [tool.id, tool]),
+  return resolveHomepageTools(
+    HOMEPAGE_FEATURED_TOOL_IDS,
+    "HOMEPAGE_FEATURED_TOOL_IDS",
+  ).filter(
+    (tool) =>
+      tool.visibility.searchable &&
+      isToolPubliclyLaunchReady(tool, capabilitySnapshot),
   );
-  const orderedTools = resolveHomepageTools(
-    HOMEPAGE_TOOL_GRID_ORDER_IDS,
-    "HOMEPAGE_TOOL_GRID_ORDER_IDS",
-  ).flatMap((tool) => {
-    const launchReadyTool = launchReadyById.get(tool.id);
-    return launchReadyTool ? [launchReadyTool] : [];
-  });
-  const orderedIds = new Set(orderedTools.map((tool) => tool.id));
-
-  return [
-    ...orderedTools,
-    ...launchReadyTools.filter((tool) => !orderedIds.has(tool.id)),
-  ];
 }
 
 export function matchesHomepageToolQuery(tool: Tool, query: string) {
@@ -499,8 +451,8 @@ export function assertHomepageCuratedIds(
     "HOMEPAGE_POPULAR_TOOL_IDS",
   );
   resolveHomepageTools(
-    HOMEPAGE_TOOL_GRID_ORDER_IDS,
-    "HOMEPAGE_TOOL_GRID_ORDER_IDS",
+    HOMEPAGE_FEATURED_TOOL_IDS,
+    "HOMEPAGE_FEATURED_TOOL_IDS",
   );
   resolveHomepageConversions(
     HOMEPAGE_FROM_PDF_IDS,

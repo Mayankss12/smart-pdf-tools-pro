@@ -12,9 +12,11 @@ import {
   splitPdfByApproximateSize,
   updatePdfMetadata,
 } from "../src/lib/pdf-stage-one.ts";
-import { getHomepageToolGridTools } from "../src/lib/home/homepage-tools.ts";
 import { getPublicLaunchCapabilitySnapshot } from "../src/lib/public-launch-snapshot.ts";
-import { isToolPubliclyLaunchReady } from "../src/lib/public-launch.ts";
+import {
+  getPublicToolsDirectory,
+  isToolPubliclyLaunchReady,
+} from "../src/lib/public-launch.ts";
 import { sanitizeTelemetryPayload } from "../src/lib/telemetry.ts";
 import { getToolById } from "../src/lib/tools.ts";
 
@@ -95,14 +97,16 @@ const stageOneIds = [
   "batch-workflows",
 ];
 const snapshot = getPublicLaunchCapabilitySnapshot();
-const homepageIds = new Set(getHomepageToolGridTools(snapshot).map((tool) => tool.id));
+const directoryIds = new Set(
+  getPublicToolsDirectory(snapshot).map((tool) => tool.id),
+);
 for (const id of stageOneIds) {
   const tool = getToolById(id);
   assert.ok(tool, `Missing Stage 1 tool ${id}`);
   assert.equal(tool.status, "working");
   assert.equal(tool.capabilities.processingMode, "browser");
   assert.equal(isToolPubliclyLaunchReady(tool, snapshot), true);
-  assert.equal(homepageIds.has(id), true);
+  assert.equal(directoryIds.has(id), true);
 }
 
 const telemetry = sanitizeTelemetryPayload({

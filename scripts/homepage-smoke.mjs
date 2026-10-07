@@ -12,16 +12,13 @@ import {
   getHomepageToolGridTools,
   getToolDiscoveryGroups,
   HOMEPAGE_FAQS,
+  HOMEPAGE_FEATURED_TOOL_IDS,
   HOMEPAGE_FROM_PDF_IDS,
   HOMEPAGE_PENDING_CONVERSION_IDS,
-  HOMEPAGE_TOOL_GRID_ORDER_IDS,
   HOMEPAGE_TO_PDF_IDS,
   matchesHomepageToolQuery,
 } from "../src/lib/home/homepage-tools.ts";
-import {
-  getPublicLaunchReadyTools,
-  isToolPubliclyLaunchReady,
-} from "../src/lib/public-launch.ts";
+import { isToolPubliclyLaunchReady } from "../src/lib/public-launch.ts";
 import { getPublicLaunchCapabilitySnapshot } from "../src/lib/public-launch-snapshot.ts";
 import { getToolById } from "../src/lib/tools.ts";
 
@@ -35,34 +32,25 @@ assert.doesNotThrow(() => assertHomepageCuratedIds(snapshot));
 assert.doesNotThrow(() => assertToolDiscoveryModel(snapshot));
 
 const gridTools = getHomepageToolGridTools(snapshot);
-const publicTools = getPublicLaunchReadyTools(snapshot).filter(
-  (tool) => tool.visibility.searchable,
-);
-assert.ok(gridTools.length > 0);
+assert.equal(gridTools.length, 15);
 assert.equal(new Set(gridTools.map((tool) => tool.id)).size, gridTools.length);
 assert.deepEqual(
-  new Set(gridTools.map((tool) => tool.id)),
-  new Set(publicTools.map((tool) => tool.id)),
-  "The homepage grid must cover every searchable launch-ready tool exactly once",
+  gridTools.map((tool) => tool.id),
+  [...HOMEPAGE_FEATURED_TOOL_IDS],
+  "The homepage must show the curated 15 most-used tools in order",
 );
 assert.ok(
   gridTools.every((tool) => isToolPubliclyLaunchReady(tool, snapshot)),
 );
-for (const id of LOCAL_BROWSER_CONVERSION_IDS) {
-  assert.ok(
-    gridTools.some((tool) => tool.id === id),
-    `Homepage grid is missing local Office conversion ${id}`,
-  );
-}
 assert.deepEqual(
   gridTools.filter((tool) => pendingIds.has(tool.id)),
   [],
   "Pending provider conversions must not enter the plain homepage grid",
 );
 
-const curatedGridIds = new Set(HOMEPAGE_TOOL_GRID_ORDER_IDS);
-assert.equal(curatedGridIds.size, HOMEPAGE_TOOL_GRID_ORDER_IDS.length);
-for (const id of HOMEPAGE_TOOL_GRID_ORDER_IDS) {
+const curatedGridIds = new Set(HOMEPAGE_FEATURED_TOOL_IDS);
+assert.equal(curatedGridIds.size, HOMEPAGE_FEATURED_TOOL_IDS.length);
+for (const id of HOMEPAGE_FEATURED_TOOL_IDS) {
   assert.ok(getToolById(id), `Unknown curated homepage grid ID: ${id}`);
 }
 
@@ -186,6 +174,7 @@ const sources = await Promise.all(
     "../src/app/page.tsx",
     "../src/components/home/HomeHero.tsx",
     "../src/components/home/HomeToolsGrid.tsx",
+    "../src/components/home/HomeSeoContent.tsx",
     "../src/components/home/EditorShowcase.tsx",
     "../src/components/home/ProcessingPrivacy.tsx",
     "../src/components/home/HomeFaq.tsx",
@@ -200,6 +189,7 @@ const [
   pageSource,
   heroSource,
   gridSource,
+  seoSource,
   editorSource,
   privacySource,
   faqSource,
@@ -213,6 +203,7 @@ const homepageSource = [
   pageSource,
   heroSource,
   gridSource,
+  seoSource,
   editorSource,
   privacySource,
   faqSource,
@@ -221,21 +212,30 @@ const homepageSource = [
 assert.doesNotMatch(pageSource.trimStart(), /^["']use client["']/);
 assert.match(pageSource, /getHomepageCapabilitySnapshot/);
 assert.match(pageSource, /<HomeToolsGrid capabilities=\{capabilities\}/);
+assert.match(pageSource, /<HomeSeoContent \/>/);
 assert.match(pageSource, /assertHomepageCuratedIds\(capabilities\)/);
 assert.doesNotMatch(pageSource, /PopularTools|ToolExplorer|ConversionHub/);
 assert.doesNotMatch(heroSource, /SmartFileEntry|Jump straight to|quickActions/);
-assert.match(heroSource, /Every PDF tool you need/);
-assert.doesNotMatch(heroSource, /Browse PDF tools|ArrowDown/);
+assert.match(heroSource, /Documents,/);
+assert.match(heroSource, /beautifully\./);
+assert.match(heroSource, /home-document-art/);
+assert.match(heroSource, /Choose a PDF/);
+assert.match(heroSource, /Explore popular tools/);
 assert.doesNotMatch(gridSource.trimStart(), /^["']use client["']/);
-assert.doesNotMatch(gridSource, /<ArrowRight|,\s*ArrowRight/);
 assert.doesNotMatch(gridSource, /home-tool-search|Search tools|Full directory/);
 assert.doesNotMatch(gridSource, /\{tool\.description\}|\{tool\.menuDescription\}/);
 assert.match(gridSource, /grid-cols-2/);
-assert.match(gridSource, /xl:grid-cols-6/);
-assert.match(gridSource, />\s*PDF tools\s*</);
+assert.match(gridSource, /lg:grid-cols-5/);
+assert.doesNotMatch(gridSource, /xl:grid-cols-6/);
+assert.match(gridSource, /Most-used PDF tools/);
+assert.match(gridSource, /href="\/tools"/);
 assert.doesNotMatch(gridSource, /role="tablist"|role="tab"|role="tabpanel"/);
 assert.doesNotMatch(gridSource, /toolCategory|pushState|popstate/);
 assert.match(gridSource, /getHomepageToolGridTools/);
+assert.match(seoSource, /Online PDF tools for everyday document work/);
+assert.match(seoSource, /href="\/editor"/);
+assert.match(pageSource, /application\/ld\+json/);
+assert.match(pageSource, /"@type": "WebApplication"/);
 assert.doesNotMatch(homepageSource, /pdfjs-dist|tesseract/i);
 assert.doesNotMatch(homepageSource, /Backend required/i);
 

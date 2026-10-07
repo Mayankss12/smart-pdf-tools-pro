@@ -13,6 +13,7 @@ import {
   validateProtectPassword,
 } from "../src/lib/pdf-security.ts";
 import { getHomepageToolGridTools } from "../src/lib/home/homepage-tools.ts";
+import { getPublicToolsDirectory } from "../src/lib/public-launch.ts";
 import { getPublicLaunchCapabilitySnapshot } from "../src/lib/public-launch-snapshot.ts";
 import { getToolById } from "../src/lib/tools.ts";
 
@@ -144,13 +145,16 @@ for (const id of ["protect-pdf", "unlock-pdf"]) {
   assert.equal(tool.capabilities.needsBackendProcessing, false);
 }
 
+const capabilitySnapshot = getPublicLaunchCapabilitySnapshot();
 const homepageToolIds = new Set(
-  getHomepageToolGridTools(getPublicLaunchCapabilitySnapshot()).map(
-    (tool) => tool.id,
-  ),
+  getHomepageToolGridTools(capabilitySnapshot).map((tool) => tool.id),
 );
 assert.equal(homepageToolIds.has("protect-pdf"), true);
-assert.equal(homepageToolIds.has("unlock-pdf"), true);
+const publicDirectoryIds = new Set(
+  getPublicToolsDirectory(capabilitySnapshot).map((tool) => tool.id),
+);
+assert.equal(publicDirectoryIds.has("protect-pdf"), true);
+assert.equal(publicDirectoryIds.has("unlock-pdf"), true);
 
 const vendoredWasm = await readFile(
   new URL("../public/pdf-security/qpdf.wasm", import.meta.url),

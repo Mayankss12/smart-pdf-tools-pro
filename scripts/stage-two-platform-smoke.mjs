@@ -4,7 +4,6 @@ import { readFile } from "node:fs/promises";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 
 import { canUseToolByTier } from "../src/lib/entitlements.ts";
-import { getHomepageToolGridTools } from "../src/lib/home/homepage-tools.ts";
 import { compareTextContent } from "../src/lib/pdf-compare-engine.ts";
 import {
   inspectPdfaReadiness,
@@ -13,7 +12,10 @@ import {
 } from "../src/lib/pdfa-engine.ts";
 import { createEditorFormFields } from "../src/lib/pdf-tools/editor-form-engine.ts";
 import { getEditorPageGeometry } from "../src/lib/pdf-tools/editor-page-geometry.ts";
-import { isToolPubliclyLaunchReady } from "../src/lib/public-launch.ts";
+import {
+  getPublicToolsDirectory,
+  isToolPubliclyLaunchReady,
+} from "../src/lib/public-launch.ts";
 import { getPublicLaunchCapabilitySnapshot } from "../src/lib/public-launch-snapshot.ts";
 import { getToolById } from "../src/lib/tools.ts";
 
@@ -87,7 +89,9 @@ assert.equal(formReloaded.getForm().getFields().length, 2);
 assert.equal(formReloaded.getForm().getTextField("CustomerName").isRequired(), true);
 
 const snapshot = getPublicLaunchCapabilitySnapshot();
-const homepageIds = new Set(getHomepageToolGridTools(snapshot).map((tool) => tool.id));
+const directoryIds = new Set(
+  getPublicToolsDirectory(snapshot).map((tool) => tool.id),
+);
 const stageTwoIds = ["compare-pdf", "form-creator", "pdfa-preflight"];
 for (const id of stageTwoIds) {
   const tool = getToolById(id);
@@ -95,7 +99,7 @@ for (const id of stageTwoIds) {
   assert.equal(tool.status, "working");
   assert.equal(tool.capabilities.processingMode, "browser");
   assert.equal(isToolPubliclyLaunchReady(tool, snapshot), true);
-  assert.equal(homepageIds.has(id), true);
+  assert.equal(directoryIds.has(id), true);
 }
 
 for (const toolKey of ["compare", "pdfa", "form-creator"]) {

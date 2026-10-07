@@ -12,12 +12,12 @@ export function ProcessingPrivacy() {
             </span>
             <div>
               <h2 className="text-xl font-bold tracking-[-0.03em] text-slate-950 sm:text-2xl">
-                Your document stays with you
+                Clear processing, before you begin
               </h2>
               <p className="mt-2 text-sm leading-7 text-slate-600">
-                The tools shown on this page process documents locally in your
-                browser. There is no software to install, and each workflow
-                explains its limits before you export.
+                Many PDFMantra tools work locally in your browser. Advanced
+                conversions that need secure server processing explain it in
+                the workflow before your document is processed.
               </p>
             </div>
           </div>
