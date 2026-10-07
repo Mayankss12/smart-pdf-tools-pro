@@ -16,6 +16,7 @@ import {
 import { PDFDocument } from "pdf-lib";
 
 import { Header } from "@/components/Header";
+import { ToolSeoGuide } from "@/components/ToolSeoGuide";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import { prepareEntitledExport } from "@/lib/export-entitlement";
 import { formatFileSize, safeFileBaseName } from "@/lib/pdf-engine";
@@ -25,6 +26,7 @@ import {
   type PdfOfficeFormat,
 } from "@/lib/conversions/pdf-office-engine";
 import type { OcrLanguage, OcrQuality } from "@/lib/pdf-ocr-engine";
+import { TOOL_GUIDES } from "@/lib/tool-guides";
 
 type UiState =
   | "idle"
@@ -323,6 +325,9 @@ export function PdfOfficeConversionPage({
             </aside>
           </div>
         </section>
+        {format === "docx" ? (
+          <ToolSeoGuide guide={TOOL_GUIDES["pdf-to-word"]} />
+        ) : null}
       </main>
     </>
   );

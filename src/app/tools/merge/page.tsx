@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 
 import { Header } from "@/components/Header";
+import { ToolSeoGuide } from "@/components/ToolSeoGuide";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import {
   PdfEngineError,
@@ -39,6 +40,7 @@ import {
   type PdfProcessingResult,
 } from "@/lib/pdf-engine";
 import { confirmPdfCompatibility } from "@/lib/pdf-document-safety";
+import { TOOL_GUIDES } from "@/lib/tool-guides";
 
 type MergeQueueItem = {
   id: string;
@@ -949,6 +951,7 @@ export default function MergePage() {
               : status}
           </div>
         </section>
+        <ToolSeoGuide guide={TOOL_GUIDES["merge-pdf"]} />
       </main>
     </>
   );

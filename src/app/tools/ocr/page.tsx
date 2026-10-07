@@ -14,6 +14,7 @@ import {
 import { PDFDocument } from "pdf-lib";
 
 import { Header } from "@/components/Header";
+import { ToolSeoGuide } from "@/components/ToolSeoGuide";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import { prepareEntitledExport } from "@/lib/export-entitlement";
 import { formatFileSize, safeFileBaseName } from "@/lib/pdf-engine";
@@ -27,6 +28,7 @@ import type {
   OcrPreprocessMode,
   OcrQuality,
 } from "@/lib/pdf-ocr-engine";
+import { TOOL_GUIDES } from "@/lib/tool-guides";
 
 type TargetMode = "all" | "current";
 
@@ -421,6 +423,7 @@ export default function OcrPdfPage() {
             </aside>
           </div>
         </section>
+        <ToolSeoGuide guide={TOOL_GUIDES["pdf-to-searchable-pdf"]} />
       </main>
     </>
   );

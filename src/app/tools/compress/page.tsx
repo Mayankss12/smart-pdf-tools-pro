@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 
 import { Header } from "@/components/Header";
+import { ToolSeoGuide } from "@/components/ToolSeoGuide";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import {
   useCompress,
@@ -33,6 +34,7 @@ import {
 } from "@/hooks/useCompress";
 import { readValidatedPdfBytes } from "@/lib/pdf-document-safety";
 import { formatFileSize, validatePdfFile } from "@/lib/pdf-engine";
+import { TOOL_GUIDES } from "@/lib/tool-guides";
 
 type OpenPanel = "level" | "target" | "help" | null;
 
@@ -741,6 +743,7 @@ export default function CompressPage() {
               : status}
           </div>
         </section>
+        <ToolSeoGuide guide={TOOL_GUIDES["compress-pdf"]} />
       </main>
     </>
   );

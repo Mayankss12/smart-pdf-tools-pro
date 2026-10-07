@@ -29,6 +29,7 @@ const suites = [
   "pdf-to-images-smoke.mjs",
   "pro-comparison-smoke.mjs",
   "saved-signatures-smoke.mjs",
+  "search-readiness-smoke.mjs",
   "standalone-overlay-smoke.mjs",
   "stage-one-platform-smoke.mjs",
   "stage-two-platform-smoke.mjs",

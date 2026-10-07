@@ -43,6 +43,9 @@ export const metadata: Metadata = {
   applicationName: "PDFMantra",
   creator: "PDFMantra",
   publisher: "PDFMantra",
+  verification: {
+    google: "ZLJyGy3l5VBH6-AK-RcwZJ6CSQmzHDJV4BAMVo_JZuw",
+  },
   robots: {
     index: true,
     follow: true,
