@@ -12,7 +12,6 @@ import { PdfEngineError } from "./pdf-errors";
 export type PdfCompatibilityFeature =
   | "acroform"
   | "digital-signature"
-  | "outlines"
   | "attachments"
   | "portfolio"
   | "xmp"
@@ -233,13 +232,6 @@ export async function inspectPdfCompatibility(
       severity: "warning",
       message:
         "Interactive form fields may be removed or become non-interactive when pages are rebuilt.",
-    });
-  }
-  if (hasOutlines) {
-    issues.push({
-      feature: "outlines",
-      severity: "warning",
-      message: "Bookmarks and document outlines are not preserved by page-copy rebuilding.",
     });
   }
   if (hasAttachments) {

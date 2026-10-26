@@ -3,6 +3,12 @@ import { degrees, PDFDocument } from "pdf-lib";
 
 import { PdfEngineError } from "@/lib/pdf-errors";
 import { readValidatedPdfBytes } from "@/lib/pdf-document-safety";
+import {
+  createBrowserImageCodec,
+  downsamplePdfImages,
+  type ImageDownsampleProfile,
+  type ImageResampleCodec,
+} from "@/lib/pdf-image-downsample";
 import { configurePdfJsWorker } from "@/lib/pdfjs-worker";
 
 if (typeof window !== "undefined") {
@@ -55,6 +61,13 @@ const LEVEL_CONFIG: Record<
   low: { scale: 2, quality: 0.94 },
   medium: { scale: 1.5, quality: 0.84 },
   high: { scale: 1.15, quality: 0.7 },
+};
+
+// Preserve Text mode only resamples embedded photos that exceed these DPIs.
+const STRUCTURAL_IMAGE_PROFILES: Record<CompressionLevel, ImageDownsampleProfile> = {
+  low: { maxDpi: 220, jpegQuality: 0.9 },
+  medium: { maxDpi: 150, jpegQuality: 0.82 },
+  high: { maxDpi: 110, jpegQuality: 0.72 },
 };
 
 const MAX_CANVAS_PIXELS = 40_000_000;
@@ -161,11 +174,13 @@ function clearMetadata(pdf: PDFDocument) {
   pdf.setProducer("PDFMantra");
 }
 
-async function structurallyCompress(
+export async function structurallyCompress(
   bytes: Uint8Array,
+  level: CompressionLevel,
   removeMetadata: boolean,
   signal: AbortSignal | undefined,
   onProgress: PdfCompressionOptions["onProgress"],
+  codec: ImageResampleCodec = createBrowserImageCodec(),
 ) {
   throwIfAborted(signal);
   report(onProgress, {
@@ -180,6 +195,14 @@ async function structurallyCompress(
     );
   }
   if (removeMetadata) clearMetadata(pdf);
+  await downsamplePdfImages(pdf, STRUCTURAL_IMAGE_PROFILES[level], codec, {
+    signal,
+    onImage: (completed, total) =>
+      report(onProgress, {
+        percent: Math.round((completed / total) * 90),
+        message: `Resampled oversized image ${completed} of ${total}.`,
+      }),
+  });
   throwIfAborted(signal);
   return pdf.save({
     useObjectStreams: true,
@@ -368,6 +391,7 @@ export async function compressPdf(
     method === "structural"
       ? await structurallyCompress(
           bytes,
+          options.level,
           Boolean(options.removeMetadata),
           options.signal,
           options.onProgress,

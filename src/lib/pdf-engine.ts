@@ -4,6 +4,7 @@ import {
   readValidatedPdfBytes,
 } from "@/lib/pdf-document-safety";
 import { PdfEngineError } from "@/lib/pdf-errors";
+import { copyPdfOutlines, type PdfOutlineCopySource } from "@/lib/pdf-outline";
 
 export { PdfEngineError } from "@/lib/pdf-errors";
 export type { PdfEngineErrorCode } from "@/lib/pdf-errors";
@@ -177,6 +178,7 @@ export async function mergePdfFiles(
   }
 
   const outputPdf = await PDFDocument.create();
+  const outlineSources: PdfOutlineCopySource[] = [];
   let originalSize = 0;
 
   for (let index = 0; index < files.length; index += 1) {
@@ -186,10 +188,14 @@ export async function mergePdfFiles(
     if (outputPdf.getPageCount() === 0) {
       copyPdfDocumentMetadata(sourcePdf, outputPdf);
     }
-    const copiedPages = await outputPdf.copyPages(sourcePdf, sourcePdf.getPageIndices());
+    const sourcePageIndices = sourcePdf.getPageIndices();
+    const copiedPages = await outputPdf.copyPages(sourcePdf, sourcePageIndices);
     copiedPages.forEach((page) => outputPdf.addPage(page));
+    outlineSources.push({ source: sourcePdf, sourcePageIndices, copiedPages });
     onProgress?.({ completed: index + 1, total: files.length });
   }
+
+  copyPdfOutlines(outputPdf, outlineSources);
 
   return savePdfResult(outputPdf, originalSize, "PDFMantra-merged.pdf");
 }
@@ -255,12 +261,11 @@ export async function splitPdfIntoGroups(
     const group = groups[index];
     const outputPdf = await PDFDocument.create();
     copyPdfDocumentMetadata(sourcePdf, outputPdf);
-    const copiedPages = await outputPdf.copyPages(
-      sourcePdf,
-      group.pages.map((pageNumber) => pageNumber - 1),
-    );
+    const sourcePageIndices = group.pages.map((pageNumber) => pageNumber - 1);
+    const copiedPages = await outputPdf.copyPages(sourcePdf, sourcePageIndices);
 
     copiedPages.forEach((page) => outputPdf.addPage(page));
+    copyPdfOutlines(outputPdf, [{ source: sourcePdf, sourcePageIndices, copiedPages }]);
 
     results.push(
       await savePdfResult(

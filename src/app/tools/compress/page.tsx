@@ -57,21 +57,21 @@ const LEVELS: LevelOption[] = [
     value: "low",
     label: "High Quality",
     shortLabel: "Quality",
-    desc: "Scan mode: about 144 DPI at 94% JPEG quality.",
+    desc: "Preserve Text: photos above 220 DPI are resampled. Scan: about 144 DPI at 94% JPEG quality.",
     badge: "Best quality",
   },
   {
     value: "medium",
     label: "Balanced",
     shortLabel: "Balanced",
-    desc: "Scan mode: about 108 DPI at 84% JPEG quality.",
+    desc: "Preserve Text: photos above 150 DPI are resampled. Scan: about 108 DPI at 84% JPEG quality.",
     badge: "Recommended",
   },
   {
     value: "high",
     label: "Smallest Size",
     shortLabel: "Small",
-    desc: "Scan mode: about 83 DPI at 70% JPEG quality.",
+    desc: "Preserve Text: photos above 110 DPI are resampled. Scan: about 83 DPI at 70% JPEG quality.",
     badge: "Max reduction",
   },
 ];
@@ -98,7 +98,7 @@ const COMPRESSION_MODES: readonly {
   {
     value: "structural",
     label: "Preserve Text",
-    description: "Keep selectable text, vectors, links, forms, dimensions, and rotation.",
+    description: "Keep selectable text, vectors, links, forms, dimensions, and rotation. Only oversized photos are resampled.",
   },
   {
     value: "scan",

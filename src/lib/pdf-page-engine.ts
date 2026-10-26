@@ -8,6 +8,19 @@ import {
   type PdfProcessingResult,
 } from "@/lib/pdf-engine";
 import { copyPdfDocumentMetadata } from "@/lib/pdf-document-safety";
+import { copyPdfOutlines } from "@/lib/pdf-outline";
+
+async function copyPagesWithOutline(
+  sourcePdf: PDFDocument,
+  sourcePageIndices: number[],
+) {
+  const outputPdf = await PDFDocument.create();
+  copyPdfDocumentMetadata(sourcePdf, outputPdf);
+  const copiedPages = await outputPdf.copyPages(sourcePdf, sourcePageIndices);
+  copiedPages.forEach((page) => outputPdf.addPage(page));
+  copyPdfOutlines(outputPdf, [{ source: sourcePdf, sourcePageIndices, copiedPages }]);
+  return outputPdf;
+}
 
 function uniqueSortedPageNumbers(pageNumbers: number[]) {
   return Array.from(new Set(pageNumbers)).sort((a, b) => a - b);
@@ -63,10 +76,7 @@ export async function deletePdfPages(
     .getPageIndices()
     .filter((pageIndex) => !deleteSet.has(pageIndex + 1));
 
-  const outputPdf = await PDFDocument.create();
-  copyPdfDocumentMetadata(sourcePdf, outputPdf);
-  const copiedPages = await outputPdf.copyPages(sourcePdf, pagesToKeep);
-  copiedPages.forEach((page) => outputPdf.addPage(page));
+  const outputPdf = await copyPagesWithOutline(sourcePdf, pagesToKeep);
 
   return savePdfResult(outputPdf, file.size, createPdfFileName("deleted-pages", file.name));
 }
@@ -81,13 +91,10 @@ export async function extractPdfPages(
 
   validatePageNumbers(cleanExtractPages, totalPages);
 
-  const outputPdf = await PDFDocument.create();
-  copyPdfDocumentMetadata(sourcePdf, outputPdf);
-  const copiedPages = await outputPdf.copyPages(
+  const outputPdf = await copyPagesWithOutline(
     sourcePdf,
     cleanExtractPages.map((pageNumber) => pageNumber - 1),
   );
-  copiedPages.forEach((page) => outputPdf.addPage(page));
 
   return savePdfResult(outputPdf, file.size, createPdfFileName("extracted-pages", file.name));
 }
@@ -101,13 +108,10 @@ export async function reorderPdfPages(
 
   validateFullPageOrder(pageOrder, totalPages);
 
-  const outputPdf = await PDFDocument.create();
-  copyPdfDocumentMetadata(sourcePdf, outputPdf);
-  const copiedPages = await outputPdf.copyPages(
+  const outputPdf = await copyPagesWithOutline(
     sourcePdf,
     pageOrder.map((pageNumber) => pageNumber - 1),
   );
-  copiedPages.forEach((page) => outputPdf.addPage(page));
 
   return savePdfResult(outputPdf, file.size, createPdfFileName("reordered", file.name));
 }
