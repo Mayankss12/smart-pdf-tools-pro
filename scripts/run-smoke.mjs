@@ -23,6 +23,7 @@ const suites = [
   "launch-readiness.mjs",
   "office-conversions-smoke.mjs",
   "page-scoped-object-controls-smoke.mjs",
+  "pdf-fidelity-smoke.mjs",
   "pdf-rebuild-safety-smoke.mjs",
   "pdf-security-smoke.mjs",
   "production-assurance-smoke.mjs",

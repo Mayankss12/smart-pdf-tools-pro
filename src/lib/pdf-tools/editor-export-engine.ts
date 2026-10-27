@@ -1,4 +1,4 @@
-import { PDFDocument, rgb, type PDFPage } from "pdf-lib";
+import { PDFDocument, PDFString, rgb, type PDFPage } from "pdf-lib";
 import type { ExistingTextEditSource } from "../editor/existing-text-edit";
 import type { BundledUnicodeFontBytes } from "../pdf-unicode-fonts";
 import type { OcrResult } from "../pdf-ocr-engine";
@@ -19,8 +19,23 @@ import { drawEditorImageObject } from "./editor-image-engine";
 import { appendEditorLinkAnnotation } from "./editor-link-engine";
 import { drawEditorNoteObject } from "./editor-note-engine";
 import { drawEditorSignatureObject } from "./editor-signature-engine";
-import { drawEditorShapeObject } from "./editor-shape-engine";
-import { drawEditorDrawObject } from "./editor-draw-engine";
+import {
+  drawEditorShapeObject,
+  getEditorShapeLineEndpoints,
+  getEditorShapeType,
+} from "./editor-shape-engine";
+import {
+  drawEditorDrawObject,
+  getEditorDrawStrokePoints,
+} from "./editor-draw-engine";
+import {
+  appendEditorMarkupAnnotation,
+  getEditorAnnotationQuadPoints,
+  toEditorAnnotationColor,
+  toEditorAnnotationText,
+  type EditorAnnotationEntries,
+  type EditorAnnotationPointMapper,
+} from "./editor-annotation-engine";
 import { drawEditorGeneratedStamp } from "./editor-stamp-engine";
 import type {
   EditorStampFormat,
@@ -86,7 +101,14 @@ export type EditorExportOcrPage = {
   readonly result: OcrResult;
 };
 
+// "annotations" keeps highlights, notes, shapes and ink editable in other PDF
+// apps; "flatten" paints them into the page content.
+export type EditorMarkupExportMode = "annotations" | "flatten";
+
 const DEFAULT_HIGHLIGHT_COLOR = "#fde047";
+const DEFAULT_NOTE_COLOR = "#fef3c7";
+const DEFAULT_STROKE_COLOR = "#111827";
+const ANNOTATION_PADDING = 8;
 
 export function safeEditedName(fileName: string) {
   const cleanName = fileName.replace(/\.pdf$/i, "");
@@ -221,6 +243,100 @@ async function drawEditorObject({
   }
 }
 
+function isMarkupAnnotationObject(object: EditorExportObject) {
+  if (object.data.linkUrl) return false;
+  if (object.type === "shape") return !object.data.formField;
+
+  return (
+    object.type === "highlight" ||
+    object.type === "note" ||
+    object.type === "draw"
+  );
+}
+
+function getMarkupAnnotationSpec(
+  object: EditorExportObject,
+): {
+  readonly subtype: "Highlight" | "FreeText" | "Square" | "Circle" | "Line" | "Ink";
+  readonly padding: number;
+  readonly entries: (
+    mapPoint: EditorAnnotationPointMapper,
+    geometry: EditorPageGeometry,
+  ) => EditorAnnotationEntries;
+} {
+  const strokeEntries = (): EditorAnnotationEntries => ({
+    C: toEditorAnnotationColor(object.data.strokeColor, DEFAULT_STROKE_COLOR),
+    BS: { W: object.data.strokeWidth ?? 2, S: "S" },
+  });
+
+  if (object.type === "highlight") {
+    return {
+      subtype: "Highlight",
+      padding: 0,
+      entries: (mapPoint, geometry) => ({
+        C: toEditorAnnotationColor(object.data.backgroundColor, DEFAULT_HIGHLIGHT_COLOR),
+        QuadPoints: getEditorAnnotationQuadPoints(object.box, geometry, mapPoint),
+      }),
+    };
+  }
+
+  if (object.type === "note") {
+    const fontSize = object.data.fontSize ?? 14;
+    return {
+      subtype: "FreeText",
+      padding: 1,
+      entries: () => ({
+        Contents: toEditorAnnotationText(object.data.text ?? ""),
+        C: toEditorAnnotationColor(object.data.backgroundColor, DEFAULT_NOTE_COLOR),
+        DA: PDFString.of(`/Helv ${fontSize} Tf 0 g`),
+      }),
+    };
+  }
+
+  if (object.type === "draw") {
+    return {
+      subtype: "Ink",
+      padding: ANNOTATION_PADDING,
+      entries: (mapPoint, geometry) => ({
+        ...strokeEntries(),
+        InkList: [
+          getEditorDrawStrokePoints(object, geometry).flatMap((point) => [...mapPoint(point)]),
+        ],
+      }),
+    };
+  }
+
+  const shapeType = getEditorShapeType(object);
+
+  if (shapeType === "rectangle" || shapeType === "circle") {
+    const fill = object.data.fillColor?.trim().toLowerCase();
+    const hasFill = Boolean(fill && fill !== "none" && fill !== "transparent");
+    return {
+      subtype: shapeType === "rectangle" ? "Square" : "Circle",
+      padding: ANNOTATION_PADDING,
+      entries: () => ({
+        ...strokeEntries(),
+        ...(hasFill
+          ? { IC: toEditorAnnotationColor(object.data.fillColor, DEFAULT_STROKE_COLOR) }
+          : {}),
+      }),
+    };
+  }
+
+  return {
+    subtype: "Line",
+    padding: ANNOTATION_PADDING,
+    entries: (mapPoint, geometry) => {
+      const { start, end } = getEditorShapeLineEndpoints(object, geometry);
+      return {
+        ...strokeEntries(),
+        L: [...mapPoint(start), ...mapPoint(end)],
+        LE: ["None", shapeType === "arrow" ? "OpenArrow" : "None"],
+      };
+    },
+  };
+}
+
 function getEditorTextSamples(objects: readonly EditorExportObject[]) {
   const samples: string[] = [];
 
@@ -242,12 +358,16 @@ export async function exportEditorPdfBytes({
   objects,
   ocrPages = [],
   unicodeFontBytes,
+  markupMode = "annotations",
 }: {
   readonly fileBytes: Uint8Array;
   readonly objects: readonly EditorExportObject[];
   readonly ocrPages?: readonly EditorExportOcrPage[];
   readonly unicodeFontBytes?: BundledUnicodeFontBytes;
+  readonly markupMode?: EditorMarkupExportMode;
 }) {
+  const asAnnotation = (object: EditorExportObject) =>
+    markupMode === "annotations" && isMarkupAnnotationObject(object);
   const pdfDoc = await PDFDocument.load(fileBytes);
   const fonts = await embedEditorTextFonts(
     pdfDoc,
@@ -273,7 +393,7 @@ export async function exportEditorPdfBytes({
 
   for (const object of objects) {
     const page = pages[object.pageNumber - 1];
-    if (!page) continue;
+    if (!page || asAnnotation(object)) continue;
     const geometry = getEditorPageGeometry(page);
 
     await withEditorPageTransform(page, geometry, () =>
@@ -285,6 +405,30 @@ export async function exportEditorPdfBytes({
         geometry,
       }),
     );
+  }
+
+  for (const object of objects) {
+    const page = pages[object.pageNumber - 1];
+    if (!page || !asAnnotation(object)) continue;
+    const spec = getMarkupAnnotationSpec(object);
+
+    await appendEditorMarkupAnnotation({
+      pdfDoc,
+      page,
+      id: object.id,
+      subtype: spec.subtype,
+      box: object.box,
+      padding: spec.padding,
+      entries: spec.entries,
+      draw: (appearancePage, appearanceGeometry) =>
+        drawEditorObject({
+          pdfDoc,
+          page: appearancePage,
+          object,
+          fonts,
+          geometry: appearanceGeometry,
+        }),
+    });
   }
 
   for (const object of objects) {

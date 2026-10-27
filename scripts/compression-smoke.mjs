@@ -1,14 +1,16 @@
 import assert from "node:assert/strict";
+import { deflateSync } from "node:zlib";
 
 import * as pdfjs from "pdfjs-dist";
 import {
   PDFDocument,
+  PDFName,
   StandardFonts,
   degrees,
   rgb,
 } from "pdf-lib";
 
-import { compressPdf } from "../src/lib/pdf-compress.ts";
+import { compressPdf, structurallyCompress } from "../src/lib/pdf-compress.ts";
 
 const source = await PDFDocument.create();
 source.setTitle("Compression smoke");
@@ -99,8 +101,123 @@ assert.deepEqual(
   new Uint8Array(await optimizedFile.arrayBuffer()),
 );
 
+// Preserve Text mode resamples only oversized photos, in place.
+async function createImagePdf() {
+  const pdf = await PDFDocument.create();
+  const imageFont = await pdf.embedFont(StandardFonts.Helvetica);
+  const letterPage = pdf.addPage([612, 792]);
+  letterPage.drawText("Photo report text stays selectable", {
+    x: 40, y: 740, size: 16, font: imageFont,
+  });
+  const context = pdf.context;
+
+  function image(width, height, colorSpace, contents, extra = {}) {
+    return context.register(context.stream(contents, {
+      Type: "XObject",
+      Subtype: "Image",
+      Width: width,
+      Height: height,
+      ColorSpace: colorSpace,
+      BitsPerComponent: 8,
+      ...extra,
+    }));
+  }
+
+  // 3000×2000 RGB with PNG "Up" row filters: every row predicts from the one above.
+  const predictedRows = new Uint8Array((3000 * 3 + 1) * 2000);
+  for (let row = 0; row < 2000; row += 1) {
+    predictedRows[row * (3000 * 3 + 1)] = 2;
+  }
+  predictedRows.set([200, 100, 50], 1);
+  const deflated = deflateSync(predictedRows);
+  const photo = image(3000, 2000, "DeviceRGB", deflated, {
+    Filter: "FlateDecode",
+    DecodeParms: { Predictor: 15, Colors: 3, BitsPerComponent: 8, Columns: 3000 },
+  });
+  const mask = image(3000, 2000, "DeviceGray", new Uint8Array(10), { Filter: "FlateDecode" });
+  const maskedJpeg = image(2600, 2600, "DeviceRGB", new Uint8Array(400_000), {
+    Filter: "DCTDecode",
+    SMask: mask,
+  });
+  const smallJpeg = image(800, 600, "DeviceGray", new Uint8Array(50_000), { Filter: "DCTDecode" });
+  const cmyk = image(3000, 3000, "DeviceCMYK", new Uint8Array(1000), { Filter: "FlateDecode" });
+  const stubborn = image(2500, 2500, "DeviceRGB", new Uint8Array(1000), { Filter: "DCTDecode" });
+  const formImage = image(2400, 2400, "DeviceRGB", new Uint8Array(300_000), { Filter: "DCTDecode" });
+  const form = context.register(context.stream("q /Fx Do Q", {
+    Type: "XObject",
+    Subtype: "Form",
+    BBox: [0, 0, 612, 792],
+    Resources: { XObject: { Fx: formImage } },
+  }));
+
+  for (const [label, ref] of Object.entries({ photo, maskedJpeg, smallJpeg, cmyk, stubborn, form })) {
+    letterPage.node.newXObject(label, ref);
+  }
+
+  return {
+    bytes: await pdf.save({ useObjectStreams: false }),
+    refs: { photo, mask, maskedJpeg, smallJpeg, cmyk, stubborn, formImage },
+  };
+}
+
+const imagePdf = await createImagePdf();
+const codecCalls = [];
+const downsampled = await PDFDocument.load(
+  await structurallyCompress(
+    imagePdf.bytes,
+    "medium",
+    false,
+    undefined,
+    undefined,
+    async (source, targetWidth, targetHeight) => {
+      codecCalls.push({ source, targetWidth, targetHeight });
+      // The "stubborn" image re-encodes larger than it started, so it must be kept.
+      return new Uint8Array(source.kind === "jpeg" && source.bytes.length === 1000 ? 5000 : 2000);
+    },
+  ),
+);
+const imageDict = (ref) => downsampled.context.lookup(ref).dict;
+const imageNumber = (ref, key) =>
+  imageDict(ref).lookup(PDFName.of(key))?.asNumber();
+const imageName = (ref, key) =>
+  imageDict(ref).lookup(PDFName.of(key))?.asString();
+
+// Letter page, longest side 11 in × 150 DPI = 1650 px.
+assert.deepEqual(
+  codecCalls.map(({ targetWidth, targetHeight }) => [targetWidth, targetHeight]).sort(),
+  [[1650, 1100], [1650, 1650], [1650, 1650], [1650, 1650]].sort(),
+);
+const flateCall = codecCalls.find(({ source }) => source.kind === "pixels");
+assert.equal(flateCall.source.width, 3000);
+// PNG "Up" prediction is undone: the last row still carries the first row's pixel.
+const lastRowStart = 1999 * 3000 * 4;
+assert.deepEqual(
+  [...flateCall.source.rgba.slice(lastRowStart, lastRowStart + 4)],
+  [200, 100, 50, 255],
+);
+
+assert.equal(imageNumber(imagePdf.refs.photo, "Width"), 1650);
+assert.equal(imageNumber(imagePdf.refs.photo, "Height"), 1100);
+assert.equal(imageName(imagePdf.refs.photo, "Filter"), "/DCTDecode");
+assert.equal(imageDict(imagePdf.refs.photo).get(PDFName.of("DecodeParms")), undefined);
+assert.equal(
+  imageDict(imagePdf.refs.maskedJpeg).get(PDFName.of("SMask")).toString(),
+  imagePdf.refs.mask.toString(),
+);
+assert.equal(imageNumber(imagePdf.refs.formImage, "Width"), 1650);
+assert.equal(imageNumber(imagePdf.refs.smallJpeg, "Width"), 800);
+assert.equal(imageName(imagePdf.refs.cmyk, "ColorSpace"), "/DeviceCMYK");
+assert.equal(imageNumber(imagePdf.refs.cmyk, "Width"), 3000);
+assert.equal(imageNumber(imagePdf.refs.stubborn, "Width"), 2500);
+
 console.log(
   JSON.stringify({
+    oversizedImageResampling: "passed",
+    pngPredictorDecoding: "passed",
+    softMaskPreserved: "passed",
+    formXObjectImages: "passed",
+    unsupportedColorSpacesKept: "passed",
+    noGainImagesKept: "passed",
     selectableText: "passed",
     vectorAndFormStructure: "passed",
     pageSizeAndRotation: "passed",

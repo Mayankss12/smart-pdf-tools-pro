@@ -392,6 +392,23 @@ function drawLineShape({
   }
 }
 
+// Bottom-up viewport endpoints of a line or arrow, matching what drawEditorShapeObject paints.
+export function getEditorShapeLineEndpoints(
+  object: EditorShapeExportObject,
+  geometry: EditorPageGeometry,
+) {
+  return getLinePoints({
+    geometry,
+    box: getSafeBox(object.box, geometry),
+    originalBox: object.box,
+    data: object.data,
+  });
+}
+
+export function getEditorShapeType(object: EditorShapeExportObject) {
+  return normalizeShapeType(object.data.shapeType);
+}
+
 export function drawEditorShapeObject(
   page: PDFPage,
   object: EditorShapeExportObject,

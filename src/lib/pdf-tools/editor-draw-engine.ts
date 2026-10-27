@@ -109,6 +109,16 @@ function drawCap(page: PDFPage, geometry: EditorPageGeometry, object: DrawObject
   });
 }
 
+// Bottom-up viewport points of the stroke, matching what drawEditorDrawObject paints.
+export function getEditorDrawStrokePoints(
+  object: DrawObject,
+  geometry: EditorPageGeometry,
+) {
+  return parsePath(object.data.pathData).map((point) =>
+    toPdfPoint(geometry, object, point),
+  );
+}
+
 export function drawEditorDrawObject(
   page: PDFPage,
   object: DrawObject,

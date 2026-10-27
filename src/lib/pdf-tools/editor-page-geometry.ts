@@ -17,7 +17,7 @@ export type EditorPageGeometry = {
   readonly pdfOriginY: number;
 };
 
-type TransformationMatrix = readonly [
+export type TransformationMatrix = readonly [
   number,
   number,
   number,
@@ -52,7 +52,7 @@ export function getEditorPageGeometry(page: PDFPage): EditorPageGeometry {
   };
 }
 
-function getViewportToPdfMatrix(geometry: EditorPageGeometry): TransformationMatrix {
+export function getViewportToPdfMatrix(geometry: EditorPageGeometry): TransformationMatrix {
   const {
     rotation,
     pdfWidth,

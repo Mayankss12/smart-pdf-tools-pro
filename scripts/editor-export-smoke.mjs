@@ -7,6 +7,8 @@ import { degrees, PDFDocument } from "pdf-lib";
 import {
   exportEditorPdfBytes,
 } from "../src/lib/pdf-tools/editor-export-engine.ts";
+import { getEditorLinkPdfRect } from "../src/lib/pdf-tools/editor-link-engine.ts";
+import { getEditorPageGeometry } from "../src/lib/pdf-tools/editor-page-geometry.ts";
 import {
   transformOcrWordsToPdfSpace,
 } from "../src/lib/pdf-text-overlay.ts";
@@ -196,24 +198,91 @@ assert.deepEqual(
 );
 assert.ok(exportedBytes.length > sourceBytes.length);
 
-const exportedPdf = await pdfjs.getDocument({ data: exportedBytes.slice() }).promise;
-let firstPageText = "";
-try {
-  const firstPage = await exportedPdf.getPage(1);
+async function readPageTextAndAnnotations(bytes, pageNumber) {
+  const pdf = await pdfjs.getDocument({ data: bytes.slice() }).promise;
   try {
-    const textContent = await firstPage.getTextContent();
-    firstPageText = textContent.items
-      .map((item) => ("str" in item ? item.str : ""))
-      .join(" ");
+    const page = await pdf.getPage(pageNumber);
+    try {
+      const textContent = await page.getTextContent();
+      return {
+        text: textContent.items
+          .map((item) => ("str" in item ? item.str : ""))
+          .join(" "),
+        annotations: await page.getAnnotations(),
+      };
+    } finally {
+      page.cleanup();
+    }
   } finally {
-    firstPage.cleanup();
+    await pdf.destroy();
   }
-} finally {
-  await exportedPdf.destroy();
 }
+
+const {
+  text: firstPageText,
+  annotations: firstPageAnnotations,
+} = await readPageTextAndAnnotations(exportedBytes, 1);
 assert.match(firstPageText, /Café/);
 assert.match(firstPageText, /नमस्ते/);
-assert.match(firstPageText, /कखग/);
+
+// Highlights, notes, shapes and ink stay editable as real PDF annotations.
+const markupBySubtype = new Map(
+  firstPageAnnotations.map((annotation) => [annotation.subtype, annotation]),
+);
+for (const subtype of ["Highlight", "FreeText", "Line", "Ink"]) {
+  const annotation = markupBySubtype.get(subtype);
+  assert.ok(annotation, `${subtype} annotation is exported`);
+  assert.equal(annotation.hasAppearance, true, `${subtype} keeps its appearance`);
+  assert.equal(annotation.titleObj?.str, "PDFMantra");
+}
+assert.equal(markupBySubtype.get("FreeText").contentsObj.str, "कखग");
+assert.equal(markupBySubtype.get("Highlight").quadPoints.length, 8);
+assert.doesNotMatch(firstPageText, /कखग/);
+
+const rotatedHighlightBytes = await exportEditorPdfBytes({
+  fileBytes: sourceBytes,
+  objects: [{
+    id: "rotated-highlight",
+    type: "highlight",
+    pageNumber: 2,
+    box: { x: 30, y: 40, width: 100, height: 20 },
+    data: { backgroundColor: "#fde047", opacity: 0.45 },
+  }, {
+    id: "overhanging-note",
+    type: "note",
+    pageNumber: 2,
+    box: { x: 250, y: 120, width: 140, height: 80 },
+    data: { text: "Edge note", fontSize: 12, opacity: 1 },
+  }],
+});
+const [rotatedHighlight, overhangingNote] = (
+  await readPageTextAndAnnotations(rotatedHighlightBytes, 2)
+).annotations;
+// The note is pulled back onto the 300pt-wide viewport, as the flattened export draws it.
+assert.deepEqual(Array.from(overhangingNote.rect, Math.round), [119, 159, 201, 300]);
+// Page 2 is 420×300 rotated 90°: bottom-up viewport (x, y) lands at PDF (420 - y, x),
+// matching the link annotation geometry.
+assert.deepEqual(
+  Array.from(rotatedHighlight.rect, Math.round),
+  getEditorLinkPdfRect(
+    { x: 30, y: 40, width: 100, height: 20 },
+    getEditorPageGeometry((await PDFDocument.load(sourceBytes)).getPage(1)),
+  ).map(Math.round),
+);
+assert.deepEqual(Array.from(rotatedHighlight.rect, Math.round), [40, 30, 60, 130]);
+
+const flattenedBytes = await exportEditorPdfBytes({
+  fileBytes: sourceBytes,
+  objects,
+  unicodeFontBytes: {
+    latin: new Uint8Array(latinFontBytes),
+    devanagari: new Uint8Array(devanagariFontBytes),
+  },
+  markupMode: "flatten",
+});
+const flattenedFirstPage = await readPageTextAndAnnotations(flattenedBytes, 1);
+assert.match(flattenedFirstPage.text, /कखग/);
+assert.equal(flattenedFirstPage.annotations.length, 0);
 assert.match(firstPageText, /SEARCHABLE-OCR-FIXTURE/);
 assert.match(firstPageText, /AUTHORIZED/);
 assert.match(firstPageText, /Mayank\s+Singh/);
@@ -256,6 +325,9 @@ console.log(
     objectTypes: [...new Set(objects.map((object) => object.type))],
     unicodeText: "devanagari passed",
     unicodeNote: "devanagari passed",
+    editableMarkupAnnotations: "passed",
+    rotatedAnnotationGeometry: "passed",
+    flattenedMarkupMode: "passed",
     unsupportedUnicodeFallback: "passed",
     asciiText: "passed",
     ocrPlacement: "passed",

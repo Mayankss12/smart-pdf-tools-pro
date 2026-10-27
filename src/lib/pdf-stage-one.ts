@@ -8,6 +8,7 @@ import {
 } from "pdf-lib";
 
 import { createPdfFileName } from "@/lib/pdf-engine";
+import { copyPdfOutlines } from "@/lib/pdf-outline";
 
 export const STAGE_ONE_MAX_FILE_SIZE_MB = 100;
 export const STAGE_ONE_BATCH_MAX_FILES = 20;
@@ -223,6 +224,7 @@ export async function splitPdfByApproximateSize(
     const output = await PDFDocument.create();
     const copied = await output.copyPages(source, [...indices]);
     copied.forEach((page) => output.addPage(page));
+    copyPdfOutlines(output, [{ source, sourcePageIndices: indices, copiedPages: copied }]);
     return output.save({ useObjectStreams: true });
   }
 
@@ -260,6 +262,7 @@ export async function splitPdfAtPages(
     const output = await PDFDocument.create();
     const pages = await output.copyPages(source, pageIndices);
     pages.forEach((page) => output.addPage(page));
+    copyPdfOutlines(output, [{ source, sourcePageIndices: pageIndices, copiedPages: pages }]);
     outputs.push(await output.save({ useObjectStreams: true }));
   }
 
