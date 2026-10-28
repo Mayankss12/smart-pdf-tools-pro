@@ -5,12 +5,17 @@ import * as pdfjs from "pdfjs-dist";
 import {
   PDFDocument,
   PDFName,
+  PDFRef,
   StandardFonts,
   degrees,
   rgb,
 } from "pdf-lib";
 
-import { compressPdf, structurallyCompress } from "../src/lib/pdf-compress.ts";
+import {
+  compressPdf,
+  compressedPdfPagesAreReadable,
+  structurallyCompress,
+} from "../src/lib/pdf-compress.ts";
 
 const source = await PDFDocument.create();
 source.setTitle("Compression smoke");
@@ -99,6 +104,37 @@ assert.equal(optimizedResult.compressedSize, optimizedFile.size);
 assert.deepEqual(
   new Uint8Array(await optimizedResult.blob.arrayBuffer()),
   new Uint8Array(await optimizedFile.arrayBuffer()),
+);
+
+const threePagePdf = await PDFDocument.create();
+for (let index = 0; index < 3; index += 1) {
+  threePagePdf.addPage([420, 300]);
+}
+const threePageBytes = await threePagePdf.save({ useObjectStreams: false });
+assert.equal(await compressedPdfPagesAreReadable(threePageBytes, 3), true);
+assert.equal(await compressedPdfPagesAreReadable(threePageBytes, 2), false);
+assert.equal(await compressedPdfPagesAreReadable(new Uint8Array([1, 2, 3]), 3), false);
+
+const threePageResult = await compressPdf(
+  new File([threePageBytes], "three-pages.pdf", { type: "application/pdf" }),
+  { mode: "structural", level: "medium" },
+);
+const threePageResultBytes = new Uint8Array(await threePageResult.blob.arrayBuffer());
+assert.equal(await compressedPdfPagesAreReadable(threePageResultBytes, 3), true);
+
+const versionedReferencePdf = await PDFDocument.create();
+versionedReferencePdf.addPage([420, 300]);
+versionedReferencePdf.context.assign(PDFRef.of(23, 1), PDFName.of("VersionedObject"));
+const versionedReferenceBytes = await versionedReferencePdf.save({ useObjectStreams: false });
+assert.equal(await compressedPdfPagesAreReadable(versionedReferenceBytes, 1), true);
+const versionedReferenceResult = await compressPdf(
+  new File([versionedReferenceBytes], "versioned-reference.pdf", { type: "application/pdf" }),
+  { mode: "structural", level: "medium", removeMetadata: true },
+);
+assert.equal(versionedReferenceResult.usedOriginal, true);
+assert.deepEqual(
+  new Uint8Array(await versionedReferenceResult.blob.arrayBuffer()),
+  versionedReferenceBytes,
 );
 
 // Preserve Text mode resamples only oversized photos, in place.
@@ -224,5 +260,8 @@ console.log(
     metadata: "passed",
     cancellation: "passed",
     largerOutputProtection: "original-preserved",
+    unreadableOutputDetection: "passed",
+    multiPageReopen: "passed",
+    versionedReferenceFallback: "original-preserved",
   }),
 );
