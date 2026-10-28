@@ -196,11 +196,16 @@ export default function CompressPage() {
 
   const outputMessage = useMemo(() => {
     if (!result) return "No compressed output yet.";
+    if (result.usedOriginal) {
+      return removeMetadata
+        ? "No safe smaller PDF was produced. The original was downloaded unchanged; its metadata was not removed."
+        : "No safe smaller PDF was produced. The original was downloaded unchanged.";
+    }
     if (result.savedBytes > 0) {
       return `${result.savedPercent}% smaller · saved ${formatFileSize(result.savedBytes)}`;
     }
-    return "This PDF was already optimized. Minimal reduction was possible.";
-  }, [result]);
+    return "No size reduction was possible.";
+  }, [result, removeMetadata]);
 
   const isError =
     !!error ||
@@ -297,7 +302,9 @@ export default function CompressPage() {
 
         if (compressedResult.usedOriginal) {
           setStatus(
-            "The optimized output was not smaller, so the original PDF was preserved and downloaded instead.",
+            removeMetadata
+              ? "No safe smaller PDF was produced. The original was downloaded unchanged; its metadata was not removed."
+              : "No safe smaller PDF was produced. The original was downloaded unchanged.",
           );
         } else if (targetBytes && compressedResult.method === "scan") {
           setStatus(
@@ -370,7 +377,7 @@ export default function CompressPage() {
                         : "bg-amber-50 text-amber-700"
                     }`}
                   >
-                    {compressionWorked ? `${savedPercent}% saved` : "Already optimized"}
+                    {compressionWorked ? `${savedPercent}% saved` : "Original preserved"}
                   </span>
                 ) : null}
               </div>
@@ -523,7 +530,7 @@ export default function CompressPage() {
           <section
             onDrop={handleUploadDrop}
             onDragOver={(event) => event.preventDefault()}
-            className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+            className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
           >
             {!file ? (
               <button
@@ -542,8 +549,8 @@ export default function CompressPage() {
                 </div>
               </button>
             ) : (
-              <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+                <div className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
                     <div className="min-w-0">
                       <div className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
@@ -647,7 +654,7 @@ export default function CompressPage() {
                   ) : null}
                 </div>
 
-                <aside className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4">
+                <aside className="min-w-0 space-y-4 rounded-2xl border border-slate-200 bg-white p-4">
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                     <div className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
                       Method

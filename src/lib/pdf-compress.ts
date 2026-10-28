@@ -194,6 +194,15 @@ export async function structurallyCompress(
       "This PDF has no pages to compress.",
     );
   }
+  // pdf-lib can rewrite nonzero-generation references with an incomplete xref.
+  // Keep the source byte-for-byte instead of risking a partially readable PDF.
+  if (pdf.context.enumerateIndirectObjects().some(([ref]) => ref.generationNumber !== 0)) {
+    report(onProgress, {
+      percent: null,
+      message: "This PDF cannot be safely rewritten; preserving the original unchanged.",
+    });
+    return bytes;
+  }
   if (removeMetadata) clearMetadata(pdf);
   await downsamplePdfImages(pdf, STRUCTURAL_IMAGE_PROFILES[level], codec, {
     signal,
@@ -205,10 +214,36 @@ export async function structurallyCompress(
   });
   throwIfAborted(signal);
   return pdf.save({
-    useObjectStreams: true,
+    // Rewriting an existing PDF into object streams can produce a smaller file
+    // whose page tree is unreadable to PDF.js for some valid source documents.
+    useObjectStreams: false,
     addDefaultPage: false,
     objectsPerTick: 40,
   });
+}
+
+export async function compressedPdfPagesAreReadable(
+  bytes: Uint8Array,
+  expectedPageCount: number,
+  signal?: AbortSignal,
+): Promise<boolean> {
+  let document: pdfjs.PDFDocumentProxy | undefined;
+  try {
+    throwIfAborted(signal);
+    document = await pdfjs.getDocument({ data: bytes.slice() }).promise;
+    if (document.numPages !== expectedPageCount) return false;
+    for (let pageNumber = 1; pageNumber <= expectedPageCount; pageNumber += 1) {
+      throwIfAborted(signal);
+      const page = await document.getPage(pageNumber);
+      page.cleanup();
+    }
+    return true;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") throw error;
+    return false;
+  } finally {
+    await document?.destroy();
+  }
 }
 
 async function scanCompress(
@@ -413,15 +448,22 @@ export async function compressPdf(
   }
 
   const outputLarger = outputBytes.length >= bytes.length;
-  const finalBytes = outputLarger ? bytes : outputBytes;
+  const outputReadable = outputLarger
+    ? true
+    : await compressedPdfPagesAreReadable(outputBytes, analysis.pageCount, options.signal);
+  throwIfAborted(options.signal);
+  const usedOriginal = outputLarger || !outputReadable;
+  const finalBytes = usedOriginal ? bytes : outputBytes;
   const blob = new Blob([finalBytes], { type: "application/pdf" });
   const targetBytes = options.targetBytes ?? null;
 
   report(options.onProgress, {
     percent: 100,
-    message: outputLarger
-      ? "The optimized output was not smaller, so the original PDF was preserved."
-      : "Compression complete.",
+    message: !outputReadable
+      ? "The optimized PDF could not be reopened, so the original PDF was preserved."
+      : outputLarger
+        ? "No safe size reduction was found, so the original PDF was preserved unchanged."
+        : "Compression complete.",
   });
 
   return {
@@ -432,6 +474,6 @@ export async function compressPdf(
     targetMet: targetBytes === null || blob.size <= targetBytes,
     method,
     analysis,
-    usedOriginal: outputLarger,
+    usedOriginal,
   };
 }
