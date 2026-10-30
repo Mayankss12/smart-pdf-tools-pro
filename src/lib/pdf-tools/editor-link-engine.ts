@@ -2,10 +2,10 @@ import {
   PDFArray,
   PDFDocument,
   PDFName,
-  PDFString,
   type PDFPage,
 } from "pdf-lib";
 
+import { pdfLiteralString } from "../pdf-string";
 import type { EditorPageGeometry } from "./editor-page-geometry";
 
 export type EditorLinkBox = {
@@ -131,7 +131,7 @@ export function appendEditorLinkAnnotation({
     A: {
       Type: PDFName.of("Action"),
       S: PDFName.of("URI"),
-      URI: PDFString.of(normalizedUrl),
+      URI: pdfLiteralString(normalizedUrl),
     },
   });
   const annotationRef = pdfDoc.context.register(annotation);

@@ -26,6 +26,7 @@ const suites = [
   "phase-one-tools-smoke.mjs",
   "pdf-fidelity-smoke.mjs",
   "pdf-rebuild-safety-smoke.mjs",
+  "pdf-string-escaping-smoke.mjs",
   "pdf-security-smoke.mjs",
   "production-assurance-smoke.mjs",
   "pdf-to-images-smoke.mjs",
