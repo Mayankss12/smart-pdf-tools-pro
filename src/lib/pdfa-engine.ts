@@ -1,4 +1,6 @@
-import { PDFDict, PDFDocument, PDFName, PDFString } from "pdf-lib";
+import { PDFDict, PDFDocument, PDFName } from "pdf-lib";
+
+import { pdfLiteralString } from "./pdf-string";
 
 export type PdfaCheck = {
   readonly id: string;
@@ -163,7 +165,7 @@ export async function preparePdfForArchival(
   pdf.catalog.delete(PDFName.of("AA"));
   pdf.catalog.delete(PDFName.of("Collection"));
   pdf.catalog.set(PDFName.of("MarkInfo"), pdf.context.obj({ Marked: true }));
-  pdf.catalog.set(PDFName.of("Lang"), PDFString.of((options.language || "en-US").slice(0, 35)));
+  pdf.catalog.set(PDFName.of("Lang"), pdfLiteralString((options.language || "en-US").slice(0, 35)));
   pdf.setTitle((options.title || pdf.getTitle() || "Archived PDF").slice(0, 512));
   pdf.setAuthor((options.author || pdf.getAuthor() || "PDFMantra user").slice(0, 256));
   pdf.setCreator("PDFMantra archival preparation");
