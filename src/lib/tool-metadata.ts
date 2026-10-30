@@ -28,6 +28,26 @@ const TOOL_SEO_DETAILS: Readonly<Record<string, ToolSeoDetail>> = {
     description:
       "Reduce PDF file size with structural or scan compression. Compare the trade-offs before downloading a smaller PDF for email or upload.",
   },
+  "grayscale-pdf": {
+    title: "Convert PDF to Grayscale Online",
+    description: "Create a grayscale visual copy of a PDF in your browser. Understand that text and interactive features are flattened before export.",
+  },
+  "n-up-pdf": {
+    title: "N-up PDF - Print Multiple Pages per Sheet",
+    description: "Arrange 2, 4, 6 or 9 PDF pages on each A4, Letter or Legal sheet with a browser-based print layout tool.",
+  },
+  "resize-pdf": {
+    title: "Resize PDF Pages to A4, Letter or Custom Size",
+    description: "Resize PDF pages proportionally for A4, Letter, Legal or custom paper while keeping vector content and annotations.",
+  },
+  "extract-images": {
+    title: "Extract Embedded Images from PDF",
+    description: "Download supported embedded JPEG and RGB or gray PDF images as a ZIP archive without taking page screenshots.",
+  },
+  "alternate-mix": {
+    title: "Alternate and Mix PDF Pages Online",
+    description: "Interleave pages from two PDFs, reverse one file when needed, and download a single combined document.",
+  },
   "fill-sign": {
     title: "Fill & Sign PDF Online - Add Text and Signatures",
     description:
