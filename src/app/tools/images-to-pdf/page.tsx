@@ -36,6 +36,7 @@ import {
 
 import { Header } from "@/components/Header";
 import { useEntitlement } from "@/hooks/useEntitlement";
+import { getExportDenialMessage } from "@/lib/export-entitlement";
 import {
   selectImageQueueCandidates,
   type ImageRouteSource,
@@ -918,10 +919,7 @@ export default function ImagesToPdfPage({ variant = DEFAULT_IMAGES_TO_PDF_VARIAN
         setExportProgress(0);
 
         const limitMessage =
-          exportRecord.error ||
-          (exportRecord.identityType === "guest"
-            ? "Guest clean export limit reached for today. Sign in to get 5 clean exports/day."
-            : `${exportRecord.planLabel} clean export limit reached for today.`);
+          getExportDenialMessage(exportRecord);
 
         setStatus(limitMessage);
         return;

@@ -1,59 +1,59 @@
 import { NextResponse } from "next/server";
 
 import {
-  getDailyCleanExportLimit,
+  getCleanExportLimit,
   getEntitlementPlan,
+  isUnlimitedPlan,
   normalizeTier,
   type UserTier,
 } from "@/lib/entitlements";
+import {
+  ACCOUNT_EXPORT_ALLOWANCE,
+  EXPORT_BURST,
+  GUEST_EXPORT_ALLOWANCE,
+  evaluateExportAllowance,
+} from "@/lib/export-limits";
+import {
+  toExportStatusFields,
+  unlimitedExportStatusFields,
+  type ExportStatusFields,
+} from "@/lib/export-status";
 import {
   createAnonymousIdentityCookie,
   createCorsPreflightResponse,
   createNoStoreHeaders,
   isSameOriginRequest,
 } from "@/lib/api-security";
+import {
+  getNetworkIdentity,
+  getNetworkIdentitySecret,
+} from "@/lib/network-identity";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import {
+  readExportAllowance,
+  readGuestExportAllowance,
+} from "@/lib/usage-windows";
+import { createSupabaseUsageWindowStore } from "@/lib/usage-windows-supabase";
 
-type UsageRow = {
-  clean_exports_used: number;
-  watermarked_exports_used: number;
-  blocked_exports_count: number;
-};
-
-const GUEST_DAILY_CLEAN_EXPORT_LIMIT = 1;
 const ALLOWED_METHODS = "GET, OPTIONS";
+
+type StatusPayload = ExportStatusFields & {
+  identityType: "guest" | "user";
+  tier: UserTier;
+  watermarkedExportsUsed: number;
+  blockedExportsCount: number;
+  isUnlimited: boolean;
+  planLabel: string;
+};
 
 function isAnonymousId(value: string | null) {
   return typeof value === "string" && /^anon_[a-zA-Z0-9._-]+$/.test(value);
 }
 
-function getTodayDateKey() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function emptyUsage(): UsageRow {
-  return {
-    clean_exports_used: 0,
-    watermarked_exports_used: 0,
-    blocked_exports_count: 0,
-  };
-}
-
 function createResponse(
   request: Request,
-  payload: {
-    identityType: "guest" | "user";
-    tier: UserTier;
-    dailyCleanExportLimit: number;
-    cleanExportsUsed: number;
-    cleanExportsRemaining: number;
-    watermarkedExportsUsed: number;
-    blockedExportsCount: number;
-    canExportClean: boolean;
-    isUnlimited: boolean;
-    planLabel: string;
-  },
+  payload: StatusPayload,
   options?: {
     setAnonymousIdentity?: string;
   },
@@ -88,12 +88,10 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const anonymousId = url.searchParams.get("anonymousId");
-  const usageDate = getTodayDateKey();
 
   const supabase = await createSupabaseServerClient();
 
   let userId: string | null = null;
-  let userTier: UserTier = "guest";
 
   if (supabase) {
     const {
@@ -103,9 +101,8 @@ export async function GET(request: Request) {
     userId = user?.id ?? null;
   }
 
-  const adminClient = createAdminClient();
-
   if (userId) {
+    const adminClient = createAdminClient();
     const { data: profile } = await adminClient
       .from("profiles")
       .select("tier, tier_expires_at, daily_export_limit")
@@ -117,86 +114,86 @@ export async function GET(request: Request) {
       profile?.tier_expires_at &&
       new Date(profile.tier_expires_at).getTime() <= Date.now();
 
-    userTier = tierExpired ? "free" : normalizedTier;
-
+    const userTier: UserTier = tierExpired ? "free" : normalizedTier;
     const plan = getEntitlementPlan(userTier);
-    const dailyLimit =
+    const cleanExportLimit =
       typeof profile?.daily_export_limit === "number"
         ? profile.daily_export_limit
-        : getDailyCleanExportLimit(userTier);
+        : getCleanExportLimit(userTier);
 
-    const { data: usage } = await adminClient
-      .from("usage_daily")
-      .select("clean_exports_used, watermarked_exports_used, blocked_exports_count")
-      .eq("user_id", userId)
-      .eq("usage_date", usageDate)
-      .maybeSingle();
+    if (isUnlimitedPlan(userTier)) {
+      return createResponse(request, {
+        identityType: "user",
+        tier: userTier,
+        ...unlimitedExportStatusFields(cleanExportLimit),
+        watermarkedExportsUsed: 0,
+        blockedExportsCount: 0,
+        isUnlimited: true,
+        planLabel: plan.label,
+      });
+    }
 
-    const usageRow = (usage as UsageRow | null) ?? emptyUsage();
-    const isUnlimited =
-      userTier === "plus" || userTier === "pro" || userTier === "admin";
-    const remaining = isUnlimited
-      ? dailyLimit
-      : Math.max(0, dailyLimit - usageRow.clean_exports_used);
+    const { row, status } = await readExportAllowance({
+      store: createSupabaseUsageWindowStore(adminClient),
+      identity: { userId, anonymousId: null },
+      allowance: {
+        burst: EXPORT_BURST,
+        daily: {
+          limit: cleanExportLimit,
+          windowHours: ACCOUNT_EXPORT_ALLOWANCE.daily.windowHours,
+        },
+      },
+    });
 
     return createResponse(request, {
       identityType: "user",
       tier: userTier,
-      dailyCleanExportLimit: dailyLimit,
-      cleanExportsUsed: usageRow.clean_exports_used,
-      cleanExportsRemaining: remaining,
-      watermarkedExportsUsed: usageRow.watermarked_exports_used,
-      blockedExportsCount: usageRow.blocked_exports_count,
-      canExportClean: isUnlimited || remaining > 0,
-      isUnlimited,
-      planLabel: plan.label,
-    });
-  }
-
-  if (!isAnonymousId(anonymousId)) {
-    const plan = getEntitlementPlan("guest");
-
-    return createResponse(request, {
-      identityType: "guest",
-      tier: "guest",
-      dailyCleanExportLimit: GUEST_DAILY_CLEAN_EXPORT_LIMIT,
-      cleanExportsUsed: 0,
-      cleanExportsRemaining: GUEST_DAILY_CLEAN_EXPORT_LIMIT,
-      watermarkedExportsUsed: 0,
-      blockedExportsCount: 0,
-      canExportClean: true,
+      ...toExportStatusFields(status),
+      watermarkedExportsUsed: row?.watermarked_exports_used ?? 0,
+      blockedExportsCount: row?.blocked_exports_count ?? 0,
       isUnlimited: false,
       planLabel: plan.label,
     });
   }
 
-  const { data: usage } = await adminClient
-    .from("usage_daily")
-    .select("clean_exports_used, watermarked_exports_used, blocked_exports_count")
-    .eq("anonymous_id", anonymousId)
-    .eq("usage_date", usageDate)
-    .maybeSingle();
+  const guestPlan = getEntitlementPlan("guest");
 
-  const usageRow = (usage as UsageRow | null) ?? emptyUsage();
-  const remaining = Math.max(
-    0,
-    GUEST_DAILY_CLEAN_EXPORT_LIMIT - usageRow.clean_exports_used,
-  );
-  const plan = getEntitlementPlan("guest");
+  if (!isAnonymousId(anonymousId)) {
+    return createResponse(request, {
+      identityType: "guest",
+      tier: "guest",
+      ...toExportStatusFields(
+        evaluateExportAllowance({
+          now: Date.now(),
+          state: { burst: null, daily: null },
+          allowance: GUEST_EXPORT_ALLOWANCE,
+        }),
+      ),
+      watermarkedExportsUsed: 0,
+      blockedExportsCount: 0,
+      isUnlimited: false,
+      planLabel: guestPlan.label,
+    });
+  }
+
+  const networkId = getNetworkIdentity(request, getNetworkIdentitySecret());
+  const { row, status } = await readGuestExportAllowance({
+    store: createSupabaseUsageWindowStore(),
+    guest: { userId: null, anonymousId },
+    network: networkId ? { userId: null, anonymousId: networkId } : null,
+    allowance: GUEST_EXPORT_ALLOWANCE,
+  });
 
   return createResponse(
     request,
     {
       identityType: "guest",
       tier: "guest",
-      dailyCleanExportLimit: GUEST_DAILY_CLEAN_EXPORT_LIMIT,
-      cleanExportsUsed: usageRow.clean_exports_used,
-      cleanExportsRemaining: remaining,
-      watermarkedExportsUsed: usageRow.watermarked_exports_used,
-      blockedExportsCount: usageRow.blocked_exports_count,
-      canExportClean: remaining > 0,
+      ...toExportStatusFields(status),
+      watermarkedExportsUsed: row?.watermarked_exports_used ?? 0,
+      blockedExportsCount: row?.blocked_exports_count ?? 0,
       isUnlimited: false,
-      planLabel: plan.label,
+      planLabel: guestPlan.label,
     },
     {
       setAnonymousIdentity: anonymousId,

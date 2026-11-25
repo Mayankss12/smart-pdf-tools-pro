@@ -9,7 +9,7 @@ import {
   createNoStoreHeaders,
   isSameSiteStateChangingRequest,
 } from "@/lib/api-security";
-import { getDailyCleanExportLimit } from "@/lib/entitlements";
+import { getCleanExportLimit } from "@/lib/entitlements";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -200,7 +200,7 @@ export async function POST(request: Request) {
     ) {
       updates.daily_export_limit = dailyLimit;
     } else if (tierChanged && tier !== undefined && body.dailyExportLimit === undefined) {
-      updates.daily_export_limit = getDailyCleanExportLimit(tier);
+      updates.daily_export_limit = getCleanExportLimit(tier);
     }
 
     if (Object.keys(updates).length === 0) {

@@ -32,7 +32,7 @@ assert.match(overviewSource, /from\("tool_runs"\)/);
 assert.match(usersSource, /isSameSiteStateChangingRequest\(request\)/);
 assert.match(usersSource, /normalizeLimit\(body\.dailyExportLimit\)/);
 assert.match(usersSource, /Your own administrator tier or expiry cannot be changed here/);
-assert.match(usersSource, /getDailyCleanExportLimit\(tier\)/);
+assert.match(usersSource, /getCleanExportLimit\(tier\)/);
 assert.match(usersSource, /beginAdminProfileAudit\(admin,/);
 assert.match(usersSource, /completeAdminProfileAudit\(admin,/);
 assert.match(usersSource, /Administrator audit log is unavailable\. No change was applied\./);

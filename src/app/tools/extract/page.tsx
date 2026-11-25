@@ -23,6 +23,7 @@ import { ToolHero } from "@/components/tool-kit/ToolHero";
 import { ToolLandingState } from "@/components/tool-kit/ToolLandingState";
 import { ToolToolbar } from "@/components/tool-kit/ToolToolbar";
 import { useEntitlement } from "@/hooks/useEntitlement";
+import { getExportDenialMessage } from "@/lib/export-entitlement";
 import { usePdfPages } from "@/hooks/usePdfPages";
 import { useRangeSelection } from "@/hooks/useRangeSelection";
 import {
@@ -253,10 +254,7 @@ export default function ExtractPagesPage() {
         setResult(null);
 
         const limitMessage =
-          exportRecord.error ||
-          (exportRecord.identityType === "guest"
-            ? "Guest clean export limit reached for today. Sign in to get 5 clean exports/day."
-            : `${exportRecord.planLabel} clean export limit reached for today.`);
+          getExportDenialMessage(exportRecord);
 
         setStatus(limitMessage);
         return;

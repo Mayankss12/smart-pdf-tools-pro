@@ -1,6 +1,13 @@
 import type {
   RecordExportResult,
 } from "@/hooks/useEntitlement";
+import {
+  ACCOUNT_EXPORT_ALLOWANCE,
+  formatCooldown,
+} from "@/lib/export-limits";
+
+const ACCOUNT_DAILY_LIMIT = ACCOUNT_EXPORT_ALLOWANCE.daily.limit;
+const ACCOUNT_DAILY_HOURS = ACCOUNT_EXPORT_ALLOWANCE.daily.windowHours;
 
 export type ExportRecorder = (input: {
   readonly toolKey: string;
@@ -21,14 +28,39 @@ export type PreparedExportResult<T> =
       readonly message: string;
     };
 
-export function getExportDenialMessage(result: RecordExportResult) {
+export function getExportDenialMessage(
+  result: RecordExportResult,
+  now: number = Date.now(),
+) {
   if (result.error) return result.error;
 
-  if (result.identityType === "guest") {
-    return "Guest clean export limit reached for today. Sign in to get 5 clean exports/day.";
+  if (result.cleanExportLimit <= 0) {
+    return "Exports are turned off for this account. Contact support if this looks wrong.";
   }
 
-  return `${result.planLabel} clean export limit reached for today.`;
+  const wait = formatCooldown(
+    result.nextExportAt ?? result.burstResetsAt ?? result.windowResetsAt,
+    now,
+  );
+  const guest = result.identityType === "guest";
+  const signUp = guest
+    ? ` Sign up free to get ${ACCOUNT_DAILY_LIMIT} exports every ${ACCOUNT_DAILY_HOURS} hours.`
+    : "";
+
+  if (result.blockedBy === "network") {
+    return `Too many exports have been made from your network. ${wait ? `Try again in ${wait}` : "Try again later"}${guest ? ", or sign in to keep going" : ""}.`;
+  }
+
+  if (result.blockedBy === "daily") {
+    const label = guest ? "free exports" : "exports";
+    return `You have used all ${result.cleanExportLimit} ${label} for ${result.exportWindowHours} hours. ${wait ? `You can export again in ${wait}.` : "Try again later."}${signUp}`;
+  }
+
+  if (result.blockedBy === "burst") {
+    return `You have used ${result.burstLimit} exports in a row, so there is a ${result.burstWindowHours}-hour break. ${wait ? `You can export again in ${wait}.` : "Try again later."}${signUp}`;
+  }
+
+  return "Export limit reached. Try again later.";
 }
 
 export async function prepareEntitledExport<T>({

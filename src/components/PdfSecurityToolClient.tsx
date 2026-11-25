@@ -26,6 +26,7 @@ import {
 
 import { Header } from "@/components/Header";
 import { useEntitlement } from "@/hooks/useEntitlement";
+import { getExportDenialMessage } from "@/lib/export-entitlement";
 import { usePdfSecurity } from "@/hooks/usePdfSecurity";
 import { readValidatedPdfBytes } from "@/lib/pdf-document-safety";
 import { downloadBlob, formatFileSize } from "@/lib/pdf-engine";
@@ -253,10 +254,7 @@ export function PdfSecurityToolClient({ mode }: PdfSecurityToolClientProps) {
       });
 
       if (!entitlement.allowed) {
-        setStatus(
-          entitlement.error ||
-            `${entitlement.planLabel} clean export limit reached for today.`,
-        );
+        setStatus(getExportDenialMessage(entitlement));
         setStatusKind("error");
         return;
       }
