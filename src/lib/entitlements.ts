@@ -1,9 +1,18 @@
+import {
+  ACCOUNT_EXPORT_ALLOWANCE,
+  GUEST_EXPORT_ALLOWANCE,
+} from "./export-limits";
+
 export type UserTier = "guest" | "free" | "plus" | "pro" | "admin";
 
 export type EntitlementPlan = {
   tier: UserTier;
   label: string;
-  dailyCleanExportLimit: number;
+  // Clean exports allowed per 24 hours. Paid tiers use a very large number.
+  // The 5-per-5-hours burst limit is shared by guest and free (see export-limits).
+  cleanExportLimit: number;
+  // Length of that window in hours; 0 when the tier has no window.
+  exportWindowHours: number;
   maxFileSizeMb: number;
   maxPagesPerFile: number;
   canExportClean: boolean;
@@ -18,7 +27,8 @@ export const PDFMANTRA_TIERS: Record<UserTier, EntitlementPlan> = {
   guest: {
     tier: "guest",
     label: "Guest",
-    dailyCleanExportLimit: 1,
+    cleanExportLimit: GUEST_EXPORT_ALLOWANCE.daily.limit,
+    exportWindowHours: GUEST_EXPORT_ALLOWANCE.daily.windowHours,
     maxFileSizeMb: 50,
     maxPagesPerFile: 50,
     canExportClean: true,
@@ -32,7 +42,8 @@ export const PDFMANTRA_TIERS: Record<UserTier, EntitlementPlan> = {
   free: {
     tier: "free",
     label: "Free",
-    dailyCleanExportLimit: 5,
+    cleanExportLimit: ACCOUNT_EXPORT_ALLOWANCE.daily.limit,
+    exportWindowHours: ACCOUNT_EXPORT_ALLOWANCE.daily.windowHours,
     maxFileSizeMb: 100,
     maxPagesPerFile: 100,
     canExportClean: true,
@@ -46,7 +57,8 @@ export const PDFMANTRA_TIERS: Record<UserTier, EntitlementPlan> = {
   plus: {
     tier: "plus",
     label: "PDFMantra Plus",
-    dailyCleanExportLimit: 999999,
+    cleanExportLimit: 999999,
+    exportWindowHours: 0,
     maxFileSizeMb: 500,
     maxPagesPerFile: 500,
     canExportClean: true,
@@ -60,7 +72,8 @@ export const PDFMANTRA_TIERS: Record<UserTier, EntitlementPlan> = {
   pro: {
     tier: "pro",
     label: "PDFMantra Pro",
-    dailyCleanExportLimit: 999999,
+    cleanExportLimit: 999999,
+    exportWindowHours: 0,
     maxFileSizeMb: 1024,
     maxPagesPerFile: 1000,
     canExportClean: true,
@@ -74,7 +87,8 @@ export const PDFMANTRA_TIERS: Record<UserTier, EntitlementPlan> = {
   admin: {
     tier: "admin",
     label: "Admin",
-    dailyCleanExportLimit: 999999,
+    cleanExportLimit: 999999,
+    exportWindowHours: 0,
     maxFileSizeMb: 2048,
     maxPagesPerFile: 2000,
     canExportClean: true,
@@ -192,8 +206,8 @@ export function isUnlimitedPlan(tier: string | null | undefined) {
   );
 }
 
-export function getDailyCleanExportLimit(tier: string | null | undefined) {
-  return getEntitlementPlan(tier).dailyCleanExportLimit;
+export function getCleanExportLimit(tier: string | null | undefined) {
+  return getEntitlementPlan(tier).cleanExportLimit;
 }
 
 function includesToolKey(keys: readonly string[], toolKey: string) {

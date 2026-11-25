@@ -5,6 +5,7 @@ import { AlertTriangle, ChevronLeft, ChevronRight, Download, EyeOff, Loader2, Ro
 
 import { Header } from "@/components/Header";
 import { useEntitlement } from "@/hooks/useEntitlement";
+import { getExportDenialMessage } from "@/lib/export-entitlement";
 import { readValidatedPdfBytes } from "@/lib/pdf-document-safety";
 import { downloadBlob, formatFileSize, validatePdfFile } from "@/lib/pdf-engine";
 import { loadRedactionPreview, permanentlyRedactPdf } from "@/lib/pdf-redaction-client";
@@ -78,7 +79,7 @@ export function PdfRedactToolClient() {
     try {
       const output = await permanentlyRedactPdf({ input: bytes, areas, onProgress: (value, message) => { setProgress(value); setStatus(message); } });
       const entitlement = await recordExport({ toolKey: "redact", exportKind: "clean" });
-      if (!entitlement.allowed) throw new Error(entitlement.error || "Export limit reached.");
+      if (!entitlement.allowed) throw new Error(getExportDenialMessage(entitlement));
       downloadBlob(new Blob([output as BlobPart], { type: "application/pdf" }), stageOneOutputName("redacted", file.name));
       setProgress(100); setStatus("Redacted PDF flattened, verified, and downloaded.");
     } catch (reason) { setError(true); setStatus(reason instanceof Error ? reason.message : "Redaction failed."); }

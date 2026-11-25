@@ -6,6 +6,7 @@ import * as pdfjsLib from "pdfjs-dist";
 
 import { Header } from "@/components/Header";
 import { useEntitlement } from "@/hooks/useEntitlement";
+import { getExportDenialMessage } from "@/lib/export-entitlement";
 import { createZipBlob } from "@/lib/browser-zip";
 import { readValidatedPdfBytes } from "@/lib/pdf-document-safety";
 import { downloadBlob, formatFileSize, safeFileBaseName, validatePdfFile } from "@/lib/pdf-engine";
@@ -77,7 +78,7 @@ export function AdvancedSplitToolClient() {
       if (mode === "size") { setStatus("Grouping pages by approximate output size…"); outputs = await splitPdfByApproximateSize(bytes, targetMb * 1024 * 1024); }
       else { setStatus(mode === "bookmark" ? "Resolving bookmark destinations…" : "Searching selectable page text…"); const starts = mode === "bookmark" ? await bookmarkStartPages(bytes) : await textStartPages(bytes, query); outputs = await splitPdfAtPages(bytes, starts); }
       const entitlement = await recordExport({ toolKey: "advanced-split", exportKind: "clean" });
-      if (!entitlement.allowed) throw new Error(entitlement.error || "Export limit reached.");
+      if (!entitlement.allowed) throw new Error(getExportDenialMessage(entitlement));
       const base = safeFileBaseName(file.name);
       if (outputs.length === 1) downloadBlob(new Blob([outputs[0] as BlobPart], { type: "application/pdf" }), `${base}-part-1.pdf`);
       else {

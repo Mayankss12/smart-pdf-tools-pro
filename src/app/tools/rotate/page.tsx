@@ -29,6 +29,7 @@ import {
 import { Header } from "@/components/Header";
 import { PageGrid } from "@/components/tool-kit/PageGrid";
 import { useEntitlement } from "@/hooks/useEntitlement";
+import { getExportDenialMessage } from "@/lib/export-entitlement";
 import { usePdfPages } from "@/hooks/usePdfPages";
 import { useRangeSelection } from "@/hooks/useRangeSelection";
 import {
@@ -432,10 +433,7 @@ export default function RotatePage() {
         setResult(null);
 
         const limitMessage =
-          exportRecord.error ||
-          (exportRecord.identityType === "guest"
-            ? "Guest clean export limit reached for today. Sign in to get 5 clean exports/day."
-            : `${exportRecord.planLabel} clean export limit reached for today.`);
+          getExportDenialMessage(exportRecord);
 
         setStatus(limitMessage);
         return;

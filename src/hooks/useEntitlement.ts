@@ -4,19 +4,19 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { getAnonymousId } from "@/lib/anonymous-identity";
 import { getEntitlementPlan, type UserTier } from "@/lib/entitlements";
+import {
+  EXPORT_BURST,
+} from "@/lib/export-limits";
+import type { ExportStatusFields } from "@/lib/export-status";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export type ExportKind = "clean" | "watermarked" | "blocked";
 
-export type EntitlementStatus = {
+export type EntitlementStatus = ExportStatusFields & {
   identityType: "guest" | "user";
   tier: UserTier;
-  dailyCleanExportLimit: number;
-  cleanExportsUsed: number;
-  cleanExportsRemaining: number;
   watermarkedExportsUsed: number;
   blockedExportsCount: number;
-  canExportClean: boolean;
   isUnlimited: boolean;
   planLabel: string;
 };
@@ -38,9 +38,17 @@ const guestPlan = getEntitlementPlan("guest");
 const DEFAULT_STATUS: EntitlementStatus = {
   identityType: "guest",
   tier: "guest",
-  dailyCleanExportLimit: 1,
+  cleanExportLimit: guestPlan.cleanExportLimit,
+  exportWindowHours: guestPlan.exportWindowHours,
   cleanExportsUsed: 0,
-  cleanExportsRemaining: 1,
+  cleanExportsRemaining: guestPlan.cleanExportLimit,
+  windowResetsAt: null,
+  burstLimit: EXPORT_BURST.limit,
+  burstWindowHours: EXPORT_BURST.windowHours,
+  burstRemaining: EXPORT_BURST.limit,
+  burstResetsAt: null,
+  blockedBy: null,
+  nextExportAt: null,
   watermarkedExportsUsed: 0,
   blockedExportsCount: 0,
   canExportClean: true,
@@ -173,20 +181,17 @@ export function useEntitlement() {
           throw new Error("Unable to record export usage.");
         }
 
+        // Error responses carry no status, so keep the last known one.
+        const nextStatus: Partial<RecordExportResult> = { ...payload };
+        delete nextStatus.allowed;
+        delete nextStatus.exportKind;
+        delete nextStatus.error;
+
         setState((current) => ({
           ...current,
-          status: {
-            identityType: payload.identityType,
-            tier: payload.tier,
-            dailyCleanExportLimit: payload.dailyCleanExportLimit,
-            cleanExportsUsed: payload.cleanExportsUsed,
-            cleanExportsRemaining: payload.cleanExportsRemaining,
-            watermarkedExportsUsed: payload.watermarkedExportsUsed,
-            blockedExportsCount: payload.blockedExportsCount,
-            canExportClean: payload.canExportClean,
-            isUnlimited: payload.isUnlimited,
-            planLabel: payload.planLabel,
-          },
+          status: payload.identityType
+            ? (nextStatus as EntitlementStatus)
+            : current.status,
           error: payload.error ?? null,
         }));
 

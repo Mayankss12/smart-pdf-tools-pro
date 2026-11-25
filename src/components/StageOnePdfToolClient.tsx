@@ -17,6 +17,7 @@ import {
 
 import { Header } from "@/components/Header";
 import { useEntitlement } from "@/hooks/useEntitlement";
+import { getExportDenialMessage } from "@/lib/export-entitlement";
 import { readValidatedPdfBytes } from "@/lib/pdf-document-safety";
 import { downloadBlob, formatFileSize, validatePdfFile } from "@/lib/pdf-engine";
 import {
@@ -181,7 +182,7 @@ export function StageOnePdfToolClient({ mode }: { readonly mode: StageOneSimpleM
       setProgress(88);
       setStatus("Checking export allowance…");
       const entitlement = await recordExport({ toolKey: mode, exportKind: "clean" });
-      if (!entitlement.allowed) throw new Error(entitlement.error || "Export limit reached.");
+      if (!entitlement.allowed) throw new Error(getExportDenialMessage(entitlement));
       downloadBlob(new Blob([output as BlobPart], { type: "application/pdf" }), stageOneOutputName(copy.output, file.name));
       setProgress(100);
       setKind("success");
