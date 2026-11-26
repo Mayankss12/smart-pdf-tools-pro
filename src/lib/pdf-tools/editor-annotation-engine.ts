@@ -13,6 +13,7 @@ import {
   type PDFPage,
 } from "pdf-lib";
 
+import { pdfLiteralString } from "../pdf-string";
 import {
   getEditorPageGeometry,
   getViewportToPdfMatrix,
@@ -296,7 +297,7 @@ export async function appendEditorMarkupAnnotation({
     Subtype: subtype,
     Rect: [...getPdfRect(bounds, mapPoint)],
     F: PRINT_FLAG,
-    NM: PDFString.of(id),
+    NM: pdfLiteralString(id),
     T: PDFHexString.fromText(ANNOTATION_AUTHOR),
     M: PDFString.fromDate(new Date()),
     P: page.ref,

@@ -1,4 +1,5 @@
-import { PDFDocument, PDFString, rgb, type PDFPage } from "pdf-lib";
+import { PDFDocument, rgb, type PDFPage } from "pdf-lib";
+import { pdfLiteralString } from "../pdf-string";
 import type { ExistingTextEditSource } from "../editor/existing-text-edit";
 import type { BundledUnicodeFontBytes } from "../pdf-unicode-fonts";
 import type { OcrResult } from "../pdf-ocr-engine";
@@ -281,14 +282,14 @@ function getMarkupAnnotationSpec(
   }
 
   if (object.type === "note") {
-    const fontSize = object.data.fontSize ?? 14;
+    const fontSize = Number.isFinite(object.data.fontSize) ? Number(object.data.fontSize) : 14;
     return {
       subtype: "FreeText",
       padding: 1,
       entries: () => ({
         Contents: toEditorAnnotationText(object.data.text ?? ""),
         C: toEditorAnnotationColor(object.data.backgroundColor, DEFAULT_NOTE_COLOR),
-        DA: PDFString.of(`/Helv ${fontSize} Tf 0 g`),
+        DA: pdfLiteralString(`/Helv ${fontSize} Tf 0 g`),
       }),
     };
   }
